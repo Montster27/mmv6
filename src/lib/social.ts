@@ -51,16 +51,28 @@ function toVectors(raw: DailyState["vectors"]) {
   return {};
 }
 
+// Boosts are limited to one send per UTC day; use created_at to enforce.
+function getUtcDayRange(date = new Date()) {
+  const start = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+}
+
 async function getExistingBoost(
   fromUserId: string,
-  dayValue: string
+  start: Date,
+  end: Date
 ): Promise<{ id: string; payload: any } | null> {
   const { data, error } = await supabase
     .from("social_actions")
     .select("id,payload")
     .eq("from_user_id", fromUserId)
     .eq("action_type", "boost")
-    .eq("payload->>day_index", dayValue)
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString())
     .limit(1)
     .maybeSingle();
 
@@ -91,12 +103,9 @@ export async function fetchPublicProfiles(
 
 export async function fetchTodayReceivedBoosts(
   userId: string,
-  dayIndex: number
+  _dayIndex: number
 ): Promise<ReceivedBoost[]> {
-  const today = new Date();
-  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
+  const { start, end } = getUtcDayRange();
 
   const { data, error } = await supabase
     .from("social_actions")
@@ -122,15 +131,16 @@ export async function fetchTodayReceivedBoosts(
 
 export async function hasSentBoostToday(
   userId: string,
-  dayIndex: number
+  _dayIndex: number
 ): Promise<boolean> {
-  const dayValue = dayIndex.toString();
+  const { start, end } = getUtcDayRange();
   const { data, error } = await supabase
     .from("social_actions")
     .select("id")
     .eq("from_user_id", userId)
     .eq("action_type", "boost")
-    .eq("payload->>day_index", dayValue)
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString())
     .limit(1);
 
   if (error) {
@@ -207,8 +217,8 @@ export async function sendBoost(
   toUserId: string,
   dayIndex: number
 ): Promise<void> {
-  const dayValue = dayIndex.toString();
-  const existing = await getExistingBoost(fromUserId, dayValue);
+  const { start, end } = getUtcDayRange();
+  const existing = await getExistingBoost(fromUserId, start, end);
   if (existing) {
     if ((existing.payload as any)?.effects_applied) {
       throw new Error("Boost already sent for today.");
@@ -232,7 +242,7 @@ export async function sendBoost(
     console.error("Failed to send boost", error);
 
     // In case of a race, recheck; if it now exists, treat as success.
-    const existsAfterError = await getExistingBoost(fromUserId, dayValue);
+    const existsAfterError = await getExistingBoost(fromUserId, start, end);
     if (existsAfterError) return;
 
     throw error;

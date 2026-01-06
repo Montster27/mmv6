@@ -95,15 +95,21 @@ export default function LoginPage() {
 
               const displayName = email || `Player-${user.id.slice(0, 6)}`;
 
-              await supabase
+              const { error: profileError } = await supabase
                 .from("profiles")
                 .upsert({ id: user.id, email }, { onConflict: "id" });
-              await supabase
+              if (profileError) {
+                throw profileError;
+              }
+              const { error: publicProfileError } = await supabase
                 .from("public_profiles")
                 .upsert(
                   { user_id: user.id, display_name: displayName },
                   { onConflict: "user_id" }
                 );
+              if (publicProfileError) {
+                throw publicProfileError;
+              }
 
               setDevMessage(
                 `Signed in as ${displayName} (${user.id.slice(0, 6)}…)`

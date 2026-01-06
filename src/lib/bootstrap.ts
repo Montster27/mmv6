@@ -17,9 +17,12 @@ export async function ensurePlayerSetup(): Promise<EnsureResult> {
   const displayName = `Player-${userId.slice(0, 6)}`;
 
   // Ensure profile
-  await supabase
+  const { error: profileError } = await supabase
     .from("profiles")
     .upsert({ id: userId, email }, { onConflict: "id" });
+  if (profileError) {
+    throw profileError;
+  }
 
   // Ensure character
   const { data: characterExisting } = await supabase
@@ -30,10 +33,21 @@ export async function ensurePlayerSetup(): Promise<EnsureResult> {
     .maybeSingle();
 
   if (!characterExisting) {
-    await supabase.from("characters").insert({
+    const { error: characterError } = await supabase.from("characters").insert({
       user_id: userId,
       name: null,
     });
+    if (characterError) {
+      const { data: characterRetry } = await supabase
+        .from("characters")
+        .select("id")
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+      if (!characterRetry) {
+        throw characterError;
+      }
+    }
   }
 
   // Ensure daily_state
@@ -45,9 +59,20 @@ export async function ensurePlayerSetup(): Promise<EnsureResult> {
     .maybeSingle();
 
   if (!dailyExisting) {
-    await supabase.from("daily_states").insert({
+    const { error: dailyError } = await supabase.from("daily_states").insert({
       user_id: userId,
     });
+    if (dailyError) {
+      const { data: dailyRetry } = await supabase
+        .from("daily_states")
+        .select("id")
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+      if (!dailyRetry) {
+        throw dailyError;
+      }
+    }
   }
 
   // Ensure public profile (do not overwrite if exists)
@@ -59,10 +84,23 @@ export async function ensurePlayerSetup(): Promise<EnsureResult> {
     .maybeSingle();
 
   if (!publicProfileExisting) {
-    await supabase.from("public_profiles").insert({
+    const { error: publicProfileError } = await supabase
+      .from("public_profiles")
+      .insert({
       user_id: userId,
       display_name: displayName,
     });
+    if (publicProfileError) {
+      const { data: publicProfileRetry } = await supabase
+        .from("public_profiles")
+        .select("user_id")
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+      if (!publicProfileRetry) {
+        throw publicProfileError;
+      }
+    }
   }
 
   return { userId };

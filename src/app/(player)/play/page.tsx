@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth";
 import { ensurePlayerSetup } from "@/lib/bootstrap";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
+import { trackEvent } from "@/lib/events";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 import {
   createStoryletRun,
@@ -74,11 +75,27 @@ export default function PlayPage() {
   } | null>(null);
   const [boostMessage, setBoostMessage] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+  const sessionStartTracked = useRef(false);
+  const sessionEndTracked = useRef(false);
+  const stageRef = useRef<DailyRunStage | null>(null);
+  const stageStartedAtRef = useRef<number | null>(null);
+  const latestStageRef = useRef<DailyRunStage | null>(null);
+  const latestDayIndexRef = useRef<number | null>(null);
 
   const dayIndex = useMemo(
     () => dailyState?.day_index ?? dayIndexState,
     [dailyState?.day_index, dayIndexState]
   );
+
+  useEffect(() => {
+    latestStageRef.current = stage;
+  }, [stage]);
+
+  useEffect(() => {
+    if (Number.isFinite(dayIndex)) {
+      latestDayIndexRef.current = dayIndex;
+    }
+  }, [dayIndex]);
 
   useEffect(() => {
     const init = async () => {
@@ -162,6 +179,61 @@ export default function PlayPage() {
 
     init();
   }, []);
+
+  useEffect(() => {
+    if (!userId || loading || sessionStartTracked.current) return;
+    sessionStartTracked.current = true;
+    trackEvent({ event_type: "session_start", day_index: dayIndex, stage });
+  }, [userId, dayIndex, stage, loading]);
+
+  useEffect(() => {
+    if (!userId || loading) return;
+    const now = Date.now();
+    const previousStage = stageRef.current;
+
+    if (!previousStage) {
+      stageRef.current = stage;
+      stageStartedAtRef.current = now;
+      trackEvent({ event_type: "stage_enter", day_index: dayIndex, stage });
+      return;
+    }
+
+    if (previousStage === stage) {
+      return;
+    }
+
+    const startedAt = stageStartedAtRef.current;
+    if (startedAt) {
+      trackEvent({
+        event_type: "stage_complete",
+        day_index: dayIndex,
+        stage: previousStage,
+        payload: { duration_ms: now - startedAt },
+      });
+    }
+
+    stageRef.current = stage;
+    stageStartedAtRef.current = now;
+    trackEvent({ event_type: "stage_enter", day_index: dayIndex, stage });
+
+    if (stage === "complete" && !sessionEndTracked.current) {
+      sessionEndTracked.current = true;
+      trackEvent({ event_type: "session_end", day_index: dayIndex, stage });
+    }
+  }, [stage, userId, dayIndex, loading]);
+
+  useEffect(() => {
+    return () => {
+      if (!userId || sessionEndTracked.current) return;
+      sessionEndTracked.current = true;
+      trackEvent({
+        event_type: "session_end",
+        day_index: latestDayIndexRef.current ?? undefined,
+        stage: latestStageRef.current ?? undefined,
+        payload: { reason: "unmount" },
+      });
+    };
+  }, [userId]);
 
   const totalAllocation = useMemo(
     () =>
@@ -351,6 +423,11 @@ export default function PlayPage() {
     try {
       if (response === "skip") {
         await upsertReflection(userId, dayIndex, { skipped: true, response: null });
+        trackEvent({
+          event_type: "reflection_skip",
+          day_index: dayIndex,
+          stage: "reflection",
+        });
       } else {
         await upsertReflection(userId, dayIndex, {
           response,
@@ -383,6 +460,8 @@ export default function PlayPage() {
       markCompleteIfNeeded();
     }
   }, [stage, alreadyCompletedToday, userId, dayIndex]);
+
+  // TODO: add micro-task skip tracking when the micro-task stage exists.
 
   return (
     <AuthGate>
