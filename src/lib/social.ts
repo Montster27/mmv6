@@ -93,12 +93,18 @@ export async function fetchTodayReceivedBoosts(
   userId: string,
   dayIndex: number
 ): Promise<ReceivedBoost[]> {
+  const today = new Date();
+  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+
   const { data, error } = await supabase
     .from("social_actions")
     .select("from_user_id,created_at,payload")
     .eq("to_user_id", userId)
     .eq("action_type", "boost")
-    .eq("payload->>day_index", dayIndex.toString())
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString())
     .order("created_at", { ascending: true });
 
   if (error) {
