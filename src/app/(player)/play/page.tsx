@@ -29,7 +29,9 @@ import {
   type PublicProfile,
   type ReceivedBoost,
 } from "@/lib/social";
+import { upsertReflection } from "@/lib/reflections";
 import type { DailyRunStage } from "@/types/dailyRun";
+import type { ReflectionResponse } from "@/types/reflections";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { ProgressPanel } from "@/components/ProgressPanel";
 
@@ -71,6 +73,7 @@ export default function PlayPage() {
     vectors?: Record<string, number>;
   } | null>(null);
   const [boostMessage, setBoostMessage] = useState<string | null>(null);
+  const [reflectionSaving, setReflectionSaving] = useState(false);
 
   const dayIndex = useMemo(
     () => dailyState?.day_index ?? dayIndexState,
@@ -318,8 +321,6 @@ export default function PlayPage() {
       if (refreshed) {
         setDailyState(refreshed);
         setOutcomeDeltas({
-          energy: 1,
-          stress: -2,
           vectors: { social: 1 },
         });
       }
@@ -343,17 +344,37 @@ export default function PlayPage() {
     }
   };
 
+  const handleReflection = async (response: ReflectionResponse | "skip") => {
+    if (!userId) return;
+    setError(null);
+    setReflectionSaving(true);
+    try {
+      if (response === "skip") {
+        await upsertReflection(userId, dayIndex, { skipped: true, response: null });
+      } else {
+        await upsertReflection(userId, dayIndex, {
+          response,
+          skipped: false,
+        });
+      }
+      setStage("complete");
+      setBoostMessage("Thanks — see you tomorrow.");
+    } catch (e) {
+      console.error(e);
+      setError("Failed to save reflection.");
+    } finally {
+      setReflectionSaving(false);
+    }
+  };
+
   useEffect(() => {
     const markCompleteIfNeeded = async () => {
       if (!userId) return;
-      if (!(stage === "reflection" || stage === "complete")) return;
+      if (stage !== "complete") return;
       if (alreadyCompletedToday) return;
       try {
         await markDailyComplete(userId, dayIndex);
         setAlreadyCompletedToday(true);
-        if (stage === "reflection") {
-          setStage("complete");
-        }
       } catch (e) {
         console.error("Failed to mark daily complete", e);
       }
@@ -627,14 +648,48 @@ export default function PlayPage() {
                     </section>
                   )}
 
-                  {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && (
-                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                      <h2 className="text-xl font-semibold">Reflection</h2>
-                      <p className="text-slate-700">
-                        Daily complete. Reflection coming soon.
-                      </p>
-                    </section>
-                  )}
+              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && (
+                <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                  <h2 className="text-xl font-semibold">Reflection</h2>
+                  <p className="text-slate-700">
+                    Did you know what to do today?
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      disabled={reflectionSaving}
+                      onClick={() => handleReflection("yes")}
+                    >
+                      Yes
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={reflectionSaving}
+                      onClick={() => handleReflection("mostly")}
+                    >
+                      Mostly
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={reflectionSaving}
+                      onClick={() => handleReflection("no")}
+                    >
+                      No
+                    </Button>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    disabled={reflectionSaving}
+                    onClick={() => handleReflection("skip")}
+                    className="px-0 text-sm text-slate-700"
+                  >
+                    Skip for today
+                  </Button>
+                  <p className="text-sm text-slate-600">
+                    Thanks — see you tomorrow.
+                  </p>
+                </section>
+              )}
                 </>
               )}
             </div>

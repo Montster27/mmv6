@@ -7,6 +7,7 @@ import {
   fetchRecentStoryletRuns,
 } from "@/lib/play";
 import { hasSentBoostToday } from "@/lib/social";
+import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
@@ -22,13 +23,15 @@ function computeStage(
   runsForPairCount: number,
   alreadyCompletedToday: boolean,
   canBoost: boolean,
-  hasStorylets: boolean
+  hasStorylets: boolean,
+  reflectionDone: boolean
 ): DailyRunStage {
   if (!hasStorylets) return "complete";
   if (alreadyCompletedToday) return "complete";
   if (!allocationPresent) return "allocation";
   if (runsForPairCount === 0) return "storylet_1";
   if (runsForPairCount === 1) return "storylet_2";
+  if (runsForPairCount >= 2 && reflectionDone) return "complete";
   if (runsForPairCount >= 2 && canBoost) return "social";
   if (runsForPairCount >= 2 && !canBoost) return "reflection";
   return "complete";
@@ -73,6 +76,9 @@ export async function getOrCreateDailyRun(
     recentRuns,
   });
 
+  const reflection = await getReflection(userId, dayIndex);
+  const reflectionDone = isReflectionDone(reflection);
+
   const storylets =
     storyletsSelected.length > 0
       ? storyletsSelected
@@ -85,7 +91,8 @@ export async function getOrCreateDailyRun(
     runsForPair.length,
     cadence.alreadyCompletedToday,
     canBoost,
-    hasStorylets
+    hasStorylets,
+    reflectionDone
   );
 
   devLogStage({
@@ -93,6 +100,7 @@ export async function getOrCreateDailyRun(
     hasAllocation: Boolean(allocation),
     runsForPair: runsForPair.length,
     canBoost,
+    reflectionDone,
     stage,
   });
 
@@ -105,7 +113,7 @@ export async function getOrCreateDailyRun(
     storylets: hasStorylets ? storylets : [fallbackStorylet(), fallbackStorylet()],
     storyletRunsToday: runs,
     canBoost,
-    reflectionStatus: stage === "reflection" || stage === "complete" ? "pending" : "pending",
+    reflectionStatus: reflectionDone ? "done" : "pending",
     microTaskStatus: "pending",
     dailyState: daily,
   };
