@@ -12,6 +12,9 @@ export type Storylet = {
   choices: StoryletChoice[];
   is_active: boolean;
   created_at?: string;
+  tags?: string[];
+  requirements?: Record<string, unknown>;
+  weight?: number;
 };
 
 export type StoryletRun = {

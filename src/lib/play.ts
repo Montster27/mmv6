@@ -110,7 +110,7 @@ export async function fetchTodayStoryletCandidates(): Promise<
 > {
   const { data, error } = await supabase
     .from("storylets")
-    .select("id,slug,title,body,choices,is_active,created_at")
+    .select("id,slug,title,body,choices,is_active,created_at,tags,requirements,weight")
     .eq("is_active", true)
     .order("created_at", { ascending: true })
     .limit(20);
@@ -189,6 +189,28 @@ export async function createStoryletRun(
   }
 
   return null;
+}
+
+export async function fetchRecentStoryletRuns(
+  userId: string,
+  dayIndex: number,
+  daysBack: number
+): Promise<StoryletRun[]> {
+  const fromDay = dayIndex - daysBack;
+  const { data, error } = await supabase
+    .from("storylet_runs")
+    .select("id,user_id,storylet_id,day_index,choice_id,created_at")
+    .eq("user_id", userId)
+    .gte("day_index", fromDay)
+    .order("day_index", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Failed to fetch recent storylet runs", error);
+    return [];
+  }
+
+  return data ?? [];
 }
 
 export async function markDailyComplete(

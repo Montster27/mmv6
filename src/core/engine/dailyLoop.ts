@@ -4,20 +4,13 @@ import {
   fetchTimeAllocation,
   fetchTodayRuns,
   fetchTodayStoryletCandidates,
+  fetchRecentStoryletRuns,
 } from "@/lib/play";
 import { hasSentBoostToday } from "@/lib/social";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
+import { selectStorylets } from "@/core/storylets/selectStorylets";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { Storylet, StoryletRun } from "@/types/storylets";
-
-function selectTwoStorylets(storylets: Storylet[], dayIndex: number): Storylet[] {
-  if (storylets.length === 0) return [];
-  const sorted = [...storylets]; // already sorted by created_at asc upstream
-  const start = (dayIndex * 2) % sorted.length;
-  const first = sorted[start];
-  const second = sorted[(start + 1) % sorted.length] ?? first;
-  return [first ?? fallbackStorylet(), second ?? fallbackStorylet()];
-}
 
 function runsForTodayPair(runs: StoryletRun[], storyletPair: Storylet[]): StoryletRun[] {
   const ids = new Set(storyletPair.map((s) => s.id));
@@ -66,9 +59,24 @@ export async function getOrCreateDailyRun(
     fetchTodayRuns(userId, dayIndex),
     fetchTodayStoryletCandidates(),
     hasSentBoostToday(userId, dayIndex),
+    // Note: we fetch recent history separately below.
   ]);
 
-  const storylets = selectTwoStorylets(storyletsRaw, dayIndex);
+  const recentRuns =
+    (await fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => [])) ?? [];
+
+  const storyletsSelected = selectStorylets({
+    seed: `${userId}-${dayIndex}`,
+    dayIndex,
+    dailyState: daily ?? null,
+    allStorylets: storyletsRaw,
+    recentRuns,
+  });
+
+  const storylets =
+    storyletsSelected.length > 0
+      ? storyletsSelected
+      : [fallbackStorylet(), fallbackStorylet()];
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
   const canBoost = !boosted;
@@ -105,7 +113,6 @@ export async function getOrCreateDailyRun(
 
 // Export helpers for testing
 export const _testOnly = {
-  selectTwoStorylets,
   runsForTodayPair,
   computeStage,
 };

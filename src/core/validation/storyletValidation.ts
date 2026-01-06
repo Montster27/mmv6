@@ -31,6 +31,14 @@ export function coerceStoryletRow(row: any): Storylet {
     choices,
     is_active: Boolean(row?.is_active),
     created_at: isString(row?.created_at) ? row.created_at : undefined,
+    tags: Array.isArray(row?.tags)
+      ? (row.tags as unknown[]).filter((t) => typeof t === "string") as string[]
+      : [],
+    requirements:
+      row?.requirements && typeof row.requirements === "object"
+        ? (row.requirements as Record<string, unknown>)
+        : {},
+    weight: typeof row?.weight === "number" ? row.weight : 100,
   };
 }
 
