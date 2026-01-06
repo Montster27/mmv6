@@ -1,0 +1,221 @@
+Title,Body,Labels,Milestone
+A1 — Add Phase One scope guardrails,"## Description
+Add documentation and PR guardrails to prevent scope creep beyond Phase One.
+
+## Tasks
+- Create docs/PHASE_ONE.md
+- Add PR template with Phase One checkbox
+- Add docs/DECISIONS.md
+
+## Acceptance criteria
+- Phase One scope clearly documented
+- PR template enforces alignment",phase-1,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+B1 — Create baseline Supabase migrations for Phase One tables,"## Description
+Define schema, indexes, and constraints for Phase One tables.
+
+## Tasks
+- Add supabase/migrations/0001_phase_one.sql
+- Define tables used by app
+- Add indexes on user_id + day_index
+
+## Acceptance criteria
+- Fresh Supabase project boots app successfully",phase-1;db;supabase,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+B2 — Add RLS policies for Phase One tables,"## Description
+Secure data access using Supabase RLS.
+
+## Tasks
+- Enable RLS
+- Add owner read/write policies
+- Add public read where needed
+
+## Acceptance criteria
+- Users can only access their own data",phase-1;db;security,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+B3 — Add Supabase setup docs + env validation,"## Description
+Make Supabase setup reproducible for new developers.
+
+## Tasks
+- Add supabase/README.md
+- Document env vars
+- Add runtime env check
+
+## Acceptance criteria
+- New dev can run project in <15 minutes",phase-1;docs;devex,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+C1 — Define core Phase One domain types,"## Description
+Replace any/unknown with explicit domain types.
+
+## Tasks
+- Create SevenVectors type
+- Create Storylet / Outcome / DailyRun types
+- Refactor usage in engine
+
+## Acceptance criteria
+- No any in storylet flow",phase-1;types;refactor,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+C2 — Add storylet schema validation,"## Description
+Prevent invalid content from breaking play.
+
+## Tasks
+- Add validator function
+- Validate on admin save
+- Fail safe in player UI
+
+## Acceptance criteria
+- Invalid storylets cannot be saved",phase-1;quality;content-tools,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+D1 — Implement daily loop orchestrator,"## Description
+Create a single orchestrator for the daily run.
+
+## Tasks
+- Add getOrCreateDailyRun
+- Enforce 2 storylets/day
+- Integrate with play page
+
+## Acceptance criteria
+- Refresh resumes same daily run",phase-1;core-loop;engine,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+D2 — Persist and resume daily stage progress,"## Description
+Ensure daily progress survives refresh and logout.
+
+## Tasks
+- Add stage persistence
+- Resume current stage in orchestrator
+
+## Acceptance criteria
+- No duplicate storylet runs",phase-1;core-loop;db,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+E1 — Extend storylets model (tags, requirements, weight),"## Description
+Support deterministic storylet selection.
+
+## Tasks
+- Add DB columns
+- Update admin UI
+
+## Acceptance criteria
+- Storylets can be filtered and deactivated",phase-1;content-tools;db,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+E2 — Implement deterministic storylet selection,"## Description
+Select exactly two coherent storylets per day.
+
+## Tasks
+- Implement selectStorylets
+- Avoid repeats
+- Prioritize onboarding tags early
+
+## Acceptance criteria
+- Same day produces same selection",phase-1;core-loop;engine,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+F1 — Apply storylet outcomes to state,"## Description
+Choices must visibly affect player state.
+
+## Tasks
+- Add applyOutcome
+- Store outcome snapshot
+- Show consequence UI
+
+## Acceptance criteria
+- Every choice produces feedback",phase-1;engine;ui,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+F2 — Add stress + seven vectors progress panel,"## Description
+Show player progression clearly.
+
+## Tasks
+- Create ProgressPanel
+- Display stress and vectors
+- Add summary text
+
+## Acceptance criteria
+- Player understands daily change quickly",phase-1;ui;core-loop,Phase One – Milestone 1 (Daily Loop End-to-End)
+
+G1 — Enforce one boost per day,"## Description
+Limit social action to one meaningful interaction per day.
+
+## Tasks
+- Add DB constraint
+- Update UI state
+
+## Acceptance criteria
+- Second boost blocked gracefully",phase-1;social;db,Phase One – Milestone 2 (Social + Reflection + Ops)
+
+G2 — Add mutual benefit effects to boosts,"## Description
+Boosts lightly benefit both sender and receiver.
+
+## Tasks
+- Apply sender vector bump
+- Apply receiver stress relief
+
+## Acceptance criteria
+- Both users receive feedback",phase-1;social;engine,Phase One – Milestone 2 (Social + Reflection + Ops)
+
+H1 — Add daily reflection prompt,"## Description
+Capture lightweight daily reflection.
+
+## Tasks
+- Add reflections table
+- Add end-of-run prompt
+
+## Acceptance criteria
+- Reflection saved once per day",phase-1;core-loop;ui,Phase One – Milestone 2 (Social + Reflection + Ops)
+
+J1 — Admin storylet CRUD + preview,"## Description
+Enable non-dev storylet creation.
+
+## Tasks
+- Create/edit storylets
+- Add preview renderer
+
+## Acceptance criteria
+- Storylets created without code changes",phase-1;admin;content-tools,Phase One – Milestone 2 (Social + Reflection + Ops)
+
+K1 — Add Phase One event tracking,"## Description
+Track minimum metrics for Phase One evaluation.
+
+## Tasks
+- Add events table
+- Track durations and skips
+
+## Acceptance criteria
+- Completion rate calculable",phase-1;analytics;db,Phase One – Milestone 2 (Social + Reflection + Ops)
+
+K2 — Admin metrics dashboard,"## Description
+Expose Phase One metrics internally.
+
+## Tasks
+- Create /admin/metrics page
+- Show completion and retention
+
+## Acceptance criteria
+- Metrics answer Phase One questions",phase-1;analytics;admin,Phase One – Milestone 2 (Social + Reflection + Ops)
+
+I1 — Implement optional micro-task slot,"## Description
+Add a skippable 60–120s micro interaction.
+
+## Tasks
+- Add micro_task_runs table
+- Implement one task
+
+## Acceptance criteria
+- Task skippable with no penalty",phase-1;minigame;engine,Phase One – Milestone 3 (Micro-task + Tests)
+
+L1 — Unit tests for storylet selection and outcomes,"## Description
+Protect core loop logic.
+
+## Tasks
+- Test selection logic
+- Test outcome application
+
+## Acceptance criteria
+- Tests catch regressions",phase-1;testing;core-loop,Phase One – Milestone 3 (Micro-task + Tests)
+
+L2 — Integration tests for daily run lifecycle,"## Description
+Ensure daily run creation and resume works.
+
+## Tasks
+- Test first login flow
+- Test refresh resume
+
+## Acceptance criteria
+- No duplicate runs created",phase-1;testing;core-loop,Phase One – Milestone 3 (Micro-task + Tests)
