@@ -8,6 +8,7 @@ import {
 } from "@/lib/play";
 import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
+import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
@@ -24,13 +25,16 @@ function computeStage(
   alreadyCompletedToday: boolean,
   canBoost: boolean,
   hasStorylets: boolean,
-  reflectionDone: boolean
+  reflectionDone: boolean,
+  microTaskEligible: boolean,
+  microTaskDone: boolean
 ): DailyRunStage {
   if (!hasStorylets) return "complete";
   if (alreadyCompletedToday) return "complete";
   if (!allocationPresent) return "allocation";
   if (runsForPairCount === 0) return "storylet_1";
   if (runsForPairCount === 1) return "storylet_2";
+  if (runsForPairCount >= 2 && microTaskEligible && !microTaskDone) return "microtask";
   if (runsForPairCount >= 2 && reflectionDone) return "complete";
   if (runsForPairCount >= 2 && canBoost) return "social";
   if (runsForPairCount >= 2 && !canBoost) return "reflection";
@@ -78,6 +82,16 @@ export async function getOrCreateDailyRun(
 
   const reflection = await getReflection(userId, dayIndex);
   const reflectionDone = isReflectionDone(reflection);
+  const microTaskEligible = dayIndex >= 1 && dayIndex % 2 === 0;
+  const microTaskRun = microTaskEligible
+    ? await fetchMicroTaskRun(userId, dayIndex)
+    : null;
+  const microTaskStatus = microTaskRun
+    ? microTaskRun.status === "completed"
+      ? "done"
+      : "skipped"
+    : "pending";
+  const microTaskDone = Boolean(microTaskRun);
 
   const storylets =
     storyletsSelected.length > 0
@@ -92,7 +106,9 @@ export async function getOrCreateDailyRun(
     cadence.alreadyCompletedToday,
     canBoost,
     hasStorylets,
-    reflectionDone
+    reflectionDone,
+    microTaskEligible,
+    microTaskDone
   );
 
   devLogStage({
@@ -101,6 +117,8 @@ export async function getOrCreateDailyRun(
     runsForPair: runsForPair.length,
     canBoost,
     reflectionDone,
+    microTaskEligible,
+    microTaskDone,
     stage,
   });
 
@@ -114,7 +132,7 @@ export async function getOrCreateDailyRun(
     storyletRunsToday: runs,
     canBoost,
     reflectionStatus: reflectionDone ? "done" : "pending",
-    microTaskStatus: "pending",
+    microTaskStatus,
     dailyState: daily,
   };
 }

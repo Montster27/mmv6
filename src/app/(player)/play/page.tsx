@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { signOut } from "@/lib/auth";
 import { ensurePlayerSetup } from "@/lib/bootstrap";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
@@ -22,6 +23,7 @@ import {
   type AllocationPayload,
   type StoryletRun,
 } from "@/lib/play";
+import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
 import {
   fetchPublicProfiles,
   fetchTodayReceivedBoosts,
@@ -75,16 +77,24 @@ export default function PlayPage() {
   } | null>(null);
   const [boostMessage, setBoostMessage] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+  const [microTaskStatus, setMicroTaskStatus] =
+    useState<"pending" | "done" | "skipped">("pending");
+  const [microTaskSaving, setMicroTaskSaving] = useState(false);
   const sessionStartTracked = useRef(false);
   const sessionEndTracked = useRef(false);
   const stageRef = useRef<DailyRunStage | null>(null);
   const stageStartedAtRef = useRef<number | null>(null);
   const latestStageRef = useRef<DailyRunStage | null>(null);
   const latestDayIndexRef = useRef<number | null>(null);
+  const microTaskStartTracked = useRef(false);
 
   const dayIndex = useMemo(
     () => dailyState?.day_index ?? dayIndexState,
     [dailyState?.day_index, dayIndexState]
+  );
+  const microTaskEligible = useMemo(
+    () => dayIndex >= 1 && dayIndex % 2 === 0,
+    [dayIndex]
   );
 
   useEffect(() => {
@@ -95,6 +105,10 @@ export default function PlayPage() {
     if (Number.isFinite(dayIndex)) {
       latestDayIndexRef.current = dayIndex;
     }
+  }, [dayIndex]);
+
+  useEffect(() => {
+    microTaskStartTracked.current = false;
   }, [dayIndex]);
 
   useEffect(() => {
@@ -115,6 +129,7 @@ export default function PlayPage() {
           setAllocationSaved(Boolean(run.allocation));
           setAllocation({ ...defaultAllocation, ...(run.allocation ?? {}) });
           setHasSentBoost(!run.canBoost);
+          setMicroTaskStatus(run.microTaskStatus ?? "pending");
           const ds = run.dailyState ?? (await fetchDailyState(userId));
           if (ds) setDailyState({ ...ds, day_index: run.dayIndex });
 
@@ -220,6 +235,13 @@ export default function PlayPage() {
       sessionEndTracked.current = true;
       trackEvent({ event_type: "session_end", day_index: dayIndex, stage });
     }
+  }, [stage, userId, dayIndex, loading]);
+
+  useEffect(() => {
+    if (!userId || loading) return;
+    if (stage !== "microtask" || microTaskStartTracked.current) return;
+    microTaskStartTracked.current = true;
+    trackEvent({ event_type: "microtask_start", day_index: dayIndex, stage: "microtask" });
   }, [stage, userId, dayIndex, loading]);
 
   useEffect(() => {
@@ -350,7 +372,13 @@ export default function PlayPage() {
         if (stage === "storylet_1") {
           setStage("storylet_2");
         } else {
-          setStage(hasSentBoost ? "reflection" : "social");
+          const nextStage =
+            microTaskEligible && microTaskStatus === "pending"
+              ? "microtask"
+              : hasSentBoost
+              ? "reflection"
+              : "social";
+          setStage(nextStage);
         }
       } else {
         setCurrentIndex((i) => i + 1);
@@ -416,6 +444,65 @@ export default function PlayPage() {
     }
   };
 
+  const handleMicroTaskComplete = async (result: {
+    score: number;
+    duration_ms: number;
+  }) => {
+    if (!userId) return;
+    if (microTaskSaving) return;
+    setError(null);
+    setMicroTaskSaving(true);
+    try {
+      const outcome = await completeMicroTask(
+        userId,
+        dayIndex,
+        result.score,
+        result.duration_ms
+      );
+      if (!outcome.alreadyRecorded) {
+        if (outcome.nextDailyState) {
+          setDailyState(outcome.nextDailyState);
+        }
+        setOutcomeDeltas(outcome.appliedDeltas ?? null);
+      }
+      setMicroTaskStatus("done");
+      trackEvent({
+        event_type: "microtask_complete",
+        day_index: dayIndex,
+        stage: "microtask",
+        payload: { score: result.score, duration_ms: result.duration_ms },
+      });
+      setStage(hasSentBoost ? "reflection" : "social");
+    } catch (e) {
+      console.error(e);
+      setError("Failed to save micro-task.");
+    } finally {
+      setMicroTaskSaving(false);
+    }
+  };
+
+  const handleMicroTaskSkip = async () => {
+    if (!userId) return;
+    if (microTaskSaving) return;
+    setError(null);
+    setMicroTaskSaving(true);
+    try {
+      await skipMicroTask(userId, dayIndex);
+      setMicroTaskStatus("skipped");
+      trackEvent({
+        event_type: "microtask_skip",
+        day_index: dayIndex,
+        stage: "microtask",
+      });
+      setStage(hasSentBoost ? "reflection" : "social");
+    } catch (e) {
+      console.error(e);
+      setError("Failed to skip micro-task.");
+    } finally {
+      setMicroTaskSaving(false);
+    }
+  };
+
   const handleReflection = async (response: ReflectionResponse | "skip") => {
     if (!userId) return;
     setError(null);
@@ -461,7 +548,6 @@ export default function PlayPage() {
     }
   }, [stage, alreadyCompletedToday, userId, dayIndex]);
 
-  // TODO: add micro-task skip tracking when the micro-task stage exists.
 
   return (
     <AuthGate>
@@ -657,6 +743,26 @@ export default function PlayPage() {
                           </div>
                         </div>
                       )}
+                    </section>
+                  )}
+
+                  {USE_DAILY_LOOP_ORCHESTRATOR && stage === "microtask" && (
+                    <section className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold">Micro-task</h2>
+                        <span className="text-sm text-slate-600">
+                          Optional · ~1 minute
+                        </span>
+                      </div>
+                      <div className="rounded-md border border-slate-200 bg-white px-4 py-4">
+                        <PatternMatchTask
+                          onComplete={handleMicroTaskComplete}
+                          onSkip={handleMicroTaskSkip}
+                        />
+                        {microTaskSaving ? (
+                          <p className="text-xs text-slate-500">Saving…</p>
+                        ) : null}
+                      </div>
                     </section>
                   )}
 

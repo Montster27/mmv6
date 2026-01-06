@@ -5,6 +5,7 @@ export type DailyRunStage =
   | "allocation"
   | "storylet_1"
   | "storylet_2"
+  | "microtask"
   | "social"
   | "reflection"
   | "complete";

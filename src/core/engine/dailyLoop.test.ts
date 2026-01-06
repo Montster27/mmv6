@@ -31,7 +31,7 @@ const storyletC: Storylet = { ...storyletA, id: "c", slug: "c", title: "C" };
 })();
 
 (() => {
-  const stage = _testOnly.computeStage(true, 1, false, true, true, false);
+  const stage = _testOnly.computeStage(true, 1, false, true, true, false, false, false);
   assert.equal(stage, "storylet_2");
 })();
 
