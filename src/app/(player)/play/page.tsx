@@ -31,6 +31,7 @@ import {
 } from "@/lib/social";
 import type { DailyRunStage } from "@/types/dailyRun";
 import { AuthGate } from "@/ui/components/AuthGate";
+import { ProgressPanel } from "@/components/ProgressPanel";
 
 const defaultAllocation: AllocationPayload = {
   study: 0,
@@ -359,221 +360,26 @@ export default function PlayPage() {
             <Button onClick={signOut}>Sign out</Button>
           </div>
 
-          {error ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          ) : null}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr]">
+            <div className="space-y-6">
+              {error ? (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {error}
+                </div>
+              ) : null}
 
-          {loading ? (
-            <p className="text-slate-700">Loading…</p>
-          ) : (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
-            (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday) ? (
-            <>
-              <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                <h2 className="text-xl font-semibold">Daily complete ✅</h2>
-                <p className="text-slate-700">Come back tomorrow.</p>
-              </section>
+              {loading ? (
+                <p className="text-slate-700">Loading…</p>
+              ) : (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
+                (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday) ? (
+                <>
+                  <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                    <h2 className="text-xl font-semibold">Daily complete ✅</h2>
+                    <p className="text-slate-700">Come back tomorrow.</p>
+                  </section>
 
-              <section className="space-y-3">
-                <h2 className="text-xl font-semibold">Boosts Received Today</h2>
-                {boostsReceived.length === 0 ? (
-                  <p className="text-sm text-slate-700">
-                    None yet. Maybe tomorrow.
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {boostsReceived.map((boost, idx) => {
-                      const sender =
-                        publicProfiles.find(
-                          (p) => p.user_id === boost.from_user_id
-                        )?.display_name ?? "Unknown player";
-                      return (
-                        <li
-                          key={`${boost.from_user_id}-${idx}`}
-                          className="rounded border border-slate-200 bg-white px-3 py-2 text-slate-800"
-                        >
-                          {sender} sent you a boost.
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-            </>
-          ) : (
-            <>
-              {(stage === "allocation" ||
-                (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">Step 1: Time Allocation</h2>
-                    <span className="text-sm text-slate-600">
-                      Total must equal 100 (current: {totalAllocation})
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {Object.keys(allocation).map((key) => (
-                      <label
-                        key={key}
-                        className="flex flex-col gap-1 text-sm text-slate-700"
-                      >
-                        <span className="capitalize">{key}</span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                          value={allocation[key as keyof AllocationPayload]}
-                          onChange={(e) =>
-                            handleAllocationChange(
-                              key as keyof AllocationPayload,
-                              Number(e.target.value)
-                            )
-                          }
-                        />
-                      </label>
-                    ))}
-                  </div>
-                  <Button
-                    onClick={handleSaveAllocation}
-                    disabled={!allocationValid || savingAllocation}
-                  >
-                    {savingAllocation ? "Saving..." : "Save allocation"}
-                  </Button>
-                </section>
-              )}
-
-              {(stage === "storylet_1" ||
-                stage === "storylet_2" ||
-                (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">Step 2: Storylets</h2>
-                    <span className="text-sm text-slate-600">
-                      Progress: {Math.min(runs.length, 2)}/2
-                    </span>
-                  </div>
-
-                  {!currentStorylet ? (
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
-                      {storylets.length === 0 ? (
-                        <p className="text-slate-700">No more storylets today.</p>
-                      ) : (
-                        <p className="text-slate-700">Daily complete ✅</p>
-                      )}
-                      <Button className="mt-3" variant="secondary">
-                        Back tomorrow
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                      <div>
-                        <p className="text-sm text-slate-600">
-                          Storylet {stage === "storylet_2" ? 2 : 1} of 2
-                        </p>
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          {currentStorylet.title}
-                        </h3>
-                        <p className="text-slate-700">{currentStorylet.body}</p>
-                      </div>
-                      <div className="space-y-2">
-                        {(() => {
-                          const choices = toChoices(currentStorylet);
-
-                          return choices.length > 0 ? (
-                            choices.map((choice) => (
-                              <Button
-                                key={choice.id}
-                                variant="secondary"
-                                disabled={savingChoice}
-                                onClick={() => handleChoice(choice.id)}
-                                className="w-full justify-start"
-                              >
-                                {choice.label}
-                              </Button>
-                            ))
-                          ) : (
-                            <p className="text-slate-600 text-sm">
-                              No choices available.
-                            </p>
-                          );
-                        })()}
-                        {(outcomeMessage || outcomeDeltas) && (
-                          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                            {outcomeMessage ? <p>{outcomeMessage}</p> : null}
-                            {outcomeDeltas ? (
-                              <ul className="mt-1 space-y-0.5 text-slate-700">
-                                {typeof outcomeDeltas.energy === "number" ? (
-                                  <li>
-                                    Energy {outcomeDeltas.energy >= 0 ? "+" : ""}
-                                    {outcomeDeltas.energy}
-                                  </li>
-                                ) : null}
-                                {typeof outcomeDeltas.stress === "number" ? (
-                                  <li>
-                                    Stress {outcomeDeltas.stress >= 0 ? "+" : ""}
-                                    {outcomeDeltas.stress}
-                                  </li>
-                                ) : null}
-                                {outcomeDeltas.vectors
-                                  ? Object.entries(outcomeDeltas.vectors).map(
-                                      ([key, delta]) => (
-                                        <li key={key}>
-                                          {key}: {delta >= 0 ? "+" : ""}
-                                          {delta}
-                                        </li>
-                                      )
-                                    )
-                                  : null}
-                              </ul>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {(stage === "social" ||
-                (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved && !currentStorylet)) && (
-                <section className="space-y-3">
-                  <h2 className="text-xl font-semibold">Send a Boost</h2>
-                  {hasSentBoost ? (
-                    <p className="text-slate-700">Boost sent for today ✅</p>
-                  ) : publicProfiles.length === 0 ? (
-                    <p className="text-slate-700">
-                      No other players yet. Invite someone and try again.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      <label className="block text-sm text-slate-700">
-                        Choose a player
-                      </label>
-                      <select
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                        value={selectedRecipient}
-                        onChange={(e) => setSelectedRecipient(e.target.value)}
-                        disabled={loadingSocial}
-                      >
-                        {publicProfiles.map((p) => (
-                          <option key={p.user_id} value={p.user_id}>
-                            {p.display_name}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        onClick={handleSendBoost}
-                        disabled={!selectedRecipient || loadingSocial}
-                      >
-                        {loadingSocial ? "Sending..." : "Send Boost"}
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Boosts Received Today</h3>
+                  <section className="space-y-3">
+                    <h2 className="text-xl font-semibold">Boosts Received Today</h2>
                     {boostsReceived.length === 0 ? (
                       <p className="text-sm text-slate-700">
                         None yet. Maybe tomorrow.
@@ -596,20 +402,226 @@ export default function PlayPage() {
                         })}
                       </ul>
                     )}
-                  </div>
-                </section>
-              )}
+                  </section>
+                </>
+              ) : (
+                <>
+                  {(stage === "allocation" ||
+                    (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
+                    <section className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold">Step 1: Time Allocation</h2>
+                        <span className="text-sm text-slate-600">
+                          Total must equal 100 (current: {totalAllocation})
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {Object.keys(allocation).map((key) => (
+                          <label
+                            key={key}
+                            className="flex flex-col gap-1 text-sm text-slate-700"
+                          >
+                            <span className="capitalize">{key}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                              value={allocation[key as keyof AllocationPayload]}
+                              onChange={(e) =>
+                                handleAllocationChange(
+                                  key as keyof AllocationPayload,
+                                  Number(e.target.value)
+                                )
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <Button
+                        onClick={handleSaveAllocation}
+                        disabled={!allocationValid || savingAllocation}
+                      >
+                        {savingAllocation ? "Saving..." : "Save allocation"}
+                      </Button>
+                    </section>
+                  )}
 
-              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && (
-                <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                  <h2 className="text-xl font-semibold">Reflection</h2>
-                  <p className="text-slate-700">
-                    Daily complete. Reflection coming soon.
-                  </p>
-                </section>
+                  {(stage === "storylet_1" ||
+                    stage === "storylet_2" ||
+                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
+                    <section className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold">Step 2: Storylets</h2>
+                        <span className="text-sm text-slate-600">
+                          Progress: {Math.min(runs.length, 2)}/2
+                        </span>
+                      </div>
+
+                      {!currentStorylet ? (
+                        <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
+                          {storylets.length === 0 ? (
+                            <p className="text-slate-700">No more storylets today.</p>
+                          ) : (
+                            <p className="text-slate-700">Daily complete ✅</p>
+                          )}
+                          <Button className="mt-3" variant="secondary">
+                            Back tomorrow
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                          <div>
+                            <p className="text-sm text-slate-600">
+                              Storylet {stage === "storylet_2" ? 2 : 1} of 2
+                            </p>
+                            <h3 className="text-lg font-semibold text-slate-900">
+                              {currentStorylet.title}
+                            </h3>
+                            <p className="text-slate-700">{currentStorylet.body}</p>
+                          </div>
+                          <div className="space-y-2">
+                            {(() => {
+                              const choices = toChoices(currentStorylet);
+
+                              return choices.length > 0 ? (
+                                choices.map((choice) => (
+                                  <Button
+                                    key={choice.id}
+                                    variant="secondary"
+                                    disabled={savingChoice}
+                                    onClick={() => handleChoice(choice.id)}
+                                    className="w-full justify-start"
+                                  >
+                                    {choice.label}
+                                  </Button>
+                                ))
+                              ) : (
+                                <p className="text-slate-600 text-sm">
+                                  No choices available.
+                                </p>
+                              );
+                            })()}
+                            {(outcomeMessage || outcomeDeltas) && (
+                              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                                {outcomeMessage ? <p>{outcomeMessage}</p> : null}
+                                {outcomeDeltas ? (
+                                  <ul className="mt-1 space-y-0.5 text-slate-700">
+                                    {typeof outcomeDeltas.energy === "number" ? (
+                                      <li>
+                                        Energy {outcomeDeltas.energy >= 0 ? "+" : ""}
+                                        {outcomeDeltas.energy}
+                                      </li>
+                                    ) : null}
+                                    {typeof outcomeDeltas.stress === "number" ? (
+                                      <li>
+                                        Stress {outcomeDeltas.stress >= 0 ? "+" : ""}
+                                        {outcomeDeltas.stress}
+                                      </li>
+                                    ) : null}
+                                    {outcomeDeltas.vectors
+                                      ? Object.entries(outcomeDeltas.vectors).map(
+                                          ([key, delta]) => (
+                                            <li key={key}>
+                                              {key}: {delta >= 0 ? "+" : ""}
+                                              {delta}
+                                            </li>
+                                          )
+                                        )
+                                      : null}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </section>
+                  )}
+
+                  {(stage === "social" ||
+                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved && !currentStorylet)) && (
+                    <section className="space-y-3">
+                      <h2 className="text-xl font-semibold">Send a Boost</h2>
+                      {hasSentBoost ? (
+                        <p className="text-slate-700">Boost sent for today ✅</p>
+                      ) : publicProfiles.length === 0 ? (
+                        <p className="text-slate-700">
+                          No other players yet. Invite someone and try again.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          <label className="block text-sm text-slate-700">
+                            Choose a player
+                          </label>
+                          <select
+                            className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            value={selectedRecipient}
+                            onChange={(e) => setSelectedRecipient(e.target.value)}
+                            disabled={loadingSocial}
+                          >
+                            {publicProfiles.map((p) => (
+                              <option key={p.user_id} value={p.user_id}>
+                                {p.display_name}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            onClick={handleSendBoost}
+                            disabled={!selectedRecipient || loadingSocial}
+                          >
+                            {loadingSocial ? "Sending..." : "Send Boost"}
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold">Boosts Received Today</h3>
+                        {boostsReceived.length === 0 ? (
+                          <p className="text-sm text-slate-700">
+                            None yet. Maybe tomorrow.
+                          </p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {boostsReceived.map((boost, idx) => {
+                              const sender =
+                                publicProfiles.find(
+                                  (p) => p.user_id === boost.from_user_id
+                                )?.display_name ?? "Unknown player";
+                              return (
+                                <li
+                                  key={`${boost.from_user_id}-${idx}`}
+                                  className="rounded border border-slate-200 bg-white px-3 py-2 text-slate-800"
+                                >
+                                  {sender} sent you a boost.
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                  {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && (
+                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                      <h2 className="text-xl font-semibold">Reflection</h2>
+                      <p className="text-slate-700">
+                        Daily complete. Reflection coming soon.
+                      </p>
+                    </section>
+                  )}
+                </>
               )}
-            </>
-          )}
+            </div>
+
+            <div className="space-y-4">
+              <ProgressPanel
+                dailyState={dailyState}
+                lastAppliedDeltas={outcomeDeltas}
+              />
+            </div>
+          </div>
         </div>
       )}
     </AuthGate>
