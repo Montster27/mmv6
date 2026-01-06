@@ -1,14 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
+import type { PublicProfile, ReceivedBoost } from "@/types/social";
 
-export type PublicProfile = {
-  user_id: string;
-  display_name: string;
-};
-
-export type ReceivedBoost = {
-  from_user_id: string;
-  created_at: string;
-};
+export type { PublicProfile, ReceivedBoost } from "@/types/social";
 
 export async function fetchPublicProfiles(
   excludeUserId: string

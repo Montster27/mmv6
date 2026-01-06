@@ -15,9 +15,9 @@ import {
   markDailyComplete,
   saveTimeAllocation,
   type DailyState,
+  type AllocationPayload,
   type StoryletListItem,
   type StoryletRun,
-  type TimeAllocation,
 } from "@/lib/play";
 import {
   fetchPublicProfiles,
@@ -29,7 +29,7 @@ import {
 } from "@/lib/social";
 import { AuthGate } from "@/ui/components/AuthGate";
 
-const defaultAllocation: TimeAllocation = {
+const defaultAllocation: AllocationPayload = {
   study: 0,
   work: 0,
   social: 0,
@@ -41,7 +41,7 @@ export default function PlayPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [dailyState, setDailyState] = useState<DailyState | null>(null);
   const [allocation, setAllocation] =
-    useState<TimeAllocation>(defaultAllocation);
+    useState<AllocationPayload>(defaultAllocation);
   const [allocationSaved, setAllocationSaved] = useState(false);
   const [storylets, setStorylets] = useState<StoryletListItem[]>([]);
   const [runs, setRuns] = useState<StoryletRun[]>([]);

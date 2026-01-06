@@ -1,33 +1,44 @@
 import { supabase } from "@/lib/supabaseClient";
+import type { AllocationMap, DailyState } from "@/types/daily";
+import type { Storylet, StoryletChoice, StoryletRun } from "@/types/storylets";
+import type { JsonObject } from "@/types/vectors";
 
-export type StoryletListItem = {
-  id: string;
-  slug: string;
-  title: string;
-  body: string;
-  choices: any;
-  is_active: boolean;
-};
+export type StoryletListItem = Storylet;
+export type AllocationPayload = AllocationMap;
 
-export type DailyState = {
-  id: string;
-  user_id: string;
-  day_index: number;
-  energy: number;
-  stress: number;
-  vectors: Record<string, unknown>;
-  start_date?: string;
-  last_day_completed?: string | null;
-  last_day_index_completed?: number | null;
-};
+function parseChoices(raw: unknown): StoryletChoice[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item) => {
+        if (
+          item &&
+          typeof item === "object" &&
+          typeof (item as any).id === "string" &&
+          typeof (item as any).label === "string"
+        ) {
+          return {
+            id: (item as any).id,
+            label: (item as any).label,
+            outcome: (item as any).outcome,
+          } as StoryletChoice;
+        }
+        return null;
+      })
+      .filter((v): v is StoryletChoice => Boolean(v));
+  }
+  // Defensive: if DB returns non-array, coerce to empty array to avoid runtime errors.
+  return [];
+}
 
-export type TimeAllocation = Record<string, number>;
-
-export type StoryletRun = {
-  id: string;
-  storylet_id: string;
-  choice_id: string | null;
-};
+function normalizeAllocation(raw: unknown): AllocationMap {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const entries = Object.entries(raw as JsonObject)
+      .filter(([, v]) => typeof v === "number")
+      .map(([k, v]) => [k, v as number]);
+    return Object.fromEntries(entries);
+  }
+  return {};
+}
 
 export async function fetchDailyState(
   userId: string
@@ -52,7 +63,7 @@ export async function fetchDailyState(
 export async function fetchTimeAllocation(
   userId: string,
   dayIndex: number
-): Promise<TimeAllocation | null> {
+): Promise<AllocationMap | null> {
   const { data, error } = await supabase
     .from("time_allocations")
     .select("allocation")
@@ -66,13 +77,13 @@ export async function fetchTimeAllocation(
     return null;
   }
 
-  return data?.allocation ?? null;
+  return data?.allocation ? normalizeAllocation(data.allocation) : null;
 }
 
 export async function saveTimeAllocation(
   userId: string,
   dayIndex: number,
-  allocation: TimeAllocation
+  allocation: AllocationPayload
 ) {
   const { error } = await supabase.from("time_allocations").upsert(
     {
@@ -90,11 +101,11 @@ export async function saveTimeAllocation(
 }
 
 export async function fetchTodayStoryletCandidates(): Promise<
-  StoryletListItem[]
+  Storylet[]
 > {
   const { data, error } = await supabase
     .from("storylets")
-    .select("id,slug,title,body,choices,is_active")
+    .select("id,slug,title,body,choices,is_active,created_at")
     .eq("is_active", true)
     .order("created_at", { ascending: true })
     .limit(20);
@@ -104,7 +115,12 @@ export async function fetchTodayStoryletCandidates(): Promise<
     return [];
   }
 
-  return data ?? [];
+  return (
+    data?.map((item) => ({
+      ...item,
+      choices: parseChoices(item.choices),
+    })) ?? []
+  );
 }
 
 export async function fetchTodayRuns(
@@ -113,7 +129,7 @@ export async function fetchTodayRuns(
 ): Promise<StoryletRun[]> {
   const { data, error } = await supabase
     .from("storylet_runs")
-    .select("id,storylet_id,choice_id")
+    .select("id,user_id,storylet_id,day_index,choice_id,created_at")
     .eq("user_id", userId)
     .eq("day_index", dayIndex)
     .order("created_at", { ascending: true });

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import type { DailyState } from "@/types/daily";
 
 export function utcToday(): string {
   const now = new Date();
@@ -29,7 +30,7 @@ export async function ensureCadenceUpToDate(userId: string): Promise<{
     )
     .eq("user_id", userId)
     .limit(1)
-    .maybeSingle();
+    .maybeSingle<DailyState>();
 
   if (error) {
     console.error("Failed to fetch daily state for cadence", error);
