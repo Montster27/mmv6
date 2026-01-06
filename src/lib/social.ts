@@ -50,12 +50,13 @@ export async function hasSentBoostToday(
   userId: string,
   dayIndex: number
 ): Promise<boolean> {
+  const dayValue = dayIndex.toString();
   const { data, error } = await supabase
     .from("social_actions")
     .select("id")
     .eq("from_user_id", userId)
     .eq("action_type", "boost")
-    .eq("payload->>day_index", dayIndex.toString())
+    .eq("payload->>day_index", dayValue)
     .limit(1);
 
   if (error) {
@@ -71,6 +72,7 @@ export async function sendBoost(
   toUserId: string,
   dayIndex: number
 ): Promise<void> {
+  const dayValue = dayIndex.toString();
   const alreadySent = await hasSentBoostToday(fromUserId, dayIndex);
   if (alreadySent) {
     throw new Error("Boost already sent for today.");
@@ -80,11 +82,16 @@ export async function sendBoost(
     from_user_id: fromUserId,
     to_user_id: toUserId,
     action_type: "boost",
-    payload: { day_index: dayIndex },
+    payload: { day_index: dayValue },
   });
 
   if (error) {
     console.error("Failed to send boost", error);
+
+    // In case of a race, recheck; if it now exists, treat as success.
+    const existsAfterError = await hasSentBoostToday(fromUserId, dayIndex);
+    if (existsAfterError) return;
+
     throw error;
   }
 }

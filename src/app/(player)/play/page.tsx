@@ -314,9 +314,15 @@ export default function PlayPage() {
       }
     } catch (e) {
       console.error(e);
-      setError(
-        e instanceof Error ? e.message : "Failed to send boost. Try again."
-      );
+      const message =
+        e instanceof Error ? e.message : "Failed to send boost. Try again.";
+      setError(message);
+      if (message.toLowerCase().includes("already sent")) {
+        setHasSentBoost(true);
+        if (USE_DAILY_LOOP_ORCHESTRATOR) {
+          setStage("reflection");
+        }
+      }
     } finally {
       setLoadingSocial(false);
     }
