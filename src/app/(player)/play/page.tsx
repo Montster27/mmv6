@@ -70,6 +70,7 @@ export default function PlayPage() {
     stress?: number;
     vectors?: Record<string, number>;
   } | null>(null);
+  const [boostMessage, setBoostMessage] = useState<string | null>(null);
 
   const dayIndex = useMemo(
     () => dailyState?.day_index ?? dayIndexState,
@@ -304,11 +305,24 @@ export default function PlayPage() {
   const handleSendBoost = async () => {
     if (!userId || !selectedRecipient) return;
     setError(null);
+    setBoostMessage(null);
     setLoadingSocial(true);
     try {
       await sendBoost(userId, selectedRecipient, dayIndex);
       await loadSocialData(userId, dayIndex);
       setHasSentBoost(true);
+      setBoostMessage(
+        "You feel more connected. Someone else feels supported."
+      );
+      const refreshed = await fetchDailyState(userId);
+      if (refreshed) {
+        setDailyState(refreshed);
+        setOutcomeDeltas({
+          energy: 1,
+          stress: -2,
+          vectors: { social: 1 },
+        });
+      }
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         setStage("reflection");
       }
@@ -319,6 +333,7 @@ export default function PlayPage() {
       setError(message);
       if (message.toLowerCase().includes("already sent")) {
         setHasSentBoost(true);
+        setBoostMessage("Boost already sent for today.");
         if (USE_DAILY_LOOP_ORCHESTRATOR) {
           setStage("reflection");
         }
@@ -548,10 +563,13 @@ export default function PlayPage() {
                   {(stage === "social" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved && !currentStorylet)) && (
                     <section className="space-y-3">
-                      <h2 className="text-xl font-semibold">Send a Boost</h2>
-                      {hasSentBoost ? (
-                        <p className="text-slate-700">Boost sent for today ✅</p>
-                      ) : publicProfiles.length === 0 ? (
+                  <h2 className="text-xl font-semibold">Send a Boost</h2>
+                  {boostMessage ? (
+                    <p className="text-sm text-slate-700">{boostMessage}</p>
+                  ) : null}
+                  {hasSentBoost ? (
+                    <p className="text-slate-700">Boost sent for today ✅</p>
+                  ) : publicProfiles.length === 0 ? (
                         <p className="text-slate-700">
                           No other players yet. Invite someone and try again.
                         </p>
