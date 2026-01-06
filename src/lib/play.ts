@@ -159,6 +159,23 @@ export async function createStoryletRun(
   dayIndex: number,
   choiceId: string
 ) {
+  const { data: existing, error: existingError } = await supabase
+    .from("storylet_runs")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("day_index", dayIndex)
+    .eq("storylet_id", storyletId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    console.error("Failed to check existing storylet run", existingError);
+  }
+
+  if (existing?.id) {
+    return existing.id;
+  }
+
   const { error } = await supabase.from("storylet_runs").insert({
     user_id: userId,
     storylet_id: storyletId,
@@ -170,6 +187,8 @@ export async function createStoryletRun(
     console.error("Failed to create storylet run", error);
     throw error;
   }
+
+  return null;
 }
 
 export async function markDailyComplete(

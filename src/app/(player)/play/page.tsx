@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth";
 import { ensurePlayerSetup } from "@/lib/bootstrap";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
+import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -16,7 +17,6 @@ import {
   saveTimeAllocation,
   type DailyState,
   type AllocationPayload,
-  type StoryletListItem,
   type StoryletRun,
 } from "@/lib/play";
 import {
@@ -27,6 +27,7 @@ import {
   type PublicProfile,
   type ReceivedBoost,
 } from "@/lib/social";
+import type { DailyRunStage } from "@/types/dailyRun";
 import { AuthGate } from "@/ui/components/AuthGate";
 
 const defaultAllocation: AllocationPayload = {
@@ -37,13 +38,15 @@ const defaultAllocation: AllocationPayload = {
   fun: 0,
 };
 
+const USE_DAILY_LOOP_ORCHESTRATOR = true;
+
 export default function PlayPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [dailyState, setDailyState] = useState<DailyState | null>(null);
   const [allocation, setAllocation] =
     useState<AllocationPayload>(defaultAllocation);
   const [allocationSaved, setAllocationSaved] = useState(false);
-  const [storylets, setStorylets] = useState<StoryletListItem[]>([]);
+  const [storylets, setStorylets] = useState<any[]>([]);
   const [runs, setRuns] = useState<StoryletRun[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -57,6 +60,7 @@ export default function PlayPage() {
   const [loadingSocial, setLoadingSocial] = useState(false);
   const [alreadyCompletedToday, setAlreadyCompletedToday] = useState(false);
   const [dayIndexState, setDayIndexState] = useState(1);
+  const [stage, setStage] = useState<DailyRunStage>("allocation");
 
   const dayIndex = useMemo(
     () => dailyState?.day_index ?? dayIndexState,
@@ -71,41 +75,70 @@ export default function PlayPage() {
         const { userId } = await ensurePlayerSetup();
         setUserId(userId);
 
-        const cadence = await ensureCadenceUpToDate(userId);
-        setDayIndexState(cadence.dayIndex);
-        setAlreadyCompletedToday(cadence.alreadyCompletedToday);
+        if (USE_DAILY_LOOP_ORCHESTRATOR) {
+          const run = await getOrCreateDailyRun(userId, new Date());
+          setDayIndexState(run.dayIndex);
+          setStage(run.stage);
+          setAlreadyCompletedToday(run.stage === "complete");
+          setStorylets(run.storylets);
+          setRuns(run.storyletRunsToday);
+          setAllocationSaved(Boolean(run.allocation));
+          setAllocation({ ...defaultAllocation, ...(run.allocation ?? {}) });
+          setHasSentBoost(!run.canBoost);
+          const ds = run.dailyState ?? (await fetchDailyState(userId));
+          if (ds) setDailyState({ ...ds, day_index: run.dayIndex });
 
-        const ds = await fetchDailyState(userId);
-        if (ds) {
-          setDailyState({ ...ds, day_index: cadence.dayIndex });
+          const [profiles, received] = await Promise.all([
+            fetchPublicProfiles(userId),
+            fetchTodayReceivedBoosts(userId, run.dayIndex),
+          ]);
+          setPublicProfiles(profiles);
+          setSelectedRecipient(profiles[0]?.user_id ?? "");
+          setBoostsReceived(received);
+        } else {
+          const cadence = await ensureCadenceUpToDate(userId);
+          setDayIndexState(cadence.dayIndex);
+          setAlreadyCompletedToday(cadence.alreadyCompletedToday);
+
+          const ds = await fetchDailyState(userId);
+          if (ds) {
+            setDailyState({ ...ds, day_index: cadence.dayIndex });
+          }
+          const day = cadence.dayIndex;
+
+          const existingAllocation = await fetchTimeAllocation(userId, day);
+          if (existingAllocation) {
+            setAllocation({ ...defaultAllocation, ...existingAllocation });
+            setAllocationSaved(true);
+          }
+
+          const existingRuns = await fetchTodayRuns(userId, day);
+          setRuns(existingRuns);
+
+          const candidates = await fetchTodayStoryletCandidates();
+          const used = new Set(existingRuns.map((r) => r.storylet_id));
+          const next = candidates
+            .filter((c) => !used.has(c.id))
+            .slice(0, 2);
+          setStorylets(next);
+
+          const [profiles, received, sent] = await Promise.all([
+            fetchPublicProfiles(userId),
+            fetchTodayReceivedBoosts(userId, day),
+            hasSentBoostToday(userId, day),
+          ]);
+          setPublicProfiles(profiles);
+          setSelectedRecipient(profiles[0]?.user_id ?? "");
+          setBoostsReceived(received);
+          setHasSentBoost(sent);
+          setStage(
+            cadence.alreadyCompletedToday
+              ? "complete"
+              : allocationSaved
+              ? "storylet_1"
+              : "allocation"
+          );
         }
-        const day = cadence.dayIndex;
-
-        const existingAllocation = await fetchTimeAllocation(userId, day);
-        if (existingAllocation) {
-          setAllocation({ ...defaultAllocation, ...existingAllocation });
-          setAllocationSaved(true);
-        }
-
-        const existingRuns = await fetchTodayRuns(userId, day);
-        setRuns(existingRuns);
-
-        const candidates = await fetchTodayStoryletCandidates();
-        const used = new Set(existingRuns.map((r) => r.storylet_id));
-        const next = candidates
-          .filter((c) => !used.has(c.id))
-          .slice(0, 2);
-        setStorylets(next);
-
-        const [profiles, received, sent] = await Promise.all([
-          fetchPublicProfiles(userId),
-          fetchTodayReceivedBoosts(userId, day),
-          hasSentBoostToday(userId, day),
-        ]);
-        setPublicProfiles(profiles);
-        setSelectedRecipient(profiles[0]?.user_id ?? "");
-        setBoostsReceived(received);
-        setHasSentBoost(sent);
       } catch (e) {
         console.error(e);
         setError("Failed to load play state.");
@@ -128,7 +161,7 @@ export default function PlayPage() {
 
   const allocationValid = totalAllocation === 100;
 
-  const handleAllocationChange = (key: keyof TimeAllocation, value: number) => {
+  const handleAllocationChange = (key: keyof AllocationPayload, value: number) => {
     setAllocation((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -139,6 +172,9 @@ export default function PlayPage() {
     try {
       await saveTimeAllocation(userId, dayIndex, allocation);
       setAllocationSaved(true);
+      if (USE_DAILY_LOOP_ORCHESTRATOR) {
+        setStage("storylet_1");
+      }
     } catch (e) {
       console.error(e);
       setError("Failed to save allocation.");
@@ -147,7 +183,12 @@ export default function PlayPage() {
     }
   };
 
-  const currentStorylet = storylets[currentIndex];
+  const currentStorylet =
+    stage === "storylet_1"
+      ? storylets[0]
+      : stage === "storylet_2"
+      ? storylets[1]
+      : storylets[currentIndex];
 
   const handleChoice = async (choiceId: string) => {
     if (!userId || !currentStorylet) return;
@@ -159,7 +200,15 @@ export default function PlayPage() {
         ...prev,
         { id: `${currentStorylet.id}-${choiceId}-${Date.now()}`, storylet_id: currentStorylet.id, choice_id: choiceId },
       ]);
-      setCurrentIndex((i) => i + 1);
+      if (USE_DAILY_LOOP_ORCHESTRATOR) {
+        if (stage === "storylet_1") {
+          setStage("storylet_2");
+        } else {
+          setStage(hasSentBoost ? "reflection" : "social");
+        }
+      } else {
+        setCurrentIndex((i) => i + 1);
+      }
     } catch (e) {
       console.error(e);
       setError("Failed to record choice.");
@@ -189,6 +238,10 @@ export default function PlayPage() {
     try {
       await sendBoost(userId, selectedRecipient, dayIndex);
       await loadSocialData(userId, dayIndex);
+      setHasSentBoost(true);
+      if (USE_DAILY_LOOP_ORCHESTRATOR) {
+        setStage("reflection");
+      }
     } catch (e) {
       console.error(e);
       setError(
@@ -199,21 +252,25 @@ export default function PlayPage() {
     }
   };
 
-  const completionReached = allocationSaved && !currentStorylet;
-
   useEffect(() => {
     const markCompleteIfNeeded = async () => {
       if (!userId) return;
-      if (!completionReached) return;
+      if (!(stage === "reflection" || stage === "complete")) return;
       if (alreadyCompletedToday) return;
       try {
         await markDailyComplete(userId, dayIndex);
+        setAlreadyCompletedToday(true);
+        if (stage === "reflection") {
+          setStage("complete");
+        }
       } catch (e) {
         console.error("Failed to mark daily complete", e);
       }
     };
-    markCompleteIfNeeded();
-  }, [completionReached, alreadyCompletedToday, userId, dayIndex]);
+    if (USE_DAILY_LOOP_ORCHESTRATOR) {
+      markCompleteIfNeeded();
+    }
+  }, [stage, alreadyCompletedToday, userId, dayIndex]);
 
   return (
     <AuthGate>
@@ -241,7 +298,8 @@ export default function PlayPage() {
 
           {loading ? (
             <p className="text-slate-700">Loading…</p>
-          ) : alreadyCompletedToday && !completionReached ? (
+          ) : (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
+            (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday) ? (
             <>
               <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
                 <h2 className="text-xl font-semibold">Daily complete ✅</h2>
@@ -276,7 +334,8 @@ export default function PlayPage() {
             </>
           ) : (
             <>
-              {!allocationSaved && (
+              {(stage === "allocation" ||
+                (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold">Step 1: Time Allocation</h2>
@@ -296,10 +355,10 @@ export default function PlayPage() {
                           min={0}
                           max={100}
                           className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                          value={allocation[key as keyof TimeAllocation]}
+                          value={allocation[key as keyof AllocationPayload]}
                           onChange={(e) =>
                             handleAllocationChange(
-                              key as keyof TimeAllocation,
+                              key as keyof AllocationPayload,
                               Number(e.target.value)
                             )
                           }
@@ -316,21 +375,21 @@ export default function PlayPage() {
                 </section>
               )}
 
-              {allocationSaved && (
+              {(stage === "storylet_1" ||
+                stage === "storylet_2" ||
+                (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold">Step 2: Storylets</h2>
                     <span className="text-sm text-slate-600">
-                      Progress: {Math.min(currentIndex, 2)}/2
+                      Progress: {Math.min(runs.length, 2)}/2
                     </span>
                   </div>
 
                   {!currentStorylet ? (
                     <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
                       {storylets.length === 0 ? (
-                        <p className="text-slate-700">
-                          No more storylets today.
-                        </p>
+                        <p className="text-slate-700">No more storylets today.</p>
                       ) : (
                         <p className="text-slate-700">Daily complete ✅</p>
                       )}
@@ -342,8 +401,7 @@ export default function PlayPage() {
                     <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
                       <div>
                         <p className="text-sm text-slate-600">
-                          Storylet {currentIndex + 1} of{" "}
-                          {Math.min(2, storylets.length)}
+                          Storylet {stage === "storylet_2" ? 2 : 1} of 2
                         </p>
                         <h3 className="text-lg font-semibold text-slate-900">
                           {currentStorylet.title}
@@ -387,7 +445,8 @@ export default function PlayPage() {
                 </section>
               )}
 
-              {completionReached && (
+              {(stage === "social" ||
+                (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved && !currentStorylet)) && (
                 <section className="space-y-3">
                   <h2 className="text-xl font-semibold">Send a Boost</h2>
                   {hasSentBoost ? (
@@ -447,6 +506,15 @@ export default function PlayPage() {
                       </ul>
                     )}
                   </div>
+                </section>
+              )}
+
+              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && (
+                <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                  <h2 className="text-xl font-semibold">Reflection</h2>
+                  <p className="text-slate-700">
+                    Daily complete. Reflection coming soon.
+                  </p>
                 </section>
               )}
             </>
