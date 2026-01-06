@@ -12,3 +12,11 @@ Implement the core daily loop end-to-end so a player can play a day, see progres
 - Factions or long-horizon economy systems.
 - Deep narrative arcs beyond minimal storylets.
 - Multiplayer depth or complex social graph features.
+
+## Phase One Metrics (K2 Admin)
+- DAU uses distinct users with `session_start` events per UTC day.
+- Completion rate uses users with `stage_complete` + `stage=complete` divided by sessions that day.
+- Average session duration uses per-user/day `(latest session_end - earliest session_start)` when both exist.
+- Stage duration averages use `stage_complete` payload `duration_ms`.
+- Retention D1/D3/D7 uses session_start users on day X who also have session_start on day X+N (UTC days).
+- Reflection/social skip rates are `% of sessions` with `reflection_skip` or `social_skip` events.
