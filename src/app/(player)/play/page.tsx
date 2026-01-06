@@ -15,6 +15,8 @@ import {
   fetchTodayStoryletCandidates,
   markDailyComplete,
   saveTimeAllocation,
+  applyOutcomeForChoice,
+  toChoices,
   type DailyState,
   type AllocationPayload,
   type StoryletRun,
@@ -61,6 +63,12 @@ export default function PlayPage() {
   const [alreadyCompletedToday, setAlreadyCompletedToday] = useState(false);
   const [dayIndexState, setDayIndexState] = useState(1);
   const [stage, setStage] = useState<DailyRunStage>("allocation");
+  const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
+  const [outcomeDeltas, setOutcomeDeltas] = useState<{
+    energy?: number;
+    stress?: number;
+    vectors?: Record<string, number>;
+  } | null>(null);
 
   const dayIndex = useMemo(
     () => dailyState?.day_index ?? dayIndexState,
@@ -194,12 +202,73 @@ export default function PlayPage() {
     if (!userId || !currentStorylet) return;
     setSavingChoice(true);
     setError(null);
+    setOutcomeMessage(null);
+    setOutcomeDeltas(null);
     try {
-      await createStoryletRun(userId, currentStorylet.id, dayIndex, choiceId);
-      setRuns((prev) => [
-        ...prev,
-        { id: `${currentStorylet.id}-${choiceId}-${Date.now()}`, storylet_id: currentStorylet.id, choice_id: choiceId },
-      ]);
+      const runId = await createStoryletRun(
+        userId,
+        currentStorylet.id,
+        dayIndex,
+        choiceId
+      );
+
+      const alreadyRecorded = Boolean(runId);
+      if (!alreadyRecorded) {
+        let state = dailyState;
+        if (!state) {
+          state = await fetchDailyState(userId);
+        }
+        if (!state) {
+          throw new Error("Unable to load daily state for outcome application.");
+        }
+
+        const { nextDailyState, appliedDeltas, appliedMessage } =
+          await applyOutcomeForChoice(state, choiceId, currentStorylet, userId);
+        setDailyState(nextDailyState);
+        const hasVectorDeltas =
+          appliedDeltas.vectors &&
+          Object.keys(appliedDeltas.vectors).length > 0;
+        const hasDeltas =
+          typeof appliedDeltas.energy === "number" ||
+          typeof appliedDeltas.stress === "number" ||
+          hasVectorDeltas;
+        setOutcomeMessage(
+          appliedMessage || (hasDeltas ? "Choice recorded." : null)
+        );
+        setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
+
+        setRuns((prev) => [
+          ...prev,
+          {
+            id: runId ?? `${currentStorylet.id}-${choiceId}-${Date.now()}`,
+            user_id: userId,
+            storylet_id: currentStorylet.id,
+            day_index: dayIndex,
+            choice_id: choiceId,
+          },
+        ]);
+      } else {
+        setOutcomeMessage("Choice already recorded.");
+        setRuns((prev) => {
+          const exists = prev.some(
+            (r) =>
+              r.storylet_id === currentStorylet.id && r.day_index === dayIndex
+          );
+          return exists
+            ? prev
+            : [
+                ...prev,
+                {
+                  id: runId ?? `${currentStorylet.id}-${choiceId}-existing`,
+                  user_id: userId,
+                  storylet_id: currentStorylet.id,
+                  day_index: dayIndex,
+                  choice_id: choiceId,
+                },
+              ];
+        });
+      }
+
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         if (stage === "storylet_1") {
           setStage("storylet_2");
@@ -410,19 +479,10 @@ export default function PlayPage() {
                       </div>
                       <div className="space-y-2">
                         {(() => {
-                          const choices =
-                            typeof currentStorylet.choices === "string"
-                              ? (() => {
-                                  try {
-                                    return JSON.parse(currentStorylet.choices);
-                                  } catch {
-                                    return [];
-                                  }
-                                })()
-                              : currentStorylet.choices || [];
+                          const choices = toChoices(currentStorylet);
 
                           return choices.length > 0 ? (
-                            choices.map((choice: any) => (
+                            choices.map((choice) => (
                               <Button
                                 key={choice.id}
                                 variant="secondary"
@@ -439,6 +499,37 @@ export default function PlayPage() {
                             </p>
                           );
                         })()}
+                        {(outcomeMessage || outcomeDeltas) && (
+                          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                            {outcomeMessage ? <p>{outcomeMessage}</p> : null}
+                            {outcomeDeltas ? (
+                              <ul className="mt-1 space-y-0.5 text-slate-700">
+                                {typeof outcomeDeltas.energy === "number" ? (
+                                  <li>
+                                    Energy {outcomeDeltas.energy >= 0 ? "+" : ""}
+                                    {outcomeDeltas.energy}
+                                  </li>
+                                ) : null}
+                                {typeof outcomeDeltas.stress === "number" ? (
+                                  <li>
+                                    Stress {outcomeDeltas.stress >= 0 ? "+" : ""}
+                                    {outcomeDeltas.stress}
+                                  </li>
+                                ) : null}
+                                {outcomeDeltas.vectors
+                                  ? Object.entries(outcomeDeltas.vectors).map(
+                                      ([key, delta]) => (
+                                        <li key={key}>
+                                          {key}: {delta >= 0 ? "+" : ""}
+                                          {delta}
+                                        </li>
+                                      )
+                                    )
+                                  : null}
+                              </ul>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

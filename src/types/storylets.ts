@@ -1,7 +1,14 @@
 export type StoryletChoice = {
   id: string;
   label: string;
-  outcome?: Record<string, unknown>;
+  outcome?: {
+    text?: string;
+    deltas?: {
+      energy?: number;
+      stress?: number;
+      vectors?: Record<string, number>;
+    };
+  };
 };
 
 export type Storylet = {

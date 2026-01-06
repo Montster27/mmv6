@@ -7,6 +7,7 @@ import {
   fallbackStorylet,
   validateStorylet,
 } from "@/core/validation/storyletValidation";
+import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -85,6 +86,21 @@ export async function fetchTimeAllocation(
   return data?.allocation ? normalizeAllocation(data.allocation) : null;
 }
 
+export function toChoices(storylet: Storylet | any): StoryletChoice[] {
+  if (Array.isArray(storylet?.choices)) {
+    return storylet.choices as StoryletChoice[];
+  }
+  if (typeof storylet?.choices === "string") {
+    try {
+      const parsed = JSON.parse(storylet.choices);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export async function saveTimeAllocation(
   userId: string,
   dayIndex: number,
@@ -153,6 +169,26 @@ export async function fetchTodayRuns(
   return data ?? [];
 }
 
+export async function updateDailyState(
+  userId: string,
+  nextState: Pick<DailyState, "energy" | "stress" | "vectors">
+) {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({
+      energy: nextState.energy,
+      stress: nextState.stress,
+      vectors: nextState.vectors,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Failed to update daily state", error);
+    throw error;
+  }
+}
+
 export async function createStoryletRun(
   userId: string,
   storyletId: string,
@@ -211,6 +247,29 @@ export async function fetchRecentStoryletRuns(
   }
 
   return data ?? [];
+}
+
+export async function applyOutcomeForChoice(
+  dailyState: DailyState,
+  choiceId: string,
+  storylet: Storylet,
+  userId: string
+): Promise<{
+  nextDailyState: DailyState;
+  appliedMessage: string;
+  appliedDeltas: {
+    energy?: number;
+    stress?: number;
+    vectors?: Record<string, number>;
+  };
+}> {
+  const choice = toChoices(storylet).find((c) => c.id === choiceId);
+  const { nextDailyState, appliedDeltas, message } = applyOutcomeToDailyState(
+    dailyState,
+    choice?.outcome
+  );
+  await updateDailyState(userId, nextDailyState);
+  return { nextDailyState, appliedMessage: message, appliedDeltas };
 }
 
 export async function markDailyComplete(
