@@ -1,4 +1,9 @@
 import { supabase } from "@/lib/supabaseClient";
+import {
+  coerceStoryletRow,
+  fallbackStorylet,
+  validateStorylet,
+} from "@/core/validation/storyletValidation";
 import type { Storylet } from "@/types/storylets";
 
 export type StoryletListItem = Storylet;
@@ -15,6 +20,13 @@ export async function fetchActiveStorylets(): Promise<Storylet[]> {
     return [];
   }
 
-  // Keep choices/body if needed downstream; no coercion here.
-  return data ?? [];
+  return (
+    data?.map((row) => {
+      const coerced = coerceStoryletRow(row);
+      const validated = validateStorylet(coerced);
+      if (validated.ok) return validated.value;
+      console.warn("Invalid storylet row; using fallback", validated.errors);
+      return fallbackStorylet();
+    }) ?? []
+  );
 }

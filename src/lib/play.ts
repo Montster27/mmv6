@@ -2,6 +2,11 @@ import { supabase } from "@/lib/supabaseClient";
 import type { AllocationMap, DailyState } from "@/types/daily";
 import type { Storylet, StoryletChoice, StoryletRun } from "@/types/storylets";
 import type { JsonObject } from "@/types/vectors";
+import {
+  coerceStoryletRow,
+  fallbackStorylet,
+  validateStorylet,
+} from "@/core/validation/storyletValidation";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -116,10 +121,16 @@ export async function fetchTodayStoryletCandidates(): Promise<
   }
 
   return (
-    data?.map((item) => ({
-      ...item,
-      choices: parseChoices(item.choices),
-    })) ?? []
+    data?.map((item) => {
+      const coerced = coerceStoryletRow({
+        ...item,
+        choices: parseChoices(item.choices),
+      });
+      const validated = validateStorylet(coerced);
+      if (validated.ok) return validated.value;
+      console.warn("Invalid storylet row; using fallback", validated.errors);
+      return fallbackStorylet();
+    }) ?? []
   );
 }
 
