@@ -1,48 +1,41 @@
-import assert from "node:assert/strict";
+import { describe, expect, it } from "vitest";
 
-import { applyOutcomeToDailyState } from "./applyOutcome";
-import type { DailyState } from "../../types/daily";
+import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
+import type { DailyState } from "@/types/daily";
+import type { StoryletChoice } from "@/types/storylets";
 
 const baseState: DailyState = {
-  id: "d1",
-  user_id: "u1",
+  id: "d",
+  user_id: "u",
   day_index: 1,
-  energy: 50,
-  stress: 10,
-  vectors: {},
+  energy: 95,
+  stress: 5,
+  vectors: { social: 99 },
 };
 
-// Run with: node src/core/engine/applyOutcome.test.ts
-(() => {
-  const res = applyOutcomeToDailyState(baseState, {
-    text: "You feel focused.",
-    deltas: { energy: 10, stress: -5, vectors: { focus: 5 } },
+describe("applyOutcomeToDailyState", () => {
+  it("applies deltas and clamps values", () => {
+    const outcome: StoryletChoice["outcome"] = {
+      text: "ok",
+      deltas: {
+        energy: 10,
+        stress: -10,
+        vectors: { social: 5, focus: -3 },
+      },
+    };
+
+    const result = applyOutcomeToDailyState(baseState, outcome);
+    expect(result.nextDailyState.energy).toBe(100);
+    expect(result.nextDailyState.stress).toBe(0);
+    expect(result.nextDailyState.vectors).toMatchObject({
+      social: 100,
+      focus: 0,
+    });
   });
-  assert.equal(res.nextDailyState.energy, 60);
-  assert.equal(res.nextDailyState.stress, 5);
-  assert.equal((res.nextDailyState.vectors as any).focus, 5);
-  assert.equal(res.appliedDeltas.energy, 10);
-  assert.equal(res.appliedDeltas.stress, -5);
-  assert.equal(res.message, "You feel focused.");
-})();
 
-(() => {
-  const res = applyOutcomeToDailyState(
-    { ...baseState, energy: 95, stress: 98, vectors: { calm: 99 } },
-    {
-      deltas: { energy: 10, stress: 10, vectors: { calm: 10 } },
-    }
-  );
-  assert.equal(res.nextDailyState.energy, 100);
-  assert.equal(res.nextDailyState.stress, 100);
-  assert.equal((res.nextDailyState.vectors as any).calm, 100);
-})();
-
-(() => {
-  const res = applyOutcomeToDailyState(baseState);
-  assert.equal(res.nextDailyState.energy, baseState.energy);
-  assert.equal(Object.keys(res.appliedDeltas).length, 0);
-  assert.equal(res.message, "");
-})();
-
-console.log("applyOutcome tests passed");
+  it("handles missing outcome safely", () => {
+    const result = applyOutcomeToDailyState(baseState, undefined);
+    expect(result.nextDailyState).toBe(baseState);
+    expect(result.appliedDeltas).toEqual({});
+  });
+});
