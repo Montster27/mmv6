@@ -308,7 +308,7 @@ export default function StoryletEditPage({
                 </label>
 
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
-                  Choices (JSON array of {{ id, label, outcome? }})
+                  {"Choices (JSON array of { id, label, outcome? })"}
                   <textarea
                     className="rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
                     rows={6}
