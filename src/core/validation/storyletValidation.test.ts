@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+import { describe, expect, it } from "vitest";
 
 import {
   coerceStoryletRow,
@@ -18,28 +18,27 @@ const valid = {
   is_active: true,
 };
 
-// Basic smoke checks. Run with: node src/core/validation/storyletValidation.test.ts
-(() => {
-  const res = validateStorylet(valid);
-  assert.equal(res.ok, true);
-})();
+describe("storyletValidation", () => {
+  it("validates a well-formed storylet", () => {
+    const res = validateStorylet(valid);
+    expect(res.ok).toBe(true);
+  });
 
-(() => {
-  const invalidChoices = { ...valid, choices: "not-array" };
-  const res = validateStorylet(invalidChoices);
-  assert.equal(res.ok, false);
-})();
+  it("rejects invalid choices", () => {
+    const invalidChoices = { ...valid, choices: "not-array" };
+    const res = validateStorylet(invalidChoices);
+    expect(res.ok).toBe(false);
+  });
 
-(() => {
-  const coerced = coerceStoryletRow({ ...valid, choices: null });
-  assert(Array.isArray(coerced.choices));
-  assert.equal(coerced.choices.length, 0);
-})();
+  it("coerces missing choices to an empty array", () => {
+    const coerced = coerceStoryletRow({ ...valid, choices: null });
+    expect(Array.isArray(coerced.choices)).toBe(true);
+    expect(coerced.choices.length).toBe(0);
+  });
 
-(() => {
-  const fb = fallbackStorylet();
-  assert.ok(fb.title.includes("Corrupted"));
-  assert.equal(fb.choices[0]?.id, "continue");
-})();
-
-console.log("storyletValidation tests passed");
+  it("returns a fallback storylet", () => {
+    const fb = fallbackStorylet();
+    expect(fb.title.includes("Corrupted")).toBe(true);
+    expect(fb.choices[0]?.id).toBe("continue");
+  });
+});
