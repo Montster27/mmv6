@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
-import { fetchDailyState, updateDailyState } from "@/lib/play";
+import { fetchDailyState } from "@/lib/play";
 import type { DailyState } from "@/types/daily";
 
 export const MICRO_TASK_ID = "pattern_match_v1";
@@ -97,11 +97,17 @@ export async function completeMicroTask(
     stress: nextStress,
   };
 
-  await updateDailyState(userId, {
-    energy: nextState.energy,
-    stress: nextState.stress,
-    vectors: nextState.vectors,
-  });
+  const { error } = await supabase
+    .from("daily_states")
+    .update({
+      stress: nextStress,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+  if (error) {
+    console.error("Failed to update daily state for micro-task", error);
+    throw error;
+  }
 
   return {
     alreadyRecorded: false,

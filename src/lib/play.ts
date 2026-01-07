@@ -221,6 +221,17 @@ export async function createStoryletRun(
 
   if (error) {
     console.error("Failed to create storylet run", error);
+    const { data: retry } = await supabase
+      .from("storylet_runs")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("day_index", dayIndex)
+      .eq("storylet_id", storyletId)
+      .limit(1)
+      .maybeSingle();
+    if (retry?.id) {
+      return retry.id;
+    }
     throw error;
   }
 

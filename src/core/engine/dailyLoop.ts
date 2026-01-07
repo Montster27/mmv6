@@ -34,8 +34,8 @@ function computeStage(
   if (!allocationPresent) return "allocation";
   if (runsForPairCount === 0) return "storylet_1";
   if (runsForPairCount === 1) return "storylet_2";
-  if (runsForPairCount >= 2 && microTaskEligible && !microTaskDone) return "microtask";
   if (runsForPairCount >= 2 && reflectionDone) return "complete";
+  if (runsForPairCount >= 2 && microTaskEligible && !microTaskDone) return "microtask";
   if (runsForPairCount >= 2 && canBoost) return "social";
   if (runsForPairCount >= 2 && !canBoost) return "reflection";
   return "complete";
