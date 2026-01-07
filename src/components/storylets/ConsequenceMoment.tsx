@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ReactElement } from "react";
 
 type DeltaInfo = {
   energy?: number;
@@ -41,7 +42,7 @@ export function ConsequenceMoment({ message, deltas, onDone }: Props) {
     };
   }, [onDone]);
 
-  const deltaItems: Array<JSX.Element> = [];
+  const deltaItems: ReactElement[] = [];
   const energy = formatDelta("Energy", deltas?.energy);
   if (energy) deltaItems.push(energy);
   const stress = formatDelta("Stress", deltas?.stress);
