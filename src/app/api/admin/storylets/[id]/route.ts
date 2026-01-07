@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 import { getAdminClient } from "@/lib/supabaseAdmin";
@@ -33,9 +33,10 @@ async function ensureAdmin(request: Request) {
 }
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params;
   const user = await ensureAdmin(request);
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
@@ -43,7 +44,7 @@ export async function GET(
   const { data, error } = await admin
     .from("storylets")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", resolvedParams.id)
     .maybeSingle();
 
   if (error || !data) {
@@ -55,15 +56,16 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const resolvedParams = await params;
   const user = await ensureAdmin(request);
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const payload = await request.json();
   const draft: Storylet = {
-    id: params.id,
+    id: resolvedParams.id,
     slug: payload.slug ?? "",
     title: payload.title ?? "",
     body: payload.body ?? "",
@@ -94,7 +96,7 @@ export async function PUT(
       requirements: draft.requirements ?? {},
       updated_at: new Date().toISOString(),
     })
-    .eq("id", params.id);
+    .eq("id", resolvedParams.id);
 
   if (error) {
     console.error("Failed to update storylet", error);
