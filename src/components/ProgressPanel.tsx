@@ -1,3 +1,7 @@
+\"use client\";
+
+import { useEffect, useState } from "react";
+
 import type { DailyState } from "@/types/daily";
 import type { SevenVectors } from "@/types/vectors";
 import { summarizeVectors } from "@/core/ui/vectorSummary";
@@ -13,6 +17,8 @@ type Props = {
   lastAppliedDeltas?: DeltaInfo | null;
 };
 
+const HIGHLIGHT_MS = 2500;
+
 const clamp = (value: number, min = 0, max = 100) =>
   Math.min(max, Math.max(min, value));
 
@@ -26,24 +32,32 @@ function toVectors(raw: DailyState["vectors"]): SevenVectors {
   return {};
 }
 
-function bar(value?: number) {
+function bar(value?: number, highlight?: boolean) {
   if (typeof value !== "number") return null;
   const width = clamp(value);
   return (
-    <div className="h-2 w-full rounded bg-slate-200">
+    <div
+      className={`h-2 w-full rounded bg-slate-200 transition ${
+        highlight ? "ring-2 ring-slate-300" : ""
+      }`}
+    >
       <div
-        className="h-2 rounded bg-slate-600"
+        className={`h-2 rounded bg-slate-600 transition ${
+          highlight ? "bg-slate-800" : ""
+        }`}
         style={{ width: `${width}%` }}
       />
     </div>
   );
 }
 
-function deltaBadge(delta?: number) {
+function deltaBadge(delta?: number, highlight?: boolean) {
   if (typeof delta !== "number" || delta === 0) return null;
   const sign = delta > 0 ? "+" : "";
   return (
-    <span className="ml-2 text-xs text-slate-600">
+    <span
+      className={`ml-2 text-xs ${highlight ? "text-slate-900" : "text-slate-600"}`}
+    >
       {sign}
       {delta}
     </span>
@@ -51,6 +65,7 @@ function deltaBadge(delta?: number) {
 }
 
 export function ProgressPanel({ dailyState, lastAppliedDeltas }: Props) {
+  const [highlight, setHighlight] = useState<DeltaInfo | null>(null);
   const energy = dailyState?.energy;
   const stress = dailyState?.stress;
   const vectors = toVectors(dailyState?.vectors ?? {});
@@ -63,26 +78,43 @@ export function ProgressPanel({ dailyState, lastAppliedDeltas }: Props) {
       : [];
 
   const summary = summarizeVectors(vectors, lastAppliedDeltas ?? undefined);
+  const highlightEnergy = typeof highlight?.energy === "number" && highlight.energy !== 0;
+  const highlightStress = typeof highlight?.stress === "number" && highlight.stress !== 0;
+
+  useEffect(() => {
+    if (!lastAppliedDeltas) return;
+    setHighlight(lastAppliedDeltas);
+    const timer = window.setTimeout(() => setHighlight(null), HIGHLIGHT_MS);
+    return () => window.clearTimeout(timer);
+  }, [lastAppliedDeltas]);
 
   return (
     <aside className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-4">
       <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm text-slate-700">
+        <div
+          className={`flex items-center justify-between text-sm ${
+            highlightEnergy ? "text-slate-900 font-medium" : "text-slate-700"
+          }`}
+        >
           <span>Energy</span>
           <span>
             {typeof energy === "number" ? energy : "—"}
-            {deltaBadge(lastAppliedDeltas?.energy)}
+            {deltaBadge(lastAppliedDeltas?.energy, highlightEnergy)}
           </span>
         </div>
-        {bar(energy)}
-        <div className="flex items-center justify-between text-sm text-slate-700">
+        {bar(energy, highlightEnergy)}
+        <div
+          className={`flex items-center justify-between text-sm ${
+            highlightStress ? "text-slate-900 font-medium" : "text-slate-700"
+          }`}
+        >
           <span>Stress</span>
           <span>
             {typeof stress === "number" ? stress : "—"}
-            {deltaBadge(lastAppliedDeltas?.stress)}
+            {deltaBadge(lastAppliedDeltas?.stress, highlightStress)}
           </span>
         </div>
-        {bar(stress)}
+        {bar(stress, highlightStress)}
       </div>
 
       <div className="space-y-2">
@@ -94,16 +126,23 @@ export function ProgressPanel({ dailyState, lastAppliedDeltas }: Props) {
             {vectorKeys.map((key) => {
               const value = vectors[key] ?? 0;
               const delta = lastAppliedDeltas?.vectors?.[key];
+              const highlightVector =
+                typeof highlight?.vectors?.[key] === "number" &&
+                highlight.vectors[key] !== 0;
               return (
                 <div key={key} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm text-slate-700">
+                  <div
+                    className={`flex items-center justify-between text-sm ${
+                      highlightVector ? "text-slate-900 font-medium" : "text-slate-700"
+                    }`}
+                  >
                     <span className="capitalize">{key}</span>
                     <span>
                       {value}
-                      {deltaBadge(delta)}
+                      {deltaBadge(delta, highlightVector)}
                     </span>
                   </div>
-                  {bar(value)}
+                  {bar(value, highlightVector)}
                 </div>
               );
             })}

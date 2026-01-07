@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
+import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { signOut } from "@/lib/auth";
 import { ensurePlayerSetup } from "@/lib/bootstrap";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
@@ -80,6 +81,7 @@ export default function PlayPage() {
   const [microTaskStatus, setMicroTaskStatus] =
     useState<"pending" | "done" | "skipped">("pending");
   const [microTaskSaving, setMicroTaskSaving] = useState(false);
+  const [consequenceActive, setConsequenceActive] = useState(false);
   const sessionStartTracked = useRef(false);
   const sessionEndTracked = useRef(false);
   const stageRef = useRef<DailyRunStage | null>(null);
@@ -87,6 +89,7 @@ export default function PlayPage() {
   const latestStageRef = useRef<DailyRunStage | null>(null);
   const latestDayIndexRef = useRef<number | null>(null);
   const microTaskStartTracked = useRef(false);
+  const pendingTransitionRef = useRef<(() => void) | null>(null);
 
   const dayIndex = useMemo(
     () => dailyState?.day_index ?? dayIndexState,
@@ -109,7 +112,18 @@ export default function PlayPage() {
 
   useEffect(() => {
     microTaskStartTracked.current = false;
+    pendingTransitionRef.current = null;
+    setConsequenceActive(false);
   }, [dayIndex]);
+
+  const finishConsequence = () => {
+    setConsequenceActive(false);
+    setOutcomeMessage(null);
+    setOutcomeDeltas(null);
+    const next = pendingTransitionRef.current;
+    pendingTransitionRef.current = null;
+    if (next) next();
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -267,6 +281,7 @@ export default function PlayPage() {
   );
 
   const allocationValid = totalAllocation === 100;
+  const choicesDisabled = savingChoice || consequenceActive;
 
   const handleAllocationChange = (key: keyof AllocationPayload, value: number) => {
     setAllocation((prev) => ({ ...prev, [key]: value }));
@@ -335,6 +350,13 @@ export default function PlayPage() {
           appliedMessage || (hasDeltas ? "Choice recorded." : null)
         );
         setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[choice-outcome]", {
+            storyletId: currentStorylet.id,
+            choiceId,
+            appliedDeltas,
+          });
+        }
 
         setRuns((prev) => [
           ...prev,
@@ -369,19 +391,22 @@ export default function PlayPage() {
       }
 
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
+        let nextStage: DailyRunStage;
         if (stage === "storylet_1") {
-          setStage("storylet_2");
+          nextStage = "storylet_2";
         } else {
-          const nextStage =
+          nextStage =
             microTaskEligible && microTaskStatus === "pending"
               ? "microtask"
               : hasSentBoost
               ? "reflection"
               : "social";
-          setStage(nextStage);
         }
+        pendingTransitionRef.current = () => setStage(nextStage);
+        setConsequenceActive(true);
       } else {
-        setCurrentIndex((i) => i + 1);
+        pendingTransitionRef.current = () => setCurrentIndex((i) => i + 1);
+        setConsequenceActive(true);
       }
     } catch (e) {
       console.error(e);
@@ -696,7 +721,7 @@ export default function PlayPage() {
                                   <Button
                                     key={choice.id}
                                     variant="secondary"
-                                    disabled={savingChoice}
+                                    disabled={choicesDisabled}
                                     onClick={() => handleChoice(choice.id)}
                                     className="w-full justify-start"
                                   >
@@ -709,7 +734,7 @@ export default function PlayPage() {
                                 </p>
                               );
                             })()}
-                            {(outcomeMessage || outcomeDeltas) && (
+                            {(outcomeMessage || outcomeDeltas) && !consequenceActive && (
                               <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
                                 {outcomeMessage ? <p>{outcomeMessage}</p> : null}
                                 {outcomeDeltas ? (
@@ -739,6 +764,13 @@ export default function PlayPage() {
                                   </ul>
                                 ) : null}
                               </div>
+                            )}
+                            {consequenceActive && (
+                              <ConsequenceMoment
+                                message={outcomeMessage}
+                                deltas={outcomeDeltas}
+                                onDone={finishConsequence}
+                              />
                             )}
                           </div>
                         </div>
