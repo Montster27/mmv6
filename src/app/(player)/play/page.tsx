@@ -21,9 +21,9 @@ import {
   applyOutcomeForChoice,
   toChoices,
   type AllocationPayload,
-  type StoryletRun,
 } from "@/lib/play";
 import type { DailyState } from "@/types/daily";
+import type { StoryletRun } from "@/types/storylets";
 import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
 import {
   fetchPublicProfiles,
