@@ -11,6 +11,7 @@ import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
+export type { StoryletRun };
 
 function parseChoices(raw: unknown): StoryletChoice[] {
   if (Array.isArray(raw)) {
