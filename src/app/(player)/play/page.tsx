@@ -20,10 +20,10 @@ import {
   saveTimeAllocation,
   applyOutcomeForChoice,
   toChoices,
-  type DailyState,
   type AllocationPayload,
   type StoryletRun,
 } from "@/lib/play";
+import type { DailyState } from "@/types/daily";
 import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
 import {
   fetchPublicProfiles,
