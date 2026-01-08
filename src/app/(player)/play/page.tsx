@@ -372,12 +372,12 @@ export default function PlayPage() {
             const merged = {
               energy: prev?.energy,
               stress: prev?.stress,
-              vectors: { ...(prev?.vectors ?? {}) },
             } as {
               energy?: number;
               stress?: number;
               vectors?: Record<string, number>;
             };
+            merged.vectors = { ...(prev?.vectors ?? {}) };
             if (typeof arcAdvance.appliedDeltas?.stress === "number") {
               merged.stress = (merged.stress ?? 0) + arcAdvance.appliedDeltas.stress;
             }
