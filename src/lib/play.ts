@@ -277,16 +277,23 @@ export async function applyOutcomeForChoice(
     vectors?: Record<string, number>;
   };
   resolvedOutcomeId?: string;
+  resolvedOutcomeAnomalies?: string[];
 }> {
   const choice = toChoices(storylet).find((c) => c.id === choiceId);
   let resolvedOutcome: StoryletOutcome | undefined = choice?.outcome;
   let resolvedOutcomeId: string | undefined;
+  let resolvedOutcomeAnomalies: string[] | undefined = choice?.outcome?.anomalies;
 
   if (!resolvedOutcome && choice?.outcomes && choice.outcomes.length > 0) {
     const seed = `${userId}:${dayIndex}:${storylet.id}:${choiceId}`;
     const resolved = chooseWeightedOutcome(seed, choice.outcomes, dailyState.vectors);
-    resolvedOutcome = { text: resolved.text, deltas: resolved.deltas };
+    resolvedOutcome = {
+      text: resolved.text,
+      deltas: resolved.deltas,
+      anomalies: resolved.anomalies,
+    };
     resolvedOutcomeId = resolved.id;
+    resolvedOutcomeAnomalies = resolved.anomalies;
   }
 
   const { nextDailyState, appliedDeltas, message } = applyOutcomeToDailyState(
@@ -294,7 +301,13 @@ export async function applyOutcomeForChoice(
     resolvedOutcome
   );
   await updateDailyState(userId, nextDailyState);
-  return { nextDailyState, appliedMessage: message, appliedDeltas, resolvedOutcomeId };
+  return {
+    nextDailyState,
+    appliedMessage: message,
+    appliedDeltas,
+    resolvedOutcomeId,
+    resolvedOutcomeAnomalies,
+  };
 }
 
 export async function markDailyComplete(
