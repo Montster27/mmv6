@@ -12,8 +12,8 @@ import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
-import { fetchCurrentSeasonIndex, getOrCreateUserSeason } from "@/lib/seasons";
 import { performSeasonReset } from "@/core/season/seasonReset";
+import { getSeasonContext } from "@/core/season/getSeasonContext";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -60,13 +60,21 @@ export async function getOrCreateDailyRun(
     .toISOString()
     .slice(0, 10);
 
-  const currentSeasonIndex = await fetchCurrentSeasonIndex(todayUtc);
-  const userSeason = await getOrCreateUserSeason(userId, currentSeasonIndex);
+  const seasonContext = await getSeasonContext(userId, today);
+  const currentSeasonIndex = seasonContext.currentSeason.season_index;
+  const userSeason = seasonContext.userSeason;
   let seasonResetNeeded = false;
   let seasonRecap = null;
   if (userSeason.current_season_index !== currentSeasonIndex) {
     seasonRecap = await performSeasonReset(userId, currentSeasonIndex, userSeason);
     seasonResetNeeded = true;
+    seasonContext.userSeason = {
+      ...userSeason,
+      current_season_index: currentSeasonIndex,
+      last_seen_season_index: currentSeasonIndex,
+      last_reset_at: new Date().toISOString(),
+      last_recap: seasonRecap ?? userSeason.last_recap,
+    };
   }
 
   const cadence = await ensureCadenceUpToDate(userId);
@@ -158,6 +166,7 @@ export async function getOrCreateDailyRun(
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
     seasonRecap: seasonResetNeeded ? seasonRecap : undefined,
+    seasonContext,
   };
 }
 

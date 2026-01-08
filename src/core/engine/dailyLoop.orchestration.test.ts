@@ -27,9 +27,8 @@ vi.mock("@/core/arcs/arcEngine", () => ({
   getOrStartArc: vi.fn(),
   getArcNextStepStorylet: vi.fn(),
 }));
-vi.mock("@/lib/seasons", () => ({
-  fetchCurrentSeasonIndex: vi.fn(),
-  getOrCreateUserSeason: vi.fn(),
+vi.mock("@/core/season/getSeasonContext", () => ({
+  getSeasonContext: vi.fn(),
 }));
 vi.mock("@/core/season/seasonReset", () => ({
   performSeasonReset: vi.fn(),
@@ -60,7 +59,7 @@ import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
-import { fetchCurrentSeasonIndex, getOrCreateUserSeason } from "@/lib/seasons";
+import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
@@ -109,16 +108,23 @@ function mockRuns(count: number): StoryletRun[] {
 }
 
 beforeEach(() => {
-  vi.mocked(fetchCurrentSeasonIndex).mockResolvedValue(1);
-  vi.mocked(getOrCreateUserSeason).mockResolvedValue({
-    id: "s1",
-    user_id: "u",
-    current_season_index: 1,
-    last_seen_season_index: 1,
-    last_reset_at: null,
-    last_recap: {},
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+  vi.mocked(getSeasonContext).mockResolvedValue({
+    currentSeason: {
+      season_index: 1,
+      starts_at: "2024-01-01",
+      ends_at: "2024-01-28",
+    },
+    daysRemaining: 10,
+    userSeason: {
+      id: "s1",
+      user_id: "u",
+      current_season_index: 1,
+      last_seen_season_index: 1,
+      last_reset_at: null,
+      last_recap: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
   });
   vi.mocked(performSeasonReset).mockResolvedValue({
     lastSeasonIndex: 1,

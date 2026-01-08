@@ -43,6 +43,8 @@ import type { ReflectionResponse } from "@/types/reflections";
 import type { SeasonRecap } from "@/types/seasons";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { ProgressPanel } from "@/components/ProgressPanel";
+import { SeasonBadge } from "@/components/SeasonBadge";
+import type { SeasonContext } from "@/types/season";
 
 const defaultAllocation: AllocationPayload = {
   study: 0,
@@ -78,6 +80,7 @@ export default function PlayPage() {
   const [seasonResetPending, setSeasonResetPending] = useState(false);
   const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
   const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
+  const [seasonContext, setSeasonContext] = useState<SeasonContext | null>(null);
   const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
   const [outcomeDeltas, setOutcomeDeltas] = useState<{
     energy?: number;
@@ -155,6 +158,7 @@ export default function PlayPage() {
           setAllocation({ ...defaultAllocation, ...(run.allocation ?? {}) });
           setHasSentBoost(!run.canBoost);
           setMicroTaskStatus(run.microTaskStatus ?? "pending");
+          setSeasonContext(run.seasonContext ?? null);
           if (run.seasonResetNeeded) {
             setSeasonResetPending(true);
             setSeasonIndex(run.newSeasonIndex ?? null);
@@ -178,6 +182,7 @@ export default function PlayPage() {
           const cadence = await ensureCadenceUpToDate(userId);
           setDayIndexState(cadence.dayIndex);
           setAlreadyCompletedToday(cadence.alreadyCompletedToday);
+          setSeasonContext(null);
 
           const ds = await fetchDailyState(userId);
           if (ds) {
@@ -229,11 +234,27 @@ export default function PlayPage() {
     init();
   }, []);
 
+  const trackWithSeason = (params: {
+    event_type: string;
+    day_index?: number;
+    stage?: string;
+    payload?: Record<string, unknown>;
+  }) => {
+    const seasonIndexValue = seasonContext?.currentSeason.season_index;
+    trackEvent({
+      ...params,
+      payload: {
+        ...(params.payload ?? {}),
+        ...(seasonIndexValue ? { season_index: seasonIndexValue } : {}),
+      },
+    });
+  };
+
   useEffect(() => {
     if (!userId || loading || sessionStartTracked.current) return;
     sessionStartTracked.current = true;
-    trackEvent({ event_type: "session_start", day_index: dayIndex, stage });
-  }, [userId, dayIndex, stage, loading]);
+    trackWithSeason({ event_type: "session_start", day_index: dayIndex, stage });
+  }, [userId, dayIndex, stage, loading, seasonContext]);
 
   useEffect(() => {
     if (!userId || loading) return;
@@ -243,7 +264,7 @@ export default function PlayPage() {
     if (!previousStage) {
       stageRef.current = stage;
       stageStartedAtRef.current = now;
-      trackEvent({ event_type: "stage_enter", day_index: dayIndex, stage });
+      trackWithSeason({ event_type: "stage_enter", day_index: dayIndex, stage });
       return;
     }
 
@@ -253,7 +274,7 @@ export default function PlayPage() {
 
     const startedAt = stageStartedAtRef.current;
     if (startedAt) {
-      trackEvent({
+      trackWithSeason({
         event_type: "stage_complete",
         day_index: dayIndex,
         stage: previousStage,
@@ -263,11 +284,11 @@ export default function PlayPage() {
 
     stageRef.current = stage;
     stageStartedAtRef.current = now;
-    trackEvent({ event_type: "stage_enter", day_index: dayIndex, stage });
+    trackWithSeason({ event_type: "stage_enter", day_index: dayIndex, stage });
 
     if (stage === "complete" && !sessionEndTracked.current) {
       sessionEndTracked.current = true;
-      trackEvent({ event_type: "session_end", day_index: dayIndex, stage });
+      trackWithSeason({ event_type: "session_end", day_index: dayIndex, stage });
     }
   }, [stage, userId, dayIndex, loading]);
 
@@ -275,14 +296,18 @@ export default function PlayPage() {
     if (!userId || loading) return;
     if (stage !== "microtask" || microTaskStartTracked.current) return;
     microTaskStartTracked.current = true;
-    trackEvent({ event_type: "microtask_start", day_index: dayIndex, stage: "microtask" });
+    trackWithSeason({
+      event_type: "microtask_start",
+      day_index: dayIndex,
+      stage: "microtask",
+    });
   }, [stage, userId, dayIndex, loading]);
 
   useEffect(() => {
     return () => {
       if (!userId || sessionEndTracked.current) return;
       sessionEndTracked.current = true;
-      trackEvent({
+      trackWithSeason({
         event_type: "session_end",
         day_index: latestDayIndexRef.current ?? undefined,
         stage: latestStageRef.current ?? undefined,
@@ -390,7 +415,7 @@ export default function PlayPage() {
             source: currentStorylet.slug ?? currentStorylet.id,
           });
           resolvedOutcomeAnomalies.forEach((anomalyId) => {
-            trackEvent({
+            trackWithSeason({
               event_type: "anomaly_discovered",
               day_index: dayIndex,
               stage,
@@ -432,7 +457,7 @@ export default function PlayPage() {
           });
         }
         if (resolvedOutcomeId) {
-          trackEvent({
+          trackWithSeason({
             event_type: "storylet_resolved_outcome",
             day_index: dayIndex,
             stage,
@@ -584,7 +609,7 @@ export default function PlayPage() {
         setOutcomeDeltas(outcome.appliedDeltas ?? null);
       }
       setMicroTaskStatus("done");
-      trackEvent({
+      trackWithSeason({
         event_type: "microtask_complete",
         day_index: dayIndex,
         stage: "microtask",
@@ -607,7 +632,7 @@ export default function PlayPage() {
     try {
       await skipMicroTask(userId, dayIndex);
       setMicroTaskStatus("skipped");
-      trackEvent({
+      trackWithSeason({
         event_type: "microtask_skip",
         day_index: dayIndex,
         stage: "microtask",
@@ -628,7 +653,7 @@ export default function PlayPage() {
     try {
       if (response === "skip") {
         await upsertReflection(userId, dayIndex, { skipped: true, response: null });
-        trackEvent({
+        trackWithSeason({
           event_type: "reflection_skip",
           day_index: dayIndex,
           stage: "reflection",
@@ -678,6 +703,14 @@ export default function PlayPage() {
                 Day {dayIndex} · Energy {dailyState?.energy ?? "—"} · Stress{" "}
                 {dailyState?.stress ?? "—"}
               </p>
+              {seasonContext ? (
+                <div className="mt-2">
+                  <SeasonBadge
+                    seasonIndex={seasonContext.currentSeason.season_index}
+                    daysRemaining={seasonContext.daysRemaining}
+                  />
+                </div>
+              ) : null}
               <p className="text-slate-600 text-sm">
                 Signed in as {session.user.email ?? "unknown user"}.
               </p>

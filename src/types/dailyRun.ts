@@ -1,6 +1,7 @@
 import type { Storylet, StoryletRun } from "./storylets";
 import type { AllocationMap, DailyState } from "./daily";
 import type { SeasonRecap } from "./seasons";
+import type { SeasonContext } from "./season";
 
 export type DailyRunStage =
   | "allocation"
@@ -26,4 +27,5 @@ export type DailyRun = {
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;
   seasonRecap?: SeasonRecap | null;
+  seasonContext?: SeasonContext;
 };
