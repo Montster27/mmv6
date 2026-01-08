@@ -99,6 +99,11 @@ export function validateStorylet(
           Array.isArray((choice as any).outcome))
       ) {
         errors.push(`Choice ${idx} outcome must be an object if present`);
+      } else if ((choice as any).outcome?.anomalies) {
+        const anomalies = (choice as any).outcome.anomalies;
+        if (!Array.isArray(anomalies) || anomalies.some((a: any) => !isString(a))) {
+          errors.push(`Choice ${idx} outcome anomalies must be an array of strings`);
+        }
       }
       if ((choice as any).outcomes) {
         if (!Array.isArray((choice as any).outcomes)) {
@@ -133,6 +138,13 @@ export function validateStorylet(
                 ) {
                   errors.push(`Choice ${idx} outcome ${oIdx} modifiers.per10 must be a number`);
                 }
+              }
+            }
+            if (outcome.anomalies) {
+              if (!Array.isArray(outcome.anomalies)) {
+                errors.push(`Choice ${idx} outcome ${oIdx} anomalies must be an array`);
+              } else if (outcome.anomalies.some((a: any) => !isString(a))) {
+                errors.push(`Choice ${idx} outcome ${oIdx} anomalies must be strings`);
               }
             }
           });

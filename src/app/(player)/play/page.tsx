@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
@@ -12,6 +13,7 @@ import { trackEvent } from "@/lib/events";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 import { advanceArcIfStepCompleted } from "@/core/arcs/arcEngine";
 import { PRIMARY_ARC_ID } from "@/content/arcs/arcDefinitions";
+import { awardAnomalies } from "@/lib/anomalies";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -338,7 +340,13 @@ export default function PlayPage() {
           throw new Error("Unable to load daily state for outcome application.");
         }
 
-        const { nextDailyState, appliedDeltas, appliedMessage, resolvedOutcomeId } =
+        const {
+          nextDailyState,
+          appliedDeltas,
+          appliedMessage,
+          resolvedOutcomeId,
+          resolvedOutcomeAnomalies,
+        } =
           await applyOutcomeForChoice(
             state,
             choiceId,
@@ -358,6 +366,22 @@ export default function PlayPage() {
           appliedMessage || (hasDeltas ? "Choice recorded." : null)
         );
         setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
+        if (resolvedOutcomeAnomalies?.length) {
+          await awardAnomalies({
+            userId,
+            anomalyIds: resolvedOutcomeAnomalies,
+            dayIndex,
+            source: currentStorylet.slug ?? currentStorylet.id,
+          });
+          resolvedOutcomeAnomalies.forEach((anomalyId) => {
+            trackEvent({
+              event_type: "anomaly_discovered",
+              day_index: dayIndex,
+              stage,
+              payload: { anomaly_id: anomalyId, source: currentStorylet.slug },
+            });
+          });
+        }
         const arcAdvance = await advanceArcIfStepCompleted(
           userId,
           PRIMARY_ARC_ID,
@@ -642,7 +666,12 @@ export default function PlayPage() {
                 Signed in as {session.user.email ?? "unknown user"}.
               </p>
             </div>
-            <Button onClick={signOut}>Sign out</Button>
+            <div className="flex items-center gap-2">
+              <Link className="text-sm text-slate-600 hover:underline" href="/journal">
+                Journal
+              </Link>
+              <Button onClick={signOut}>Sign out</Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr]">

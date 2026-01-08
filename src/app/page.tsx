@@ -16,6 +16,9 @@ export default function Home() {
           <Link className="block underline underline-offset-4" href="/play">
             Play
           </Link>
+          <Link className="block underline underline-offset-4" href="/journal">
+            Journal
+          </Link>
           <Link className="block underline underline-offset-4" href="/admin">
             Admin
           </Link>

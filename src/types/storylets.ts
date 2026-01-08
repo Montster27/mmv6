@@ -5,6 +5,7 @@ export type StoryletOutcome = {
     stress?: number;
     vectors?: Record<string, number>;
   };
+  anomalies?: string[];
 };
 
 export type StoryletOutcomeOption = StoryletOutcome & {
