@@ -8,8 +8,10 @@ create table if not exists public.user_anomalies (
     source text
 );
 
-alter table public.user_anomalies
-  add constraint user_anomalies_unique unique (user_id, anomaly_id);
+do $$ begin
+  alter table public.user_anomalies
+    add constraint user_anomalies_unique unique (user_id, anomaly_id);
+exception when duplicate_object then null; end $$;
 
 create index if not exists user_anomalies_user_discovered_idx
   on public.user_anomalies (user_id, discovered_at desc);
