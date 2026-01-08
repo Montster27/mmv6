@@ -308,7 +308,7 @@ export default function StoryletEditPage({
                 </label>
 
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
-                  {"Choices (JSON array of { id, label, outcome? })"}
+                  {"Choices (JSON array of { id, label, outcome? | outcomes? })"}
                   <textarea
                     className="rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
                     rows={6}
@@ -336,6 +336,43 @@ export default function StoryletEditPage({
                     }
                   >
                     Insert sample choices
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="px-0 text-xs text-slate-700"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        choices: JSON.stringify(
+                          [
+                            {
+                              id: "A",
+                              label: "Take the risk",
+                              outcomes: [
+                                {
+                                  id: "success",
+                                  weight: 70,
+                                  text: "It pays off.",
+                                  deltas: { energy: 2, vectors: { focus: 1 } },
+                                  modifiers: { vector: "focus", per10: 2 },
+                                },
+                                {
+                                  id: "setback",
+                                  weight: 30,
+                                  text: "It backfires.",
+                                  deltas: { stress: 2 },
+                                },
+                              ],
+                            },
+                          ],
+                          null,
+                          2
+                        ),
+                      }))
+                    }
+                  >
+                    Insert probabilistic template
                   </Button>
                 </label>
 

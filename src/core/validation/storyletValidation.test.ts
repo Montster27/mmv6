@@ -41,4 +41,37 @@ describe("storyletValidation", () => {
     expect(fb.title.includes("Corrupted")).toBe(true);
     expect(fb.choices[0]?.id).toBe("continue");
   });
+
+  it("accepts probabilistic outcomes with weights", () => {
+    const withOutcomes = {
+      ...valid,
+      choices: [
+        {
+          id: "A",
+          label: "Option A",
+          outcomes: [
+            { id: "success", weight: 70, text: "ok" },
+            { id: "fail", weight: 30, text: "nope" },
+          ],
+        },
+      ],
+    };
+    const res = validateStorylet(withOutcomes);
+    expect(res.ok).toBe(true);
+  });
+
+  it("rejects invalid probabilistic outcomes", () => {
+    const withBadOutcomes = {
+      ...valid,
+      choices: [
+        {
+          id: "A",
+          label: "Option A",
+          outcomes: [{ id: "oops", weight: 0 }],
+        },
+      ],
+    };
+    const res = validateStorylet(withBadOutcomes);
+    expect(res.ok).toBe(false);
+  });
 });

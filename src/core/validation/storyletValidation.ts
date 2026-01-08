@@ -1,4 +1,9 @@
-import type { Storylet, StoryletChoice } from "@/types/storylets";
+import type {
+  Storylet,
+  StoryletChoice,
+  StoryletOutcome,
+  StoryletOutcomeOption,
+} from "@/types/storylets";
 import type { JsonObject } from "@/types/vectors";
 
 function isString(value: unknown): value is string {
@@ -14,7 +19,25 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     outcome && typeof outcome === "object" && !Array.isArray(outcome)
       ? (outcome as JsonObject)
       : undefined;
-  return { id: obj.id, label: obj.label, outcome: outcomeObj };
+  const outcomesRaw = Array.isArray(obj.outcomes) ? obj.outcomes : undefined;
+  const outcomes = outcomesRaw
+    ?.map((item) => coerceOutcomeOption(item))
+    .filter((item): item is StoryletOutcomeOption => Boolean(item));
+  return {
+    id: obj.id,
+    label: obj.label,
+    outcome: outcomeObj as StoryletOutcome | undefined,
+    outcomes,
+  };
+}
+
+function coerceOutcomeOption(raw: unknown): StoryletOutcomeOption | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (!isString(obj.id)) return null;
+  if (typeof obj.weight !== "number") return null;
+  const outcome = obj as JsonObject;
+  return outcome as StoryletOutcomeOption;
 }
 
 export function coerceStoryletRow(row: any): Storylet {
@@ -76,6 +99,44 @@ export function validateStorylet(
           Array.isArray((choice as any).outcome))
       ) {
         errors.push(`Choice ${idx} outcome must be an object if present`);
+      }
+      if ((choice as any).outcomes) {
+        if (!Array.isArray((choice as any).outcomes)) {
+          errors.push(`Choice ${idx} outcomes must be an array if present`);
+        } else if ((choice as any).outcomes.length === 0) {
+          errors.push(`Choice ${idx} outcomes must be non-empty`);
+        } else {
+          (choice as any).outcomes.forEach((outcome: any, oIdx: number) => {
+            if (!outcome || typeof outcome !== "object") {
+              errors.push(`Choice ${idx} outcome ${oIdx} is not an object`);
+              return;
+            }
+            if (!isString(outcome.id) || !outcome.id) {
+              errors.push(`Choice ${idx} outcome ${oIdx} missing id`);
+            }
+            if (typeof outcome.weight !== "number" || outcome.weight <= 0) {
+              errors.push(`Choice ${idx} outcome ${oIdx} weight must be > 0`);
+            }
+            if (outcome.modifiers) {
+              if (typeof outcome.modifiers !== "object" || Array.isArray(outcome.modifiers)) {
+                errors.push(`Choice ${idx} outcome ${oIdx} modifiers must be an object`);
+              } else {
+                if (
+                  outcome.modifiers.vector !== undefined &&
+                  !isString(outcome.modifiers.vector)
+                ) {
+                  errors.push(`Choice ${idx} outcome ${oIdx} modifiers.vector must be a string`);
+                }
+                if (
+                  outcome.modifiers.per10 !== undefined &&
+                  typeof outcome.modifiers.per10 !== "number"
+                ) {
+                  errors.push(`Choice ${idx} outcome ${oIdx} modifiers.per10 must be a number`);
+                }
+              }
+            }
+          });
+        }
       }
     });
   }

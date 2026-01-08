@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import type { AllocationMap, DailyState } from "@/types/daily";
-import type { Storylet, StoryletChoice, StoryletRun } from "@/types/storylets";
+import type { Storylet, StoryletChoice, StoryletRun, StoryletOutcome } from "@/types/storylets";
 import type { JsonObject } from "@/types/vectors";
 import {
   coerceStoryletRow,
@@ -8,6 +8,7 @@ import {
   validateStorylet,
 } from "@/core/validation/storyletValidation";
 import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
+import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -265,7 +266,8 @@ export async function applyOutcomeForChoice(
   dailyState: DailyState,
   choiceId: string,
   storylet: Storylet,
-  userId: string
+  userId: string,
+  dayIndex: number
 ): Promise<{
   nextDailyState: DailyState;
   appliedMessage: string;
@@ -274,14 +276,25 @@ export async function applyOutcomeForChoice(
     stress?: number;
     vectors?: Record<string, number>;
   };
+  resolvedOutcomeId?: string;
 }> {
   const choice = toChoices(storylet).find((c) => c.id === choiceId);
+  let resolvedOutcome: StoryletOutcome | undefined = choice?.outcome;
+  let resolvedOutcomeId: string | undefined;
+
+  if (!resolvedOutcome && choice?.outcomes && choice.outcomes.length > 0) {
+    const seed = `${userId}:${dayIndex}:${storylet.id}:${choiceId}`;
+    const resolved = chooseWeightedOutcome(seed, choice.outcomes, dailyState.vectors);
+    resolvedOutcome = { text: resolved.text, deltas: resolved.deltas };
+    resolvedOutcomeId = resolved.id;
+  }
+
   const { nextDailyState, appliedDeltas, message } = applyOutcomeToDailyState(
     dailyState,
-    choice?.outcome
+    resolvedOutcome
   );
   await updateDailyState(userId, nextDailyState);
-  return { nextDailyState, appliedMessage: message, appliedDeltas };
+  return { nextDailyState, appliedMessage: message, appliedDeltas, resolvedOutcomeId };
 }
 
 export async function markDailyComplete(

@@ -336,8 +336,14 @@ export default function PlayPage() {
           throw new Error("Unable to load daily state for outcome application.");
         }
 
-        const { nextDailyState, appliedDeltas, appliedMessage } =
-          await applyOutcomeForChoice(state, choiceId, currentStorylet, userId);
+        const { nextDailyState, appliedDeltas, appliedMessage, resolvedOutcomeId } =
+          await applyOutcomeForChoice(
+            state,
+            choiceId,
+            currentStorylet,
+            userId,
+            dayIndex
+          );
         setDailyState(nextDailyState);
         const hasVectorDeltas =
           appliedDeltas.vectors &&
@@ -350,6 +356,18 @@ export default function PlayPage() {
           appliedMessage || (hasDeltas ? "Choice recorded." : null)
         );
         setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
+        if (resolvedOutcomeId) {
+          trackEvent({
+            event_type: "storylet_resolved_outcome",
+            day_index: dayIndex,
+            stage,
+            payload: {
+              storylet_id: currentStorylet.id,
+              choice_id: choiceId,
+              outcome_id: resolvedOutcomeId,
+            },
+          });
+        }
         if (process.env.NODE_ENV !== "production") {
           console.debug("[choice-outcome]", {
             storyletId: currentStorylet.id,

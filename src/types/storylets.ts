@@ -1,14 +1,26 @@
+export type StoryletOutcome = {
+  text?: string;
+  deltas?: {
+    energy?: number;
+    stress?: number;
+    vectors?: Record<string, number>;
+  };
+};
+
+export type StoryletOutcomeOption = StoryletOutcome & {
+  id: string;
+  weight: number;
+  modifiers?: {
+    vector?: string;
+    per10?: number;
+  };
+};
+
 export type StoryletChoice = {
   id: string;
   label: string;
-  outcome?: {
-    text?: string;
-    deltas?: {
-      energy?: number;
-      stress?: number;
-      vectors?: Record<string, number>;
-    };
-  };
+  outcome?: StoryletOutcome;
+  outcomes?: StoryletOutcomeOption[];
 };
 
 export type Storylet = {
