@@ -217,6 +217,7 @@ export async function sendBoost(
   toUserId: string,
   dayIndex: number
 ): Promise<void> {
+  const dayValue = dayIndex.toString();
   const { start, end } = getUtcDayRange();
   const existing = await getExistingBoost(fromUserId, start, end);
   if (existing) {
