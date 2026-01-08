@@ -55,6 +55,10 @@ async function upsertProfile(params: {
 
 export default function LoginPage() {
   const router = useRouter();
+  const buildStamp =
+    process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ??
+    process.env.NEXT_PUBLIC_COMMIT_SHA?.slice(0, 7) ??
+    "dev";
 
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -235,7 +239,10 @@ export default function LoginPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-md">
-      <h1 className="text-2xl font-semibold">Login</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Login</h1>
+        <span className="text-xs text-slate-400">build {buildStamp}</span>
+      </div>
 
       <div className="space-y-3 rounded-md border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold">Sign in with username</h2>
