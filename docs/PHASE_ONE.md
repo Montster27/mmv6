@@ -20,3 +20,6 @@ Implement the core daily loop end-to-end so a player can play a day, see progres
 - Stage duration averages use `stage_complete` payload `duration_ms`.
 - Retention D1/D3/D7 uses session_start users on day X who also have session_start on day X+N (UTC days).
 - Reflection/social skip rates are `% of sessions` with `reflection_skip` or `social_skip` events.
+
+## Data Notes
+- Social boosts are enforced once-per-day in app logic; the boost payload stores `day_index` (not a column), so DB uniqueness is deferred. Consider a dedicated column in a future migration if needed.
