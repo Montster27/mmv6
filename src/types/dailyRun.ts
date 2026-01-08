@@ -1,5 +1,6 @@
 import type { Storylet, StoryletRun } from "./storylets";
 import type { AllocationMap, DailyState } from "./daily";
+import type { SeasonRecap } from "./seasons";
 
 export type DailyRunStage =
   | "allocation"
@@ -22,4 +23,7 @@ export type DailyRun = {
   reflectionStatus: "pending" | "done";
   microTaskStatus?: "pending" | "done" | "skipped";
   dailyState?: DailyState | null;
+  seasonResetNeeded?: boolean;
+  newSeasonIndex?: number;
+  seasonRecap?: SeasonRecap | null;
 };

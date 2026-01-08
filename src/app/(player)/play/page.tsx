@@ -40,6 +40,7 @@ import {
 import { upsertReflection } from "@/lib/reflections";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type { ReflectionResponse } from "@/types/reflections";
+import type { SeasonRecap } from "@/types/seasons";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { ProgressPanel } from "@/components/ProgressPanel";
 
@@ -74,6 +75,9 @@ export default function PlayPage() {
   const [alreadyCompletedToday, setAlreadyCompletedToday] = useState(false);
   const [dayIndexState, setDayIndexState] = useState(1);
   const [stage, setStage] = useState<DailyRunStage>("allocation");
+  const [seasonResetPending, setSeasonResetPending] = useState(false);
+  const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
+  const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
   const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
   const [outcomeDeltas, setOutcomeDeltas] = useState<{
     energy?: number;
@@ -103,6 +107,9 @@ export default function PlayPage() {
     () => dayIndex >= 1 && dayIndex % 2 === 0,
     [dayIndex]
   );
+  const showDailyComplete =
+    (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
+    (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   useEffect(() => {
     latestStageRef.current = stage;
@@ -148,6 +155,15 @@ export default function PlayPage() {
           setAllocation({ ...defaultAllocation, ...(run.allocation ?? {}) });
           setHasSentBoost(!run.canBoost);
           setMicroTaskStatus(run.microTaskStatus ?? "pending");
+          if (run.seasonResetNeeded) {
+            setSeasonResetPending(true);
+            setSeasonIndex(run.newSeasonIndex ?? null);
+            setSeasonRecap(run.seasonRecap ?? null);
+          } else {
+            setSeasonResetPending(false);
+            setSeasonIndex(null);
+            setSeasonRecap(null);
+          }
           const ds = run.dailyState ?? (await fetchDailyState(userId));
           if (ds) setDailyState({ ...ds, day_index: run.dayIndex });
 
@@ -677,52 +693,77 @@ export default function PlayPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr]">
-            <div className="space-y-6">
-              {error ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
+          {seasonResetPending ? (
+            <section className="rounded-md border border-amber-200 bg-amber-50 px-4 py-4 space-y-3">
+              <h2 className="text-xl font-semibold">
+                Season {seasonIndex ?? "?"} begins
+              </h2>
+              <p className="text-slate-700">
+                You remember: anomalies and theories.
+              </p>
+              <p className="text-slate-700">
+                You forget: the daily ledger (energy, stress, vectors reset).
+              </p>
+              {seasonRecap ? (
+                <div className="rounded-md border border-amber-200 bg-white px-3 py-3 text-sm text-slate-700 space-y-1">
+                  <p>Last season recap:</p>
+                  <p>· Anomalies found: {seasonRecap.anomaliesFoundCount}</p>
+                  <p>· Hypotheses written: {seasonRecap.hypothesesCount}</p>
+                  {seasonRecap.topVector ? (
+                    <p>· Strongest vector: {seasonRecap.topVector}</p>
+                  ) : null}
                 </div>
               ) : null}
+              <Button onClick={() => setSeasonResetPending(false)}>
+                Start the new season
+              </Button>
+            </section>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr]">
+              <div className="space-y-6">
+                {error ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {error}
+                  </div>
+                ) : null}
 
-              {loading ? (
-                <p className="text-slate-700">Loading…</p>
-              ) : (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
-                (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday) ? (
-                <>
-                  <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                    <h2 className="text-xl font-semibold">Daily complete ✅</h2>
-                    <p className="text-slate-700">Come back tomorrow.</p>
-                  </section>
+                {loading ? (
+                  <p className="text-slate-700">Loading…</p>
+                ) : showDailyComplete ? (
+                  <>
+                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                      <h2 className="text-xl font-semibold">Daily complete ✅</h2>
+                      <p className="text-slate-700">Come back tomorrow.</p>
+                    </section>
 
-                  <section className="space-y-3">
-                    <h2 className="text-xl font-semibold">Boosts Received Today</h2>
-                    {boostsReceived.length === 0 ? (
-                      <p className="text-sm text-slate-700">
-                        None yet. Maybe tomorrow.
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {boostsReceived.map((boost, idx) => {
-                          const sender =
-                            publicProfiles.find(
-                              (p) => p.user_id === boost.from_user_id
-                            )?.display_name ?? "Unknown player";
-                          return (
-                            <li
-                              key={`${boost.from_user_id}-${idx}`}
-                              className="rounded border border-slate-200 bg-white px-3 py-2 text-slate-800"
-                            >
-                              {sender} sent you a boost.
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </section>
-                </>
-              ) : (
-                <>
+                    <section className="space-y-3">
+                      <h2 className="text-xl font-semibold">Boosts Received Today</h2>
+                      {boostsReceived.length === 0 ? (
+                        <p className="text-sm text-slate-700">
+                          None yet. Maybe tomorrow.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {boostsReceived.map((boost, idx) => {
+                            const sender =
+                              publicProfiles.find(
+                                (p) => p.user_id === boost.from_user_id
+                              )?.display_name ?? "Unknown player";
+                            return (
+                              <li
+                                key={`${boost.from_user_id}-${idx}`}
+                                className="rounded border border-slate-200 bg-white px-3 py-2 text-slate-800"
+                              >
+                                {sender} sent you a boost.
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </section>
+                  </>
+                ) : (
+                  <>
                   {(stage === "allocation" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
                     <section className="space-y-3">
@@ -1003,6 +1044,7 @@ export default function PlayPage() {
               />
             </div>
           </div>
+          )}
         </div>
       )}
     </AuthGate>

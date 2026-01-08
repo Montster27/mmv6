@@ -12,6 +12,8 @@ import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
+import { fetchCurrentSeasonIndex, getOrCreateUserSeason } from "@/lib/seasons";
+import { performSeasonReset } from "@/core/season/seasonReset";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -57,6 +59,15 @@ export async function getOrCreateDailyRun(
   )
     .toISOString()
     .slice(0, 10);
+
+  const currentSeasonIndex = await fetchCurrentSeasonIndex(todayUtc);
+  const userSeason = await getOrCreateUserSeason(userId, currentSeasonIndex);
+  let seasonResetNeeded = false;
+  let seasonRecap = null;
+  if (userSeason.current_season_index !== currentSeasonIndex) {
+    seasonRecap = await performSeasonReset(userId, currentSeasonIndex, userSeason);
+    seasonResetNeeded = true;
+  }
 
   const cadence = await ensureCadenceUpToDate(userId);
   const dayIndex = cadence.dayIndex;
@@ -144,6 +155,9 @@ export async function getOrCreateDailyRun(
     reflectionStatus: reflectionDone ? "done" : "pending",
     microTaskStatus,
     dailyState: daily,
+    seasonResetNeeded,
+    newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
+    seasonRecap: seasonResetNeeded ? seasonRecap : undefined,
   };
 }
 
