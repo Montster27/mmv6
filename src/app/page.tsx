@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
 import { getExperimentConfig } from "@/lib/experiments";
 
 export default function Home() {

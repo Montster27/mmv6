@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import { getOrCreateUserSeason } from "@/lib/seasons";
 import type { SeasonContext, Season } from "@/types/season";
 

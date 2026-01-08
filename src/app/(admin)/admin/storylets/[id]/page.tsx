@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
 import { isEmailAllowed } from "@/lib/adminAuth";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import type { Storylet } from "@/types/storylets";
 import { validateStorylet } from "@/core/validation/storyletValidation";
 import { StoryletCard } from "@/components/storylets/StoryletCard";

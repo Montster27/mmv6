@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 import { getAdminClient } from "@/lib/supabaseAdmin";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { validateStorylet, coerceStoryletRow } from "@/core/validation/storyletValidation";
 import type { Storylet } from "@/types/storylets";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { supabaseServer } from "@/lib/supabase/server";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
-  const client = createClient(supabaseUrl, anonKey);
-  const { data, error } = await client.auth.getUser(token);
+  const { data, error } = await supabaseServer.auth.getUser(token);
   if (error) {
     console.error("Failed to verify user token", error);
     return null;

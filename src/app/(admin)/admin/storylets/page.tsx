@@ -6,7 +6,7 @@ import Link from "next/link";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
 import { isEmailAllowed } from "@/lib/adminAuth";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import type { Storylet } from "@/types/storylets";
 
 type FilterState = {

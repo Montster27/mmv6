@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import type { Season, UserSeason } from "@/types/seasons";
 
 const userSeasonSelect =

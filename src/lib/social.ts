@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import type { PublicProfile, ReceivedBoost } from "@/types/social";
 import type { DailyState } from "@/types/daily";
 

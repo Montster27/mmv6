@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import { trackEvent } from "@/lib/events";
 import { fetchDailyState } from "@/lib/play";
 import type { DailyState } from "@/types/daily";

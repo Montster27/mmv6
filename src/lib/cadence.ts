@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import type { DailyState } from "@/types/daily";
 
 export function utcToday(): string {

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import { utcToday } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import type { DailyState } from "@/types/daily";

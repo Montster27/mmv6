@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 
 const devQuickEnabled =
   process.env.NEXT_PUBLIC_ENABLE_DEV_SWITCH === "1" ||

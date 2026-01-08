@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import type { Reflection, ReflectionResponse } from "@/types/reflections";
 
 const PROMPT_ID = "clarity_v1";

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import type { Anomaly, UserAnomaly } from "@/types/anomalies";
 
 export async function fetchAnomaliesByIds(ids: string[]): Promise<Anomaly[]> {

@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { fetchMetrics } from "@/server/metrics";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { supabaseServer } from "@/lib/supabase/server";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
-  const client = createClient(supabaseUrl, anonKey);
-  const { data, error } = await client.auth.getUser(token);
+  const { data, error } = await supabaseServer.auth.getUser(token);
   if (error) {
     console.error("Failed to verify user token", error);
     return null;

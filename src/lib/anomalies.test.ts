@@ -28,7 +28,7 @@ const mockState = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabaseClient", () => ({ supabase: mockState.supabase }));
+vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
 
 import { awardAnomalies } from "@/lib/anomalies";
 

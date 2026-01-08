@@ -16,7 +16,7 @@ const mockState = vi.hoisted(() => {
   return { supabase };
 });
 
-vi.mock("@/lib/supabaseClient", () => ({ supabase: mockState.supabase }));
+vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
 vi.mock("@/lib/events", () => ({ trackEvent: vi.fn() }));
 
 import { linkAnomaly } from "@/lib/hypotheses";

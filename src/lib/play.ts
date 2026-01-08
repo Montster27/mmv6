@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase/browser";
 import type { AllocationMap, DailyState } from "@/types/daily";
 import type { Storylet, StoryletChoice, StoryletRun, StoryletOutcome } from "@/types/storylets";
 import type { JsonObject } from "@/types/vectors";
