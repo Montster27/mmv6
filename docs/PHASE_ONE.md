@@ -23,3 +23,6 @@ Implement the core daily loop end-to-end so a player can play a day, see progres
 
 ## Data Notes
 - Social boosts are enforced once-per-day in app logic; the boost payload stores `day_index` (not a column), so DB uniqueness is deferred. Consider a dedicated column in a future migration if needed.
+
+## Seed Notes
+- Medium arc v1 (roommate): create storylets with slugs `roommate-1`, `roommate-2`, `roommate-3`, `roommate-4` so the arc can resolve its steps.
