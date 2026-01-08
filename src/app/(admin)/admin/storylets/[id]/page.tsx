@@ -396,7 +396,24 @@ export default function StoryletEditPage({
                 </div>
               </div>
 
-              <StoryletCard storylet={previewStorylet} disabled />
+              <div className="space-y-2">
+                <StoryletCard storylet={previewStorylet} disabled />
+                {previewStorylet.choices?.length ? (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                    <p className="font-medium">Preview choices</p>
+                    <ul className="mt-1 space-y-1">
+                      {previewStorylet.choices.map((choice) => (
+                        <li key={choice.id} className="flex items-center gap-2">
+                          <span>{choice.label}</span>
+                          {choice.outcomes?.length ? (
+                            <span className="text-xs text-slate-500">(chance)</span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         );
