@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ const defaultAllocation: AllocationPayload = {
 const USE_DAILY_LOOP_ORCHESTRATOR = true;
 
 export default function PlayPage() {
+  const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [dailyState, setDailyState] = useState<DailyState | null>(null);
   const [allocation, setAllocation] =
@@ -747,7 +749,16 @@ export default function PlayPage() {
                   ) : null}
                 </div>
               ) : null}
-              <Button onClick={() => setSeasonResetPending(false)}>
+              <Button
+                onClick={() => {
+                  setSeasonResetPending(false);
+                  const lastSeason =
+                    seasonRecap?.lastSeasonIndex ??
+                    (seasonIndex ? seasonIndex - 1 : null);
+                  const query = lastSeason ? `?season=${lastSeason}` : "";
+                  router.push(`/season-recap${query}`);
+                }}
+              >
                 Start the new season
               </Button>
             </section>
