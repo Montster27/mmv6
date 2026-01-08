@@ -670,6 +670,9 @@ export default function PlayPage() {
               <Link className="text-sm text-slate-600 hover:underline" href="/journal">
                 Journal
               </Link>
+              <Link className="text-sm text-slate-600 hover:underline" href="/theory">
+                Theoryboard
+              </Link>
               <Button onClick={signOut}>Sign out</Button>
             </div>
           </div>
