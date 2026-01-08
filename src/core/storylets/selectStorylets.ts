@@ -16,6 +16,7 @@ type SelectorArgs = {
   dailyState: DailyState | null;
   allStorylets: Storylet[];
   recentRuns: StoryletRun[];
+  forcedStorylet?: Storylet | null;
 };
 
 function hashString(input: string): number {
@@ -81,6 +82,7 @@ export function selectStorylets({
   dailyState,
   allStorylets,
   recentRuns,
+  forcedStorylet,
 }: SelectorArgs): Storylet[] {
   const todayUsedIds = new Set(
     recentRuns.filter((r) => r.day_index === dayIndex).map((r) => r.storylet_id)
@@ -104,6 +106,13 @@ export function selectStorylets({
   const onboardingEligible = dayIndex <= 3 ? onboarding : [];
 
   let picked: Storylet[] = [];
+  if (
+    forcedStorylet &&
+    forcedStorylet.is_active &&
+    !todayUsedIds.has(forcedStorylet.id)
+  ) {
+    picked.push(forcedStorylet);
+  }
   if (onboardingEligible.length > 0) {
     picked.push(...pickTop(onboardingEligible, seed, 2));
   }

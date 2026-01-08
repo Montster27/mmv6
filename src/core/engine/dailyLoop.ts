@@ -11,6 +11,7 @@ import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
+import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -72,12 +73,21 @@ export async function getOrCreateDailyRun(
   const recentRuns =
     (await fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => [])) ?? [];
 
+  const userArc = await getOrStartArc(userId, dayIndex);
+  const arcStorylet = getArcNextStepStorylet(
+    userArc,
+    dayIndex,
+    storyletsRaw,
+    runs
+  );
+
   const storyletsSelected = selectStorylets({
     seed: `${userId}-${dayIndex}`,
     dayIndex,
     dailyState: daily ?? null,
     allStorylets: storyletsRaw,
     recentRuns,
+    forcedStorylet: arcStorylet ?? undefined,
   });
 
   const reflection = await getReflection(userId, dayIndex);

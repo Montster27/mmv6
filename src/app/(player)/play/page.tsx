@@ -10,6 +10,8 @@ import { ensurePlayerSetup } from "@/lib/bootstrap";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
+import { advanceArcIfStepCompleted } from "@/core/arcs/arcEngine";
+import { PRIMARY_ARC_ID } from "@/content/arcs/arcDefinitions";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -356,6 +358,39 @@ export default function PlayPage() {
           appliedMessage || (hasDeltas ? "Choice recorded." : null)
         );
         setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
+        const arcAdvance = await advanceArcIfStepCompleted(
+          userId,
+          PRIMARY_ARC_ID,
+          dayIndex,
+          currentStorylet.slug
+        );
+        if (arcAdvance?.nextDailyState) {
+          setDailyState(arcAdvance.nextDailyState);
+        }
+        if (arcAdvance?.appliedDeltas) {
+          setOutcomeDeltas((prev) => {
+            const merged = {
+              energy: prev?.energy,
+              stress: prev?.stress,
+              vectors: { ...(prev?.vectors ?? {}) },
+            } as {
+              energy?: number;
+              stress?: number;
+              vectors?: Record<string, number>;
+            };
+            if (typeof arcAdvance.appliedDeltas?.stress === "number") {
+              merged.stress = (merged.stress ?? 0) + arcAdvance.appliedDeltas.stress;
+            }
+            if (arcAdvance.appliedDeltas?.vectors) {
+              for (const [key, delta] of Object.entries(
+                arcAdvance.appliedDeltas.vectors
+              )) {
+                merged.vectors[key] = (merged.vectors[key] ?? 0) + delta;
+              }
+            }
+            return merged;
+          });
+        }
         if (resolvedOutcomeId) {
           trackEvent({
             event_type: "storylet_resolved_outcome",

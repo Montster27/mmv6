@@ -23,6 +23,10 @@ vi.mock("@/lib/reflections", () => ({
 vi.mock("@/lib/microtasks", () => ({
   fetchMicroTaskRun: vi.fn(),
 }));
+vi.mock("@/core/arcs/arcEngine", () => ({
+  getOrStartArc: vi.fn(),
+  getArcNextStepStorylet: vi.fn(),
+}));
 vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
 }));
@@ -48,6 +52,7 @@ import {
 import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
+import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
@@ -114,6 +119,8 @@ beforeEach(() => {
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
   vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
+  vi.mocked(getOrStartArc).mockResolvedValue(null);
+  vi.mocked(getArcNextStepStorylet).mockReturnValue(null);
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
 });
 

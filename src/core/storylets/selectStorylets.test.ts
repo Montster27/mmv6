@@ -111,4 +111,19 @@ describe("selectStorylets", () => {
 
     expect(selected.every((s) => (s.tags ?? []).includes("onboarding"))).toBe(true);
   });
+
+  it("includes a forced storylet as the first pick when eligible", () => {
+    const forced = makeStorylet("forced");
+    const storylets = [forced, makeStorylet("b"), makeStorylet("c")];
+    const selected = selectStorylets({
+      seed: "seed",
+      dayIndex: 4,
+      dailyState: baseState,
+      allStorylets: storylets,
+      recentRuns: [],
+      forcedStorylet: forced,
+    });
+    expect(selected[0]?.id).toBe("forced");
+    expect(selected).toHaveLength(2);
+  });
 });
