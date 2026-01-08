@@ -21,7 +21,7 @@ export function coerceStoryletRow(row: any): Storylet {
   const choicesRaw = Array.isArray(row?.choices) ? row.choices : [];
   const choices: StoryletChoice[] = choicesRaw
     .map(coerceChoice)
-    .filter((c): c is StoryletChoice => Boolean(c));
+    .filter((c: StoryletChoice | null): c is StoryletChoice => Boolean(c));
 
   return {
     id: isString(row?.id) ? row.id : "",
