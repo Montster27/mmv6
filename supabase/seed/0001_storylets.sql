@@ -33,3 +33,12 @@ values
     '{dorm,night}',
     true
   );
+
+-- Season gating examples
+update public.storylets
+  set requirements = '{"seasons_any":[1]}'::jsonb
+  where slug in ('campus-green-echo', 'library-flicker');
+
+update public.storylets
+  set requirements = '{"min_season_index":2}'::jsonb
+  where slug in ('lab-spill', 'dorm-knock');

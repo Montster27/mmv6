@@ -99,6 +99,8 @@ export default function StoryletEditPage({
   const seasonsAny = Array.isArray(requirements.seasons_any)
     ? requirements.seasons_any.join(", ")
     : "";
+  const hasSeasonRules =
+    seasonMin !== "" || seasonMax !== "" || (seasonsAny && seasonsAny.length > 0);
 
   const previewStorylet = useMemo<Storylet>(() => {
     return {
@@ -518,6 +520,18 @@ export default function StoryletEditPage({
               </div>
 
               <div className="space-y-2">
+                {hasSeasonRules ? (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                    <p className="font-medium text-slate-700">
+                      Season eligibility
+                    </p>
+                    <div className="mt-1 space-y-0.5">
+                      {seasonMin !== "" ? <p>Min season: {seasonMin}</p> : null}
+                      {seasonMax !== "" ? <p>Max season: {seasonMax}</p> : null}
+                      {seasonsAny ? <p>Allowlist: {seasonsAny}</p> : null}
+                    </div>
+                  </div>
+                ) : null}
                 <StoryletCard storylet={previewStorylet} disabled />
                 {previewStorylet.choices?.length ? (
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
