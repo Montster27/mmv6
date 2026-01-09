@@ -153,6 +153,32 @@ export function validateStorylet(
     });
   }
 
+  if (storylet.requirements && typeof storylet.requirements === "object") {
+    const req = storylet.requirements as Record<string, unknown>;
+    const minSeason = req.min_season_index;
+    const maxSeason = req.max_season_index;
+    if (minSeason !== undefined && typeof minSeason !== "number") {
+      errors.push("requirements.min_season_index must be a number");
+    }
+    if (maxSeason !== undefined && typeof maxSeason !== "number") {
+      errors.push("requirements.max_season_index must be a number");
+    }
+    if (
+      typeof minSeason === "number" &&
+      typeof maxSeason === "number" &&
+      minSeason > maxSeason
+    ) {
+      errors.push("requirements.min_season_index cannot exceed max_season_index");
+    }
+    if (req.seasons_any !== undefined) {
+      if (!Array.isArray(req.seasons_any)) {
+        errors.push("requirements.seasons_any must be an array of numbers");
+      } else if (req.seasons_any.some((v) => typeof v !== "number")) {
+        errors.push("requirements.seasons_any must be an array of numbers");
+      }
+    }
+  }
+
   if (errors.length) return { ok: false, errors };
   return { ok: true, value: storylet };
 }

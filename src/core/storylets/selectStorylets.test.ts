@@ -37,6 +37,7 @@ describe("selectStorylets", () => {
     const args = {
       seed: "user-1-2",
       dayIndex: 2,
+      seasonIndex: 1,
       dailyState: baseState,
       allStorylets: storylets,
       recentRuns: [] as StoryletRun[],
@@ -52,6 +53,7 @@ describe("selectStorylets", () => {
     const selected = selectStorylets({
       seed: "seed",
       dayIndex: 4,
+      seasonIndex: 1,
       dailyState: baseState,
       allStorylets: storylets,
       recentRuns: [],
@@ -68,6 +70,7 @@ describe("selectStorylets", () => {
     const selected = selectStorylets({
       seed: "seed",
       dayIndex: 4,
+      seasonIndex: 1,
       dailyState: baseState,
       allStorylets: storylets,
       recentRuns: [],
@@ -85,6 +88,7 @@ describe("selectStorylets", () => {
     const selected = selectStorylets({
       seed: "seed",
       dayIndex: 2,
+      seasonIndex: 1,
       dailyState: baseState,
       allStorylets: storylets,
       recentRuns,
@@ -104,6 +108,7 @@ describe("selectStorylets", () => {
     const selected = selectStorylets({
       seed: "seed",
       dayIndex: 2,
+      seasonIndex: 1,
       dailyState: baseState,
       allStorylets: storylets,
       recentRuns: [],
@@ -118,12 +123,52 @@ describe("selectStorylets", () => {
     const selected = selectStorylets({
       seed: "seed",
       dayIndex: 4,
+      seasonIndex: 1,
       dailyState: baseState,
       allStorylets: storylets,
       recentRuns: [],
       forcedStorylet: forced,
     });
     expect(selected[0]?.id).toBe("forced");
+    expect(selected).toHaveLength(2);
+  });
+
+  it("respects season allowlist when possible", () => {
+    const storylets = [
+      makeStorylet("season-1", {
+        requirements: { seasons_any: [1] },
+      }),
+      makeStorylet("season-2", {
+        requirements: { seasons_any: [2] },
+      }),
+      makeStorylet("neutral"),
+    ];
+    const selected = selectStorylets({
+      seed: "seed",
+      dayIndex: 4,
+      seasonIndex: 1,
+      dailyState: baseState,
+      allStorylets: storylets,
+      recentRuns: [],
+    });
+    const ids = selected.map((s) => s.id);
+    expect(ids).toContain("season-1");
+  });
+
+  it("falls back when season gating reduces the pool", () => {
+    const storylets = [
+      makeStorylet("season-2", { requirements: { min_season_index: 2 } }),
+      makeStorylet("season-2b", { requirements: { min_season_index: 2 } }),
+      makeStorylet("neutral"),
+    ];
+    const selected = selectStorylets({
+      seed: "seed",
+      dayIndex: 4,
+      seasonIndex: 1,
+      dailyState: baseState,
+      allStorylets: storylets,
+      recentRuns: [],
+    });
     expect(selected).toHaveLength(2);
   });
 });

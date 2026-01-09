@@ -7,12 +7,16 @@ type Requirements = {
   max_day_index?: number;
   requires_tags_any?: string[];
   vectors_min?: Record<string, number>;
+  min_season_index?: number;
+  max_season_index?: number;
+  seasons_any?: number[];
   [key: string]: unknown;
 };
 
 type SelectorArgs = {
   seed: string;
   dayIndex: number;
+  seasonIndex: number;
   dailyState: DailyState | null;
   allStorylets: Storylet[];
   recentRuns: StoryletRun[];
@@ -33,10 +37,39 @@ function tagsIntersect(a: string[] | undefined, b: string[] | undefined): boolea
   return b.some((t) => setA.has(t));
 }
 
+function hasSeasonRules(req: Requirements): boolean {
+  return (
+    typeof req.min_season_index === "number" ||
+    typeof req.max_season_index === "number" ||
+    (Array.isArray(req.seasons_any) && req.seasons_any.length > 0)
+  );
+}
+
+function meetsSeasonRules(req: Requirements, seasonIndex: number): boolean {
+  if (Array.isArray(req.seasons_any) && req.seasons_any.length > 0) {
+    if (!req.seasons_any.includes(seasonIndex)) return false;
+  }
+  if (
+    typeof req.min_season_index === "number" &&
+    seasonIndex < req.min_season_index
+  ) {
+    return false;
+  }
+  if (
+    typeof req.max_season_index === "number" &&
+    seasonIndex > req.max_season_index
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function meetsRequirements(
   storylet: Storylet,
   dayIndex: number,
-  dailyState: DailyState | null
+  dailyState: DailyState | null,
+  seasonIndex: number,
+  opts?: { ignoreSeason?: boolean }
 ): boolean {
   const req = (storylet.requirements || {}) as Requirements;
   if (typeof req.min_day_index === "number" && dayIndex < req.min_day_index) return false;
@@ -53,6 +86,10 @@ function meetsRequirements(
         if (typeof current !== "number" || current < min) return false;
       }
     }
+  }
+
+  if (!opts?.ignoreSeason && hasSeasonRules(req)) {
+    if (!meetsSeasonRules(req, seasonIndex)) return false;
   }
 
   return true;
@@ -79,6 +116,7 @@ function pickTop(storylets: Storylet[], seed: string, count: number): Storylet[]
 export function selectStorylets({
   seed,
   dayIndex,
+  seasonIndex,
   dailyState,
   allStorylets,
   recentRuns,
@@ -97,7 +135,9 @@ export function selectStorylets({
   const activeStorylets = allStorylets.filter((s) => s.is_active);
 
   const baseEligible = activeStorylets.filter(
-    (s) => !todayUsedIds.has(s.id) && meetsRequirements(s, dayIndex, dailyState)
+    (s) =>
+      !todayUsedIds.has(s.id) &&
+      meetsRequirements(s, dayIndex, dailyState, seasonIndex)
   );
 
   const preferred = baseEligible.filter((s) => !recentIds.has(s.id));
@@ -111,6 +151,16 @@ export function selectStorylets({
     forcedStorylet.is_active &&
     !todayUsedIds.has(forcedStorylet.id)
   ) {
+    const forcedReq = (forcedStorylet.requirements || {}) as Requirements;
+    if (
+      process.env.NODE_ENV !== "production" &&
+      hasSeasonRules(forcedReq) &&
+      !meetsSeasonRules(forcedReq, seasonIndex)
+    ) {
+      console.warn(
+        `[storylets] Forced storylet ${forcedStorylet.slug ?? forcedStorylet.id} excluded by season gating.`
+      );
+    }
     picked.push(forcedStorylet);
   }
   if (onboardingEligible.length > 0) {
@@ -124,6 +174,37 @@ export function selectStorylets({
 
   if (picked.length < 2) {
     const remaining = baseEligible.filter((s) => !picked.includes(s));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+  }
+
+  if (picked.length < 2 && baseEligible.length < 2) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Season gating reduced pool; using fallback.");
+    }
+    const nonSeasonEligible = activeStorylets.filter((s) => {
+      if (todayUsedIds.has(s.id)) return false;
+      const req = (s.requirements || {}) as Requirements;
+      return (
+        !hasSeasonRules(req) &&
+        meetsRequirements(s, dayIndex, dailyState, seasonIndex, {
+          ignoreSeason: true,
+        })
+      );
+    });
+    const nonSeasonPreferred = nonSeasonEligible.filter((s) => !recentIds.has(s.id));
+    const remaining = nonSeasonPreferred.filter((s) => !picked.includes(s));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+  }
+
+  if (picked.length < 2 && baseEligible.length < 2) {
+    const relaxedEligible = activeStorylets.filter((s) => {
+      if (todayUsedIds.has(s.id)) return false;
+      return meetsRequirements(s, dayIndex, dailyState, seasonIndex, {
+        ignoreSeason: true,
+      });
+    });
+    const relaxedPreferred = relaxedEligible.filter((s) => !recentIds.has(s.id));
+    const remaining = relaxedPreferred.filter((s) => !picked.includes(s));
     picked.push(...pickTop(remaining, seed, 2 - picked.length));
   }
 
@@ -148,6 +229,8 @@ export function selectStorylets({
 export const _testOnly = {
   hashString,
   meetsRequirements,
+  hasSeasonRules,
+  meetsSeasonRules,
   pickTop,
   scoreStorylet,
 };

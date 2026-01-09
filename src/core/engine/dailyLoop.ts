@@ -103,6 +103,7 @@ export async function getOrCreateDailyRun(
   const storyletsSelected = selectStorylets({
     seed: `${userId}-${dayIndex}`,
     dayIndex,
+    seasonIndex: seasonContext.currentSeason.season_index,
     dailyState: daily ?? null,
     allStorylets: storyletsRaw,
     recentRuns,

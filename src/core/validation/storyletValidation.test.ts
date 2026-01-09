@@ -74,4 +74,22 @@ describe("storyletValidation", () => {
     const res = validateStorylet(withBadOutcomes);
     expect(res.ok).toBe(false);
   });
+
+  it("rejects invalid season requirements", () => {
+    const invalidReq = {
+      ...valid,
+      requirements: { min_season_index: 3, max_season_index: 1 },
+    };
+    const res = validateStorylet(invalidReq);
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects non-numeric season allowlist", () => {
+    const invalidReq = {
+      ...valid,
+      requirements: { seasons_any: ["1"] },
+    };
+    const res = validateStorylet(invalidReq);
+    expect(res.ok).toBe(false);
+  });
 });

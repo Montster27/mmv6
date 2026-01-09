@@ -50,6 +50,29 @@ function parseJson(input: string, fallback: any) {
   }
 }
 
+function updateRequirementsJson(
+  raw: string,
+  patch: Record<string, unknown>
+): string {
+  const current = parseJson(raw, {});
+  const base =
+    current && typeof current === "object" && !Array.isArray(current)
+      ? { ...(current as Record<string, unknown>) }
+      : {};
+  Object.entries(patch).forEach(([key, value]) => {
+    if (
+      value === undefined ||
+      value === null ||
+      (typeof value === "string" && value.trim() === "")
+    ) {
+      delete base[key];
+      return;
+    }
+    base[key] = value;
+  });
+  return JSON.stringify(base, null, 2);
+}
+
 export default function StoryletEditPage({
   params,
 }: {
@@ -63,6 +86,19 @@ export default function StoryletEditPage({
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [storylet, setStorylet] = useState<Storylet | null>(null);
+
+  const requirements = useMemo(() => parseJson(form.requirements, {}), [form.requirements]);
+  const seasonMin =
+    typeof requirements.min_season_index === "number"
+      ? requirements.min_season_index
+      : "";
+  const seasonMax =
+    typeof requirements.max_season_index === "number"
+      ? requirements.max_season_index
+      : "";
+  const seasonsAny = Array.isArray(requirements.seasons_any)
+    ? requirements.seasons_any.join(", ")
+    : "";
 
   const previewStorylet = useMemo<Storylet>(() => {
     return {
@@ -292,8 +328,93 @@ export default function StoryletEditPage({
                     onChange={(e) =>
                       setForm((f) => ({ ...f, weight: Number(e.target.value) }))
                     }
-                  />
+                    />
                 </label>
+
+                <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    Season eligibility
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1 text-sm text-slate-700">
+                      Min season (inclusive)
+                      <input
+                        type="number"
+                        className="rounded-md border border-slate-300 px-3 py-2"
+                        value={seasonMin}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const next =
+                            value === "" ? null : Number.parseInt(value, 10);
+                          setForm((f) => ({
+                            ...f,
+                            requirements: updateRequirementsJson(f.requirements, {
+                              min_season_index: Number.isNaN(next) ? null : next,
+                            }),
+                          }));
+                        }}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm text-slate-700">
+                      Max season (inclusive)
+                      <input
+                        type="number"
+                        className="rounded-md border border-slate-300 px-3 py-2"
+                        value={seasonMax}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const next =
+                            value === "" ? null : Number.parseInt(value, 10);
+                          setForm((f) => ({
+                            ...f,
+                            requirements: updateRequirementsJson(f.requirements, {
+                              max_season_index: Number.isNaN(next) ? null : next,
+                            }),
+                          }));
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <label className="flex flex-col gap-1 text-sm text-slate-700">
+                    Seasons allowlist (comma-separated)
+                    <input
+                      className="rounded-md border border-slate-300 px-3 py-2"
+                      value={seasonsAny}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const next = raw
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean)
+                          .map((item) => Number.parseInt(item, 10))
+                          .filter((value) => Number.isFinite(value));
+                        setForm((f) => ({
+                          ...f,
+                          requirements: updateRequirementsJson(f.requirements, {
+                            seasons_any: next.length ? next : null,
+                          }),
+                        }));
+                      }}
+                    />
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="px-0 text-xs text-slate-700"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        requirements: updateRequirementsJson(f.requirements, {
+                          min_season_index: 1,
+                          max_season_index: 2,
+                          seasons_any: [1, 2],
+                        }),
+                      }))
+                    }
+                  >
+                    Insert season gating template
+                  </Button>
+                </div>
 
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
                   Requirements (JSON)
