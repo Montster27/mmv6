@@ -114,7 +114,11 @@ function RecapContent({ seasonIndex }: { seasonIndex: number | null }) {
               ))}
             </div>
             <div className="text-xs text-slate-500">
-              Completion rate: {formatPercent(recap.world.supportingStats.completionRate)} ·
+              Completion rate:{" "}
+              {formatPercent(
+                recap.world.supportingStats.completionRate ?? null
+              )}{" "}
+              ·
               Boosts per active:{" "}
               {recap.world.supportingStats.boostsPerActive?.toFixed(2) ?? "—"} ·
               Anomalies per active:{" "}
