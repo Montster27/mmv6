@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -134,14 +134,22 @@ function RecapContent({ seasonIndex }: { seasonIndex: number | null }) {
   );
 }
 
-export default function SeasonRecapPage() {
+function SeasonRecapWithParams() {
   const params = useSearchParams();
   const seasonParam = params.get("season");
   const seasonIndex = seasonParam ? Number(seasonParam) : null;
 
+  return <RecapContent seasonIndex={seasonIndex} />;
+}
+
+export default function SeasonRecapPage() {
   return (
     <AuthGate>
-      {(session) => <RecapContent seasonIndex={seasonIndex} />}
+      {() => (
+        <Suspense fallback={<div className="p-6 text-slate-700">Loading…</div>}>
+          <SeasonRecapWithParams />
+        </Suspense>
+      )}
     </AuthGate>
   );
 }
