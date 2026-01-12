@@ -272,7 +272,7 @@ export default function StoryletEditPage({
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
                   Slug
                   <input
-                    className="rounded-md border border-slate-300 px-3 py-2"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
                     value={form.slug}
                     onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
                   />
@@ -280,7 +280,7 @@ export default function StoryletEditPage({
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
                   Title
                   <input
-                    className="rounded-md border border-slate-300 px-3 py-2"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
                     value={form.title}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, title: e.target.value }))
@@ -290,7 +290,7 @@ export default function StoryletEditPage({
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
                   Body
                   <textarea
-                    className="rounded-md border border-slate-300 px-3 py-2"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
                     rows={4}
                     value={form.body}
                     onChange={(e) =>
@@ -313,7 +313,7 @@ export default function StoryletEditPage({
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
                   Tags (comma separated)
                   <input
-                    className="rounded-md border border-slate-300 px-3 py-2"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
                     value={form.tags}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, tags: e.target.value }))
@@ -325,7 +325,7 @@ export default function StoryletEditPage({
                   Weight
                   <input
                     type="number"
-                    className="rounded-md border border-slate-300 px-3 py-2"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
                     value={form.weight}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, weight: Number(e.target.value) }))
@@ -342,7 +342,7 @@ export default function StoryletEditPage({
                       Min season (inclusive)
                       <input
                         type="number"
-                        className="rounded-md border border-slate-300 px-3 py-2"
+                        className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
                         value={seasonMin}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -361,7 +361,7 @@ export default function StoryletEditPage({
                       Max season (inclusive)
                       <input
                         type="number"
-                        className="rounded-md border border-slate-300 px-3 py-2"
+                        className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
                         value={seasonMax}
                         onChange={(e) => {
                           const value = e.target.value;
@@ -380,7 +380,7 @@ export default function StoryletEditPage({
                   <label className="flex flex-col gap-1 text-sm text-slate-700">
                     Seasons allowlist (comma-separated)
                     <input
-                      className="rounded-md border border-slate-300 px-3 py-2"
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
                       value={seasonsAny}
                       onChange={(e) => {
                         const raw = e.target.value;
@@ -421,7 +421,7 @@ export default function StoryletEditPage({
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
                   Requirements (JSON)
                   <textarea
-                    className="rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900"
                     rows={4}
                     value={form.requirements}
                     onChange={(e) =>
@@ -433,7 +433,7 @@ export default function StoryletEditPage({
                 <label className="flex flex-col gap-1 text-sm text-slate-700">
                   {"Choices (JSON array of { id, label, outcome? | outcomes? })"}
                   <textarea
-                    className="rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900"
                     rows={6}
                     value={form.choices}
                     onChange={(e) =>

@@ -11,6 +11,7 @@ import { signOut } from "@/lib/auth";
 import { ensurePlayerSetup } from "@/lib/bootstrap";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
+import { supabase } from "@/lib/supabase/browser";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 import { advanceArcIfStepCompleted } from "@/core/arcs/arcEngine";
 import { PRIMARY_ARC_ID } from "@/content/arcs/arcDefinitions";
@@ -46,6 +47,7 @@ import { AuthGate } from "@/ui/components/AuthGate";
 import { ProgressPanel } from "@/components/ProgressPanel";
 import { SeasonBadge } from "@/components/SeasonBadge";
 import type { SeasonContext } from "@/types/season";
+import { isEmailAllowed } from "@/lib/adminAuth";
 
 const defaultAllocation: AllocationPayload = {
   study: 0,
@@ -83,6 +85,19 @@ export default function PlayPage() {
   const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
   const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
   const [seasonContext, setSeasonContext] = useState<SeasonContext | null>(null);
+  const [showDevMenu, setShowDevMenu] = useState(false);
+  const [devLoading, setDevLoading] = useState(false);
+  const [devError, setDevError] = useState<string | null>(null);
+  const [devCharacters, setDevCharacters] = useState<
+    Array<{
+      user_id: string;
+      email: string | null;
+      username: string | null;
+      day_index: number | null;
+      created_at: string;
+    }>
+  >([]);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
   const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
   const [outcomeDeltas, setOutcomeDeltas] = useState<{
     energy?: number;
@@ -115,6 +130,63 @@ export default function PlayPage() {
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
+
+  const loadDevCharacters = async () => {
+    setDevLoading(true);
+    setDevError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setDevError("No session found.");
+        return;
+      }
+      const res = await fetch("/api/admin/dev/characters", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to load characters.");
+      }
+      setDevCharacters(json.characters ?? []);
+    } catch (e) {
+      console.error(e);
+      setDevError(e instanceof Error ? e.message : "Failed to load characters.");
+    } finally {
+      setDevLoading(false);
+    }
+  };
+
+  const handleResetAccount = async (userId: string) => {
+    setResettingUserId(userId);
+    setDevError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setDevError("No session found.");
+        return;
+      }
+      const res = await fetch("/api/admin/dev/reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to reset account.");
+      }
+      await loadDevCharacters();
+    } catch (e) {
+      console.error(e);
+      setDevError(e instanceof Error ? e.message : "Failed to reset account.");
+    } finally {
+      setResettingUserId(null);
+    }
+  };
 
   useEffect(() => {
     latestStageRef.current = stage;
@@ -724,9 +796,75 @@ export default function PlayPage() {
               <Link className="text-sm text-slate-600 hover:underline" href="/theory">
                 Theoryboard
               </Link>
+              {isEmailAllowed(session.user.email) ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const next = !showDevMenu;
+                    setShowDevMenu(next);
+                    if (next) {
+                      loadDevCharacters();
+                    }
+                  }}
+                >
+                  Dev menu
+                </Button>
+              ) : null}
               <Button onClick={signOut}>Sign out</Button>
             </div>
           </div>
+
+          {showDevMenu ? (
+            <section className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Dev menu</h2>
+                <Button variant="ghost" onClick={() => setShowDevMenu(false)}>
+                  Close
+                </Button>
+              </div>
+              <p className="text-sm text-slate-600">
+                Reset accounts to day one for testing.
+              </p>
+              {devError ? (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {devError}
+                </div>
+              ) : null}
+              {devLoading ? (
+                <p className="text-sm text-slate-700">Loading…</p>
+              ) : devCharacters.length === 0 ? (
+                <p className="text-sm text-slate-700">No characters found.</p>
+              ) : (
+                <div className="space-y-2">
+                  {devCharacters.map((row) => (
+                    <div
+                      key={row.user_id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900">
+                          {row.username ?? "Unknown"}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {row.email ?? "no-email"} · Day{" "}
+                          {row.day_index ?? "—"}
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        disabled={resettingUserId === row.user_id}
+                        onClick={() => handleResetAccount(row.user_id)}
+                      >
+                        {resettingUserId === row.user_id
+                          ? "Resetting..."
+                          : "Reset to day one"}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : null}
 
           {seasonResetPending ? (
             <section className="rounded-md border border-amber-200 bg-amber-50 px-4 py-4 space-y-3">
