@@ -738,13 +738,6 @@ export default function PlayPage() {
       const message =
         e instanceof Error ? e.message : "Failed to send boost. Try again.";
       setError(message);
-      if (message.toLowerCase().includes("already sent")) {
-        setHasSentBoost(true);
-        setBoostMessage("Boost already sent for today.");
-        if (USE_DAILY_LOOP_ORCHESTRATOR) {
-          setStage("reflection");
-        }
-      }
     } finally {
       setLoadingSocial(false);
     }

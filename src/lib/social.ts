@@ -51,38 +51,6 @@ function toVectors(raw: DailyState["vectors"]) {
   return {};
 }
 
-// Boosts are limited to one send per UTC day; use created_at to enforce.
-function getUtcDayRange(date = new Date()) {
-  const start = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
-  );
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 1);
-  return { start, end };
-}
-
-async function getExistingBoost(
-  fromUserId: string,
-  start: Date,
-  end: Date
-): Promise<{ id: string; payload: any } | null> {
-  const { data, error } = await supabase
-    .from("social_actions")
-    .select("id,payload")
-    .eq("from_user_id", fromUserId)
-    .eq("action_type", "boost")
-    .gte("created_at", start.toISOString())
-    .lt("created_at", end.toISOString())
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Failed to check boost status", error);
-    return null;
-  }
-  return data ?? null;
-}
-
 export async function fetchPublicProfiles(
   excludeUserId: string
 ): Promise<PublicProfile[]> {
@@ -103,17 +71,14 @@ export async function fetchPublicProfiles(
 
 export async function fetchTodayReceivedBoosts(
   userId: string,
-  _dayIndex: number
+  dayIndex: number
 ): Promise<ReceivedBoost[]> {
-  const { start, end } = getUtcDayRange();
-
   const { data, error } = await supabase
     .from("social_actions")
     .select("from_user_id,created_at,payload")
     .eq("to_user_id", userId)
     .eq("action_type", "boost")
-    .gte("created_at", start.toISOString())
-    .lt("created_at", end.toISOString())
+    .eq("payload->>day_index", dayIndex.toString())
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -131,16 +96,14 @@ export async function fetchTodayReceivedBoosts(
 
 export async function hasSentBoostToday(
   userId: string,
-  _dayIndex: number
+  dayIndex: number
 ): Promise<boolean> {
-  const { start, end } = getUtcDayRange();
   const { data, error } = await supabase
     .from("social_actions")
     .select("id")
     .eq("from_user_id", userId)
     .eq("action_type", "boost")
-    .gte("created_at", start.toISOString())
-    .lt("created_at", end.toISOString())
+    .eq("payload->>day_index", dayIndex.toString())
     .limit(1);
 
   if (error) {
@@ -218,16 +181,6 @@ export async function sendBoost(
   dayIndex: number
 ): Promise<void> {
   const dayValue = dayIndex.toString();
-  const { start, end } = getUtcDayRange();
-  const existing = await getExistingBoost(fromUserId, start, end);
-  if (existing) {
-    if ((existing.payload as any)?.effects_applied) {
-      throw new Error("Boost already sent for today.");
-    }
-    // Existing boost without marker; treat as sent but avoid double-applying effects.
-    throw new Error("Boost already sent for today.");
-  }
-
   const { data, error } = await supabase
     .from("social_actions")
     .insert({
@@ -241,11 +194,6 @@ export async function sendBoost(
 
   if (error) {
     console.error("Failed to send boost", error);
-
-    // In case of a race, recheck; if it now exists, treat as success.
-    const existsAfterError = await getExistingBoost(fromUserId, start, end);
-    if (existsAfterError) return;
-
     throw error;
   }
 

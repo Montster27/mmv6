@@ -5,3 +5,7 @@
 - **Milestone 3:** Micro-task + tests
 
 Details and issue breakdowns live in the tracker; this file stays high-level to avoid duplication.
+
+## Notes
+
+- TODO: Revisit boost rate-limiting (UTC-based cap removed for testing; day_index checks only).
