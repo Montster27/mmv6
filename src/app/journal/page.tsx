@@ -10,6 +10,15 @@ import type { Anomaly, UserAnomaly } from "@/types/anomalies";
 function JournalContent({ session }: { session: Session }) {
   const [entries, setEntries] = useState<UserAnomaly[]>([]);
   const [catalog, setCatalog] = useState<Record<string, Anomaly>>({});
+  const [clues, setClues] = useState<
+    Array<{
+      id: string;
+      from_display_name: string | null;
+      anomaly_title: string | null;
+      anomaly_description: string | null;
+      created_at: string;
+    }>
+  >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +43,14 @@ function JournalContent({ session }: { session: Session }) {
           return acc;
         }, {});
         setCatalog(map);
+
+        const clueRes = await fetch("/api/group/clues/inbox", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (clueRes.ok) {
+          const json = await clueRes.json();
+          setClues(json.clues ?? []);
+        }
       } catch (e) {
         console.error(e);
         setError("Failed to load journal.");
@@ -52,6 +69,37 @@ function JournalContent({ session }: { session: Session }) {
           Discovered anomalies and the days you found them.
         </p>
       </div>
+
+      {clues.length > 0 ? (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Clues received</h2>
+          <div className="space-y-3">
+            {clues.map((clue) => (
+              <div
+                key={clue.id}
+                className="rounded-md border border-slate-200 bg-white px-4 py-3"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-slate-900">
+                    {clue.anomaly_title ?? "Anomaly clue"}
+                  </h3>
+                  <span className="text-xs text-slate-500">
+                    {clue.created_at
+                      ? new Date(clue.created_at).toLocaleDateString()
+                      : ""}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-700">
+                  {clue.anomaly_description ?? "A clue arrived from your group."}
+                </p>
+                <p className="text-xs text-slate-500 mt-2">
+                  From {clue.from_display_name ?? "a group member"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

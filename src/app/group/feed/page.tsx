@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { fetchAnomaliesByIds } from "@/lib/anomalies";
 import { supabase } from "@/lib/supabase/browser";
 import { fetchGroup, fetchGroupFeed, fetchMyGroupMembership } from "@/lib/groups";
+import { fetchUserAnomalies } from "@/lib/anomalies";
 import type { Anomaly } from "@/types/anomalies";
 import type { Group, GroupFeedItem } from "@/types/groups";
 
@@ -38,6 +39,14 @@ function GroupFeed({ session }: { session: Session }) {
   const [profiles, setProfiles] = useState<Record<string, ProfileRow>>({});
   const [anomalies, setAnomalies] = useState<Record<string, Anomaly>>({});
   const [objective, setObjective] = useState<ObjectiveRow | null>(null);
+  const [members, setMembers] = useState<ProfileRow[]>([]);
+  const [myAnomalies, setMyAnomalies] = useState<Anomaly[]>([]);
+  const [selectedRecipient, setSelectedRecipient] = useState("");
+  const [selectedAnomaly, setSelectedAnomaly] = useState("");
+  const [sendMessage, setSendMessage] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [sentToday, setSentToday] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -97,6 +106,33 @@ function GroupFeed({ session }: { session: Session }) {
           }, {});
           setAnomalies(map);
         }
+
+        const { data: memberRows } = await supabase
+          .from("group_members")
+          .select("user_id")
+          .eq("group_id", membership.group_id);
+        const memberIds = (memberRows ?? []).map((row) => row.user_id);
+        if (memberIds.length) {
+          const { data: memberProfiles } = await supabase
+            .from("profiles")
+            .select("id,display_name")
+            .in("id", memberIds);
+          const list = (memberProfiles ?? []).filter((row) => row.id !== session.user.id);
+          setMembers(list);
+          if (!selectedRecipient && list[0]) {
+            setSelectedRecipient(list[0].id);
+          }
+        }
+
+        const myAnomalyRows = await fetchUserAnomalies(session.user.id);
+        const myIds = Array.from(new Set(myAnomalyRows.map((row) => row.anomaly_id)));
+        if (myIds.length) {
+          const list = await fetchAnomaliesByIds(myIds);
+          setMyAnomalies(list);
+          if (!selectedAnomaly && list[0]) {
+            setSelectedAnomaly(list[0].id);
+          }
+        }
       } catch (e) {
         console.error(e);
         setError("Failed to load group feed.");
@@ -154,6 +190,44 @@ function GroupFeed({ session }: { session: Session }) {
     });
   }, [feed, profiles, anomalies]);
 
+  const handleSend = async () => {
+    if (!selectedRecipient || !selectedAnomaly) {
+      setSendError("Choose a recipient and anomaly.");
+      return;
+    }
+    setSending(true);
+    setSendError(null);
+    setSendMessage(null);
+    try {
+      const res = await fetch("/api/group/clues/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          to_user_id: selectedRecipient,
+          anomaly_id: selectedAnomaly,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (res.status === 409) {
+          setSentToday(true);
+          throw new Error("You already sent a clue today.");
+        }
+        throw new Error(json.error ?? "Failed to send clue.");
+      }
+      setSentToday(true);
+      setSendMessage("Clue sent.");
+    } catch (e) {
+      console.error(e);
+      setSendError(e instanceof Error ? e.message : "Failed to send clue.");
+    } finally {
+      setSending(false);
+    }
+  };
+
   if (loading) {
     return <p className="p-6 text-slate-700">Loading…</p>;
   }
@@ -180,6 +254,66 @@ function GroupFeed({ session }: { session: Session }) {
           {error}
         </div>
       ) : null}
+
+      <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-3">
+        <h2 className="text-lg font-semibold">Send a clue</h2>
+        <p className="text-sm text-slate-600">
+          Share one anomaly per day with a group member.
+        </p>
+        {sendError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {sendError}
+          </div>
+        ) : null}
+        {sendMessage ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {sendMessage}
+          </div>
+        ) : null}
+        {members.length === 0 || myAnomalies.length === 0 ? (
+          <p className="text-sm text-slate-600">
+            {members.length === 0
+              ? "No other members yet."
+              : "No anomalies discovered yet."}
+          </p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="text-sm text-slate-700">
+              Recipient
+              <select
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
+                value={selectedRecipient}
+                onChange={(e) => setSelectedRecipient(e.target.value)}
+                disabled={sending || sentToday}
+              >
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.display_name ?? "Group member"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm text-slate-700">
+              Anomaly
+              <select
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
+                value={selectedAnomaly}
+                onChange={(e) => setSelectedAnomaly(e.target.value)}
+                disabled={sending || sentToday}
+              >
+                {myAnomalies.map((anomaly) => (
+                  <option key={anomaly.id} value={anomaly.id}>
+                    {anomaly.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        <Button onClick={handleSend} disabled={sending || sentToday}>
+          {sentToday ? "Clue sent today" : sending ? "Sending..." : "Send clue"}
+        </Button>
+      </div>
 
       {objective ? (
         <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
