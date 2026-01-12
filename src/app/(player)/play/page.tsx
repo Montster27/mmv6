@@ -16,6 +16,7 @@ import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 import { advanceArcIfStepCompleted } from "@/core/arcs/arcEngine";
 import { PRIMARY_ARC_ID } from "@/content/arcs/arcDefinitions";
 import { awardAnomalies } from "@/lib/anomalies";
+import { appendGroupFeedEvent } from "@/lib/groups/feed";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -718,6 +719,9 @@ export default function PlayPage() {
     setLoadingSocial(true);
     try {
       await sendBoost(userId, selectedRecipient, dayIndex);
+      appendGroupFeedEvent(userId, "boost_sent", { to_user_id: selectedRecipient }).catch(
+        () => {}
+      );
       await loadSocialData(userId, dayIndex);
       setHasSentBoost(true);
       setBoostMessage(
@@ -877,6 +881,9 @@ export default function PlayPage() {
               </Link>
               <Link className="text-sm text-slate-600 hover:underline" href="/theory">
                 Theoryboard
+              </Link>
+              <Link className="text-sm text-slate-600 hover:underline" href="/group">
+                Group
               </Link>
               {isEmailAllowed(session.user.email) || devIsAdmin ? (
                 <Button

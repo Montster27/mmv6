@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/browser";
+import { appendGroupFeedEvent } from "@/lib/groups/feed";
 import type { Anomaly, UserAnomaly } from "@/types/anomalies";
 
 export async function fetchAnomaliesByIds(ids: string[]): Promise<Anomaly[]> {
@@ -61,6 +62,11 @@ export async function awardAnomalies(payload: {
         if (process.env.NODE_ENV !== "production") {
           console.warn("Failed to award anomaly", error);
         }
+      } else {
+        appendGroupFeedEvent(payload.userId, "anomaly_found", {
+          anomaly_id: anomalyId,
+          source: payload.source ?? null,
+        }).catch(() => {});
       }
     } catch (err) {
       if (process.env.NODE_ENV !== "production") {

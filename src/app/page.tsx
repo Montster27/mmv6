@@ -21,6 +21,9 @@ export default function Home() {
           <Link className="block underline underline-offset-4" href="/theory">
             Theoryboard
           </Link>
+          <Link className="block underline underline-offset-4" href="/group">
+            Group
+          </Link>
           <Link className="block underline underline-offset-4" href="/admin">
             Admin
           </Link>

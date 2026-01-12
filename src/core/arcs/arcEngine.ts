@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase/browser";
 import { trackEvent } from "@/lib/events";
 import { fetchDailyState } from "@/lib/play";
+import { appendGroupFeedEvent } from "@/lib/groups/feed";
 import type { DailyState } from "@/types/daily";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 import { ARC_DEFINITIONS, getArcDefinition } from "@/content/arcs/arcDefinitions";
@@ -215,6 +216,10 @@ export async function advanceArcIfStepCompleted(
     day_index: dayIndex,
     payload: { arc_id: arc.arc_id, step_index: userArc.step_index },
   });
+  appendGroupFeedEvent(userId, "arc_step", {
+    arc_id: arc.arc_id,
+    step_index: userArc.step_index,
+  }).catch(() => {});
 
   if (completed) {
     trackEvent({
