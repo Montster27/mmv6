@@ -17,6 +17,7 @@ import { advanceArcIfStepCompleted } from "@/core/arcs/arcEngine";
 import { PRIMARY_ARC_ID } from "@/content/arcs/arcDefinitions";
 import { awardAnomalies } from "@/lib/anomalies";
 import { appendGroupFeedEvent } from "@/lib/groups/feed";
+import { incrementGroupObjective } from "@/lib/groups/objective";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -722,6 +723,7 @@ export default function PlayPage() {
       appendGroupFeedEvent(userId, "boost_sent", { to_user_id: selectedRecipient }).catch(
         () => {}
       );
+      incrementGroupObjective(1, "boost_sent").catch(() => {});
       await loadSocialData(userId, dayIndex);
       setHasSentBoost(true);
       setBoostMessage(
@@ -841,6 +843,7 @@ export default function PlayPage() {
       if (alreadyCompletedToday) return;
       try {
         await markDailyComplete(userId, dayIndex);
+        incrementGroupObjective(2, "daily_complete").catch(() => {});
         setAlreadyCompletedToday(true);
       } catch (e) {
         console.error("Failed to mark daily complete", e);

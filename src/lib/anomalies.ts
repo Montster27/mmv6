@@ -67,6 +67,9 @@ export async function awardAnomalies(payload: {
           anomaly_id: anomalyId,
           source: payload.source ?? null,
         }).catch(() => {});
+        import("@/lib/groups/objective")
+          .then((mod) => mod.incrementGroupObjective(2, "anomaly_found"))
+          .catch(() => {});
       }
     } catch (err) {
       if (process.env.NODE_ENV !== "production") {

@@ -13,6 +13,18 @@ import type { Anomaly } from "@/types/anomalies";
 import type { Group, GroupFeedItem } from "@/types/groups";
 
 type ProfileRow = { id: string; display_name: string | null };
+type ObjectiveRow = {
+  week_key: string;
+  objective_type: string;
+  target: number;
+  progress: number;
+  completed: boolean;
+};
+
+function objectiveTitle(type?: string | null) {
+  if (type === "stabilize_v1") return "Stabilize the Timeline";
+  return "Group Objective";
+}
 
 function formatWhen(ts: string) {
   const date = new Date(ts);
@@ -25,6 +37,7 @@ function GroupFeed({ session }: { session: Session }) {
   const [feed, setFeed] = useState<GroupFeedItem[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ProfileRow>>({});
   const [anomalies, setAnomalies] = useState<Record<string, Anomaly>>({});
+  const [objective, setObjective] = useState<ObjectiveRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -45,6 +58,14 @@ function GroupFeed({ session }: { session: Session }) {
         ]);
         setGroup(groupRow);
         setFeed(feedRows);
+
+        const objectiveRes = await fetch("/api/groups/objective/current", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (objectiveRes.ok) {
+          const json = await objectiveRes.json();
+          setObjective(json.objective ?? null);
+        }
 
         const actorIds = Array.from(
           new Set(feedRows.map((row) => row.actor_user_id).filter(Boolean))
@@ -157,6 +178,35 @@ function GroupFeed({ session }: { session: Session }) {
       {error ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
+        </div>
+      ) : null}
+
+      {objective ? (
+        <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">
+              {objectiveTitle(objective.objective_type)}
+            </h2>
+            {objective.completed ? (
+              <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded">
+                Complete
+              </span>
+            ) : null}
+          </div>
+          <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+            <div
+              className="h-full bg-slate-900"
+              style={{
+                width: `${Math.min(
+                  100,
+                  Math.round((objective.progress / objective.target) * 100)
+                )}%`,
+              }}
+            />
+          </div>
+          <p className="text-xs text-slate-600">
+            {objective.progress}/{objective.target} · Week {objective.week_key}
+          </p>
         </div>
       ) : null}
 
