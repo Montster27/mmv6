@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAdminClient } from "@/lib/supabaseAdmin";
-import { isEmailAllowed } from "@/lib/adminAuth";
+import { isUserAdmin } from "@/lib/adminAuthServer";
 import { validateStorylet, coerceStoryletRow } from "@/core/validation/storyletValidation";
 import type { Storylet } from "@/types/storylets";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -22,7 +22,11 @@ async function ensureAdmin(request: Request) {
     ? authHeader.slice("Bearer ".length)
     : undefined;
   const user = await getUserFromToken(token);
-  if (!user || !isEmailAllowed(user.email)) {
+  if (!user) {
+    return null;
+  }
+  const ok = await isUserAdmin(user);
+  if (!ok) {
     return null;
   }
   return user;

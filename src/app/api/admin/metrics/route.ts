@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { isEmailAllowed } from "@/lib/adminAuth";
 import { fetchMetrics } from "@/server/metrics";
 import { supabaseServer } from "@/lib/supabase/server";
+import { isUserAdmin } from "@/lib/adminAuthServer";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -20,7 +20,11 @@ async function ensureAdmin(request: Request) {
     ? authHeader.slice("Bearer ".length)
     : undefined;
   const user = await getUserFromToken(token);
-  if (!user || !isEmailAllowed(user.email)) {
+  if (!user) {
+    return null;
+  }
+  const ok = await isUserAdmin(user);
+  if (!ok) {
     return null;
   }
   return user;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { isEmailAllowed } from "@/lib/adminAuth";
 import { supabaseServer } from "@/lib/supabase/server";
+import { isUserAdmin } from "@/lib/adminAuthServer";
 
 function utcToday(): string {
   const now = new Date();
@@ -28,7 +28,11 @@ async function ensureAdmin(request: Request) {
     ? authHeader.slice("Bearer ".length)
     : undefined;
   const user = await getUserFromToken(token);
-  if (!user || !isEmailAllowed(user.email)) {
+  if (!user) {
+    return null;
+  }
+  const ok = await isUserAdmin(user);
+  if (!ok) {
     return null;
   }
   return user;

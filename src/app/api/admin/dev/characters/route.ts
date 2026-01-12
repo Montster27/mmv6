@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isEmailAllowed } from "@/lib/adminAuth";
+import { isUserAdmin } from "@/lib/adminAuthServer";
 import { supabaseServer } from "@/lib/supabase/server";
 
 type CharacterRow = {
@@ -24,7 +24,11 @@ async function ensureAdmin(request: Request) {
     ? authHeader.slice("Bearer ".length)
     : undefined;
   const user = await getUserFromToken(token);
-  if (!user || !isEmailAllowed(user.email)) {
+  if (!user) {
+    return null;
+  }
+  const ok = await isUserAdmin(user);
+  if (!ok) {
     return null;
   }
   return user;
@@ -50,7 +54,7 @@ export async function GET(request: Request) {
 
   const { data: profiles } = await supabaseServer
     .from("profiles")
-    .select("id,email,username")
+    .select("id,email,username,is_admin")
     .in("id", userIds);
 
   const { data: dailyStates } = await supabaseServer
@@ -73,6 +77,7 @@ export async function GET(request: Request) {
       created_at: row.created_at,
       email: profile?.email ?? null,
       username: profile?.username ?? null,
+      is_admin: profile?.is_admin ?? false,
       day_index: daily?.day_index ?? null,
     };
   });

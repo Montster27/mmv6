@@ -3,8 +3,9 @@ const allowlistEnv =
   process.env.ADMIN_EMAIL_ALLOWLIST ??
   "";
 
-const adminEmails = allowlistEnv
-  .split(",")
+const defaultAdmins = ["monty.sharma@massdigi.org"];
+
+const adminEmails = [...defaultAdmins, ...allowlistEnv.split(",")]
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 

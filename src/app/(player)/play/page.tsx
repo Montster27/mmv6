@@ -88,16 +88,20 @@ export default function PlayPage() {
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
+  const [devIsAdmin, setDevIsAdmin] = useState(false);
   const [devCharacters, setDevCharacters] = useState<
     Array<{
       user_id: string;
       email: string | null;
       username: string | null;
+      is_admin: boolean;
       day_index: number | null;
       created_at: string;
     }>
   >([]);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
+  const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
   const [outcomeDeltas, setOutcomeDeltas] = useState<{
     energy?: number;
@@ -157,6 +161,24 @@ export default function PlayPage() {
     }
   };
 
+  const loadAdminFlag = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", userId)
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        console.error("Failed to load admin flag", error);
+        return;
+      }
+      setDevIsAdmin(Boolean(data?.is_admin));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleResetAccount = async (userId: string) => {
     setResettingUserId(userId);
     setDevError(null);
@@ -188,6 +210,68 @@ export default function PlayPage() {
     }
   };
 
+  const handleAdvanceDay = async (userId: string) => {
+    setAdvancingUserId(userId);
+    setDevError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setDevError("No session found.");
+        return;
+      }
+      const res = await fetch("/api/admin/dev/next-day", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to advance day.");
+      }
+      await loadDevCharacters();
+    } catch (e) {
+      console.error(e);
+      setDevError(e instanceof Error ? e.message : "Failed to advance day.");
+    } finally {
+      setAdvancingUserId(null);
+    }
+  };
+
+  const handleToggleAdmin = async (userId: string, nextValue: boolean) => {
+    setTogglingAdminId(userId);
+    setDevError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setDevError("No session found.");
+        return;
+      }
+      const res = await fetch("/api/admin/dev/admins", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: userId, is_admin: nextValue }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to update admin flag.");
+      }
+      await loadDevCharacters();
+    } catch (e) {
+      console.error(e);
+      setDevError(e instanceof Error ? e.message : "Failed to update admin flag.");
+    } finally {
+      setTogglingAdminId(null);
+    }
+  };
+
   useEffect(() => {
     latestStageRef.current = stage;
   }, [stage]);
@@ -203,6 +287,11 @@ export default function PlayPage() {
     pendingTransitionRef.current = null;
     setConsequenceActive(false);
   }, [dayIndex]);
+
+  useEffect(() => {
+    if (!userId) return;
+    loadAdminFlag(userId);
+  }, [userId]);
 
   const finishConsequence = () => {
     setConsequenceActive(false);
@@ -796,7 +885,7 @@ export default function PlayPage() {
               <Link className="text-sm text-slate-600 hover:underline" href="/theory">
                 Theoryboard
               </Link>
-              {isEmailAllowed(session.user.email) ? (
+              {isEmailAllowed(session.user.email) || devIsAdmin ? (
                 <Button
                   variant="secondary"
                   onClick={() => {
@@ -823,7 +912,7 @@ export default function PlayPage() {
                 </Button>
               </div>
               <p className="text-sm text-slate-600">
-                Reset accounts to day one for testing.
+                Reset accounts or advance the day for testing.
               </p>
               {devError ? (
                 <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -844,21 +933,50 @@ export default function PlayPage() {
                       <div>
                         <p className="font-medium text-slate-900">
                           {row.username ?? "Unknown"}
+                          {row.is_admin ? (
+                            <span className="ml-2 rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                              admin
+                            </span>
+                          ) : null}
                         </p>
                         <p className="text-xs text-slate-500">
                           {row.email ?? "no-email"} · Day{" "}
                           {row.day_index ?? "—"}
                         </p>
                       </div>
-                      <Button
-                        variant="secondary"
-                        disabled={resettingUserId === row.user_id}
-                        onClick={() => handleResetAccount(row.user_id)}
-                      >
-                        {resettingUserId === row.user_id
-                          ? "Resetting..."
-                          : "Reset to day one"}
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="secondary"
+                          disabled={advancingUserId === row.user_id}
+                          onClick={() => handleAdvanceDay(row.user_id)}
+                        >
+                          {advancingUserId === row.user_id
+                            ? "Advancing..."
+                            : "Next day"}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          disabled={resettingUserId === row.user_id}
+                          onClick={() => handleResetAccount(row.user_id)}
+                        >
+                          {resettingUserId === row.user_id
+                            ? "Resetting..."
+                            : "Reset to day one"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          disabled={togglingAdminId === row.user_id}
+                          onClick={() =>
+                            handleToggleAdmin(row.user_id, !row.is_admin)
+                          }
+                        >
+                          {togglingAdminId === row.user_id
+                            ? "Updating..."
+                            : row.is_admin
+                              ? "Revoke admin"
+                              : "Make admin"}
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
