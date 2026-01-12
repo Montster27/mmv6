@@ -60,28 +60,39 @@ export async function getOrStartArc(
   userId: string,
   dayIndex: number
 ): Promise<UserArc | null> {
-  const arc = ARC_DEFINITIONS[0];
-  if (!arc) return null;
-  if (dayIndex < arc.start_day_index) return null;
+  if (ARC_DEFINITIONS.length === 0) return null;
 
-  const { data, error } = await supabase
+  const arcIds = ARC_DEFINITIONS.map((arc) => arc.arc_id);
+  const { data: rows, error } = await supabase
     .from("user_arcs")
     .select("id,user_id,arc_id,status,step_index,started_day_index,last_advanced_day_index,created_at,updated_at")
     .eq("user_id", userId)
-    .eq("arc_id", arc.arc_id)
-    .limit(1)
-    .maybeSingle();
+    .in("arc_id", arcIds);
 
   if (error) {
-    console.error("Failed to fetch user arc", error);
+    console.error("Failed to fetch user arcs", error);
     return null;
   }
 
-  if (data) return data as UserArc;
+  const existingById = new Map(
+    (rows ?? []).map((row) => [row.arc_id, row as UserArc])
+  );
+
+  for (const arc of ARC_DEFINITIONS) {
+    const existing = existingById.get(arc.arc_id);
+    if (existing && existing.status === "active") {
+      return existing;
+    }
+  }
+
+  const nextArc = ARC_DEFINITIONS.find(
+    (arc) => dayIndex >= arc.start_day_index && !existingById.has(arc.arc_id)
+  );
+  if (!nextArc) return null;
 
   const insertPayload = {
     user_id: userId,
-    arc_id: arc.arc_id,
+    arc_id: nextArc.arc_id,
     status: "active",
     step_index: 0,
     started_day_index: dayIndex,
@@ -93,7 +104,7 @@ export async function getOrStartArc(
       .from("user_arcs")
       .select("id,user_id,arc_id,status,step_index,started_day_index,last_advanced_day_index,created_at,updated_at")
       .eq("user_id", userId)
-      .eq("arc_id", arc.arc_id)
+      .eq("arc_id", nextArc.arc_id)
       .limit(1)
       .maybeSingle();
     if (retry) return retry as UserArc;
@@ -101,13 +112,17 @@ export async function getOrStartArc(
     return null;
   }
 
-  trackEvent({ event_type: "arc_started", day_index: dayIndex, payload: { arc_id: arc.arc_id } });
+  trackEvent({
+    event_type: "arc_started",
+    day_index: dayIndex,
+    payload: { arc_id: nextArc.arc_id },
+  });
 
   const { data: created } = await supabase
     .from("user_arcs")
     .select("id,user_id,arc_id,status,step_index,started_day_index,last_advanced_day_index,created_at,updated_at")
     .eq("user_id", userId)
-    .eq("arc_id", arc.arc_id)
+    .eq("arc_id", nextArc.arc_id)
     .limit(1)
     .maybeSingle();
 

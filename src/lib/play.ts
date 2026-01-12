@@ -130,8 +130,7 @@ export async function fetchTodayStoryletCandidates(): Promise<
     .from("storylets")
     .select("id,slug,title,body,choices,is_active,created_at,tags,requirements,weight")
     .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(20);
+    .order("created_at", { ascending: true });
 
   if (error) {
     console.error("Failed to fetch storylets", error);
