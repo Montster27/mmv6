@@ -29,7 +29,10 @@ async function ensureAssignment(token: string, experimentId: string) {
   return json.variant as string | null;
 }
 
-export function useExperiments(required: string[] = []) {
+export function useExperiments(
+  required: string[] = [],
+  initialAssignments?: AssignmentMap
+) {
   const requiredKey = required.join("|");
   const [assignments, setAssignments] = useState<AssignmentMap>({});
   const [ready, setReady] = useState(false);
@@ -44,7 +47,10 @@ export function useExperiments(required: string[] = []) {
         if (alive) setReady(true);
         return;
       }
-      let nextAssignments = await fetchAssignments(token);
+      let nextAssignments = initialAssignments ?? {};
+      if (!Object.keys(nextAssignments).length) {
+        nextAssignments = await fetchAssignments(token);
+      }
       for (const expId of required) {
         if (!nextAssignments[expId]) {
           const variant = await ensureAssignment(token, expId);
@@ -62,7 +68,7 @@ export function useExperiments(required: string[] = []) {
     return () => {
       alive = false;
     };
-  }, [requiredKey]);
+  }, [requiredKey, initialAssignments]);
 
   const getVariant = (id: string, fallback = "A") =>
     assignments[id] ?? fallback;

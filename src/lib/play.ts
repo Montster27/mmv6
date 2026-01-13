@@ -9,6 +9,7 @@ import {
 } from "@/core/validation/storyletValidation";
 import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
+import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -123,32 +124,36 @@ export async function saveTimeAllocation(
   }
 }
 
-export async function fetchTodayStoryletCandidates(): Promise<
-  Storylet[]
-> {
-  const { data, error } = await supabase
-    .from("storylets")
-    .select("id,slug,title,body,choices,is_active,created_at,tags,requirements,weight")
-    .eq("is_active", true)
-    .order("created_at", { ascending: true });
+export async function fetchTodayStoryletCandidates(
+  seasonIndex?: number
+): Promise<Storylet[]> {
+  const fetcher = async () => {
+    const { data, error } = await supabase
+      .from("storylets")
+      .select("id,slug,title,body,choices,is_active,created_at,tags,requirements,weight")
+      .eq("is_active", true)
+      .order("created_at", { ascending: true });
 
-  if (error) {
-    console.error("Failed to fetch storylets", error);
-    return [];
-  }
+    if (error) {
+      console.error("Failed to fetch storylets", error);
+      return [] as Storylet[];
+    }
 
-  return (
-    data?.map((item) => {
-      const coerced = coerceStoryletRow({
-        ...item,
-        choices: parseChoices(item.choices),
-      });
-      const validated = validateStorylet(coerced);
-      if (validated.ok) return validated.value;
-      console.warn("Invalid storylet row; using fallback", validated.errors);
-      return fallbackStorylet();
-    }) ?? []
-  );
+    return (
+      data?.map((item) => {
+        const coerced = coerceStoryletRow({
+          ...item,
+          choices: parseChoices(item.choices),
+        });
+        const validated = validateStorylet(coerced);
+        if (validated.ok) return validated.value;
+        console.warn("Invalid storylet row; using fallback", validated.errors);
+        return fallbackStorylet();
+      }) ?? []
+    );
+  };
+
+  return fetchStoryletCatalog(seasonIndex, fetcher);
 }
 
 export async function fetchTodayRuns(

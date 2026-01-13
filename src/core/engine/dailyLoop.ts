@@ -97,7 +97,7 @@ export async function getOrCreateDailyRun(
     fetchDailyState(userId),
     fetchTimeAllocation(userId, dayIndex),
     fetchTodayRuns(userId, dayIndex),
-    fetchTodayStoryletCandidates(),
+    fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
     hasSentBoostToday(userId, dayIndex),
     // Note: we fetch recent history separately below.
   ]);

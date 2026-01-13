@@ -9,7 +9,6 @@ import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
 import { signOut } from "@/lib/auth";
-import { ensurePlayerSetup } from "@/lib/bootstrap";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import { supabase } from "@/lib/supabase/browser";
@@ -94,9 +93,16 @@ export default function PlayPage() {
   const [funPulseEligible, setFunPulseEligible] = useState(false);
   const [funPulseDone, setFunPulseDone] = useState(false);
   const [funPulseSaving, setFunPulseSaving] = useState(false);
+  const [bootstrapAssignments, setBootstrapAssignments] = useState<
+    Record<string, string>
+  >({});
+  const [bootstrapIsAdmin, setBootstrapIsAdmin] = useState(false);
+  const [bootstrapReady, setBootstrapReady] = useState(false);
+  const [bootstrapUserId, setBootstrapUserId] = useState<string | null>(null);
+  const [bootstrapEmail, setBootstrapEmail] = useState<string | null>(null);
   const { assignments, getVariant, ready: experimentsReady } = useExperiments([
     "microtask_freq_v1",
-  ]);
+  ], bootstrapAssignments);
   const microtaskVariant = getVariant("microtask_freq_v1", "A");
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
@@ -320,19 +326,46 @@ export default function PlayPage() {
   };
 
   useEffect(() => {
+    const loadBootstrap = async () => {
+      setError(null);
+      try {
+        const sessionData = await supabase.auth.getSession();
+        const token = sessionData.data.session?.access_token;
+        if (!token) throw new Error("No session found.");
+        const bootRes = await fetch("/api/bootstrap", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const bootJson = await bootRes.json();
+        if (!bootRes.ok) {
+          throw new Error(bootJson.error ?? "Failed to load bootstrap.");
+        }
+        setUserId(bootJson.userId);
+        setBootstrapUserId(bootJson.userId);
+        setBootstrapEmail(bootJson.email ?? null);
+        setBootstrapAssignments(bootJson.experiments ?? {});
+        setBootstrapIsAdmin(Boolean(bootJson.isAdmin));
+        setBootstrapReady(true);
+      } catch (e) {
+        console.error(e);
+        setError("Failed to load play state.");
+      }
+    };
+
+    loadBootstrap();
+  }, []);
+
+  useEffect(() => {
     const init = async () => {
+      if (!bootstrapReady || !bootstrapUserId) return;
       if (!experimentsReady) return;
       setLoading(true);
       setError(null);
       try {
-        const { userId } = await ensurePlayerSetup();
-        setUserId(userId);
-        const sessionData = await supabase.auth.getSession();
-        const email = sessionData.data.session?.user.email;
-        const isAdmin = isEmailAllowed(email) || devIsAdmin;
+        const isAdmin =
+          isEmailAllowed(bootstrapEmail) || devIsAdmin || bootstrapIsAdmin;
 
         if (USE_DAILY_LOOP_ORCHESTRATOR) {
-          const run = await getOrCreateDailyRun(userId, new Date(), {
+          const run = await getOrCreateDailyRun(bootstrapUserId, new Date(), {
             microtaskVariant,
             experiments,
             isAdmin,
@@ -358,7 +391,8 @@ export default function PlayPage() {
             setSeasonIndex(null);
             setSeasonRecap(null);
           }
-          const ds = run.dailyState ?? (await fetchDailyState(userId));
+          const ds =
+            run.dailyState ?? (await fetchDailyState(bootstrapUserId));
           if (ds) setDailyState({ ...ds, day_index: run.dayIndex });
 
           const servedKey = `${run.dayIndex}:${run.storylets
@@ -382,31 +416,31 @@ export default function PlayPage() {
           }
 
           const [profiles, received] = await Promise.all([
-            fetchPublicProfiles(userId),
-            fetchTodayReceivedBoosts(userId, run.dayIndex),
+            fetchPublicProfiles(bootstrapUserId),
+            fetchTodayReceivedBoosts(bootstrapUserId, run.dayIndex),
           ]);
           setPublicProfiles(profiles);
           setSelectedRecipient(profiles[0]?.user_id ?? "");
           setBoostsReceived(received);
         } else {
-          const cadence = await ensureCadenceUpToDate(userId);
+          const cadence = await ensureCadenceUpToDate(bootstrapUserId);
           setDayIndexState(cadence.dayIndex);
           setAlreadyCompletedToday(cadence.alreadyCompletedToday);
           setSeasonContext(null);
 
-          const ds = await fetchDailyState(userId);
+          const ds = await fetchDailyState(bootstrapUserId);
           if (ds) {
             setDailyState({ ...ds, day_index: cadence.dayIndex });
           }
           const day = cadence.dayIndex;
 
-          const existingAllocation = await fetchTimeAllocation(userId, day);
+          const existingAllocation = await fetchTimeAllocation(bootstrapUserId, day);
           if (existingAllocation) {
             setAllocation({ ...defaultAllocation, ...existingAllocation });
             setAllocationSaved(true);
           }
 
-          const existingRuns = await fetchTodayRuns(userId, day);
+          const existingRuns = await fetchTodayRuns(bootstrapUserId, day);
           setRuns(existingRuns);
 
           const candidates = await fetchTodayStoryletCandidates();
@@ -417,9 +451,9 @@ export default function PlayPage() {
           setStorylets(next);
 
           const [profiles, received, sent] = await Promise.all([
-            fetchPublicProfiles(userId),
-            fetchTodayReceivedBoosts(userId, day),
-            hasSentBoostToday(userId, day),
+            fetchPublicProfiles(bootstrapUserId),
+            fetchTodayReceivedBoosts(bootstrapUserId, day),
+            hasSentBoostToday(bootstrapUserId, day),
           ]);
           setPublicProfiles(profiles);
           setSelectedRecipient(profiles[0]?.user_id ?? "");
@@ -442,7 +476,16 @@ export default function PlayPage() {
     };
 
     init();
-  }, [experimentsReady, microtaskVariant, experiments, devIsAdmin]);
+  }, [
+    bootstrapReady,
+    bootstrapUserId,
+    experimentsReady,
+    microtaskVariant,
+    experiments,
+    devIsAdmin,
+    bootstrapEmail,
+    bootstrapIsAdmin,
+  ]);
 
   const trackWithSeason = (params: {
     event_type: string;
