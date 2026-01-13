@@ -6,6 +6,7 @@ import {
   coerceStoryletRow,
   validateStoryletIssues,
   validateArcDefinitions,
+  type ValidationIssue,
 } from "@/core/validation/storyletValidation";
 
 async function getUserFromToken(token?: string) {
@@ -43,8 +44,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Failed to fetch storylets" }, { status: 500 });
   }
 
-  const errors = [];
-  const warnings = [];
+  const errors: ValidationIssue[] = [];
+  const warnings: ValidationIssue[] = [];
   const storylets = (rows ?? []).map((row) => coerceStoryletRow(row));
 
   storylets.forEach((storylet) => {
