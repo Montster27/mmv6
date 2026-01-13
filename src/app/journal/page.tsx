@@ -6,6 +6,7 @@ import type { Session } from "@supabase/supabase-js";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { fetchAnomaliesByIds, fetchUserAnomalies } from "@/lib/anomalies";
 import { submitReport } from "@/lib/reports";
+import { Button } from "@/components/ui/button";
 import type { Anomaly, UserAnomaly } from "@/types/anomalies";
 
 function JournalContent({ session }: { session: Session }) {
