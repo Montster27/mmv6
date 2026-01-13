@@ -1065,9 +1065,14 @@ export default function PlayPage() {
             <section className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Dev menu</h2>
-                <Button variant="ghost" onClick={() => setShowDevMenu(false)}>
-                  Close
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary" asChild>
+                    <Link href="/admin/storylets/validate">Validate storylets</Link>
+                  </Button>
+                  <Button variant="ghost" onClick={() => setShowDevMenu(false)}>
+                    Close
+                  </Button>
+                </div>
               </div>
               <p className="text-sm text-slate-600">
                 Reset accounts or advance the day for testing.
