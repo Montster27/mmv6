@@ -101,6 +101,16 @@ export default function StoryletEditPage({
     : "";
   const hasSeasonRules =
     seasonMin !== "" || seasonMax !== "" || (seasonsAny && seasonsAny.length > 0);
+  const audience = requirements.audience ?? {};
+  const audienceRollout =
+    typeof audience.rollout_pct === "number" ? audience.rollout_pct : "";
+  const audienceExperimentId =
+    typeof audience.experiment?.id === "string" ? audience.experiment.id : "";
+  const audienceVariants = Array.isArray(audience.experiment?.variants_any)
+    ? audience.experiment.variants_any.join(", ")
+    : "";
+  const audienceAllowAdmin =
+    typeof audience.allow_admin === "boolean" ? audience.allow_admin : false;
 
   const previewStorylet = useMemo<Storylet>(() => {
     return {
@@ -415,6 +425,139 @@ export default function StoryletEditPage({
                     }
                   >
                     Insert season gating template
+                  </Button>
+                </div>
+
+                <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    Audience / rollout
+                  </h3>
+                  <label className="flex flex-col gap-1 text-sm text-slate-700">
+                    Rollout percent (0–100)
+                    <input
+                      type="number"
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
+                      value={audienceRollout}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const next =
+                          raw === "" ? null : Number.parseFloat(raw);
+                        setForm((f) => ({
+                          ...f,
+                          requirements: updateRequirementsJson(f.requirements, {
+                            audience: {
+                              ...((requirements.audience as Record<string, unknown>) ?? {}),
+                              rollout_pct: Number.isNaN(next) ? null : next,
+                            },
+                          }),
+                        }));
+                      }}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm text-slate-700">
+                    Experiment id
+                    <input
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
+                      value={audienceExperimentId}
+                      onChange={(e) => {
+                        const value = e.target.value.trim();
+                        const current =
+                          (requirements.audience as Record<string, unknown>) ?? {};
+                        const experiment =
+                          value === ""
+                            ? null
+                            : {
+                                id: value,
+                                variants_any: Array.isArray(
+                                  (current as any).experiment?.variants_any
+                                )
+                                  ? (current as any).experiment.variants_any
+                                  : [],
+                              };
+                        setForm((f) => ({
+                          ...f,
+                          requirements: updateRequirementsJson(f.requirements, {
+                            audience: {
+                              ...current,
+                              experiment,
+                            },
+                          }),
+                        }));
+                      }}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm text-slate-700">
+                    Experiment variants allowlist (comma-separated)
+                    <input
+                      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900"
+                      value={audienceVariants}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const next = raw
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean);
+                        const current =
+                          (requirements.audience as Record<string, unknown>) ?? {};
+                        const experiment =
+                          (current as any).experiment ?? {};
+                        setForm((f) => ({
+                          ...f,
+                          requirements: updateRequirementsJson(f.requirements, {
+                            audience: {
+                              ...current,
+                              experiment:
+                                Object.keys(experiment).length === 0 &&
+                                next.length === 0
+                                  ? null
+                                  : {
+                                      ...experiment,
+                                      variants_any: next,
+                                    },
+                            },
+                          }),
+                        }));
+                      }}
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={audienceAllowAdmin}
+                      onChange={(e) => {
+                        const current =
+                          (requirements.audience as Record<string, unknown>) ?? {};
+                        setForm((f) => ({
+                          ...f,
+                          requirements: updateRequirementsJson(f.requirements, {
+                            audience: {
+                              ...current,
+                              allow_admin: e.target.checked,
+                            },
+                          }),
+                        }));
+                      }}
+                    />
+                    Allow admin/testers
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="px-0 text-xs text-slate-700"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        requirements: updateRequirementsJson(f.requirements, {
+                          audience: {
+                            rollout_pct: 10,
+                            experiment: { id: "microtask_freq_v1", variants_any: ["B"] },
+                            allow_admin: true,
+                          },
+                        }),
+                      }))
+                    }
+                  >
+                    Insert audience template
                   </Button>
                 </div>
 

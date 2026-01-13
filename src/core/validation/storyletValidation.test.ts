@@ -133,4 +133,24 @@ describe("storyletValidation", () => {
     expect(res.errors.length).toBe(0);
     expect(res.warnings.length).toBe(1);
   });
+
+  it("rejects invalid audience rollout percent", () => {
+    const invalidReq = {
+      ...valid,
+      requirements: { audience: { rollout_pct: 200 } },
+    };
+    const res = validateStorylet(invalidReq);
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects invalid audience experiment variants", () => {
+    const invalidReq = {
+      ...valid,
+      requirements: {
+        audience: { experiment: { id: "exp", variants_any: [1] } },
+      },
+    };
+    const res = validateStorylet(invalidReq);
+    expect(res.ok).toBe(false);
+  });
 });

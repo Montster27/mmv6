@@ -94,10 +94,12 @@ export default function PlayPage() {
   const [funPulseEligible, setFunPulseEligible] = useState(false);
   const [funPulseDone, setFunPulseDone] = useState(false);
   const [funPulseSaving, setFunPulseSaving] = useState(false);
-  const { getVariant, ready: experimentsReady } = useExperiments([
+  const { assignments, getVariant, ready: experimentsReady } = useExperiments([
     "microtask_freq_v1",
   ]);
   const microtaskVariant = getVariant("microtask_freq_v1", "A");
+  const experiments = useMemo(() => assignments, [assignments]);
+  const servedStoryletsRef = useRef<string | null>(null);
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
@@ -325,10 +327,15 @@ export default function PlayPage() {
       try {
         const { userId } = await ensurePlayerSetup();
         setUserId(userId);
+        const sessionData = await supabase.auth.getSession();
+        const email = sessionData.data.session?.user.email;
+        const isAdmin = isEmailAllowed(email) || devIsAdmin;
 
         if (USE_DAILY_LOOP_ORCHESTRATOR) {
           const run = await getOrCreateDailyRun(userId, new Date(), {
             microtaskVariant,
+            experiments,
+            isAdmin,
           });
           setDayIndexState(run.dayIndex);
           setStage(run.stage);
@@ -353,6 +360,26 @@ export default function PlayPage() {
           }
           const ds = run.dailyState ?? (await fetchDailyState(userId));
           if (ds) setDailyState({ ...ds, day_index: run.dayIndex });
+
+          const servedKey = `${run.dayIndex}:${run.storylets
+            .map((s) => s.id)
+            .join(",")}`;
+          if (servedStoryletsRef.current !== servedKey) {
+            servedStoryletsRef.current = servedKey;
+            run.storylets.forEach((storylet) => {
+              const audience = (storylet.requirements as any)?.audience;
+              trackWithSeason({
+                event_type: "storylet_served",
+                day_index: run.dayIndex,
+                stage: run.stage,
+                payload: {
+                  storylet_id: storylet.id,
+                  storylet_slug: storylet.slug,
+                  audience: audience ?? null,
+                },
+              });
+            });
+          }
 
           const [profiles, received] = await Promise.all([
             fetchPublicProfiles(userId),
@@ -415,7 +442,7 @@ export default function PlayPage() {
     };
 
     init();
-  }, [experimentsReady, microtaskVariant]);
+  }, [experimentsReady, microtaskVariant, experiments, devIsAdmin]);
 
   const trackWithSeason = (params: {
     event_type: string;

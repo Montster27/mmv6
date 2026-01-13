@@ -61,7 +61,11 @@ function devLogStage(snapshot: Record<string, unknown>) {
 export async function getOrCreateDailyRun(
   userId: string,
   today: Date,
-  options?: { microtaskVariant?: string }
+  options?: {
+    microtaskVariant?: string;
+    experiments?: Record<string, string>;
+    isAdmin?: boolean;
+  }
 ): Promise<DailyRun> {
   const todayUtc = new Date(
     Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
@@ -111,12 +115,15 @@ export async function getOrCreateDailyRun(
 
   const storyletsSelected = selectStorylets({
     seed: `${userId}-${dayIndex}`,
+    userId,
     dayIndex,
     seasonIndex: seasonContext.currentSeason.season_index,
     dailyState: daily ?? null,
     allStorylets: storyletsRaw,
     recentRuns,
     forcedStorylet: arcStorylet ?? undefined,
+    experiments: options?.experiments,
+    isAdmin: options?.isAdmin,
   });
 
   const reflection = await getReflection(userId, dayIndex);

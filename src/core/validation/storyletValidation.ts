@@ -91,6 +91,7 @@ const KNOWN_REQUIREMENT_KEYS = new Set([
   "min_season_index",
   "max_season_index",
   "seasons_any",
+  "audience",
 ]);
 
 function addIssue(
@@ -352,6 +353,73 @@ export function validateStoryletIssues(
           "requirements.seasons_any",
           "requirements.seasons_any must be an array of integers"
         );
+      }
+    }
+    if (req.audience !== undefined) {
+      if (!req.audience || typeof req.audience !== "object" || Array.isArray(req.audience)) {
+        addIssue(errors, storylet, "requirements.audience", "Audience must be an object");
+      } else {
+        const audience = req.audience as Record<string, unknown>;
+        if (
+          audience.rollout_pct !== undefined &&
+          (typeof audience.rollout_pct !== "number" ||
+            audience.rollout_pct < 0 ||
+            audience.rollout_pct > 100)
+        ) {
+          addIssue(
+            errors,
+            storylet,
+            "requirements.audience.rollout_pct",
+            "rollout_pct must be a number between 0 and 100"
+          );
+        }
+        if (audience.allow_admin !== undefined && typeof audience.allow_admin !== "boolean") {
+          addIssue(
+            errors,
+            storylet,
+            "requirements.audience.allow_admin",
+            "allow_admin must be a boolean"
+          );
+        }
+        if (audience.experiment !== undefined) {
+          if (!audience.experiment || typeof audience.experiment !== "object") {
+            addIssue(
+              errors,
+              storylet,
+              "requirements.audience.experiment",
+              "experiment must be an object"
+            );
+          } else {
+            const exp = audience.experiment as Record<string, unknown>;
+            if (!isString(exp.id) || !exp.id) {
+              addIssue(
+                errors,
+                storylet,
+                "requirements.audience.experiment.id",
+                "experiment.id must be a string"
+              );
+            }
+            if (exp.variants_any !== undefined) {
+              if (!Array.isArray(exp.variants_any)) {
+                addIssue(
+                  errors,
+                  storylet,
+                  "requirements.audience.experiment.variants_any",
+                  "variants_any must be an array of strings"
+                );
+              } else if (
+                exp.variants_any.some((v) => !isString(v))
+              ) {
+                addIssue(
+                  errors,
+                  storylet,
+                  "requirements.audience.experiment.variants_any",
+                  "variants_any must be an array of strings"
+                );
+              }
+            }
+          }
+        }
       }
     }
     Object.keys(req).forEach((key) => {

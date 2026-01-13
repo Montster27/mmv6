@@ -36,6 +36,7 @@ describe("selectStorylets", () => {
     const storylets = [makeStorylet("a"), makeStorylet("b"), makeStorylet("c")];
     const args = {
       seed: "user-1-2",
+      userId: "user-1",
       dayIndex: 2,
       seasonIndex: 1,
       dailyState: baseState,
@@ -52,6 +53,7 @@ describe("selectStorylets", () => {
     const storylets = [makeStorylet("a"), makeStorylet("b"), makeStorylet("c")];
     const selected = selectStorylets({
       seed: "seed",
+      userId: "user-1",
       dayIndex: 4,
       seasonIndex: 1,
       dailyState: baseState,
@@ -69,6 +71,7 @@ describe("selectStorylets", () => {
     ];
     const selected = selectStorylets({
       seed: "seed",
+      userId: "user-1",
       dayIndex: 4,
       seasonIndex: 1,
       dailyState: baseState,
@@ -87,6 +90,7 @@ describe("selectStorylets", () => {
 
     const selected = selectStorylets({
       seed: "seed",
+      userId: "user-1",
       dayIndex: 2,
       seasonIndex: 1,
       dailyState: baseState,
@@ -107,6 +111,7 @@ describe("selectStorylets", () => {
 
     const selected = selectStorylets({
       seed: "seed",
+      userId: "user-1",
       dayIndex: 2,
       seasonIndex: 1,
       dailyState: baseState,
@@ -122,6 +127,7 @@ describe("selectStorylets", () => {
     const storylets = [forced, makeStorylet("b"), makeStorylet("c")];
     const selected = selectStorylets({
       seed: "seed",
+      userId: "user-1",
       dayIndex: 4,
       seasonIndex: 1,
       dailyState: baseState,
@@ -145,6 +151,7 @@ describe("selectStorylets", () => {
     ];
     const selected = selectStorylets({
       seed: "seed",
+      userId: "user-1",
       dayIndex: 4,
       seasonIndex: 1,
       dailyState: baseState,
@@ -163,6 +170,7 @@ describe("selectStorylets", () => {
     ];
     const selected = selectStorylets({
       seed: "seed",
+      userId: "user-1",
       dayIndex: 4,
       seasonIndex: 1,
       dailyState: baseState,
@@ -170,5 +178,71 @@ describe("selectStorylets", () => {
       recentRuns: [],
     });
     expect(selected).toHaveLength(2);
+  });
+
+  it("respects rollout audience gating", () => {
+    const storylets = [
+      makeStorylet("gated", {
+        requirements: { audience: { rollout_pct: 0 } },
+      }),
+      makeStorylet("open"),
+    ];
+    const selected = selectStorylets({
+      seed: "seed",
+      userId: "user-1",
+      dayIndex: 4,
+      seasonIndex: 1,
+      dailyState: baseState,
+      allStorylets: storylets,
+      recentRuns: [],
+    });
+    const ids = selected.map((s) => s.id);
+    expect(ids).toContain("open");
+  });
+
+  it("allows admin audience override", () => {
+    const storylets = [
+      makeStorylet("admin-only", {
+        requirements: { audience: { rollout_pct: 0, allow_admin: true } },
+      }),
+      makeStorylet("open"),
+    ];
+    const selected = selectStorylets({
+      seed: "seed",
+      userId: "user-1",
+      dayIndex: 4,
+      seasonIndex: 1,
+      dailyState: baseState,
+      allStorylets: storylets,
+      recentRuns: [],
+      isAdmin: true,
+    });
+    const ids = selected.map((s) => s.id);
+    expect(ids).toContain("admin-only");
+  });
+
+  it("respects experiment audience gating", () => {
+    const storylets = [
+      makeStorylet("exp-gated", {
+        requirements: {
+          audience: {
+            experiment: { id: "exp1", variants_any: ["B"] },
+          },
+        },
+      }),
+      makeStorylet("open"),
+    ];
+    const selected = selectStorylets({
+      seed: "seed",
+      userId: "user-1",
+      dayIndex: 4,
+      seasonIndex: 1,
+      dailyState: baseState,
+      allStorylets: storylets,
+      recentRuns: [],
+      experiments: { exp1: "B" },
+    });
+    const ids = selected.map((s) => s.id);
+    expect(ids).toContain("exp-gated");
   });
 });

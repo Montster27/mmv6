@@ -1,6 +1,7 @@
 import type { DailyState } from "@/types/daily";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
+import { pctInRollout } from "@/core/eligibility/rollout";
 
 type Requirements = {
   min_day_index?: number;
@@ -10,17 +11,25 @@ type Requirements = {
   min_season_index?: number;
   max_season_index?: number;
   seasons_any?: number[];
+  audience?: {
+    rollout_pct?: number;
+    experiment?: { id?: string; variants_any?: string[] };
+    allow_admin?: boolean;
+  };
   [key: string]: unknown;
 };
 
 type SelectorArgs = {
   seed: string;
+  userId: string;
   dayIndex: number;
   seasonIndex: number;
   dailyState: DailyState | null;
   allStorylets: Storylet[];
   recentRuns: StoryletRun[];
   forcedStorylet?: Storylet | null;
+  experiments?: Record<string, string>;
+  isAdmin?: boolean;
 };
 
 function hashString(input: string): number {
@@ -42,6 +51,14 @@ function hasSeasonRules(req: Requirements): boolean {
     typeof req.min_season_index === "number" ||
     typeof req.max_season_index === "number" ||
     (Array.isArray(req.seasons_any) && req.seasons_any.length > 0)
+  );
+}
+
+function hasAudienceRules(req: Requirements): boolean {
+  return (
+    typeof req.audience?.rollout_pct === "number" ||
+    Boolean(req.audience?.experiment?.id) ||
+    typeof req.audience?.allow_admin === "boolean"
   );
 }
 
@@ -69,7 +86,10 @@ function meetsRequirements(
   dayIndex: number,
   dailyState: DailyState | null,
   seasonIndex: number,
-  opts?: { ignoreSeason?: boolean }
+  userId: string,
+  experiments: Record<string, string>,
+  isAdmin: boolean,
+  opts?: { ignoreSeason?: boolean; ignoreAudience?: boolean }
 ): boolean {
   const req = (storylet.requirements || {}) as Requirements;
   if (typeof req.min_day_index === "number" && dayIndex < req.min_day_index) return false;
@@ -90,6 +110,22 @@ function meetsRequirements(
 
   if (!opts?.ignoreSeason && hasSeasonRules(req)) {
     if (!meetsSeasonRules(req, seasonIndex)) return false;
+  }
+
+  if (!opts?.ignoreAudience && req.audience && typeof req.audience === "object" && !Array.isArray(req.audience)) {
+    const audience = req.audience as Requirements["audience"];
+    if (audience?.allow_admin && isAdmin) return true;
+    if (typeof audience?.rollout_pct === "number") {
+      if (!pctInRollout(userId, storylet.id || storylet.slug || "", audience.rollout_pct)) {
+        return false;
+      }
+    }
+    if (audience?.experiment && audience.experiment.id && audience.experiment.variants_any) {
+      const assigned = experiments[audience.experiment.id];
+      if (!assigned || !audience.experiment.variants_any.includes(assigned)) {
+        return false;
+      }
+    }
   }
 
   return true;
@@ -115,12 +151,15 @@ function pickTop(storylets: Storylet[], seed: string, count: number): Storylet[]
 
 export function selectStorylets({
   seed,
+  userId,
   dayIndex,
   seasonIndex,
   dailyState,
   allStorylets,
   recentRuns,
   forcedStorylet,
+  experiments = {},
+  isAdmin = false,
 }: SelectorArgs): Storylet[] {
   const todayUsedIds = new Set(
     recentRuns.filter((r) => r.day_index === dayIndex).map((r) => r.storylet_id)
@@ -137,7 +176,7 @@ export function selectStorylets({
   const baseEligible = activeStorylets.filter(
     (s) =>
       !todayUsedIds.has(s.id) &&
-      meetsRequirements(s, dayIndex, dailyState, seasonIndex)
+      meetsRequirements(s, dayIndex, dailyState, seasonIndex, userId, experiments, isAdmin)
   );
 
   const preferred = baseEligible.filter((s) => !recentIds.has(s.id));
@@ -159,6 +198,23 @@ export function selectStorylets({
     ) {
       console.warn(
         `[storylets] Forced storylet ${forcedStorylet.slug ?? forcedStorylet.id} excluded by season gating.`
+      );
+    }
+    if (
+      process.env.NODE_ENV !== "production" &&
+      hasAudienceRules(forcedReq) &&
+      !meetsRequirements(
+        forcedStorylet,
+        dayIndex,
+        dailyState,
+        seasonIndex,
+        userId,
+        experiments,
+        isAdmin
+      )
+    ) {
+      console.warn(
+        `[storylets] Forced storylet ${forcedStorylet.slug ?? forcedStorylet.id} excluded by audience gating.`
       );
     }
     picked.push(forcedStorylet);
@@ -186,7 +242,8 @@ export function selectStorylets({
       const req = (s.requirements || {}) as Requirements;
       return (
         !hasSeasonRules(req) &&
-        meetsRequirements(s, dayIndex, dailyState, seasonIndex, {
+        !hasAudienceRules(req) &&
+        meetsRequirements(s, dayIndex, dailyState, seasonIndex, userId, experiments, isAdmin, {
           ignoreSeason: true,
         })
       );
@@ -199,12 +256,42 @@ export function selectStorylets({
   if (picked.length < 2 && baseEligible.length < 2) {
     const relaxedEligible = activeStorylets.filter((s) => {
       if (todayUsedIds.has(s.id)) return false;
-      return meetsRequirements(s, dayIndex, dailyState, seasonIndex, {
-        ignoreSeason: true,
-      });
+      return meetsRequirements(
+        s,
+        dayIndex,
+        dailyState,
+        seasonIndex,
+        userId,
+        experiments,
+        isAdmin,
+        {
+          ignoreSeason: true,
+        }
+      );
     });
     const relaxedPreferred = relaxedEligible.filter((s) => !recentIds.has(s.id));
     const remaining = relaxedPreferred.filter((s) => !picked.includes(s));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+  }
+
+  if (picked.length < 2) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Audience gating reduced pool; using fallback.");
+    }
+    const relaxedAudience = activeStorylets.filter((s) => {
+      if (todayUsedIds.has(s.id)) return false;
+      return meetsRequirements(
+        s,
+        dayIndex,
+        dailyState,
+        seasonIndex,
+        userId,
+        experiments,
+        isAdmin,
+        { ignoreSeason: true, ignoreAudience: true }
+      );
+    });
+    const remaining = relaxedAudience.filter((s) => !picked.includes(s));
     picked.push(...pickTop(remaining, seed, 2 - picked.length));
   }
 
@@ -230,6 +317,7 @@ export const _testOnly = {
   hashString,
   meetsRequirements,
   hasSeasonRules,
+  hasAudienceRules,
   meetsSeasonRules,
   pickTop,
   scoreStorylet,
