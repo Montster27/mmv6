@@ -10,6 +10,7 @@ import { fetchAnomaliesByIds } from "@/lib/anomalies";
 import { supabase } from "@/lib/supabase/browser";
 import { fetchGroup, fetchGroupFeed, fetchMyGroupMembership } from "@/lib/groups";
 import { fetchUserAnomalies } from "@/lib/anomalies";
+import { submitReport } from "@/lib/reports";
 import type { Anomaly } from "@/types/anomalies";
 import type { Group, GroupFeedItem } from "@/types/groups";
 
@@ -38,6 +39,15 @@ function GroupFeed({ session }: { session: Session }) {
   const [feed, setFeed] = useState<GroupFeedItem[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ProfileRow>>({});
   const [anomalies, setAnomalies] = useState<Record<string, Anomaly>>({});
+  const [clues, setClues] = useState<
+    Array<{
+      id: string;
+      from_display_name: string | null;
+      anomaly_title: string | null;
+      anomaly_description: string | null;
+      created_at: string;
+    }>
+  >([]);
   const [objective, setObjective] = useState<ObjectiveRow | null>(null);
   const [members, setMembers] = useState<ProfileRow[]>([]);
   const [myAnomalies, setMyAnomalies] = useState<Anomaly[]>([]);
@@ -47,6 +57,11 @@ function GroupFeed({ session }: { session: Session }) {
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sentToday, setSentToday] = useState(false);
+  const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState("spam");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportSaving, setReportSaving] = useState(false);
+  const [reportMessage, setReportMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -132,6 +147,14 @@ function GroupFeed({ session }: { session: Session }) {
           if (!selectedAnomaly && list[0]) {
             setSelectedAnomaly(list[0].id);
           }
+        }
+
+        const clueRes = await fetch("/api/group/clues/inbox", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (clueRes.ok) {
+          const json = await clueRes.json();
+          setClues(json.clues ?? []);
         }
       } catch (e) {
         console.error(e);
@@ -341,6 +364,112 @@ function GroupFeed({ session }: { session: Session }) {
           <p className="text-xs text-slate-600">
             {objective.progress}/{objective.target} · Week {objective.week_key}
           </p>
+        </div>
+      ) : null}
+
+      {clues.length > 0 ? (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Clues received</h2>
+          <div className="space-y-3">
+            {clues.map((clue) => (
+              <div
+                key={clue.id}
+                className="rounded-md border border-slate-200 bg-white px-4 py-3"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-slate-900">
+                    {clue.anomaly_title ?? "Anomaly clue"}
+                  </h3>
+                  <span className="text-xs text-slate-500">
+                    {clue.created_at
+                      ? new Date(clue.created_at).toLocaleDateString()
+                      : ""}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-700">
+                  {clue.anomaly_description ?? "A clue arrived from your group."}
+                </p>
+                <p className="text-xs text-slate-500 mt-2">
+                  From {clue.from_display_name ?? "a group member"}
+                </p>
+                <Button
+                  variant="ghost"
+                  className="px-0 text-xs text-slate-700"
+                  onClick={() => {
+                    setReportTarget(clue.id);
+                    setReportMessage(null);
+                  }}
+                >
+                  Report
+                </Button>
+              </div>
+            ))}
+          </div>
+          {reportTarget ? (
+            <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
+              <h3 className="text-sm font-semibold text-slate-700">Report clue</h3>
+              <label className="text-sm text-slate-700">
+                Reason
+                <select
+                  className="ml-2 rounded border border-slate-300 px-2 py-1 text-slate-900"
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                >
+                  <option value="spam">Spam</option>
+                  <option value="harassment">Harassment</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label className="block text-sm text-slate-700">
+                Details (optional)
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
+                  rows={2}
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                />
+              </label>
+              {reportMessage ? (
+                <p className="text-xs text-slate-600">{reportMessage}</p>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={async () => {
+                    setReportSaving(true);
+                    try {
+                      await submitReport({
+                        target_type: "clue",
+                        target_id: reportTarget,
+                        reason: reportReason,
+                        details: reportDetails.trim() || undefined,
+                      });
+                      setReportMessage("Report submitted.");
+                      setReportTarget(null);
+                      setReportDetails("");
+                    } catch (e) {
+                      setReportMessage(
+                        e instanceof Error ? e.message : "Failed to submit report."
+                      );
+                    } finally {
+                      setReportSaving(false);
+                    }
+                  }}
+                  disabled={reportSaving}
+                >
+                  {reportSaving ? "Submitting..." : "Submit report"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setReportTarget(null);
+                    setReportDetails("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
