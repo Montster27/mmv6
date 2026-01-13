@@ -34,6 +34,22 @@ export const ARC_DEFINITIONS: ArcDefinition[] = [
       },
     },
   },
+  {
+    arc_id: "familiar_stranger_v1",
+    title: "Familiar Stranger",
+    start_day_index: 2,
+    steps: [
+      { step_id: "arc_stranger_1", storylet_slug: "arc_stranger_1" },
+      { step_id: "arc_stranger_2", storylet_slug: "arc_stranger_2", min_day_gap: 1 },
+      { step_id: "arc_stranger_3", storylet_slug: "arc_stranger_3", min_day_gap: 1 },
+      { step_id: "arc_stranger_4", storylet_slug: "arc_stranger_4", min_day_gap: 1 },
+    ],
+    payoff: {
+      deltas: {
+        vectors: { reflection: 2 },
+      },
+    },
+  },
 ];
 
 export const PRIMARY_ARC_ID = ARC_DEFINITIONS[0]?.arc_id ?? "roommate_v1";
