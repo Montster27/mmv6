@@ -5,8 +5,8 @@ import { supabaseServer } from "@/lib/supabase/server";
 export async function GET() {
   const { data, error } = await supabaseServer
     .from("storylets")
-    .select("created_at")
-    .order("created_at", { ascending: false })
+    .select("updated_at")
+    .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -16,6 +16,6 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    stamp: data?.created_at ?? null,
+    stamp: data?.updated_at ?? null,
   });
 }
