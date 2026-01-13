@@ -16,6 +16,7 @@ import { performSeasonReset } from "@/core/season/seasonReset";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
+import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -59,7 +60,8 @@ function devLogStage(snapshot: Record<string, unknown>) {
 
 export async function getOrCreateDailyRun(
   userId: string,
-  today: Date
+  today: Date,
+  options?: { microtaskVariant?: string }
 ): Promise<DailyRun> {
   const todayUtc = new Date(
     Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
@@ -124,7 +126,8 @@ export async function getOrCreateDailyRun(
     ? await getFunPulse(userId, currentSeasonIndex, dayIndex)
     : null;
   const funPulseDone = Boolean(funPulseRow);
-  const microTaskEligible = dayIndex >= 1 && dayIndex % 2 === 0;
+  const microTaskVariant = options?.microtaskVariant ?? "A";
+  const microTaskEligible = isMicrotaskEligible(dayIndex, microTaskVariant);
   const microTaskRun = microTaskEligible
     ? await fetchMicroTaskRun(userId, dayIndex)
     : null;

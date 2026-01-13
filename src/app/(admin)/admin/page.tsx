@@ -33,6 +33,17 @@ export default function AdminPage() {
           <p className="text-slate-700">
             You&apos;re signed in as {session.user.email ?? "unknown user"}.
           </p>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" asChild>
+              <a href="/admin/storylets">Storylets</a>
+            </Button>
+            <Button variant="secondary" asChild>
+              <a href="/admin/metrics">Metrics</a>
+            </Button>
+            <Button variant="secondary" asChild>
+              <a href="/admin/experiments">Experiments</a>
+            </Button>
+          </div>
           <div className="flex items-center gap-3">
             <p className="font-medium">
               Active storylets: {loading ? "…" : storylets.length}

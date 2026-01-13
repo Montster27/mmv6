@@ -20,6 +20,8 @@ import { awardAnomalies } from "@/lib/anomalies";
 import { appendGroupFeedEvent } from "@/lib/groups/feed";
 import { incrementGroupObjective } from "@/lib/groups/objective";
 import { upsertFunPulse } from "@/lib/funPulse";
+import { useExperiments } from "@/lib/experiments";
+import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -92,6 +94,10 @@ export default function PlayPage() {
   const [funPulseEligible, setFunPulseEligible] = useState(false);
   const [funPulseDone, setFunPulseDone] = useState(false);
   const [funPulseSaving, setFunPulseSaving] = useState(false);
+  const { getVariant, ready: experimentsReady } = useExperiments([
+    "microtask_freq_v1",
+  ]);
+  const microtaskVariant = getVariant("microtask_freq_v1", "A");
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
@@ -136,8 +142,8 @@ export default function PlayPage() {
     [dailyState?.day_index, dayIndexState]
   );
   const microTaskEligible = useMemo(
-    () => dayIndex >= 1 && dayIndex % 2 === 0,
-    [dayIndex]
+    () => isMicrotaskEligible(dayIndex, microtaskVariant),
+    [dayIndex, microtaskVariant]
   );
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
@@ -313,6 +319,7 @@ export default function PlayPage() {
 
   useEffect(() => {
     const init = async () => {
+      if (!experimentsReady) return;
       setLoading(true);
       setError(null);
       try {
@@ -320,7 +327,9 @@ export default function PlayPage() {
         setUserId(userId);
 
         if (USE_DAILY_LOOP_ORCHESTRATOR) {
-          const run = await getOrCreateDailyRun(userId, new Date());
+          const run = await getOrCreateDailyRun(userId, new Date(), {
+            microtaskVariant,
+          });
           setDayIndexState(run.dayIndex);
           setStage(run.stage);
           setAlreadyCompletedToday(run.stage === "complete");
@@ -406,7 +415,7 @@ export default function PlayPage() {
     };
 
     init();
-  }, []);
+  }, [experimentsReady, microtaskVariant]);
 
   const trackWithSeason = (params: {
     event_type: string;

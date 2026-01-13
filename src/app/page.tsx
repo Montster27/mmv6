@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getExperimentConfig } from "@/lib/experiments";
+import { getExperimentConfig } from "@/lib/experimentConfig";
 
 export default function Home() {
   const experiments = getExperimentConfig();
