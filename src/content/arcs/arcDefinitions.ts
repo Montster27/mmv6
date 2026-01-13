@@ -19,22 +19,6 @@ export type ArcDefinition = {
 
 export const ARC_DEFINITIONS: ArcDefinition[] = [
   {
-    arc_id: "roommate_v1",
-    title: "Roommate Tensions",
-    start_day_index: 2,
-    steps: [
-      { step_id: "roommate_1", storylet_slug: "roommate-1" },
-      { step_id: "roommate_2", storylet_slug: "roommate-2", min_day_gap: 1 },
-      { step_id: "roommate_3", storylet_slug: "roommate-3", min_day_gap: 1 },
-      { step_id: "roommate_4", storylet_slug: "roommate-4", min_day_gap: 1 },
-    ],
-    payoff: {
-      deltas: {
-        vectors: { social: 2 },
-      },
-    },
-  },
-  {
     arc_id: "familiar_stranger_v1",
     title: "Familiar Stranger",
     start_day_index: 2,
