@@ -21,6 +21,7 @@ import { incrementGroupObjective } from "@/lib/groups/objective";
 import { upsertFunPulse } from "@/lib/funPulse";
 import { useExperiments } from "@/lib/experiments";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
+import { TEST_MODE } from "@/lib/flags";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -107,6 +108,7 @@ export default function PlayPage() {
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
   const [showDevMenu, setShowDevMenu] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
   const [devIsAdmin, setDevIsAdmin] = useState(false);
@@ -485,7 +487,32 @@ export default function PlayPage() {
     devIsAdmin,
     bootstrapEmail,
     bootstrapIsAdmin,
+    refreshTick,
   ]);
+
+  const handleFastForward = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const sessionData = await supabase.auth.getSession();
+      const token = sessionData.data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+      const res = await fetch("/api/test/advance-day", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to advance day.");
+      }
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to advance day.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const trackWithSeason = (params: {
     event_type: string;
@@ -1077,6 +1104,14 @@ export default function PlayPage() {
               <p className="text-sm text-slate-600">
                 Reset accounts or advance the day for testing.
               </p>
+              {TEST_MODE ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center justify-between gap-2">
+                  <span>Test mode: fast-forward your day.</span>
+                  <Button variant="secondary" onClick={handleFastForward}>
+                    Fast Forward: Next Day
+                  </Button>
+                </div>
+              ) : null}
               {devError ? (
                 <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   {devError}
@@ -1197,6 +1232,16 @@ export default function PlayPage() {
                     <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
                       <h2 className="text-xl font-semibold">Daily complete ✅</h2>
                       <p className="text-slate-700">Come back tomorrow.</p>
+                      {TEST_MODE ? (
+                        <div className="pt-2">
+                          <Button variant="secondary" onClick={handleFastForward}>
+                            Fast Forward: Next Day
+                          </Button>
+                          <p className="text-xs text-slate-500 mt-2">
+                            Test mode only.
+                          </p>
+                        </div>
+                      ) : null}
                     </section>
 
                     <section className="space-y-3">
