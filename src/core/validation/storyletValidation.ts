@@ -5,6 +5,7 @@ import type {
   StoryletOutcomeOption,
 } from "@/types/storylets";
 import type { JsonObject } from "@/types/vectors";
+import { ARC_DEFINITIONS } from "@/content/arcs/arcDefinitions";
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
@@ -68,86 +69,237 @@ export function coerceStoryletRow(row: any): Storylet {
 export function validateStorylet(
   input: unknown
 ): { ok: true; value: Storylet } | { ok: false; errors: string[] } {
-  const errors: string[] = [];
+  const { errors } = validateStoryletIssues(input);
+  if (errors.length) {
+    return { ok: false, errors: errors.map((err) => err.message) };
+  }
+  return { ok: true, value: input as Storylet };
+}
+
+export type ValidationIssue = {
+  storyletId: string;
+  slug: string;
+  path: string;
+  message: string;
+};
+
+const KNOWN_REQUIREMENT_KEYS = new Set([
+  "min_day_index",
+  "max_day_index",
+  "requires_tags_any",
+  "vectors_min",
+  "min_season_index",
+  "max_season_index",
+  "seasons_any",
+]);
+
+function addIssue(
+  list: ValidationIssue[],
+  storylet: Partial<Storylet>,
+  path: string,
+  message: string
+) {
+  list.push({
+    storyletId: isString(storylet.id) ? storylet.id : "",
+    slug: isString(storylet.slug) ? storylet.slug : "",
+    path,
+    message,
+  });
+}
+
+export function validateStoryletIssues(
+  input: unknown
+): { errors: ValidationIssue[]; warnings: ValidationIssue[] } {
+  const errors: ValidationIssue[] = [];
+  const warnings: ValidationIssue[] = [];
   if (!input || typeof input !== "object") {
-    return { ok: false, errors: ["Storylet is not an object"] };
+    return {
+      errors: [
+        {
+          storyletId: "",
+          slug: "",
+          path: "storylet",
+          message: "Storylet is not an object",
+        },
+      ],
+      warnings: [],
+    };
   }
   const storylet = input as Storylet;
 
-  if (!isString(storylet.id) || !storylet.id) errors.push("Missing id");
-  if (!isString(storylet.slug) || !storylet.slug) errors.push("Missing slug");
-  if (!isString(storylet.title) || !storylet.title) errors.push("Missing title");
-  if (!isString(storylet.body) || !storylet.body) errors.push("Missing body");
+  if (!isString(storylet.id) || !storylet.id) {
+    addIssue(errors, storylet, "id", "Missing id");
+  }
+  if (!isString(storylet.slug) || !storylet.slug) {
+    addIssue(errors, storylet, "slug", "Missing slug");
+  }
+  if (!isString(storylet.title) || !storylet.title) {
+    addIssue(errors, storylet, "title", "Missing title");
+  }
+  if (!isString(storylet.body) || !storylet.body) {
+    addIssue(errors, storylet, "body", "Missing body");
+  } else if (storylet.body.length > 2000) {
+    addIssue(warnings, storylet, "body", "Body is unusually long");
+  }
 
   if (!Array.isArray(storylet.choices)) {
-    errors.push("Choices must be an array");
+    addIssue(errors, storylet, "choices", "Choices must be an array");
   } else {
+    if (storylet.choices.length === 0) {
+      addIssue(errors, storylet, "choices", "Choices must be non-empty");
+    }
+    const choiceIds = new Set<string>();
     storylet.choices.forEach((choice, idx) => {
       if (!choice || typeof choice !== "object") {
-        errors.push(`Choice ${idx} is not an object`);
+        addIssue(errors, storylet, `choices[${idx}]`, "Choice is not an object");
         return;
       }
       if (!isString((choice as any).id) || !(choice as any).id) {
-        errors.push(`Choice ${idx} missing id`);
+        addIssue(errors, storylet, `choices[${idx}].id`, "Choice missing id");
+      } else if (choiceIds.has((choice as any).id)) {
+        addIssue(errors, storylet, `choices[${idx}].id`, "Choice id must be unique");
+      } else {
+        choiceIds.add((choice as any).id);
       }
       if (!isString((choice as any).label) || !(choice as any).label) {
-        errors.push(`Choice ${idx} missing label`);
+        addIssue(errors, storylet, `choices[${idx}].label`, "Choice missing label");
       }
       if (
         (choice as any).outcome &&
         (typeof (choice as any).outcome !== "object" ||
           Array.isArray((choice as any).outcome))
       ) {
-        errors.push(`Choice ${idx} outcome must be an object if present`);
+        addIssue(
+          errors,
+          storylet,
+          `choices[${idx}].outcome`,
+          "Outcome must be an object if present"
+        );
       } else if ((choice as any).outcome?.anomalies) {
         const anomalies = (choice as any).outcome.anomalies;
         if (!Array.isArray(anomalies) || anomalies.some((a: any) => !isString(a))) {
-          errors.push(`Choice ${idx} outcome anomalies must be an array of strings`);
+          addIssue(
+            errors,
+            storylet,
+            `choices[${idx}].outcome.anomalies`,
+            "Outcome anomalies must be an array of strings"
+          );
         }
       }
       if ((choice as any).outcomes) {
         if (!Array.isArray((choice as any).outcomes)) {
-          errors.push(`Choice ${idx} outcomes must be an array if present`);
+          addIssue(
+            errors,
+            storylet,
+            `choices[${idx}].outcomes`,
+            "Outcomes must be an array if present"
+          );
         } else if ((choice as any).outcomes.length === 0) {
-          errors.push(`Choice ${idx} outcomes must be non-empty`);
+          addIssue(
+            errors,
+            storylet,
+            `choices[${idx}].outcomes`,
+            "Outcomes must be non-empty"
+          );
         } else {
+          const outcomeIds = new Set<string>();
+          let weightSum = 0;
           (choice as any).outcomes.forEach((outcome: any, oIdx: number) => {
             if (!outcome || typeof outcome !== "object") {
-              errors.push(`Choice ${idx} outcome ${oIdx} is not an object`);
+              addIssue(
+                errors,
+                storylet,
+                `choices[${idx}].outcomes[${oIdx}]`,
+                "Outcome is not an object"
+              );
               return;
             }
             if (!isString(outcome.id) || !outcome.id) {
-              errors.push(`Choice ${idx} outcome ${oIdx} missing id`);
+              addIssue(
+                errors,
+                storylet,
+                `choices[${idx}].outcomes[${oIdx}].id`,
+                "Outcome missing id"
+              );
+            } else if (outcomeIds.has(outcome.id)) {
+              addIssue(
+                errors,
+                storylet,
+                `choices[${idx}].outcomes[${oIdx}].id`,
+                "Outcome id must be unique"
+              );
+            } else {
+              outcomeIds.add(outcome.id);
             }
             if (typeof outcome.weight !== "number" || outcome.weight <= 0) {
-              errors.push(`Choice ${idx} outcome ${oIdx} weight must be > 0`);
+              addIssue(
+                errors,
+                storylet,
+                `choices[${idx}].outcomes[${oIdx}].weight`,
+                "Outcome weight must be > 0"
+              );
+            } else {
+              weightSum += outcome.weight;
             }
             if (outcome.modifiers) {
               if (typeof outcome.modifiers !== "object" || Array.isArray(outcome.modifiers)) {
-                errors.push(`Choice ${idx} outcome ${oIdx} modifiers must be an object`);
+                addIssue(
+                  errors,
+                  storylet,
+                  `choices[${idx}].outcomes[${oIdx}].modifiers`,
+                  "Modifiers must be an object"
+                );
               } else {
                 if (
                   outcome.modifiers.vector !== undefined &&
                   !isString(outcome.modifiers.vector)
                 ) {
-                  errors.push(`Choice ${idx} outcome ${oIdx} modifiers.vector must be a string`);
+                  addIssue(
+                    errors,
+                    storylet,
+                    `choices[${idx}].outcomes[${oIdx}].modifiers.vector`,
+                    "Modifiers.vector must be a string"
+                  );
                 }
                 if (
                   outcome.modifiers.per10 !== undefined &&
                   typeof outcome.modifiers.per10 !== "number"
                 ) {
-                  errors.push(`Choice ${idx} outcome ${oIdx} modifiers.per10 must be a number`);
+                  addIssue(
+                    errors,
+                    storylet,
+                    `choices[${idx}].outcomes[${oIdx}].modifiers.per10`,
+                    "Modifiers.per10 must be a number"
+                  );
                 }
               }
             }
             if (outcome.anomalies) {
               if (!Array.isArray(outcome.anomalies)) {
-                errors.push(`Choice ${idx} outcome ${oIdx} anomalies must be an array`);
+                addIssue(
+                  errors,
+                  storylet,
+                  `choices[${idx}].outcomes[${oIdx}].anomalies`,
+                  "Outcome anomalies must be an array"
+                );
               } else if (outcome.anomalies.some((a: any) => !isString(a))) {
-                errors.push(`Choice ${idx} outcome ${oIdx} anomalies must be strings`);
+                addIssue(
+                  errors,
+                  storylet,
+                  `choices[${idx}].outcomes[${oIdx}].anomalies`,
+                  "Outcome anomalies must be strings"
+                );
               }
             }
           });
+          if (weightSum > 1000) {
+            addIssue(
+              warnings,
+              storylet,
+              `choices[${idx}].outcomes`,
+              "Total outcome weight is unusually high"
+            );
+          }
         }
       }
     });
@@ -158,29 +310,63 @@ export function validateStorylet(
     const minSeason = req.min_season_index;
     const maxSeason = req.max_season_index;
     if (minSeason !== undefined && typeof minSeason !== "number") {
-      errors.push("requirements.min_season_index must be a number");
+      addIssue(
+        errors,
+        storylet,
+        "requirements.min_season_index",
+        "requirements.min_season_index must be a number"
+      );
     }
     if (maxSeason !== undefined && typeof maxSeason !== "number") {
-      errors.push("requirements.max_season_index must be a number");
+      addIssue(
+        errors,
+        storylet,
+        "requirements.max_season_index",
+        "requirements.max_season_index must be a number"
+      );
     }
     if (
       typeof minSeason === "number" &&
       typeof maxSeason === "number" &&
       minSeason > maxSeason
     ) {
-      errors.push("requirements.min_season_index cannot exceed max_season_index");
+      addIssue(
+        errors,
+        storylet,
+        "requirements.min_season_index",
+        "requirements.min_season_index cannot exceed max_season_index"
+      );
     }
     if (req.seasons_any !== undefined) {
       if (!Array.isArray(req.seasons_any)) {
-        errors.push("requirements.seasons_any must be an array of numbers");
-      } else if (req.seasons_any.some((v) => typeof v !== "number")) {
-        errors.push("requirements.seasons_any must be an array of numbers");
+        addIssue(
+          errors,
+          storylet,
+          "requirements.seasons_any",
+          "requirements.seasons_any must be an array of numbers"
+        );
+      } else if (req.seasons_any.some((v) => typeof v !== "number" || !Number.isInteger(v))) {
+        addIssue(
+          errors,
+          storylet,
+          "requirements.seasons_any",
+          "requirements.seasons_any must be an array of integers"
+        );
       }
     }
+    Object.keys(req).forEach((key) => {
+      if (!KNOWN_REQUIREMENT_KEYS.has(key)) {
+        addIssue(
+          warnings,
+          storylet,
+          `requirements.${key}`,
+          "Unknown requirements key"
+        );
+      }
+    });
   }
 
-  if (errors.length) return { ok: false, errors };
-  return { ok: true, value: storylet };
+  return { errors, warnings };
 }
 
 export function fallbackStorylet(): Storylet {
@@ -192,4 +378,32 @@ export function fallbackStorylet(): Storylet {
     choices: [{ id: "continue", label: "Continue" }],
     is_active: false,
   };
+}
+
+export function validateArcDefinitions(storylets: Storylet[]) {
+  const warnings: ValidationIssue[] = [];
+  const bySlug = new Map(storylets.map((s) => [s.slug, s]));
+  ARC_DEFINITIONS.forEach((arc) => {
+    arc.steps.forEach((step) => {
+      const storylet = bySlug.get(step.storylet_slug);
+      if (!storylet) {
+        warnings.push({
+          storyletId: "",
+          slug: step.storylet_slug,
+          path: `arc.${arc.arc_id}.${step.step_id}`,
+          message: "Arc step storylet slug not found",
+        });
+        return;
+      }
+      if (!storylet.is_active) {
+        warnings.push({
+          storyletId: storylet.id,
+          slug: storylet.slug,
+          path: `arc.${arc.arc_id}.${step.step_id}`,
+          message: "Arc step storylet is inactive",
+        });
+      }
+    });
+  });
+  return warnings;
 }

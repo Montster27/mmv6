@@ -4,6 +4,7 @@ import {
   coerceStoryletRow,
   fallbackStorylet,
   validateStorylet,
+  validateStoryletIssues,
 } from "./storyletValidation";
 
 const valid = {
@@ -75,6 +76,36 @@ describe("storyletValidation", () => {
     expect(res.ok).toBe(false);
   });
 
+  it("rejects duplicate choice ids", () => {
+    const invalid = {
+      ...valid,
+      choices: [
+        { id: "dup", label: "A" },
+        { id: "dup", label: "B" },
+      ],
+    };
+    const res = validateStorylet(invalid);
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects duplicate outcome ids", () => {
+    const invalid = {
+      ...valid,
+      choices: [
+        {
+          id: "A",
+          label: "Option A",
+          outcomes: [
+            { id: "same", weight: 1 },
+            { id: "same", weight: 2 },
+          ],
+        },
+      ],
+    };
+    const res = validateStorylet(invalid);
+    expect(res.ok).toBe(false);
+  });
+
   it("rejects invalid season requirements", () => {
     const invalidReq = {
       ...valid,
@@ -91,5 +122,15 @@ describe("storyletValidation", () => {
     };
     const res = validateStorylet(invalidReq);
     expect(res.ok).toBe(false);
+  });
+
+  it("warns on unknown requirement keys", () => {
+    const invalidReq = {
+      ...valid,
+      requirements: { unknown_key: true },
+    };
+    const res = validateStoryletIssues(invalidReq);
+    expect(res.errors.length).toBe(0);
+    expect(res.warnings.length).toBe(1);
   });
 });

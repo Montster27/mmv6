@@ -68,9 +68,14 @@ export default function StoryletAdminListPage() {
                   Manage and preview storylets.
                 </p>
               </div>
-              <Link href="/admin/storylets/new">
-                <Button>Create storylet</Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link href="/admin/storylets/validate">
+                  <Button variant="secondary">Validate all</Button>
+                </Link>
+                <Link href="/admin/storylets/new">
+                  <Button>Create storylet</Button>
+                </Link>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-3 items-end">
