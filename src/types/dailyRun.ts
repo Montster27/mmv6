@@ -10,6 +10,7 @@ export type DailyRunStage =
   | "microtask"
   | "social"
   | "reflection"
+  | "fun_pulse"
   | "complete";
 
 export type DailyRun = {
@@ -23,6 +24,8 @@ export type DailyRun = {
   canBoost: boolean;
   reflectionStatus: "pending" | "done";
   microTaskStatus?: "pending" | "done" | "skipped";
+  funPulseEligible?: boolean;
+  funPulseDone?: boolean;
   dailyState?: DailyState | null;
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;

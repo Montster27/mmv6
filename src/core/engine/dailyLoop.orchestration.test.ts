@@ -33,6 +33,12 @@ vi.mock("@/core/season/getSeasonContext", () => ({
 vi.mock("@/core/season/seasonReset", () => ({
   performSeasonReset: vi.fn(),
 }));
+vi.mock("@/core/funPulse/shouldShowFunPulse", () => ({
+  shouldShowFunPulse: vi.fn(),
+}));
+vi.mock("@/lib/funPulse", () => ({
+  getFunPulse: vi.fn(),
+}));
 vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
 }));
@@ -62,6 +68,8 @@ import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
+import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
+import { getFunPulse } from "@/lib/funPulse";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
 const storyletA: Storylet = {
@@ -154,6 +162,8 @@ beforeEach(() => {
   vi.mocked(getOrStartArc).mockResolvedValue(null);
   vi.mocked(getArcNextStepStorylet).mockReturnValue(null);
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
+  vi.mocked(shouldShowFunPulse).mockReturnValue(false);
+  vi.mocked(getFunPulse).mockResolvedValue(null);
 });
 
 describe("getOrCreateDailyRun", () => {
@@ -231,5 +241,24 @@ describe("getOrCreateDailyRun", () => {
     vi.mocked(isReflectionDone).mockReturnValue(true);
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("complete");
+  });
+
+  it("returns fun_pulse when eligible after reflection", async () => {
+    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(2));
+    vi.mocked(fetchMicroTaskRun).mockResolvedValue({
+      id: "m",
+      user_id: "u",
+      day_index: 2,
+      task_id: "pattern_match_v1",
+      status: "completed",
+      score: 2,
+      duration_ms: 1000,
+      created_at: new Date().toISOString(),
+    });
+    vi.mocked(isReflectionDone).mockReturnValue(true);
+    vi.mocked(shouldShowFunPulse).mockReturnValue(true);
+    vi.mocked(getFunPulse).mockResolvedValue(null);
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.stage).toBe("fun_pulse");
   });
 });

@@ -32,7 +32,18 @@ describe("dailyLoop helpers", () => {
   });
 
   it("computes storylet_2 stage for one completed run", () => {
-    const stage = _testOnly.computeStage(true, 1, false, true, true, false, false, false);
+    const stage = _testOnly.computeStage(
+      true,
+      1,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    );
     expect(stage).toBe("storylet_2");
   });
 });

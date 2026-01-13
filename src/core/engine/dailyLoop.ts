@@ -14,6 +14,8 @@ import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
+import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
+import { getFunPulse } from "@/lib/funPulse";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -30,13 +32,18 @@ function computeStage(
   hasStorylets: boolean,
   reflectionDone: boolean,
   microTaskEligible: boolean,
-  microTaskDone: boolean
+  microTaskDone: boolean,
+  funPulseEligible: boolean,
+  funPulseDone: boolean
 ): DailyRunStage {
   if (!hasStorylets) return "complete";
   if (alreadyCompletedToday) return "complete";
   if (!allocationPresent) return "allocation";
   if (runsForPairCount === 0) return "storylet_1";
   if (runsForPairCount === 1) return "storylet_2";
+  if (runsForPairCount >= 2 && reflectionDone && funPulseEligible && !funPulseDone) {
+    return "fun_pulse";
+  }
   if (runsForPairCount >= 2 && reflectionDone) return "complete";
   if (runsForPairCount >= 2 && microTaskEligible && !microTaskDone) return "microtask";
   if (runsForPairCount >= 2 && canBoost) return "social";
@@ -112,6 +119,11 @@ export async function getOrCreateDailyRun(
 
   const reflection = await getReflection(userId, dayIndex);
   const reflectionDone = isReflectionDone(reflection);
+  const funPulseEligible = shouldShowFunPulse(dayIndex, currentSeasonIndex);
+  const funPulseRow = funPulseEligible
+    ? await getFunPulse(userId, currentSeasonIndex, dayIndex)
+    : null;
+  const funPulseDone = Boolean(funPulseRow);
   const microTaskEligible = dayIndex >= 1 && dayIndex % 2 === 0;
   const microTaskRun = microTaskEligible
     ? await fetchMicroTaskRun(userId, dayIndex)
@@ -138,7 +150,9 @@ export async function getOrCreateDailyRun(
     hasStorylets,
     reflectionDone,
     microTaskEligible,
-    microTaskDone
+    microTaskDone,
+    funPulseEligible,
+    funPulseDone
   );
 
   devLogStage({
@@ -163,6 +177,8 @@ export async function getOrCreateDailyRun(
     canBoost,
     reflectionStatus: reflectionDone ? "done" : "pending",
     microTaskStatus,
+    funPulseEligible,
+    funPulseDone,
     dailyState: daily,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,

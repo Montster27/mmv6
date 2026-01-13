@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
+import { FunPulse } from "@/components/FunPulse";
 import { signOut } from "@/lib/auth";
 import { ensurePlayerSetup } from "@/lib/bootstrap";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
@@ -18,6 +19,7 @@ import { PRIMARY_ARC_ID } from "@/content/arcs/arcDefinitions";
 import { awardAnomalies } from "@/lib/anomalies";
 import { appendGroupFeedEvent } from "@/lib/groups/feed";
 import { incrementGroupObjective } from "@/lib/groups/objective";
+import { upsertFunPulse } from "@/lib/funPulse";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -87,6 +89,9 @@ export default function PlayPage() {
   const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
   const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
   const [seasonContext, setSeasonContext] = useState<SeasonContext | null>(null);
+  const [funPulseEligible, setFunPulseEligible] = useState(false);
+  const [funPulseDone, setFunPulseDone] = useState(false);
+  const [funPulseSaving, setFunPulseSaving] = useState(false);
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
@@ -123,6 +128,7 @@ export default function PlayPage() {
   const latestStageRef = useRef<DailyRunStage | null>(null);
   const latestDayIndexRef = useRef<number | null>(null);
   const microTaskStartTracked = useRef(false);
+  const funPulseShownTracked = useRef(false);
   const pendingTransitionRef = useRef<(() => void) | null>(null);
 
   const dayIndex = useMemo(
@@ -286,6 +292,7 @@ export default function PlayPage() {
 
   useEffect(() => {
     microTaskStartTracked.current = false;
+    funPulseShownTracked.current = false;
     pendingTransitionRef.current = null;
     setConsequenceActive(false);
   }, [dayIndex]);
@@ -324,6 +331,8 @@ export default function PlayPage() {
           setHasSentBoost(!run.canBoost);
           setMicroTaskStatus(run.microTaskStatus ?? "pending");
           setSeasonContext(run.seasonContext ?? null);
+          setFunPulseEligible(Boolean(run.funPulseEligible));
+          setFunPulseDone(Boolean(run.funPulseDone));
           if (run.seasonResetNeeded) {
             setSeasonResetPending(true);
             setSeasonIndex(run.newSeasonIndex ?? null);
@@ -466,6 +475,13 @@ export default function PlayPage() {
       day_index: dayIndex,
       stage: "microtask",
     });
+  }, [stage, userId, dayIndex, loading]);
+
+  useEffect(() => {
+    if (!userId || loading) return;
+    if (stage !== "fun_pulse" || funPulseShownTracked.current) return;
+    funPulseShownTracked.current = true;
+    trackWithSeason({ event_type: "fun_pulse_shown", day_index: dayIndex, stage });
   }, [stage, userId, dayIndex, loading]);
 
   useEffect(() => {
@@ -826,13 +842,73 @@ export default function PlayPage() {
           skipped: false,
         });
       }
-      setStage("complete");
+      if (funPulseEligible && !funPulseDone) {
+        setStage("fun_pulse");
+      } else {
+        setStage("complete");
+      }
       setBoostMessage("Thanks — see you tomorrow.");
     } catch (e) {
       console.error(e);
       setError("Failed to save reflection.");
     } finally {
       setReflectionSaving(false);
+    }
+  };
+
+  const handleFunPulseSelect = async (rating: number) => {
+    if (!userId || !seasonContext) return;
+    if (funPulseSaving) return;
+    setError(null);
+    setFunPulseSaving(true);
+    try {
+      await upsertFunPulse({
+        userId,
+        seasonIndex: seasonContext.currentSeason.season_index,
+        dayIndex,
+        rating,
+        skipped: false,
+      });
+      setFunPulseDone(true);
+      trackWithSeason({
+        event_type: "fun_pulse_answered",
+        day_index: dayIndex,
+        stage: "fun_pulse",
+        payload: { rating },
+      });
+      setStage("complete");
+    } catch (e) {
+      console.error(e);
+      setError("Failed to save fun pulse.");
+    } finally {
+      setFunPulseSaving(false);
+    }
+  };
+
+  const handleFunPulseSkip = async () => {
+    if (!userId || !seasonContext) return;
+    if (funPulseSaving) return;
+    setError(null);
+    setFunPulseSaving(true);
+    try {
+      await upsertFunPulse({
+        userId,
+        seasonIndex: seasonContext.currentSeason.season_index,
+        dayIndex,
+        skipped: true,
+      });
+      setFunPulseDone(true);
+      trackWithSeason({
+        event_type: "fun_pulse_skipped",
+        day_index: dayIndex,
+        stage: "fun_pulse",
+      });
+      setStage("complete");
+    } catch (e) {
+      console.error(e);
+      setError("Failed to save fun pulse.");
+    } finally {
+      setFunPulseSaving(false);
     }
   };
 
@@ -1334,6 +1410,15 @@ export default function PlayPage() {
                   <p className="text-sm text-slate-600">
                     Thanks — see you tomorrow.
                   </p>
+                </section>
+              )}
+              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "fun_pulse" && (
+                <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                  <FunPulse
+                    onSelect={handleFunPulseSelect}
+                    onSkip={handleFunPulseSkip}
+                    disabled={funPulseSaving}
+                  />
                 </section>
               )}
                 </>
