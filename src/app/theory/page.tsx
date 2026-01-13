@@ -85,11 +85,19 @@ function TheoryContent({ session }: { session: Session }) {
               return;
             }
             setCreating(true);
-            const created = await createHypothesis({
-              userId: session.user.id,
-              title: newTitle.trim(),
-              body: newBody.trim(),
-            });
+            let created: Hypothesis | null = null;
+            try {
+              created = await createHypothesis({
+                userId: session.user.id,
+                title: newTitle.trim(),
+                body: newBody.trim(),
+              });
+            } catch (e) {
+              console.error(e);
+              setError(
+                e instanceof Error ? e.message : "Failed to create hypothesis."
+              );
+            }
             setCreating(false);
             if (created) {
               setNewTitle("");

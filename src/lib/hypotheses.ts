@@ -38,6 +38,24 @@ export async function createHypothesis(payload: {
   title: string;
   body: string;
 }): Promise<Hypothesis | null> {
+  const now = new Date();
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+
+  const { count } = await supabase
+    .from("hypotheses")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", payload.userId)
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString());
+
+  if ((count ?? 0) >= 3) {
+    throw new Error("Try refining existing theories today.");
+  }
+
   const { data, error } = await supabase
     .from("hypotheses")
     .insert({

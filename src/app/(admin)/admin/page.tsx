@@ -41,6 +41,9 @@ export default function AdminPage() {
               <a href="/admin/metrics">Metrics</a>
             </Button>
             <Button variant="secondary" asChild>
+              <a href="/admin/reports">Reports</a>
+            </Button>
+            <Button variant="secondary" asChild>
               <a href="/admin/experiments">Experiments</a>
             </Button>
           </div>

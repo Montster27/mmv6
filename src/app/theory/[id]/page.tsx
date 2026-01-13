@@ -13,6 +13,7 @@ import {
   unlinkAnomaly,
   updateHypothesis,
 } from "@/lib/hypotheses";
+import { submitReport } from "@/lib/reports";
 import type { Anomaly, UserAnomaly } from "@/types/anomalies";
 import type { Hypothesis } from "@/types/hypotheses";
 
@@ -31,6 +32,11 @@ function TheoryDetailContent({
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("spam");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportSaving, setReportSaving] = useState(false);
+  const [reportMessage, setReportMessage] = useState<string | null>(null);
 
   const anomaliesById = useMemo(() => {
     return anomalies.reduce<Record<string, Anomaly>>((acc, item) => {
@@ -99,6 +105,19 @@ function TheoryDetailContent({
       {hypothesis ? (
         <div className="space-y-4">
           <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-700">Details</h2>
+              <Button
+                variant="ghost"
+                className="px-0 text-xs text-slate-700"
+                onClick={() => {
+                  setReportOpen((prev) => !prev);
+                  setReportMessage(null);
+                }}
+              >
+                Report
+              </Button>
+            </div>
             <label className="block text-sm text-slate-700">
               Title
               <input
@@ -156,6 +175,72 @@ function TheoryDetailContent({
                 {hypothesis.status === "active" ? "Archive" : "Unarchive"}
               </Button>
             </div>
+            {reportOpen ? (
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 space-y-2">
+                <p className="text-xs text-slate-600">
+                  Report this hypothesis for review.
+                </p>
+                <label className="text-sm text-slate-700">
+                  Reason
+                  <select
+                    className="ml-2 rounded border border-slate-300 px-2 py-1"
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                  >
+                    <option value="spam">Spam</option>
+                    <option value="harassment">Harassment</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label className="block text-sm text-slate-700">
+                  Details (optional)
+                  <textarea
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-slate-900"
+                    rows={2}
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                  />
+                </label>
+                {reportMessage ? (
+                  <p className="text-xs text-slate-600">{reportMessage}</p>
+                ) : null}
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={async () => {
+                      setReportSaving(true);
+                      try {
+                        await submitReport({
+                          target_type: "hypothesis",
+                          target_id: hypothesis.id,
+                          reason: reportReason,
+                          details: reportDetails.trim() || undefined,
+                        });
+                        setReportMessage("Report submitted.");
+                        setReportDetails("");
+                        setReportOpen(false);
+                      } catch (e) {
+                        setReportMessage(
+                          e instanceof Error
+                            ? e.message
+                            : "Failed to submit report."
+                        );
+                      } finally {
+                        setReportSaving(false);
+                      }
+                    }}
+                    disabled={reportSaving}
+                  >
+                    {reportSaving ? "Submitting..." : "Submit report"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setReportOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-3">
