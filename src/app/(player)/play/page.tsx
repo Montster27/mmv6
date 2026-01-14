@@ -21,7 +21,7 @@ import { incrementGroupObjective } from "@/lib/groups/objective";
 import { upsertFunPulse } from "@/lib/funPulse";
 import { useExperiments } from "@/lib/experiments";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
-import { TEST_MODE } from "@/lib/flags";
+import { fetchDevSettings, saveDevSettings } from "@/lib/devSettings";
 import {
   createStoryletRun,
   fetchDailyState,
@@ -112,6 +112,9 @@ export default function PlayPage() {
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
   const [devIsAdmin, setDevIsAdmin] = useState(false);
+  const [devSettingsLoading, setDevSettingsLoading] = useState(false);
+  const [devSettingsSaving, setDevSettingsSaving] = useState(false);
+  const [devSettings, setDevSettings] = useState({ test_mode: false });
   const [devCharacters, setDevCharacters] = useState<
     Array<{
       user_id: string;
@@ -511,6 +514,33 @@ export default function PlayPage() {
       setError(e instanceof Error ? e.message : "Failed to advance day.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDevSettings = async (currentUserId: string) => {
+    setDevSettingsLoading(true);
+    try {
+      const settings = await fetchDevSettings(currentUserId);
+      setDevSettings(settings);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDevSettingsLoading(false);
+    }
+  };
+
+  const handleToggleTestMode = async () => {
+    if (!bootstrapUserId) return;
+    const next = { ...devSettings, test_mode: !devSettings.test_mode };
+    setDevSettingsSaving(true);
+    try {
+      await saveDevSettings(bootstrapUserId, next);
+      setDevSettings(next);
+    } catch (e) {
+      console.error(e);
+      setError("Failed to update dev settings.");
+    } finally {
+      setDevSettingsSaving(false);
     }
   };
 
@@ -1078,6 +1108,9 @@ export default function PlayPage() {
                     setShowDevMenu(next);
                     if (next) {
                       loadDevCharacters();
+                      if (bootstrapUserId) {
+                        loadDevSettings(bootstrapUserId);
+                      }
                     }
                   }}
                 >
@@ -1104,14 +1137,26 @@ export default function PlayPage() {
               <p className="text-sm text-slate-600">
                 Reset accounts or advance the day for testing.
               </p>
-              {TEST_MODE ? (
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 flex items-center justify-between gap-2">
-                  <span>Test mode: fast-forward your day.</span>
-                  <Button variant="secondary" onClick={handleFastForward}>
-                    Fast Forward: Next Day
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span>Test mode (your account).</span>
+                  <Button
+                    variant="secondary"
+                    onClick={handleToggleTestMode}
+                    disabled={devSettingsLoading || devSettingsSaving}
+                  >
+                    {devSettings.test_mode ? "Disable" : "Enable"}
                   </Button>
                 </div>
-              ) : null}
+                {devSettings.test_mode ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <span>Fast-forward your day.</span>
+                    <Button variant="secondary" onClick={handleFastForward}>
+                      Fast Forward: Next Day
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
               {devError ? (
                 <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   {devError}
@@ -1232,7 +1277,7 @@ export default function PlayPage() {
                     <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
                       <h2 className="text-xl font-semibold">Daily complete ✅</h2>
                       <p className="text-slate-700">Come back tomorrow.</p>
-                      {TEST_MODE ? (
+                      {devSettings.test_mode ? (
                         <div className="pt-2">
                           <Button variant="secondary" onClick={handleFastForward}>
                             Fast Forward: Next Day

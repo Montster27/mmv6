@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
+import { isUserAdmin } from "@/lib/adminAuthServer";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -21,12 +22,30 @@ async function ensureAuthed(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (process.env.TEST_MODE_SERVER !== "1") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
   const user = await ensureAuthed(request);
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+  const isAdmin = await isUserAdmin(user);
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  }
+
+  const { data: settingsRow } = await supabaseServer
+    .from("player_experiments")
+    .select("config")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  const config =
+    settingsRow?.config && typeof settingsRow.config === "object"
+      ? settingsRow.config
+      : {};
+  const devSettings = (config as Record<string, unknown>).dev_settings as
+    | { test_mode?: boolean }
+    | undefined;
+  if (!devSettings?.test_mode) {
+    return NextResponse.json({ error: "Test mode is disabled" }, { status: 403 });
+  }
 
   const { data: daily, error } = await supabaseServer
     .from("daily_states")
