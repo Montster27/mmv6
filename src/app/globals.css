@@ -28,6 +28,22 @@ html {
   color-scheme: light;
 }
 
+@keyframes highlight-pulse {
+  0% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.stat-highlight {
+  animation: highlight-pulse 250ms ease-out;
+}
+
 
 
 @layer base {

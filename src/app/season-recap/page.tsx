@@ -69,7 +69,7 @@ function RecapContent({ seasonIndex }: { seasonIndex: number | null }) {
   }, [seasonIndex]);
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
+    <div className="p-6 space-y-6 max-w-2xl min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-blue-100/50">
       <div>
         <h1 className="text-2xl font-semibold">Season Recap</h1>
         <p className="text-sm text-slate-600">
@@ -87,27 +87,46 @@ function RecapContent({ seasonIndex }: { seasonIndex: number | null }) {
 
       {recap ? (
         <>
-          <section className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-2">
+          <section className="rounded-md border border-slate-300/60 bg-transparent px-4 py-4 space-y-2">
             <h2 className="text-lg font-semibold">Last season: You</h2>
             <p className="text-sm text-slate-700">
-              Season {recap.personal.seasonIndex}
+              Season <span className="text-cyan-700">{recap.personal.seasonIndex}</span>
             </p>
             <ul className="text-sm text-slate-700 space-y-1">
-              <li>Days played: {recap.personal.daysPlayed}</li>
-              <li>Completion rate: {formatPercent(recap.personal.completionRate)}</li>
-              <li>Anomalies found: {recap.personal.anomaliesFound}</li>
-              <li>Hypotheses written: {recap.personal.hypothesesWritten}</li>
-              <li>Boosts sent: {recap.personal.boostsSent}</li>
+              <li>
+                Days played:{" "}
+                <span className="text-cyan-700">{recap.personal.daysPlayed}</span>
+              </li>
+              <li>
+                Completion rate:{" "}
+                <span className="text-cyan-700">
+                  {formatPercent(recap.personal.completionRate)}
+                </span>
+              </li>
+              <li>
+                Anomalies found:{" "}
+                <span className="text-cyan-700">{recap.personal.anomaliesFound}</span>
+              </li>
+              <li>
+                Hypotheses written:{" "}
+                <span className="text-cyan-700">
+                  {recap.personal.hypothesesWritten}
+                </span>
+              </li>
+              <li>
+                Boosts sent:{" "}
+                <span className="text-cyan-700">{recap.personal.boostsSent}</span>
+              </li>
             </ul>
           </section>
 
-          <section className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-3">
+          <section className="rounded-md border border-slate-300/60 bg-transparent px-4 py-4 space-y-3">
             <h2 className="text-lg font-semibold">World drift</h2>
             <div className="flex flex-wrap gap-2">
               {recap.world.driftTags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700"
+                  className="rounded-full border border-slate-300/60 px-3 py-1 text-xs text-slate-700"
                 >
                   {tag}
                 </span>
@@ -129,7 +148,13 @@ function RecapContent({ seasonIndex }: { seasonIndex: number | null }) {
         </>
       ) : null}
 
-      <Button onClick={() => router.push("/play")}>Begin Season</Button>
+      <Button
+        variant="outline"
+        onClick={() => router.push("/play")}
+        className="border-slate-300 text-slate-700 hover:bg-slate-100"
+      >
+        Begin Season
+      </Button>
     </div>
   );
 }

@@ -1,6 +1,13 @@
 import { Button } from "@/components/ui/button";
 
 const labels = ["Not fun", "Meh", "Okay", "Good", "Great"];
+const scaleClasses = [
+  "border-purple-200 text-purple-700 hover:bg-purple-50",
+  "border-purple-200 text-purple-700 hover:bg-purple-100/70",
+  "border-purple-300 text-purple-800 hover:bg-purple-100",
+  "border-purple-300 text-purple-800 hover:bg-purple-200/60",
+  "border-purple-400 text-purple-900 hover:bg-purple-200",
+];
 
 export function FunPulse({
   onSelect,
@@ -18,15 +25,21 @@ export function FunPulse({
         {labels.map((label, idx) => (
           <Button
             key={label}
-            variant="secondary"
+            variant="outline"
             onClick={() => onSelect(idx + 1)}
             disabled={disabled}
+            className={scaleClasses[idx]}
           >
             {idx + 1} · {label}
           </Button>
         ))}
       </div>
-      <Button variant="ghost" onClick={onSkip} disabled={disabled}>
+      <Button
+        variant="outline"
+        onClick={onSkip}
+        disabled={disabled}
+        className="border-slate-300 text-slate-600 hover:bg-slate-100"
+      >
         Skip
       </Button>
     </div>

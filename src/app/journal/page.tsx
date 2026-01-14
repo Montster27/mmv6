@@ -68,6 +68,12 @@ function JournalContent({ session }: { session: Session }) {
     load();
   }, [session.user.id]);
 
+  useEffect(() => {
+    if (reportMessage !== "Report submitted.") return;
+    const timer = window.setTimeout(() => setReportMessage(null), 2000);
+    return () => window.clearTimeout(timer);
+  }, [reportMessage]);
+
   return (
     <div className="p-6 space-y-4">
       <div>
@@ -84,11 +90,12 @@ function JournalContent({ session }: { session: Session }) {
             {clues.map((clue) => (
               <div
                 key={clue.id}
-                className="rounded-md border border-slate-200 bg-white px-4 py-3"
+                className="rounded-md border border-emerald-200 border-l-4 border-l-emerald-300 bg-emerald-50/40 px-4 py-3"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-slate-900">
-                    {clue.anomaly_title ?? "Anomaly clue"}
+                  <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                    <span aria-hidden="true">✉️</span>
+                    <span>{clue.anomaly_title ?? "Anomaly clue"}</span>
                   </h3>
                   <span className="text-xs text-slate-500">
                     {clue.created_at
@@ -140,7 +147,13 @@ function JournalContent({ session }: { session: Session }) {
                 />
               </label>
               {reportMessage ? (
-                <p className="text-xs text-slate-600">{reportMessage}</p>
+                reportMessage === "Report submitted." ? (
+                  <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
+                    {reportMessage}
+                  </span>
+                ) : (
+                  <p className="text-xs text-red-600">{reportMessage}</p>
+                )
               ) : null}
               <div className="flex items-center gap-2">
                 <Button

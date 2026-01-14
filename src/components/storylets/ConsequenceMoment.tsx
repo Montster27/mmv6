@@ -21,8 +21,11 @@ const EXIT_MS = 250;
 function formatDelta(label: string, value?: number) {
   if (typeof value !== "number" || value === 0) return null;
   const sign = value > 0 ? "+" : "";
+  const tone = value > 0 ? "text-teal-600" : "text-slate-500";
   return (
-    <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700">
+    <span
+      className={`rounded-full border border-blue-100 bg-white px-2 py-0.5 text-xs ${tone}`}
+    >
       {label} {sign}
       {value}
     </span>
@@ -57,7 +60,7 @@ export function ConsequenceMoment({ message, deltas, onDone }: Props) {
     <div
       role="status"
       aria-live="polite"
-      className={`rounded-md border border-slate-200 bg-slate-50 px-4 py-3 transition-all duration-300 ${
+      className={`rounded-md border border-blue-200 border-l-4 border-l-blue-400 bg-blue-50/70 px-4 py-3 transition-all duration-300 ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"
       }`}
     >

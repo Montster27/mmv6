@@ -1149,10 +1149,14 @@ export default function PlayPage() {
                   </Button>
                 </div>
                 {devSettings.test_mode ? (
-                  <div className="flex items-center justify-between gap-2">
-                    <span>Fast-forward your day.</span>
-                    <Button variant="secondary" onClick={handleFastForward}>
-                      Fast Forward: Next Day
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-amber-300 bg-amber-100/80 px-2 py-2 text-amber-900">
+                    <span>Fast-forward your day (TEST MODE).</span>
+                    <Button
+                      variant="outline"
+                      onClick={handleFastForward}
+                      className="border-amber-400 text-amber-900 hover:bg-amber-200/70"
+                    >
+                      ⏩ Fast Forward: Next Day (TEST MODE)
                     </Button>
                   </div>
                 ) : null}
@@ -1228,18 +1232,18 @@ export default function PlayPage() {
           ) : null}
 
           {seasonResetPending ? (
-            <section className="rounded-md border border-amber-200 bg-amber-50 px-4 py-4 space-y-3">
-              <h2 className="text-xl font-semibold">
+            <section className="rounded-md border border-slate-500/40 border-l-4 border-l-slate-300/70 bg-indigo-950 px-4 py-4 space-y-3 text-slate-100">
+              <h2 className="text-xl font-semibold tracking-wide">
                 Season {seasonIndex ?? "?"} begins
               </h2>
-              <p className="text-slate-700">
+              <p className="text-slate-200">
                 You remember: anomalies and theories.
               </p>
-              <p className="text-slate-700">
+              <p className="text-slate-200">
                 You forget: the daily ledger (energy, stress, vectors reset).
               </p>
               {seasonRecap ? (
-                <div className="rounded-md border border-amber-200 bg-white px-3 py-3 text-sm text-slate-700 space-y-1">
+                <div className="rounded-md border border-slate-500/40 bg-slate-900/40 px-3 py-3 text-sm text-slate-200 space-y-1">
                   <p>Last season recap:</p>
                   <p>· Anomalies found: {seasonRecap.anomaliesFoundCount}</p>
                   <p>· Hypotheses written: {seasonRecap.hypothesesCount}</p>
@@ -1249,6 +1253,7 @@ export default function PlayPage() {
                 </div>
               ) : null}
               <Button
+                className="bg-slate-100 text-slate-900 hover:bg-white"
                 onClick={() => {
                   setSeasonResetPending(false);
                   const lastSeason =
@@ -1274,13 +1279,19 @@ export default function PlayPage() {
                   <p className="text-slate-700">Loading…</p>
                 ) : showDailyComplete ? (
                   <>
-                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                      <h2 className="text-xl font-semibold">Daily complete ✅</h2>
-                      <p className="text-slate-700">Come back tomorrow.</p>
+                    <section className="space-y-3 rounded-md border border-slate-200 bg-gradient-to-br from-slate-100 via-slate-50 to-blue-100/60 px-4 py-4">
+                      <h2 className="text-xl font-semibold text-slate-700">
+                        Daily complete ✅
+                      </h2>
+                      <p className="text-slate-600">Come back tomorrow.</p>
                       {devSettings.test_mode ? (
                         <div className="pt-2">
-                          <Button variant="secondary" onClick={handleFastForward}>
-                            Fast Forward: Next Day
+                          <Button
+                            variant="outline"
+                            onClick={handleFastForward}
+                            className="border-amber-300 text-amber-900 hover:bg-amber-100/70"
+                          >
+                            ⏩ Fast Forward: Next Day (TEST MODE)
                           </Button>
                           <p className="text-xs text-slate-500 mt-2">
                             Test mode only.
@@ -1545,39 +1556,42 @@ export default function PlayPage() {
                   )}
 
               {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && (
-                <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                <section className="space-y-3 rounded-md border border-purple-200 bg-stone-50 px-4 py-4">
                   <h2 className="text-xl font-semibold">Reflection</h2>
-                  <p className="text-slate-700">
+                  <p className="text-slate-500 italic">
                     Did you know what to do today?
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      variant="secondary"
+                      variant="outline"
                       disabled={reflectionSaving}
                       onClick={() => handleReflection("yes")}
+                      className="border-slate-300 text-slate-700 hover:bg-slate-100"
                     >
                       Yes
                     </Button>
                     <Button
-                      variant="secondary"
+                      variant="outline"
                       disabled={reflectionSaving}
                       onClick={() => handleReflection("mostly")}
+                      className="border-slate-300 text-slate-700 hover:bg-slate-100"
                     >
                       Mostly
                     </Button>
                     <Button
-                      variant="secondary"
+                      variant="outline"
                       disabled={reflectionSaving}
                       onClick={() => handleReflection("no")}
+                      className="border-slate-300 text-slate-700 hover:bg-slate-100"
                     >
                       No
                     </Button>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     disabled={reflectionSaving}
                     onClick={() => handleReflection("skip")}
-                    className="px-0 text-sm text-slate-700"
+                    className="border-slate-300 text-slate-600 hover:bg-slate-100"
                   >
                     Skip for today
                   </Button>
@@ -1587,7 +1601,7 @@ export default function PlayPage() {
                 </section>
               )}
               {USE_DAILY_LOOP_ORCHESTRATOR && stage === "fun_pulse" && (
-                <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                <section className="space-y-3 rounded-md border border-purple-200 bg-purple-50/70 px-4 py-4">
                   <FunPulse
                     onSelect={handleFunPulseSelect}
                     onSkip={handleFunPulseSkip}

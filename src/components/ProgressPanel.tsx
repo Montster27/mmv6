@@ -17,7 +17,7 @@ type Props = {
   lastAppliedDeltas?: DeltaInfo | null;
 };
 
-const HIGHLIGHT_MS = 2500;
+const HIGHLIGHT_MS = 250;
 
 const clamp = (value: number, min = 0, max = 100) =>
   Math.min(max, Math.max(min, value));
@@ -35,16 +35,13 @@ function toVectors(raw: DailyState["vectors"]): SevenVectors {
 function bar(value?: number, highlight?: boolean) {
   if (typeof value !== "number") return null;
   const width = clamp(value);
+  const highlightClass = highlight ? "stat-highlight ring-2 ring-cyan-300/60" : "";
   return (
     <div
-      className={`h-2 w-full rounded bg-slate-200 transition ${
-        highlight ? "ring-2 ring-slate-300" : ""
-      }`}
+      className={`h-2 w-full rounded bg-slate-200 transition ${highlightClass}`}
     >
       <div
-        className={`h-2 rounded bg-slate-600 transition ${
-          highlight ? "bg-slate-800" : ""
-        }`}
+        className="h-2 rounded bg-slate-600 transition"
         style={{ width: `${width}%` }}
       />
     </div>
@@ -54,9 +51,10 @@ function bar(value?: number, highlight?: boolean) {
 function deltaBadge(delta?: number, highlight?: boolean) {
   if (typeof delta !== "number" || delta === 0) return null;
   const sign = delta > 0 ? "+" : "";
+  const highlightClass = highlight ? "text-cyan-700 stat-highlight" : "text-slate-600";
   return (
     <span
-      className={`ml-2 text-xs ${highlight ? "text-slate-900" : "text-slate-600"}`}
+      className={`ml-2 text-xs ${highlightClass}`}
     >
       {sign}
       {delta}
@@ -93,7 +91,9 @@ export function ProgressPanel({ dailyState, lastAppliedDeltas }: Props) {
       <div className="space-y-2">
         <div
           className={`flex items-center justify-between text-sm ${
-            highlightEnergy ? "text-slate-900 font-medium" : "text-slate-700"
+            highlightEnergy
+              ? "text-slate-900 font-medium underline decoration-cyan-400/70 stat-highlight"
+              : "text-slate-700"
           }`}
         >
           <span>Energy</span>
@@ -105,7 +105,9 @@ export function ProgressPanel({ dailyState, lastAppliedDeltas }: Props) {
         {bar(energy, highlightEnergy)}
         <div
           className={`flex items-center justify-between text-sm ${
-            highlightStress ? "text-slate-900 font-medium" : "text-slate-700"
+            highlightStress
+              ? "text-slate-900 font-medium underline decoration-cyan-400/70 stat-highlight"
+              : "text-slate-700"
           }`}
         >
           <span>Stress</span>
@@ -133,7 +135,9 @@ export function ProgressPanel({ dailyState, lastAppliedDeltas }: Props) {
                 <div key={key} className="space-y-1">
                   <div
                     className={`flex items-center justify-between text-sm ${
-                      highlightVector ? "text-slate-900 font-medium" : "text-slate-700"
+                      highlightVector
+                        ? "text-slate-900 font-medium underline decoration-cyan-400/70 stat-highlight"
+                        : "text-slate-700"
                     }`}
                   >
                     <span className="capitalize">{key}</span>

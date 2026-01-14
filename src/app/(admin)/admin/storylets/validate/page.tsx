@@ -87,7 +87,7 @@ export default function StoryletValidatePage() {
         }
 
         return (
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h1 className="text-2xl font-semibold">Validate Storylets</h1>
@@ -110,7 +110,7 @@ export default function StoryletValidatePage() {
             </div>
 
             {counts ? (
-              <div className="text-sm text-slate-700">
+              <div className="text-sm text-slate-500">
                 {counts.storylets} storylets · {counts.errors} errors ·{" "}
                 {counts.warnings} warnings
               </div>
@@ -150,9 +150,9 @@ export default function StoryletValidatePage() {
             </div>
 
             {groups.length === 0 && !loading ? (
-              <p className="text-sm text-slate-600">No issues found.</p>
+              <p className="text-sm text-slate-500">No issues found.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {groups.map(([slug, issues]) => (
                   <div key={slug} className="rounded border border-slate-200 bg-white p-3">
                     <div className="flex items-center justify-between">
@@ -171,12 +171,13 @@ export default function StoryletValidatePage() {
                         </a>
                       ) : null}
                     </div>
-                    <ul className="mt-2 space-y-1 text-sm">
+                    <ul className="mt-2 space-y-1 text-xs leading-tight">
                       {issues.map((issue, idx) => {
                         const isError = errors.includes(issue);
+                        const statusClass = isError ? "text-red-600" : "text-amber-600";
                         return (
                           <li key={`${issue.path}-${idx}`} className="text-slate-700">
-                            <span className="font-medium">
+                            <span className={`font-medium ${statusClass}`}>
                               {isError ? "Error" : "Warning"}:
                             </span>{" "}
                             {issue.path} — {issue.message}
