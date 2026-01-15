@@ -1617,6 +1617,7 @@ export default function PlayPage() {
               <ProgressPanel
                 dailyState={dailyState}
                 lastAppliedDeltas={outcomeDeltas}
+                boostsReceivedCount={boostsReceived.length}
               />
             </div>
           </div>

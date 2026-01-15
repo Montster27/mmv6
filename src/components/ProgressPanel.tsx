@@ -15,6 +15,7 @@ type DeltaInfo = {
 type Props = {
   dailyState?: Pick<DailyState, "energy" | "stress" | "vectors"> | null;
   lastAppliedDeltas?: DeltaInfo | null;
+  boostsReceivedCount?: number;
 };
 
 const HIGHLIGHT_MS = 250;
@@ -62,7 +63,11 @@ function deltaBadge(delta?: number, highlight?: boolean) {
   );
 }
 
-export function ProgressPanel({ dailyState, lastAppliedDeltas }: Props) {
+export function ProgressPanel({
+  dailyState,
+  lastAppliedDeltas,
+  boostsReceivedCount,
+}: Props) {
   const [highlight, setHighlight] = useState<DeltaInfo | null>(null);
   const energy = dailyState?.energy;
   const stress = dailyState?.stress;
@@ -154,7 +159,12 @@ export function ProgressPanel({ dailyState, lastAppliedDeltas }: Props) {
         )}
       </div>
 
-      <p className="text-sm text-slate-700">{summary}</p>
+      <div className="text-sm text-slate-700 space-y-1">
+        <p>{summary}</p>
+        <p className="text-xs text-slate-600">
+          Boosts received today: {boostsReceivedCount ?? 0}
+        </p>
+      </div>
     </aside>
   );
 }
