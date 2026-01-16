@@ -40,6 +40,8 @@ vi.mock("@/lib/funPulse", () => ({
   getFunPulse: vi.fn(),
 }));
 vi.mock("@/lib/dailyInteractions", () => ({
+  ensureSkillBankUpToDate: vi.fn(),
+  fetchSkillAllocations: vi.fn(),
   fetchTensions: vi.fn(),
   fetchSkillBank: vi.fn(),
   fetchPosture: vi.fn(),
@@ -76,6 +78,8 @@ import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
 import {
+  ensureSkillBankUpToDate,
+  fetchSkillAllocations,
   fetchPosture,
   fetchSkillBank,
   fetchTensions,
@@ -174,6 +178,7 @@ beforeEach(() => {
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
+  vi.mocked(ensureSkillBankUpToDate).mockResolvedValue();
   vi.mocked(fetchTensions).mockResolvedValue([]);
   vi.mocked(fetchSkillBank).mockResolvedValue({
     user_id: "u",
@@ -187,6 +192,7 @@ beforeEach(() => {
     posture: "steady",
     created_at: new Date().toISOString(),
   });
+  vi.mocked(fetchSkillAllocations).mockResolvedValue([]);
 });
 
 describe("getOrCreateDailyRun", () => {
@@ -205,6 +211,29 @@ describe("getOrCreateDailyRun", () => {
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("setup");
     expect(run.tensions?.length).toBe(1);
+  });
+
+  it("returns setup when skill points are available", async () => {
+    vi.mocked(fetchSkillBank).mockResolvedValue({
+      user_id: "u",
+      available_points: 1,
+      cap: 2,
+      last_awarded_day_index: 1,
+    });
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.stage).toBe("setup");
+  });
+
+  it("returns allocation when skill points are drained", async () => {
+    vi.mocked(fetchSkillBank).mockResolvedValue({
+      user_id: "u",
+      available_points: 0,
+      cap: 2,
+      last_awarded_day_index: 2,
+    });
+    vi.mocked(fetchTimeAllocation).mockResolvedValue(null);
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.stage).toBe("allocation");
   });
 
   it("returns allocation stage when no allocation saved", async () => {

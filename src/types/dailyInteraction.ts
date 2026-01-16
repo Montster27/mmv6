@@ -17,6 +17,14 @@ export type SkillBank = {
   last_awarded_day_index: number | null;
 };
 
+export type SkillPointAllocation = {
+  user_id: string;
+  day_index: number;
+  skill_key: string;
+  points: number;
+  created_at: string;
+};
+
 export type DailyPosture = {
   user_id: string;
   day_index: number;

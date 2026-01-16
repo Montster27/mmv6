@@ -2,6 +2,12 @@ import type { Storylet, StoryletRun } from "./storylets";
 import type { AllocationMap, DailyState } from "./daily";
 import type { SeasonRecap } from "./seasons";
 import type { SeasonContext } from "./season";
+import type {
+  DailyPosture,
+  DailyTension,
+  SkillBank,
+  SkillPointAllocation,
+} from "./dailyInteraction";
 
 export type DailyRunStage =
   | "setup"
@@ -23,9 +29,10 @@ export type DailyRun = {
   storylets: Storylet[];
   storyletRunsToday: StoryletRun[];
   canBoost: boolean;
-  tensions?: import("./dailyInteraction").DailyTension[];
-  skillBank?: import("./dailyInteraction").SkillBank | null;
-  posture?: import("./dailyInteraction").DailyPosture | null;
+  tensions?: DailyTension[];
+  skillBank?: SkillBank | null;
+  posture?: DailyPosture | null;
+  allocations?: SkillPointAllocation[];
   reflectionStatus: "pending" | "done";
   microTaskStatus?: "pending" | "done" | "skipped";
   funPulseEligible?: boolean;

@@ -18,6 +18,8 @@ import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import {
+  ensureSkillBankUpToDate,
+  fetchSkillAllocations,
   fetchPosture,
   fetchSkillBank,
   fetchTensions,
@@ -118,18 +120,30 @@ export async function getOrCreateDailyRun(
   const cadence = await ensureCadenceUpToDate(userId);
   const dayIndex = cadence.dayIndex;
 
-  const [daily, allocation, runs, storyletsRaw, boosted, tensions, skillBank, posture] =
-    await Promise.all([
-      fetchDailyState(userId),
-      fetchTimeAllocation(userId, dayIndex),
-      fetchTodayRuns(userId, dayIndex),
-      fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
-      hasSentBoostToday(userId, dayIndex),
-      fetchTensions(userId, dayIndex),
-      fetchSkillBank(userId),
-      fetchPosture(userId, dayIndex),
-      // Note: we fetch recent history separately below.
-    ]);
+  await ensureSkillBankUpToDate(userId, dayIndex);
+
+  const [
+    daily,
+    allocation,
+    runs,
+    storyletsRaw,
+    boosted,
+    tensions,
+    skillBank,
+    posture,
+    allocations,
+  ] = await Promise.all([
+    fetchDailyState(userId),
+    fetchTimeAllocation(userId, dayIndex),
+    fetchTodayRuns(userId, dayIndex),
+    fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
+    hasSentBoostToday(userId, dayIndex),
+    fetchTensions(userId, dayIndex),
+    fetchSkillBank(userId),
+    fetchPosture(userId, dayIndex),
+    fetchSkillAllocations(userId, dayIndex),
+    // Note: we fetch recent history separately below.
+  ]);
 
   const recentRuns =
     (await fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => [])) ?? [];
@@ -221,6 +235,7 @@ export async function getOrCreateDailyRun(
     tensions,
     skillBank,
     posture,
+    allocations,
     reflectionStatus: reflectionDone ? "done" : "pending",
     microTaskStatus,
     funPulseEligible,

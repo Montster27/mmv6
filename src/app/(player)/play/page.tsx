@@ -47,11 +47,13 @@ import {
   type ReceivedBoost,
 } from "@/lib/social";
 import { upsertReflection } from "@/lib/reflections";
+import { allocateSkillPoint } from "@/lib/dailyInteractions";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
   DailyTension,
   SkillBank,
+  SkillPointAllocation,
 } from "@/types/dailyInteraction";
 import type { ReflectionResponse } from "@/types/reflections";
 import type { SeasonRecap } from "@/types/seasons";
@@ -96,6 +98,8 @@ export default function PlayPage() {
   const [tensions, setTensions] = useState<DailyTension[]>([]);
   const [skillBank, setSkillBank] = useState<SkillBank | null>(null);
   const [posture, setPosture] = useState<DailyPosture | null>(null);
+  const [skillAllocations, setSkillAllocations] = useState<SkillPointAllocation[]>([]);
+  const [allocatingSkill, setAllocatingSkill] = useState(false);
   const [seasonResetPending, setSeasonResetPending] = useState(false);
   const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
   const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
@@ -390,6 +394,7 @@ export default function PlayPage() {
           setTensions(run.tensions ?? []);
           setSkillBank(run.skillBank ?? null);
           setPosture(run.posture ?? null);
+          setSkillAllocations(run.allocations ?? []);
           setStorylets(run.storylets);
           setRuns(run.storyletRunsToday);
           setAllocationSaved(Boolean(run.allocation));
@@ -972,6 +977,21 @@ export default function PlayPage() {
     }
   };
 
+  const handleAllocateSkillPoint = async (skillKey: string) => {
+    if (!userId) return;
+    setError(null);
+    setAllocatingSkill(true);
+    try {
+      await allocateSkillPoint({ userId, dayIndex, skillKey });
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to allocate skill point.");
+    } finally {
+      setAllocatingSkill(false);
+    }
+  };
+
   const handleReflection = async (response: ReflectionResponse | "skip") => {
     if (!userId) return;
     setError(null);
@@ -1346,6 +1366,9 @@ export default function PlayPage() {
                         tensions={tensions}
                         skillBank={skillBank}
                         posture={posture}
+                        allocations={skillAllocations}
+                        onAllocateSkillPoint={handleAllocateSkillPoint}
+                        submitting={allocatingSkill}
                       />
                     </section>
                   )}

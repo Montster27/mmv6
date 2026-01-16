@@ -1,16 +1,34 @@
-import type { DailyPosture, DailyTension, SkillBank } from "@/types/dailyInteraction";
+import { Button } from "@/components/ui/button";
+import type {
+  DailyPosture,
+  DailyTension,
+  SkillBank,
+  SkillPointAllocation,
+} from "@/types/dailyInteraction";
 
 type Props = {
   tensions: DailyTension[];
   skillBank: SkillBank | null;
   posture: DailyPosture | null;
+  allocations: SkillPointAllocation[];
+  onAllocateSkillPoint: (skillKey: string) => void;
+  submitting?: boolean;
 };
+
+const SKILLS = ["focus", "memory", "networking", "grit"];
 
 function formatKey(key: string) {
   return key.replace(/_/g, " ");
 }
 
-export function DailySetupPanel({ tensions, skillBank, posture }: Props) {
+export function DailySetupPanel({
+  tensions,
+  skillBank,
+  posture,
+  allocations,
+  onAllocateSkillPoint,
+  submitting,
+}: Props) {
   const activeTensions = tensions.filter((tension) => !tension.resolved_at);
   const points = skillBank?.available_points ?? 0;
   const cap = skillBank?.cap ?? 0;
@@ -26,13 +44,36 @@ export function DailySetupPanel({ tensions, skillBank, posture }: Props) {
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
         <h3 className="text-sm font-semibold text-slate-800">Skill points</h3>
-        {points > 0 ? (
-          <p className="text-sm text-slate-700">
-            {points} available · cap {cap}
-          </p>
+        <p className="text-sm text-slate-700">
+          {points} available · cap {cap}
+        </p>
+        {allocations.length > 0 ? (
+          <ul className="text-xs text-slate-600">
+            {allocations.map((allocation) => (
+              <li
+                key={`${allocation.user_id}-${allocation.day_index}-${allocation.skill_key}`}
+                className="capitalize"
+              >
+                {formatKey(allocation.skill_key)} · {allocation.points}
+              </li>
+            ))}
+          </ul>
         ) : (
-          <p className="text-sm text-slate-600">No points to assign.</p>
+          <p className="text-xs text-slate-500">No allocations yet.</p>
         )}
+        <div className="flex flex-wrap gap-2">
+          {SKILLS.map((skill) => (
+            <Button
+              key={skill}
+              variant="outline"
+              disabled={submitting || points <= 0}
+              onClick={() => onAllocateSkillPoint(skill)}
+              className="capitalize"
+            >
+              Allocate 1 · {skill}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
