@@ -17,7 +17,17 @@ import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
+import {
+  fetchPosture,
+  fetchSkillBank,
+  fetchTensions,
+} from "@/lib/dailyInteractions";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
+import type {
+  DailyPosture,
+  DailyTension,
+  SkillBank,
+} from "@/types/dailyInteraction";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
 function runsForTodayPair(runs: StoryletRun[], storyletPair: Storylet[]): StoryletRun[] {
@@ -58,6 +68,21 @@ function devLogStage(snapshot: Record<string, unknown>) {
   }
 }
 
+function needsSetup({
+  tensions,
+  skillBank,
+  posture,
+}: {
+  tensions: DailyTension[];
+  skillBank: SkillBank | null;
+  posture: DailyPosture | null;
+}) {
+  if (tensions.some((t) => !t.resolved_at)) return true;
+  if (skillBank && skillBank.available_points > 0) return true;
+  if (!posture) return true;
+  return false;
+}
+
 export async function getOrCreateDailyRun(
   userId: string,
   today: Date,
@@ -93,14 +118,18 @@ export async function getOrCreateDailyRun(
   const cadence = await ensureCadenceUpToDate(userId);
   const dayIndex = cadence.dayIndex;
 
-  const [daily, allocation, runs, storyletsRaw, boosted] = await Promise.all([
-    fetchDailyState(userId),
-    fetchTimeAllocation(userId, dayIndex),
-    fetchTodayRuns(userId, dayIndex),
-    fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
-    hasSentBoostToday(userId, dayIndex),
-    // Note: we fetch recent history separately below.
-  ]);
+  const [daily, allocation, runs, storyletsRaw, boosted, tensions, skillBank, posture] =
+    await Promise.all([
+      fetchDailyState(userId),
+      fetchTimeAllocation(userId, dayIndex),
+      fetchTodayRuns(userId, dayIndex),
+      fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
+      hasSentBoostToday(userId, dayIndex),
+      fetchTensions(userId, dayIndex),
+      fetchSkillBank(userId),
+      fetchPosture(userId, dayIndex),
+      // Note: we fetch recent history separately below.
+    ]);
 
   const recentRuns =
     (await fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => [])) ?? [];
@@ -152,7 +181,8 @@ export async function getOrCreateDailyRun(
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
   const canBoost = !boosted;
-  const stage = computeStage(
+  const setupNeeded = needsSetup({ tensions, skillBank, posture });
+  const baseStage = computeStage(
     Boolean(allocation),
     runsForPair.length,
     cadence.alreadyCompletedToday,
@@ -164,6 +194,8 @@ export async function getOrCreateDailyRun(
     funPulseEligible,
     funPulseDone
   );
+  const stage =
+    !cadence.alreadyCompletedToday && setupNeeded ? "setup" : baseStage;
 
   devLogStage({
     dayIndex,
@@ -173,6 +205,7 @@ export async function getOrCreateDailyRun(
     reflectionDone,
     microTaskEligible,
     microTaskDone,
+    needsSetup: setupNeeded,
     stage,
   });
 
@@ -185,6 +218,9 @@ export async function getOrCreateDailyRun(
     storylets: hasStorylets ? storylets : [fallbackStorylet(), fallbackStorylet()],
     storyletRunsToday: runs,
     canBoost,
+    tensions,
+    skillBank,
+    posture,
     reflectionStatus: reflectionDone ? "done" : "pending",
     microTaskStatus,
     funPulseEligible,

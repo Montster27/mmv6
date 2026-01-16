@@ -4,6 +4,7 @@ import type { SeasonRecap } from "./seasons";
 import type { SeasonContext } from "./season";
 
 export type DailyRunStage =
+  | "setup"
   | "allocation"
   | "storylet_1"
   | "storylet_2"
@@ -22,6 +23,9 @@ export type DailyRun = {
   storylets: Storylet[];
   storyletRunsToday: StoryletRun[];
   canBoost: boolean;
+  tensions?: import("./dailyInteraction").DailyTension[];
+  skillBank?: import("./dailyInteraction").SkillBank | null;
+  posture?: import("./dailyInteraction").DailyPosture | null;
   reflectionStatus: "pending" | "done";
   microTaskStatus?: "pending" | "done" | "skipped";
   funPulseEligible?: boolean;

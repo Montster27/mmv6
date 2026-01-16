@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
+import { DailySetupPanel } from "@/components/play/DailySetupPanel";
 import { signOut } from "@/lib/auth";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
@@ -47,6 +48,11 @@ import {
 } from "@/lib/social";
 import { upsertReflection } from "@/lib/reflections";
 import type { DailyRunStage } from "@/types/dailyRun";
+import type {
+  DailyPosture,
+  DailyTension,
+  SkillBank,
+} from "@/types/dailyInteraction";
 import type { ReflectionResponse } from "@/types/reflections";
 import type { SeasonRecap } from "@/types/seasons";
 import { AuthGate } from "@/ui/components/AuthGate";
@@ -87,6 +93,9 @@ export default function PlayPage() {
   const [alreadyCompletedToday, setAlreadyCompletedToday] = useState(false);
   const [dayIndexState, setDayIndexState] = useState(1);
   const [stage, setStage] = useState<DailyRunStage>("allocation");
+  const [tensions, setTensions] = useState<DailyTension[]>([]);
+  const [skillBank, setSkillBank] = useState<SkillBank | null>(null);
+  const [posture, setPosture] = useState<DailyPosture | null>(null);
   const [seasonResetPending, setSeasonResetPending] = useState(false);
   const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
   const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
@@ -378,6 +387,9 @@ export default function PlayPage() {
           setDayIndexState(run.dayIndex);
           setStage(run.stage);
           setAlreadyCompletedToday(run.stage === "complete");
+          setTensions(run.tensions ?? []);
+          setSkillBank(run.skillBank ?? null);
+          setPosture(run.posture ?? null);
           setStorylets(run.storylets);
           setRuns(run.storyletRunsToday);
           setAllocationSaved(Boolean(run.allocation));
@@ -1328,6 +1340,15 @@ export default function PlayPage() {
                   </>
                 ) : (
                   <>
+                  {USE_DAILY_LOOP_ORCHESTRATOR && stage === "setup" && (
+                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                      <DailySetupPanel
+                        tensions={tensions}
+                        skillBank={skillBank}
+                        posture={posture}
+                      />
+                    </section>
+                  )}
                   {(stage === "allocation" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
                     <section className="space-y-3">

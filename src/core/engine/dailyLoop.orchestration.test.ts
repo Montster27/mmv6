@@ -39,6 +39,11 @@ vi.mock("@/core/funPulse/shouldShowFunPulse", () => ({
 vi.mock("@/lib/funPulse", () => ({
   getFunPulse: vi.fn(),
 }));
+vi.mock("@/lib/dailyInteractions", () => ({
+  fetchTensions: vi.fn(),
+  fetchSkillBank: vi.fn(),
+  fetchPosture: vi.fn(),
+}));
 vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
 }));
@@ -70,6 +75,11 @@ import { performSeasonReset } from "@/core/season/seasonReset";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
+import {
+  fetchPosture,
+  fetchSkillBank,
+  fetchTensions,
+} from "@/lib/dailyInteractions";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
 const storyletA: Storylet = {
@@ -164,9 +174,39 @@ beforeEach(() => {
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
+  vi.mocked(fetchTensions).mockResolvedValue([]);
+  vi.mocked(fetchSkillBank).mockResolvedValue({
+    user_id: "u",
+    available_points: 0,
+    cap: 0,
+    last_awarded_day_index: null,
+  });
+  vi.mocked(fetchPosture).mockResolvedValue({
+    user_id: "u",
+    day_index: 2,
+    posture: "steady",
+    created_at: new Date().toISOString(),
+  });
 });
 
 describe("getOrCreateDailyRun", () => {
+  it("returns setup when daily setup is required", async () => {
+    vi.mocked(fetchTensions).mockResolvedValue([
+      {
+        user_id: "u",
+        day_index: 2,
+        key: "unfinished_assignment",
+        severity: 2,
+        expires_day_index: 3,
+        resolved_at: null,
+        meta: null,
+      },
+    ]);
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.stage).toBe("setup");
+    expect(run.tensions?.length).toBe(1);
+  });
+
   it("returns allocation stage when no allocation saved", async () => {
     vi.mocked(fetchTimeAllocation).mockResolvedValue(null);
     const run = await getOrCreateDailyRun("u", new Date());
