@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 import.env
 
+# supabase
+/supabase/.temp/
+
 # vercel
 .vercel
 
