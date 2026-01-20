@@ -60,6 +60,19 @@ vi.mock("@/lib/dailyInteractions", () => ({
   fetchSkillBank: vi.fn(),
   fetchPosture: vi.fn(),
 }));
+vi.mock("@/lib/cohorts", () => ({
+  ensureUserInCohort: vi.fn(),
+}));
+vi.mock("@/lib/arcs", () => ({
+  fetchArcByKey: vi.fn(),
+  fetchArcInstance: vi.fn(),
+}));
+vi.mock("@/lib/initiatives", () => ({
+  fetchInitiativeProgress: vi.fn(),
+  fetchOpenInitiativesForCohort: vi.fn(),
+  fetchUserContributionStatus: vi.fn(),
+  getOrCreateWeeklyInitiative: vi.fn(),
+}));
 
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import {
@@ -86,6 +99,14 @@ import {
   fetchSkillBank,
   fetchTensions,
 } from "@/lib/dailyInteractions";
+import { ensureUserInCohort } from "@/lib/cohorts";
+import { fetchArcByKey, fetchArcInstance } from "@/lib/arcs";
+import {
+  fetchInitiativeProgress,
+  fetchOpenInitiativesForCohort,
+  fetchUserContributionStatus,
+  getOrCreateWeeklyInitiative,
+} from "@/lib/initiatives";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
 const storyletA: Storylet = {
@@ -173,6 +194,13 @@ beforeEach(() => {
     created_at: new Date().toISOString(),
   });
   vi.mocked(fetchSkillAllocations).mockResolvedValue([]);
+  vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
+  vi.mocked(fetchArcByKey).mockResolvedValue(null);
+  vi.mocked(fetchArcInstance).mockResolvedValue(null);
+  vi.mocked(getOrCreateWeeklyInitiative).mockResolvedValue(null);
+  vi.mocked(fetchOpenInitiativesForCohort).mockResolvedValue([]);
+  vi.mocked(fetchUserContributionStatus).mockResolvedValue(false);
+  vi.mocked(fetchInitiativeProgress).mockResolvedValue(0);
 });
 
 describe("daily loop validation", () => {
@@ -237,5 +265,50 @@ describe("daily loop validation", () => {
 
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("microtask");
+  });
+
+  it("attaches cohort, arc, and initiatives", async () => {
+    vi.mocked(fetchArcByKey).mockResolvedValue({
+      id: "arc-1",
+      key: "anomaly_001",
+      title: "Anomaly 001",
+      description: "Test arc",
+      created_at: new Date().toISOString(),
+      is_active: true,
+      meta: null,
+    });
+    vi.mocked(fetchArcInstance).mockResolvedValue({
+      id: "inst-1",
+      user_id: "u",
+      arc_id: "arc-1",
+      status: "active",
+      started_day_index: 2,
+      current_step: 1,
+      updated_at: new Date().toISOString(),
+      meta: null,
+    });
+    vi.mocked(fetchOpenInitiativesForCohort).mockResolvedValue([
+      {
+        id: "init-1",
+        cohort_id: "c1",
+        key: "week_0",
+        title: "Quiet Logistics",
+        description: "Test initiative",
+        created_at: new Date().toISOString(),
+        starts_day_index: 1,
+        ends_day_index: 7,
+        status: "open",
+        goal: 100,
+        meta: null,
+      },
+    ]);
+    vi.mocked(fetchUserContributionStatus).mockResolvedValue(true);
+    vi.mocked(fetchInitiativeProgress).mockResolvedValue(5);
+
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.cohortId).toBe("c1");
+    expect(run.arc?.key).toBe("anomaly_001");
+    expect(run.initiatives?.length).toBe(1);
+    expect(run.initiatives?.[0]?.contributedToday).toBe(true);
   });
 });

@@ -47,6 +47,19 @@ vi.mock("@/lib/dailyInteractions", () => ({
   fetchSkillBank: vi.fn(),
   fetchPosture: vi.fn(),
 }));
+vi.mock("@/lib/cohorts", () => ({
+  ensureUserInCohort: vi.fn(),
+}));
+vi.mock("@/lib/arcs", () => ({
+  fetchArcByKey: vi.fn(),
+  fetchArcInstance: vi.fn(),
+}));
+vi.mock("@/lib/initiatives", () => ({
+  fetchInitiativeProgress: vi.fn(),
+  fetchOpenInitiativesForCohort: vi.fn(),
+  fetchUserContributionStatus: vi.fn(),
+  getOrCreateWeeklyInitiative: vi.fn(),
+}));
 vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
 }));
@@ -86,6 +99,14 @@ import {
   fetchSkillBank,
   fetchTensions,
 } from "@/lib/dailyInteractions";
+import { ensureUserInCohort } from "@/lib/cohorts";
+import { fetchArcByKey, fetchArcInstance } from "@/lib/arcs";
+import {
+  fetchInitiativeProgress,
+  fetchOpenInitiativesForCohort,
+  fetchUserContributionStatus,
+  getOrCreateWeeklyInitiative,
+} from "@/lib/initiatives";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
 const storyletA: Storylet = {
@@ -196,6 +217,13 @@ beforeEach(() => {
     created_at: new Date().toISOString(),
   });
   vi.mocked(fetchSkillAllocations).mockResolvedValue([]);
+  vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
+  vi.mocked(fetchArcByKey).mockResolvedValue(null);
+  vi.mocked(fetchArcInstance).mockResolvedValue(null);
+  vi.mocked(getOrCreateWeeklyInitiative).mockResolvedValue(null);
+  vi.mocked(fetchOpenInitiativesForCohort).mockResolvedValue([]);
+  vi.mocked(fetchUserContributionStatus).mockResolvedValue(false);
+  vi.mocked(fetchInitiativeProgress).mockResolvedValue(0);
 });
 
 describe("getOrCreateDailyRun", () => {
