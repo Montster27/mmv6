@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectStorylets } from "@/core/storylets/selectStorylets";
+import { selectStorylets, _testOnly } from "@/core/storylets/selectStorylets";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 import type { DailyState } from "@/types/daily";
 
@@ -244,5 +244,23 @@ describe("selectStorylets", () => {
     });
     const ids = selected.map((s) => s.id);
     expect(ids).toContain("exp-gated");
+  });
+
+  it("scores social tags higher for connect posture", () => {
+    const social = makeStorylet("social", { tags: ["social"] });
+    const other = makeStorylet("other", { tags: ["study"] });
+    const ctx = { posture: "connect", unresolvedTensionKeys: [] };
+    const scoreSocial = _testOnly.scoreStorylet(social, "seed", ctx);
+    const scoreOther = _testOnly.scoreStorylet(other, "seed", ctx);
+    expect(scoreSocial).toBeLessThan(scoreOther);
+  });
+
+  it("scores study tags higher for unfinished assignment tension", () => {
+    const study = makeStorylet("study", { tags: ["study"] });
+    const other = makeStorylet("other", { tags: ["social"] });
+    const ctx = { posture: null, unresolvedTensionKeys: ["unfinished_assignment"] };
+    const scoreStudy = _testOnly.scoreStorylet(study, "seed", ctx);
+    const scoreOther = _testOnly.scoreStorylet(other, "seed", ctx);
+    expect(scoreStudy).toBeLessThan(scoreOther);
   });
 });

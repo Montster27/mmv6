@@ -17,6 +17,7 @@ import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
+import { buildStoryletContext } from "@/core/engine/storyletContext";
 import {
   ensureSkillBankUpToDate,
   ensureTensionsUpToDate,
@@ -169,6 +170,7 @@ export async function getOrCreateDailyRun(
     forcedStorylet: arcStorylet ?? undefined,
     experiments: options?.experiments,
     isAdmin: options?.isAdmin,
+    context: buildStoryletContext({ posture, tensions }),
   });
 
   const reflection = await getReflection(userId, dayIndex);

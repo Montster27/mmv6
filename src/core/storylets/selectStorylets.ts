@@ -1,5 +1,6 @@
 import type { DailyState } from "@/types/daily";
 import type { Storylet, StoryletRun } from "@/types/storylets";
+import type { StoryletContext } from "@/core/engine/storyletContext";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { pctInRollout } from "@/core/eligibility/rollout";
 
@@ -30,6 +31,7 @@ type SelectorArgs = {
   forcedStorylet?: Storylet | null;
   experiments?: Record<string, string>;
   isAdmin?: boolean;
+  context?: StoryletContext | null;
 };
 
 function hashString(input: string): number {
@@ -131,10 +133,39 @@ function meetsRequirements(
   return true;
 }
 
-function scoreStorylet(storylet: Storylet, seed: string): number {
+function scoreStorylet(
+  storylet: Storylet,
+  seed: string,
+  context?: StoryletContext | null
+): number {
   const base = hashString(`${seed}:${storylet.id}`);
   const weight = storylet.weight ?? 100;
-  return base / Math.max(weight, 1);
+  const tags = storylet.tags ?? [];
+  const hasTag = (tag: string) => tags.includes(tag);
+  let bonus = 0;
+  const posture = context?.posture ?? null;
+  if (posture === "push" && (hasTag("study") || hasTag("work"))) {
+    bonus += 0.2;
+  } else if (posture === "recover" && hasTag("health")) {
+    bonus += 0.2;
+  } else if (posture === "connect" && hasTag("social")) {
+    bonus += 0.2;
+  } else if (
+    posture === "steady" &&
+    (hasTag("study") || hasTag("work") || hasTag("social") || hasTag("health"))
+  ) {
+    bonus += 0.1;
+  }
+
+  const tensions = context?.unresolvedTensionKeys ?? [];
+  if (tensions.includes("unfinished_assignment") && hasTag("study")) {
+    bonus += 0.2;
+  }
+  if (tensions.includes("fatigue") && hasTag("health")) {
+    bonus += 0.2;
+  }
+
+  return base / (Math.max(weight, 1) * (1 + bonus));
 }
 
 function partitionOnboarding(storylets: Storylet[]): { onboarding: Storylet[]; others: Storylet[] } {
@@ -143,9 +174,14 @@ function partitionOnboarding(storylets: Storylet[]): { onboarding: Storylet[]; o
   return { onboarding, others };
 }
 
-function pickTop(storylets: Storylet[], seed: string, count: number): Storylet[] {
+function pickTop(
+  storylets: Storylet[],
+  seed: string,
+  count: number,
+  context?: StoryletContext | null
+): Storylet[] {
   return [...storylets]
-    .sort((a, b) => scoreStorylet(a, seed) - scoreStorylet(b, seed))
+    .sort((a, b) => scoreStorylet(a, seed, context) - scoreStorylet(b, seed, context))
     .slice(0, count);
 }
 
@@ -160,6 +196,7 @@ export function selectStorylets({
   forcedStorylet,
   experiments = {},
   isAdmin = false,
+  context = null,
 }: SelectorArgs): Storylet[] {
   const todayUsedIds = new Set(
     recentRuns.filter((r) => r.day_index === dayIndex).map((r) => r.storylet_id)
@@ -220,17 +257,17 @@ export function selectStorylets({
     picked.push(forcedStorylet);
   }
   if (onboardingEligible.length > 0) {
-    picked.push(...pickTop(onboardingEligible, seed, 2));
+    picked.push(...pickTop(onboardingEligible, seed, 2, context));
   }
 
   if (picked.length < 2) {
     const remaining = preferred.filter((s) => !picked.includes(s));
-    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
   }
 
   if (picked.length < 2) {
     const remaining = baseEligible.filter((s) => !picked.includes(s));
-    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
   }
 
   if (picked.length < 2 && baseEligible.length < 2) {
@@ -250,7 +287,7 @@ export function selectStorylets({
     });
     const nonSeasonPreferred = nonSeasonEligible.filter((s) => !recentIds.has(s.id));
     const remaining = nonSeasonPreferred.filter((s) => !picked.includes(s));
-    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
   }
 
   if (picked.length < 2 && baseEligible.length < 2) {
@@ -271,7 +308,7 @@ export function selectStorylets({
     });
     const relaxedPreferred = relaxedEligible.filter((s) => !recentIds.has(s.id));
     const remaining = relaxedPreferred.filter((s) => !picked.includes(s));
-    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
   }
 
   if (picked.length < 2) {
@@ -292,12 +329,12 @@ export function selectStorylets({
       );
     });
     const remaining = relaxedAudience.filter((s) => !picked.includes(s));
-    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
   }
 
   if (picked.length < 2) {
     const remaining = activeStorylets.filter((s) => !picked.includes(s) && !todayUsedIds.has(s.id));
-    picked.push(...pickTop(remaining, seed, 2 - picked.length));
+    picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
   }
 
   if (picked.length === 0) {
