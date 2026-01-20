@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
+import { ArcPanel } from "@/components/play/ArcPanel";
+import { InitiativePanel } from "@/components/play/InitiativePanel";
 import { DailySetupPanel } from "@/components/play/DailySetupPanel";
 import { signOut } from "@/lib/auth";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
@@ -53,6 +55,8 @@ import {
   resolveTension,
   submitPosture,
 } from "@/lib/dailyInteractions";
+import { getOrStartArc, advanceArcStep, completeArc } from "@/lib/arcs";
+import { contributeToInitiative } from "@/lib/initiatives";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
@@ -60,6 +64,7 @@ import type {
   SkillBank,
   SkillPointAllocation,
 } from "@/types/dailyInteraction";
+import type { Initiative } from "@/types/initiatives";
 import type { ReflectionResponse } from "@/types/reflections";
 import type { SeasonRecap } from "@/types/seasons";
 import { AuthGate } from "@/ui/components/AuthGate";
@@ -109,6 +114,18 @@ export default function PlayPage() {
   const [submittingPosture, setSubmittingPosture] = useState(false);
   const [setupActionError, setSetupActionError] = useState<string | null>(null);
   const [dayRolloverNotice, setDayRolloverNotice] = useState<string | null>(null);
+  const [arc, setArc] = useState<{
+    arcId: string;
+    key: string;
+    title: string;
+    status: "not_started" | "active" | "completed" | "abandoned";
+    currentStep: number;
+  } | null>(null);
+  const [initiatives, setInitiatives] = useState<
+    Array<Initiative & { contributedToday?: boolean; progress?: number }>
+  >([]);
+  const [arcSubmitting, setArcSubmitting] = useState(false);
+  const [initiativeSubmitting, setInitiativeSubmitting] = useState(false);
   const [seasonResetPending, setSeasonResetPending] = useState(false);
   const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
   const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
@@ -412,6 +429,8 @@ export default function PlayPage() {
           setSkillBank(run.skillBank ?? null);
           setPosture(run.posture ?? null);
           setSkillAllocations(run.allocations ?? []);
+          setArc(run.arc ?? null);
+          setInitiatives(run.initiatives ?? []);
           setStorylets(run.storylets);
           setRuns(run.storyletRunsToday);
           setAllocationSaved(Boolean(run.allocation));
@@ -1044,6 +1063,55 @@ export default function PlayPage() {
     }
   };
 
+  const handleStartArc = async () => {
+    if (!userId || !arc) return;
+    setArcSubmitting(true);
+    setError(null);
+    try {
+      await getOrStartArc(userId, arc.key, dayIndex);
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to start arc.");
+    } finally {
+      setArcSubmitting(false);
+    }
+  };
+
+  const handleAdvanceArc = async (nextStep: number, complete: boolean) => {
+    if (!userId || !arc) return;
+    setArcSubmitting(true);
+    setError(null);
+    try {
+      if (complete) {
+        await completeArc(userId, arc.key, dayIndex);
+      } else {
+        await advanceArcStep(userId, arc.key, nextStep, dayIndex);
+      }
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to advance arc.");
+    } finally {
+      setArcSubmitting(false);
+    }
+  };
+
+  const handleContributeInitiative = async (initiativeId: string) => {
+    if (!userId) return;
+    setInitiativeSubmitting(true);
+    setError(null);
+    try {
+      await contributeToInitiative(initiativeId, userId, dayIndex, 1);
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to contribute.");
+    } finally {
+      setInitiativeSubmitting(false);
+    }
+  };
+
   const handleReflection = async (response: ReflectionResponse | "skip") => {
     if (!userId) return;
     setError(null);
@@ -1577,6 +1645,22 @@ export default function PlayPage() {
                     </section>
                   )}
 
+                  {USE_DAILY_LOOP_ORCHESTRATOR &&
+                    arc &&
+                    stage !== "setup" &&
+                    stage !== "allocation" &&
+                    stage !== "storylet_1" &&
+                    stage !== "storylet_2" && (
+                      <section className="space-y-3">
+                        <ArcPanel
+                          arc={arc}
+                          submitting={arcSubmitting}
+                          onStart={handleStartArc}
+                          onAdvance={handleAdvanceArc}
+                        />
+                      </section>
+                    )}
+
                   {USE_DAILY_LOOP_ORCHESTRATOR && stage === "microtask" && (
                     <section className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -1661,6 +1745,16 @@ export default function PlayPage() {
                           </ul>
                         )}
                       </div>
+                      {initiatives.length > 0 ? (
+                        <InitiativePanel
+                          initiative={initiatives[0]}
+                          dayIndex={dayIndex}
+                          submitting={initiativeSubmitting}
+                          onContribute={() =>
+                            handleContributeInitiative(initiatives[0].id)
+                          }
+                        />
+                      ) : null}
                     </section>
                   )}
 
