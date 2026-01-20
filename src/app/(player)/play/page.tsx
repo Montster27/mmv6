@@ -47,7 +47,7 @@ import {
   type ReceivedBoost,
 } from "@/lib/social";
 import { upsertReflection } from "@/lib/reflections";
-import { allocateSkillPoint } from "@/lib/dailyInteractions";
+import { allocateSkillPoint, submitPosture } from "@/lib/dailyInteractions";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
@@ -100,6 +100,7 @@ export default function PlayPage() {
   const [posture, setPosture] = useState<DailyPosture | null>(null);
   const [skillAllocations, setSkillAllocations] = useState<SkillPointAllocation[]>([]);
   const [allocatingSkill, setAllocatingSkill] = useState(false);
+  const [submittingPosture, setSubmittingPosture] = useState(false);
   const [seasonResetPending, setSeasonResetPending] = useState(false);
   const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
   const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
@@ -992,6 +993,21 @@ export default function PlayPage() {
     }
   };
 
+  const handleSubmitPosture = async (postureValue: DailyPosture["posture"]) => {
+    if (!userId) return;
+    setError(null);
+    setSubmittingPosture(true);
+    try {
+      await submitPosture({ userId, dayIndex, posture: postureValue });
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to set posture.");
+    } finally {
+      setSubmittingPosture(false);
+    }
+  };
+
   const handleReflection = async (response: ReflectionResponse | "skip") => {
     if (!userId) return;
     setError(null);
@@ -1369,6 +1385,8 @@ export default function PlayPage() {
                         allocations={skillAllocations}
                         onAllocateSkillPoint={handleAllocateSkillPoint}
                         submitting={allocatingSkill}
+                        onSubmitPosture={handleSubmitPosture}
+                        submittingPosture={submittingPosture}
                       />
                     </section>
                   )}

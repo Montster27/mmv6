@@ -236,6 +236,18 @@ describe("getOrCreateDailyRun", () => {
     expect(run.stage).toBe("allocation");
   });
 
+  it("returns setup when posture is missing", async () => {
+    vi.mocked(fetchSkillBank).mockResolvedValue({
+      user_id: "u",
+      available_points: 0,
+      cap: 2,
+      last_awarded_day_index: 2,
+    });
+    vi.mocked(fetchPosture).mockResolvedValue(null);
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.stage).toBe("setup");
+  });
+
   it("returns allocation stage when no allocation saved", async () => {
     vi.mocked(fetchTimeAllocation).mockResolvedValue(null);
     const run = await getOrCreateDailyRun("u", new Date());

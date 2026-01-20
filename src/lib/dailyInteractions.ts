@@ -143,6 +143,36 @@ export async function fetchPosture(
   return data ?? null;
 }
 
+export async function submitPosture(params: {
+  userId: string;
+  dayIndex: number;
+  posture: DailyPosture["posture"];
+}): Promise<void> {
+  const allowed = new Set<DailyPosture["posture"]>([
+    "push",
+    "steady",
+    "recover",
+    "connect",
+  ]);
+  if (!allowed.has(params.posture)) {
+    throw new Error("Invalid posture.");
+  }
+
+  const { error } = await supabase.from("daily_posture").insert({
+    user_id: params.userId,
+    day_index: params.dayIndex,
+    posture: params.posture,
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("Posture already set for today.");
+    }
+    console.error("Failed to submit posture", error);
+    throw error;
+  }
+}
+
 export async function fetchSkillAllocations(
   userId: string,
   dayIndex: number

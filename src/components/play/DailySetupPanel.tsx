@@ -13,9 +13,12 @@ type Props = {
   allocations: SkillPointAllocation[];
   onAllocateSkillPoint: (skillKey: string) => void;
   submitting?: boolean;
+  onSubmitPosture: (posture: DailyPosture["posture"]) => void;
+  submittingPosture?: boolean;
 };
 
 const SKILLS = ["focus", "memory", "networking", "grit"];
+const POSTURES: DailyPosture["posture"][] = ["push", "steady", "recover", "connect"];
 
 function formatKey(key: string) {
   return key.replace(/_/g, " ");
@@ -28,6 +31,8 @@ export function DailySetupPanel({
   allocations,
   onAllocateSkillPoint,
   submitting,
+  onSubmitPosture,
+  submittingPosture,
 }: Props) {
   const activeTensions = tensions.filter((tension) => !tension.resolved_at);
   const points = skillBank?.available_points ?? 0;
@@ -77,12 +82,25 @@ export function DailySetupPanel({
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800">Posture</h3>
+        <h3 className="text-sm font-semibold text-slate-800">Choose today's posture</h3>
         {posture ? (
           <p className="text-sm text-slate-700 capitalize">{posture.posture}</p>
         ) : (
           <p className="text-sm text-slate-600">Not set yet.</p>
         )}
+        <div className="flex flex-wrap gap-2">
+          {POSTURES.map((option) => (
+            <Button
+              key={option}
+              variant={posture?.posture === option ? "default" : "outline"}
+              disabled={Boolean(posture) || submittingPosture}
+              onClick={() => onSubmitPosture(option)}
+              className="capitalize"
+            >
+              {option}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
