@@ -67,6 +67,7 @@ import { ProgressPanel } from "@/components/ProgressPanel";
 import { SeasonBadge } from "@/components/SeasonBadge";
 import type { SeasonContext } from "@/types/season";
 import { isEmailAllowed } from "@/lib/adminAuth";
+import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
 
 const defaultAllocation: AllocationPayload = {
   study: 0,
@@ -106,6 +107,8 @@ export default function PlayPage() {
   const [skillAllocations, setSkillAllocations] = useState<SkillPointAllocation[]>([]);
   const [allocatingSkill, setAllocatingSkill] = useState(false);
   const [submittingPosture, setSubmittingPosture] = useState(false);
+  const [setupActionError, setSetupActionError] = useState<string | null>(null);
+  const [dayRolloverNotice, setDayRolloverNotice] = useState<string | null>(null);
   const [seasonResetPending, setSeasonResetPending] = useState(false);
   const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
   const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
@@ -165,6 +168,7 @@ export default function PlayPage() {
   const stageStartedAtRef = useRef<number | null>(null);
   const latestStageRef = useRef<DailyRunStage | null>(null);
   const latestDayIndexRef = useRef<number | null>(null);
+  const lastRunDayIndexRef = useRef<number | null>(null);
   const microTaskStartTracked = useRef(false);
   const funPulseShownTracked = useRef(false);
   const pendingTransitionRef = useRef<(() => void) | null>(null);
@@ -394,6 +398,13 @@ export default function PlayPage() {
             experiments,
             isAdmin,
           });
+          if (
+            typeof lastRunDayIndexRef.current === "number" &&
+            lastRunDayIndexRef.current !== run.dayIndex
+          ) {
+            setDayRolloverNotice("New day has started.");
+          }
+          lastRunDayIndexRef.current = run.dayIndex;
           setDayIndexState(run.dayIndex);
           setStage(run.stage);
           setAlreadyCompletedToday(run.stage === "complete");
@@ -1002,13 +1013,16 @@ export default function PlayPage() {
   const handleAllocateSkillPoint = async (skillKey: string) => {
     if (!userId) return;
     setError(null);
+    setSetupActionError(null);
     setAllocatingSkill(true);
     try {
       await allocateSkillPoint({ userId, dayIndex, skillKey });
       setRefreshTick((tick) => tick + 1);
     } catch (e) {
       console.error(e);
-      setError(e instanceof Error ? e.message : "Failed to allocate skill point.");
+      setSetupActionError(
+        e instanceof Error ? e.message : "Failed to allocate skill point."
+      );
     } finally {
       setAllocatingSkill(false);
     }
@@ -1017,13 +1031,14 @@ export default function PlayPage() {
   const handleSubmitPosture = async (postureValue: DailyPosture["posture"]) => {
     if (!userId) return;
     setError(null);
+    setSetupActionError(null);
     setSubmittingPosture(true);
     try {
       await submitPosture({ userId, dayIndex, posture: postureValue });
       setRefreshTick((tick) => tick + 1);
     } catch (e) {
       console.error(e);
-      setError(e instanceof Error ? e.message : "Failed to set posture.");
+      setSetupActionError(e instanceof Error ? e.message : "Failed to set posture.");
     } finally {
       setSubmittingPosture(false);
     }
@@ -1147,6 +1162,12 @@ export default function PlayPage() {
                 Day {dayIndex} · Energy {dailyState?.energy ?? "—"} · Stress{" "}
                 {dailyState?.stress ?? "—"}
               </p>
+              <div className="mt-2 text-sm text-slate-600">
+                <p className="font-medium text-slate-700">
+                  {getDailyStageCopy(stage).title}
+                </p>
+                <p>{getDailyStageCopy(stage).body}</p>
+              </div>
               {seasonContext ? (
                 <div className="mt-2">
                   <SeasonBadge
@@ -1158,6 +1179,9 @@ export default function PlayPage() {
               <p className="text-slate-600 text-sm">
                 Signed in as {session.user.email ?? "unknown user"}.
               </p>
+              {dayRolloverNotice ? (
+                <p className="mt-2 text-xs text-slate-500">{dayRolloverNotice}</p>
+              ) : null}
             </div>
             <div className="flex items-center gap-2">
               <Link className="text-sm text-slate-600 hover:underline" href="/journal">
@@ -1409,6 +1433,7 @@ export default function PlayPage() {
                         submitting={allocatingSkill}
                         onSubmitPosture={handleSubmitPosture}
                         submittingPosture={submittingPosture}
+                        actionError={setupActionError}
                       />
                     </section>
                   )}

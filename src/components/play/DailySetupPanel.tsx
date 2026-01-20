@@ -16,6 +16,7 @@ type Props = {
   submitting?: boolean;
   onSubmitPosture: (posture: DailyPosture["posture"]) => void;
   submittingPosture?: boolean;
+  actionError?: string | null;
 };
 
 const SKILLS = ["focus", "memory", "networking", "grit"];
@@ -35,10 +36,12 @@ export function DailySetupPanel({
   submitting,
   onSubmitPosture,
   submittingPosture,
+  actionError,
 }: Props) {
   const activeTensions = tensions.filter((tension) => !tension.resolved_at);
   const points = skillBank?.available_points ?? 0;
   const cap = skillBank?.cap ?? 0;
+  const unresolvedCount = activeTensions.length;
   const getHint = (tension: DailyTension) => {
     const meta = tension.meta as Record<string, unknown> | null;
     return meta && typeof meta.hint === "string" ? meta.hint : null;
@@ -57,6 +60,18 @@ export function DailySetupPanel({
         <p className="text-sm text-slate-600">
           A few loose threads still need attention.
         </p>
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
+        <h3 className="text-sm font-semibold text-slate-800">Setup checklist</h3>
+        <ul className="text-sm text-slate-700 space-y-1">
+          <li>Posture set: {posture ? "yes" : "no"}</li>
+          <li>Skill points remaining: {points}</li>
+          <li>Unresolved tensions: {unresolvedCount}</li>
+        </ul>
+        {actionError ? (
+          <p className="text-xs text-red-600">{actionError}</p>
+        ) : null}
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
