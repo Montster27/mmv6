@@ -36,11 +36,19 @@ export type DailyRun = {
   allocations?: SkillPointAllocation[];
   cohortId?: string | null;
   arc?: {
-    arcId: string;
-    key: string;
+    arc_key: string;
+    status: "not_started" | "active" | "completed";
     title: string;
-    status: "not_started" | "active" | "completed" | "abandoned";
-    currentStep: number;
+    description: string;
+    current_step: number | null;
+    step?:
+      | {
+          step_index: number;
+          title: string;
+          body: string;
+          choices: Array<{ key: string; label: string; flags?: Record<string, boolean> }>;
+        }
+      | null;
   } | null;
   initiatives?: Array<Initiative & { contributedToday?: boolean; progress?: number }> | null;
   reflectionStatus: "pending" | "done";

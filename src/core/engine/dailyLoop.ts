@@ -19,7 +19,8 @@ import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { buildStoryletContext } from "@/core/engine/storyletContext";
 import { ensureUserInCohort } from "@/lib/cohorts";
-import { fetchArcByKey, fetchArcInstance } from "@/lib/arcs";
+import { fetchArcByKey as fetchContentArcByKey } from "@/lib/content/arcs";
+import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
 import {
   fetchInitiativeProgress,
   fetchOpenInitiativesForCohort,
@@ -202,9 +203,12 @@ export async function getOrCreateDailyRun(
     initiatives = enriched;
   }
 
-  const arcDefinition = await fetchArcByKey(ARC_KEY);
-  const arcInstance =
-    arcDefinition?.id ? await fetchArcInstance(userId, arcDefinition.id) : null;
+  const arcDefinition = await fetchContentArcByKey(ARC_KEY);
+  const arcInstance = arcDefinition ? await fetchArcInstance(userId, ARC_KEY) : null;
+  const arcStep =
+    arcDefinition && arcInstance?.status === "active"
+      ? await fetchArcCurrentStepContent(ARC_KEY, arcInstance.current_step)
+      : null;
 
   const reflection = await getReflection(userId, dayIndex);
   const reflectionDone = isReflectionDone(reflection);
@@ -276,11 +280,24 @@ export async function getOrCreateDailyRun(
     cohortId,
     arc: arcDefinition
       ? {
-          arcId: arcDefinition.id,
-          key: arcDefinition.key,
+          arc_key: arcDefinition.key,
+          status:
+            arcInstance?.status === "completed"
+              ? "completed"
+              : arcInstance?.status === "active"
+                ? "active"
+                : "not_started",
           title: arcDefinition.title,
-          status: arcInstance?.status ?? "not_started",
-          currentStep: arcInstance?.current_step ?? 0,
+          description: arcDefinition.description,
+          current_step: arcInstance?.current_step ?? null,
+          step: arcStep
+            ? {
+                step_index: arcStep.step_index,
+                title: arcStep.title,
+                body: arcStep.body,
+                choices: arcStep.choices ?? [],
+              }
+            : null,
         }
       : null,
     initiatives,

@@ -63,8 +63,11 @@ vi.mock("@/lib/dailyInteractions", () => ({
 vi.mock("@/lib/cohorts", () => ({
   ensureUserInCohort: vi.fn(),
 }));
-vi.mock("@/lib/arcs", () => ({
+vi.mock("@/lib/content/arcs", () => ({
   fetchArcByKey: vi.fn(),
+}));
+vi.mock("@/lib/arcs", () => ({
+  fetchArcCurrentStepContent: vi.fn(),
   fetchArcInstance: vi.fn(),
 }));
 vi.mock("@/lib/initiatives", () => ({
@@ -100,7 +103,8 @@ import {
   fetchTensions,
 } from "@/lib/dailyInteractions";
 import { ensureUserInCohort } from "@/lib/cohorts";
-import { fetchArcByKey, fetchArcInstance } from "@/lib/arcs";
+import { fetchArcByKey } from "@/lib/content/arcs";
+import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
 import {
   fetchInitiativeProgress,
   fetchOpenInitiativesForCohort,
@@ -197,6 +201,7 @@ beforeEach(() => {
   vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
   vi.mocked(fetchArcByKey).mockResolvedValue(null);
   vi.mocked(fetchArcInstance).mockResolvedValue(null);
+  vi.mocked(fetchArcCurrentStepContent).mockResolvedValue(null);
   vi.mocked(getOrCreateWeeklyInitiative).mockResolvedValue(null);
   vi.mocked(fetchOpenInitiativesForCohort).mockResolvedValue([]);
   vi.mocked(fetchUserContributionStatus).mockResolvedValue(false);
@@ -269,23 +274,30 @@ describe("daily loop validation", () => {
 
   it("attaches cohort, arc, and initiatives", async () => {
     vi.mocked(fetchArcByKey).mockResolvedValue({
-      id: "arc-1",
       key: "anomaly_001",
       title: "Anomaly 001",
       description: "Test arc",
-      created_at: new Date().toISOString(),
+      tags: [],
       is_active: true,
-      meta: null,
+      created_at: new Date().toISOString(),
     });
     vi.mocked(fetchArcInstance).mockResolvedValue({
       id: "inst-1",
       user_id: "u",
-      arc_id: "arc-1",
+      arc_key: "anomaly_001",
       status: "active",
       started_day_index: 2,
       current_step: 1,
       updated_at: new Date().toISOString(),
       meta: null,
+    });
+    vi.mocked(fetchArcCurrentStepContent).mockResolvedValue({
+      arc_key: "anomaly_001",
+      step_index: 1,
+      title: "Step 1",
+      body: "Body",
+      choices: [],
+      created_at: new Date().toISOString(),
     });
     vi.mocked(fetchOpenInitiativesForCohort).mockResolvedValue([
       {
@@ -307,7 +319,7 @@ describe("daily loop validation", () => {
 
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.cohortId).toBe("c1");
-    expect(run.arc?.key).toBe("anomaly_001");
+    expect(run.arc?.arc_key).toBe("anomaly_001");
     expect(run.initiatives?.length).toBe(1);
     expect(run.initiatives?.[0]?.contributedToday).toBe(true);
   });

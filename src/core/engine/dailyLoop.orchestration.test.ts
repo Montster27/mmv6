@@ -50,8 +50,11 @@ vi.mock("@/lib/dailyInteractions", () => ({
 vi.mock("@/lib/cohorts", () => ({
   ensureUserInCohort: vi.fn(),
 }));
-vi.mock("@/lib/arcs", () => ({
+vi.mock("@/lib/content/arcs", () => ({
   fetchArcByKey: vi.fn(),
+}));
+vi.mock("@/lib/arcs", () => ({
+  fetchArcCurrentStepContent: vi.fn(),
   fetchArcInstance: vi.fn(),
 }));
 vi.mock("@/lib/initiatives", () => ({
@@ -100,7 +103,8 @@ import {
   fetchTensions,
 } from "@/lib/dailyInteractions";
 import { ensureUserInCohort } from "@/lib/cohorts";
-import { fetchArcByKey, fetchArcInstance } from "@/lib/arcs";
+import { fetchArcByKey } from "@/lib/content/arcs";
+import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
 import {
   fetchInitiativeProgress,
   fetchOpenInitiativesForCohort,
@@ -220,6 +224,7 @@ beforeEach(() => {
   vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
   vi.mocked(fetchArcByKey).mockResolvedValue(null);
   vi.mocked(fetchArcInstance).mockResolvedValue(null);
+  vi.mocked(fetchArcCurrentStepContent).mockResolvedValue(null);
   vi.mocked(getOrCreateWeeklyInitiative).mockResolvedValue(null);
   vi.mocked(fetchOpenInitiativesForCohort).mockResolvedValue([]);
   vi.mocked(fetchUserContributionStatus).mockResolvedValue(false);

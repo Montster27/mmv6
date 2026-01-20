@@ -55,7 +55,7 @@ import {
   resolveTension,
   submitPosture,
 } from "@/lib/dailyInteractions";
-import { getOrStartArc, advanceArcStep, completeArc } from "@/lib/arcs";
+import { advanceArc, completeArc, startArc } from "@/lib/arcs";
 import { contributeToInitiative } from "@/lib/initiatives";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type {
@@ -115,11 +115,17 @@ export default function PlayPage() {
   const [setupActionError, setSetupActionError] = useState<string | null>(null);
   const [dayRolloverNotice, setDayRolloverNotice] = useState<string | null>(null);
   const [arc, setArc] = useState<{
-    arcId: string;
-    key: string;
+    arc_key: string;
+    status: "not_started" | "active" | "completed";
     title: string;
-    status: "not_started" | "active" | "completed" | "abandoned";
-    currentStep: number;
+    description: string;
+    current_step: number | null;
+    step?: {
+      step_index: number;
+      title: string;
+      body: string;
+      choices: Array<{ key: string; label: string; flags?: Record<string, boolean> }>;
+    } | null;
   } | null>(null);
   const [initiatives, setInitiatives] = useState<
     Array<Initiative & { contributedToday?: boolean; progress?: number }>
@@ -1068,7 +1074,7 @@ export default function PlayPage() {
     setArcSubmitting(true);
     setError(null);
     try {
-      await getOrStartArc(userId, arc.key, dayIndex);
+      await startArc(userId, arc.arc_key, dayIndex);
       setRefreshTick((tick) => tick + 1);
     } catch (e) {
       console.error(e);
@@ -1084,9 +1090,9 @@ export default function PlayPage() {
     setError(null);
     try {
       if (complete) {
-        await completeArc(userId, arc.key, dayIndex);
+        await completeArc(userId, arc.arc_key);
       } else {
-        await advanceArcStep(userId, arc.key, nextStep, dayIndex);
+        await advanceArc(userId, arc.arc_key, nextStep);
       }
       setRefreshTick((tick) => tick + 1);
     } catch (e) {
