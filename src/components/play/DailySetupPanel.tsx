@@ -10,6 +10,7 @@ type Props = {
   tensions: DailyTension[];
   skillBank: SkillBank | null;
   posture: DailyPosture | null;
+  dayIndex: number;
   allocations: SkillPointAllocation[];
   onAllocateSkillPoint: (skillKey: string) => void;
   submitting?: boolean;
@@ -28,6 +29,7 @@ export function DailySetupPanel({
   tensions,
   skillBank,
   posture,
+  dayIndex,
   allocations,
   onAllocateSkillPoint,
   submitting,
@@ -37,6 +39,16 @@ export function DailySetupPanel({
   const activeTensions = tensions.filter((tension) => !tension.resolved_at);
   const points = skillBank?.available_points ?? 0;
   const cap = skillBank?.cap ?? 0;
+  const getHint = (tension: DailyTension) => {
+    const meta = tension.meta as Record<string, unknown> | null;
+    return meta && typeof meta.hint === "string" ? meta.hint : null;
+  };
+  const formatExpires = (tension: DailyTension) => {
+    const remaining = tension.expires_day_index - dayIndex;
+    if (!Number.isFinite(remaining)) return null;
+    if (remaining <= 0) return "expires today";
+    return `expires in ${remaining} day${remaining === 1 ? "" : "s"}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -111,11 +123,20 @@ export function DailySetupPanel({
           <ul className="space-y-2 text-sm text-slate-700">
             {activeTensions.map((tension) => (
               <li key={`${tension.user_id}-${tension.day_index}-${tension.key}`}>
-                <span className="font-medium capitalize">{formatKey(tension.key)}</span>
-                <span className="text-slate-500"> · severity {tension.severity}</span>
-                <span className="text-slate-500">
-                  {" "}· expires day {tension.expires_day_index}
-                </span>
+                <div className="font-medium capitalize">
+                  {formatKey(tension.key)}
+                </div>
+                <div className="text-xs text-slate-600">
+                  Severity {tension.severity}
+                </div>
+                {getHint(tension) ? (
+                  <div className="text-xs text-slate-500">{getHint(tension)}</div>
+                ) : null}
+                {formatExpires(tension) ? (
+                  <div className="text-xs text-slate-500">
+                    {formatExpires(tension)}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

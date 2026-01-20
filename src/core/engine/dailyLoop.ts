@@ -19,6 +19,7 @@ import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import {
   ensureSkillBankUpToDate,
+  ensureTensionsUpToDate,
   fetchSkillAllocations,
   fetchPosture,
   fetchSkillBank,
@@ -121,6 +122,7 @@ export async function getOrCreateDailyRun(
   const dayIndex = cadence.dayIndex;
 
   await ensureSkillBankUpToDate(userId, dayIndex);
+  await ensureTensionsUpToDate(userId, dayIndex);
 
   const [
     daily,

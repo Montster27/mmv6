@@ -41,6 +41,7 @@ vi.mock("@/lib/funPulse", () => ({
 }));
 vi.mock("@/lib/dailyInteractions", () => ({
   ensureSkillBankUpToDate: vi.fn(),
+  ensureTensionsUpToDate: vi.fn(),
   fetchSkillAllocations: vi.fn(),
   fetchTensions: vi.fn(),
   fetchSkillBank: vi.fn(),
@@ -79,6 +80,7 @@ import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
 import {
   ensureSkillBankUpToDate,
+  ensureTensionsUpToDate,
   fetchSkillAllocations,
   fetchPosture,
   fetchSkillBank,
@@ -179,6 +181,7 @@ beforeEach(() => {
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
   vi.mocked(ensureSkillBankUpToDate).mockResolvedValue();
+  vi.mocked(ensureTensionsUpToDate).mockResolvedValue();
   vi.mocked(fetchTensions).mockResolvedValue([]);
   vi.mocked(fetchSkillBank).mockResolvedValue({
     user_id: "u",
@@ -211,6 +214,51 @@ describe("getOrCreateDailyRun", () => {
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("setup");
     expect(run.tensions?.length).toBe(1);
+  });
+
+  it("returns setup when a tension is unresolved", async () => {
+    vi.mocked(fetchTensions).mockResolvedValue([
+      {
+        user_id: "u",
+        day_index: 2,
+        key: "fatigue",
+        severity: 1,
+        expires_day_index: 3,
+        resolved_at: null,
+        meta: null,
+      },
+    ]);
+    vi.mocked(fetchSkillBank).mockResolvedValue({
+      user_id: "u",
+      available_points: 0,
+      cap: 2,
+      last_awarded_day_index: 2,
+    });
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.stage).toBe("setup");
+  });
+
+  it("returns allocation when tensions are resolved", async () => {
+    vi.mocked(fetchTensions).mockResolvedValue([
+      {
+        user_id: "u",
+        day_index: 2,
+        key: "fatigue",
+        severity: 1,
+        expires_day_index: 3,
+        resolved_at: new Date().toISOString(),
+        meta: null,
+      },
+    ]);
+    vi.mocked(fetchSkillBank).mockResolvedValue({
+      user_id: "u",
+      available_points: 0,
+      cap: 2,
+      last_awarded_day_index: 2,
+    });
+    vi.mocked(fetchTimeAllocation).mockResolvedValue(null);
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.stage).toBe("allocation");
   });
 
   it("returns setup when skill points are available", async () => {

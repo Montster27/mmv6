@@ -47,7 +47,12 @@ import {
   type ReceivedBoost,
 } from "@/lib/social";
 import { upsertReflection } from "@/lib/reflections";
-import { allocateSkillPoint, submitPosture } from "@/lib/dailyInteractions";
+import {
+  allocateSkillPoint,
+  fetchTensions,
+  resolveTension,
+  submitPosture,
+} from "@/lib/dailyInteractions";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
@@ -662,6 +667,8 @@ export default function PlayPage() {
 
   const allocationValid = totalAllocation === 100;
   const choicesDisabled = savingChoice || consequenceActive;
+  const STUDY_TENSION_THRESHOLD = 40;
+  const HEALTH_TENSION_THRESHOLD = 30;
 
   const handleAllocationChange = (key: keyof AllocationPayload, value: number) => {
     setAllocation((prev) => ({ ...prev, [key]: value }));
@@ -673,6 +680,20 @@ export default function PlayPage() {
     setError(null);
     try {
       await saveTimeAllocation(userId, dayIndex, allocation);
+      const todayTensions = await fetchTensions(userId, dayIndex);
+      const unresolved = todayTensions.filter((tension) => !tension.resolved_at);
+      if (
+        allocation.study >= STUDY_TENSION_THRESHOLD &&
+        unresolved.some((tension) => tension.key === "unfinished_assignment")
+      ) {
+        await resolveTension(userId, dayIndex, "unfinished_assignment");
+      }
+      if (
+        allocation.health >= HEALTH_TENSION_THRESHOLD &&
+        unresolved.some((tension) => tension.key === "fatigue")
+      ) {
+        await resolveTension(userId, dayIndex, "fatigue");
+      }
       setAllocationSaved(true);
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         setStage("storylet_1");
@@ -1382,6 +1403,7 @@ export default function PlayPage() {
                         tensions={tensions}
                         skillBank={skillBank}
                         posture={posture}
+                        dayIndex={dayIndex}
                         allocations={skillAllocations}
                         onAllocateSkillPoint={handleAllocateSkillPoint}
                         submitting={allocatingSkill}
