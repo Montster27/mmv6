@@ -18,6 +18,14 @@ import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { buildStoryletContext } from "@/core/engine/storyletContext";
+import { ensureUserInCohort } from "@/lib/cohorts";
+import { fetchArcByKey, fetchArcInstance } from "@/lib/arcs";
+import {
+  fetchInitiativeProgress,
+  fetchOpenInitiativesForCohort,
+  fetchUserContributionStatus,
+  getOrCreateWeeklyInitiative,
+} from "@/lib/initiatives";
 import {
   ensureSkillBankUpToDate,
   ensureTensionsUpToDate,
@@ -33,6 +41,8 @@ import type {
   SkillBank,
 } from "@/types/dailyInteraction";
 import type { Storylet, StoryletRun } from "@/types/storylets";
+
+const ARC_KEY = "anomaly_001";
 
 function runsForTodayPair(runs: StoryletRun[], storyletPair: Storylet[]): StoryletRun[] {
   const ids = new Set(storyletPair.map((s) => s.id));
@@ -173,6 +183,29 @@ export async function getOrCreateDailyRun(
     context: buildStoryletContext({ posture, tensions }),
   });
 
+  const cohort = await ensureUserInCohort(userId).catch(() => null);
+  const cohortId = cohort?.cohortId ?? null;
+
+  let initiatives = null as DailyRun["initiatives"];
+  if (cohortId) {
+    await getOrCreateWeeklyInitiative(cohortId, dayIndex);
+    const openInitiatives = await fetchOpenInitiativesForCohort(cohortId, dayIndex);
+    const enriched = await Promise.all(
+      openInitiatives.map(async (initiative) => {
+        const [contributedToday, progress] = await Promise.all([
+          fetchUserContributionStatus(initiative.id, userId, dayIndex),
+          fetchInitiativeProgress(initiative.id),
+        ]);
+        return { ...initiative, contributedToday, progress };
+      })
+    );
+    initiatives = enriched;
+  }
+
+  const arcDefinition = await fetchArcByKey(ARC_KEY);
+  const arcInstance =
+    arcDefinition?.id ? await fetchArcInstance(userId, arcDefinition.id) : null;
+
   const reflection = await getReflection(userId, dayIndex);
   const reflectionDone = isReflectionDone(reflection);
   const funPulseEligible = shouldShowFunPulse(dayIndex, currentSeasonIndex);
@@ -240,6 +273,17 @@ export async function getOrCreateDailyRun(
     skillBank,
     posture,
     allocations,
+    cohortId,
+    arc: arcDefinition
+      ? {
+          arcId: arcDefinition.id,
+          key: arcDefinition.key,
+          title: arcDefinition.title,
+          status: arcInstance?.status ?? "not_started",
+          currentStep: arcInstance?.current_step ?? 0,
+        }
+      : null,
+    initiatives,
     reflectionStatus: reflectionDone ? "done" : "pending",
     microTaskStatus,
     funPulseEligible,

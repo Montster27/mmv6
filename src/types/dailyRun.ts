@@ -8,6 +8,7 @@ import type {
   SkillBank,
   SkillPointAllocation,
 } from "./dailyInteraction";
+import type { Initiative } from "./initiatives";
 
 export type DailyRunStage =
   | "setup"
@@ -33,6 +34,15 @@ export type DailyRun = {
   skillBank?: SkillBank | null;
   posture?: DailyPosture | null;
   allocations?: SkillPointAllocation[];
+  cohortId?: string | null;
+  arc?: {
+    arcId: string;
+    key: string;
+    title: string;
+    status: "not_started" | "active" | "completed" | "abandoned";
+    currentStep: number;
+  } | null;
+  initiatives?: Array<Initiative & { contributedToday?: boolean; progress?: number }> | null;
   reflectionStatus: "pending" | "done";
   microTaskStatus?: "pending" | "done" | "skipped";
   funPulseEligible?: boolean;
