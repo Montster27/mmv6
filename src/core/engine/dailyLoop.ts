@@ -21,20 +21,32 @@ import { buildStoryletContext } from "@/core/engine/storyletContext";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { fetchArcByKey as fetchContentArcByKey, listActiveArcs } from "@/lib/content/arcs";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
-import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
+import {
+  fetchArcCurrentStepContent,
+  fetchArcInstance,
+  fetchArcInstancesByKeys,
+} from "@/lib/arcs";
 import { listFactions } from "@/lib/factions";
 import {
   ensureUserAlignmentRows,
   fetchRecentAlignmentEvents,
   fetchUserAlignment,
+  hasAlignmentEvent,
+  applyAlignmentDelta,
 } from "@/lib/alignment";
-import { getOrCreateWeeklyDirective } from "@/lib/directives";
+import {
+  fetchStaleDirectiveForCohort,
+  getOrCreateWeeklyDirective,
+  updateDirectiveStatus,
+} from "@/lib/directives";
 import { computeUnlockedContent } from "@/lib/unlocks";
 import {
   fetchInitiativeProgress,
   fetchOpenInitiativesForCohort,
   fetchUserContributionStatus,
+  fetchInitiativeForWeek,
   getOrCreateWeeklyInitiative,
+  closeInitiative,
 } from "@/lib/initiatives";
 import {
   ensureSkillBankUpToDate,
@@ -197,20 +209,6 @@ export async function getOrCreateDailyRun(
   const cohortId = cohort?.cohortId ?? null;
 
   let initiatives = null as DailyRun["initiatives"];
-  if (cohortId) {
-    await getOrCreateWeeklyInitiative(cohortId, dayIndex);
-    const openInitiatives = await fetchOpenInitiativesForCohort(cohortId, dayIndex);
-    const enriched = await Promise.all(
-      openInitiatives.map(async (initiative) => {
-        const [contributedToday, progress] = await Promise.all([
-          fetchUserContributionStatus(initiative.id, userId, dayIndex),
-          fetchInitiativeProgress(initiative.id),
-        ]);
-        return { ...initiative, contributedToday, progress };
-      })
-    );
-    initiatives = enriched;
-  }
 
   await ensureUserAlignmentRows(userId);
   const [factions, alignmentRows, contentArcs, contentInitiatives, recentEvents] =
@@ -225,10 +223,69 @@ export async function getOrCreateDailyRun(
     acc[row.faction_key] = row.score;
     return acc;
   }, {});
-  const directive = cohortId
-    ? await getOrCreateWeeklyDirective(cohortId, dayIndex).catch(() => null)
-    : null;
   const unlocks = computeUnlockedContent(alignment, contentArcs, contentInitiatives);
+  const directive = cohortId
+    ? await getOrCreateWeeklyDirective(
+        cohortId,
+        dayIndex,
+        unlocks.unlockedInitiativeKeys
+      ).catch(() => null)
+    : null;
+
+  if (cohortId) {
+    await getOrCreateWeeklyInitiative(cohortId, dayIndex, directive);
+  }
+
+  if (cohortId) {
+    const staleDirective = await fetchStaleDirectiveForCohort(cohortId, dayIndex).catch(
+      () => null
+    );
+    if (staleDirective) {
+      const initiative = await fetchInitiativeForWeek(
+        cohortId,
+        staleDirective.week_start_day_index
+      );
+      if (initiative && initiative.status === "open" && dayIndex > initiative.ends_day_index) {
+        const progress = await fetchInitiativeProgress(initiative.id);
+        const nextStatus = progress >= initiative.goal ? "completed" : "expired";
+        await closeInitiative(initiative.id);
+        await updateDirectiveStatus(staleDirective.id, nextStatus);
+        staleDirective.status = nextStatus;
+      }
+
+      if (staleDirective.status === "completed") {
+        const alreadyRewarded = await hasAlignmentEvent({
+          userId,
+          source: "directive",
+          sourceRef: staleDirective.id,
+        }).catch(() => false);
+        if (!alreadyRewarded) {
+          await applyAlignmentDelta({
+            userId,
+            dayIndex,
+            factionKey: staleDirective.faction_key,
+            delta: 2,
+            source: "directive",
+            sourceRef: staleDirective.id,
+          }).catch(() => {});
+        }
+      }
+    }
+  }
+
+  if (cohortId) {
+    const openInitiatives = await fetchOpenInitiativesForCohort(cohortId, dayIndex);
+    const enriched = await Promise.all(
+      openInitiatives.map(async (initiative) => {
+        const [contributedToday, progress] = await Promise.all([
+          fetchUserContributionStatus(initiative.id, userId, dayIndex),
+          fetchInitiativeProgress(initiative.id),
+        ]);
+        return { ...initiative, contributedToday, progress };
+      })
+    );
+    initiatives = enriched;
+  }
 
   const arcDefinition = await fetchContentArcByKey(ARC_KEY);
   const arcInstance = arcDefinition ? await fetchArcInstance(userId, ARC_KEY) : null;
@@ -291,6 +348,16 @@ export async function getOrCreateDailyRun(
     stage,
   });
 
+  const unlockedInstances = await fetchArcInstancesByKeys(
+    userId,
+    unlocks.unlockedArcKeys
+  ).catch(() => []);
+  const startedArcKeys = new Set(unlockedInstances.map((item) => item.arc_key));
+  const availableArcs = contentArcs
+    .filter((arc) => unlocks.unlockedArcKeys.includes(arc.key))
+    .filter((arc) => !startedArcKeys.has(arc.key))
+    .map((arc) => ({ key: arc.key, title: arc.title, description: arc.description }));
+
   return {
     userId,
     dayIndex,
@@ -333,6 +400,7 @@ export async function getOrCreateDailyRun(
       arcKeys: unlocks.unlockedArcKeys,
       initiativeKeys: unlocks.unlockedInitiativeKeys,
     },
+    availableArcs,
     recentAlignmentEvents: recentEvents,
     directive: directive
       ? {

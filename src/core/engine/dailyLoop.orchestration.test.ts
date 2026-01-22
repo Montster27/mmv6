@@ -60,6 +60,7 @@ vi.mock("@/lib/content/initiatives", () => ({
 vi.mock("@/lib/arcs", () => ({
   fetchArcCurrentStepContent: vi.fn(),
   fetchArcInstance: vi.fn(),
+  fetchArcInstancesByKeys: vi.fn(),
 }));
 vi.mock("@/lib/factions", () => ({
   listFactions: vi.fn(),
@@ -68,15 +69,21 @@ vi.mock("@/lib/alignment", () => ({
   ensureUserAlignmentRows: vi.fn(),
   fetchUserAlignment: vi.fn(),
   fetchRecentAlignmentEvents: vi.fn(),
+  hasAlignmentEvent: vi.fn(),
+  applyAlignmentDelta: vi.fn(),
 }));
 vi.mock("@/lib/directives", () => ({
   getOrCreateWeeklyDirective: vi.fn(),
+  fetchStaleDirectiveForCohort: vi.fn(),
+  updateDirectiveStatus: vi.fn(),
 }));
 vi.mock("@/lib/initiatives", () => ({
   fetchInitiativeProgress: vi.fn(),
   fetchOpenInitiativesForCohort: vi.fn(),
   fetchUserContributionStatus: vi.fn(),
   getOrCreateWeeklyInitiative: vi.fn(),
+  fetchInitiativeForWeek: vi.fn(),
+  closeInitiative: vi.fn(),
 }));
 vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
@@ -121,19 +128,31 @@ import { ensureUserInCohort } from "@/lib/cohorts";
 import { fetchArcByKey } from "@/lib/content/arcs";
 import { listActiveArcs } from "@/lib/content/arcs";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
-import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
+import {
+  fetchArcCurrentStepContent,
+  fetchArcInstance,
+  fetchArcInstancesByKeys,
+} from "@/lib/arcs";
 import { listFactions } from "@/lib/factions";
 import {
   ensureUserAlignmentRows,
   fetchRecentAlignmentEvents,
   fetchUserAlignment,
+  hasAlignmentEvent,
+  applyAlignmentDelta,
 } from "@/lib/alignment";
-import { getOrCreateWeeklyDirective } from "@/lib/directives";
+import {
+  fetchStaleDirectiveForCohort,
+  getOrCreateWeeklyDirective,
+  updateDirectiveStatus,
+} from "@/lib/directives";
 import {
   fetchInitiativeProgress,
   fetchOpenInitiativesForCohort,
   fetchUserContributionStatus,
   getOrCreateWeeklyInitiative,
+  fetchInitiativeForWeek,
+  closeInitiative,
 } from "@/lib/initiatives";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
@@ -250,6 +269,7 @@ beforeEach(() => {
   vi.mocked(listActiveArcs).mockResolvedValue([]);
   vi.mocked(fetchArcInstance).mockResolvedValue(null);
   vi.mocked(fetchArcCurrentStepContent).mockResolvedValue(null);
+  vi.mocked(fetchArcInstancesByKeys).mockResolvedValue([]);
   vi.mocked(ensureUserAlignmentRows).mockResolvedValue();
   vi.mocked(listFactions).mockResolvedValue([
     {
@@ -291,6 +311,12 @@ beforeEach(() => {
   ]);
   vi.mocked(fetchRecentAlignmentEvents).mockResolvedValue([]);
   vi.mocked(listActiveInitiativesCatalog).mockResolvedValue([]);
+  vi.mocked(fetchStaleDirectiveForCohort).mockResolvedValue(null);
+  vi.mocked(updateDirectiveStatus).mockResolvedValue();
+  vi.mocked(fetchInitiativeForWeek).mockResolvedValue(null);
+  vi.mocked(closeInitiative).mockResolvedValue();
+  vi.mocked(hasAlignmentEvent).mockResolvedValue(false);
+  vi.mocked(applyAlignmentDelta).mockResolvedValue();
   vi.mocked(getOrCreateWeeklyDirective).mockResolvedValue({
     id: "d1",
     cohort_id: "c1",

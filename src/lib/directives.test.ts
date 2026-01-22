@@ -111,4 +111,33 @@ describe("directives", () => {
     const directive = await fetchActiveDirectiveForCohort("c1", 2);
     expect(directive?.cohort_id).toBe("c1");
   });
+
+  it("selects target key from unlocked initiatives when available", async () => {
+    mockState.reset();
+    mockState.setMaybeSingleResponses([
+      { data: null, error: null },
+      {
+        data: {
+          id: "d1",
+          cohort_id: "c1",
+          faction_key: "neo_assyrian",
+          week_start_day_index: 7,
+          week_end_day_index: 13,
+          title: "Template",
+          description: "Template",
+          target_type: "initiative",
+          target_key: "market_whisper",
+          status: "active",
+          created_at: new Date().toISOString(),
+        },
+        error: null,
+      },
+    ]);
+
+    const directive = await getOrCreateWeeklyDirective("c1", 8, [
+      "quiet_leverage",
+      "market_whisper",
+    ]);
+    expect(directive.target_key).toBe("market_whisper");
+  });
 });

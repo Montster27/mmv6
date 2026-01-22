@@ -66,6 +66,11 @@ export type DailyRun = {
     arcKeys: string[];
     initiativeKeys: string[];
   };
+  availableArcs?: Array<{
+    key: string;
+    title: string;
+    description: string;
+  }>;
   recentAlignmentEvents?: AlignmentEvent[];
   initiatives?: Array<Initiative & { contributedToday?: boolean; progress?: number }> | null;
   reflectionStatus: "pending" | "done";

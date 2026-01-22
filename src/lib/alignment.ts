@@ -166,3 +166,25 @@ export async function fetchRecentAlignmentEvents(
 
   return data ?? [];
 }
+
+export async function hasAlignmentEvent(params: {
+  userId: string;
+  source: AlignmentEvent["source"];
+  sourceRef: string;
+}): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("alignment_events")
+    .select("id")
+    .eq("user_id", params.userId)
+    .eq("source", params.source)
+    .eq("source_ref", params.sourceRef)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to check alignment event", error);
+    throw new Error("Failed to check alignment event.");
+  }
+
+  return Boolean(data);
+}

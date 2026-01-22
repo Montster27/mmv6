@@ -122,6 +122,9 @@ export default function PlayPage() {
   const [recentAlignmentEvents, setRecentAlignmentEvents] = useState<AlignmentEvent[]>(
     []
   );
+  const [availableArcs, setAvailableArcs] = useState<
+    Array<{ key: string; title: string; description: string }>
+  >([]);
   const [cohortId, setCohortId] = useState<string | null>(null);
   const [arc, setArc] = useState<{
     arc_key: string;
@@ -450,6 +453,7 @@ export default function PlayPage() {
           setAlignment(run.alignment ?? {});
           setDirective(run.directive ?? null);
           setRecentAlignmentEvents(run.recentAlignmentEvents ?? []);
+          setAvailableArcs(run.availableArcs ?? []);
           setCohortId(run.cohortId ?? null);
           setStorylets(run.storylets);
           setRuns(run.storyletRunsToday);
@@ -1117,6 +1121,21 @@ export default function PlayPage() {
     }
   };
 
+  const handleBeginUnlockedArc = async (arcKey: string) => {
+    if (!userId) return;
+    setArcSubmitting(true);
+    setError(null);
+    try {
+      await startArc(userId, arcKey, dayIndex);
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to start arc.");
+    } finally {
+      setArcSubmitting(false);
+    }
+  };
+
   const handleContributeInitiative = async (initiativeId: string) => {
     if (!userId) return;
     setInitiativeSubmitting(true);
@@ -1674,9 +1693,11 @@ export default function PlayPage() {
                       <section className="space-y-3">
                         <ArcPanel
                           arc={arc}
+                          availableArcs={availableArcs}
                           submitting={arcSubmitting}
                           onStart={handleStartArc}
                           onAdvance={handleAdvanceArc}
+                          onBeginUnlocked={handleBeginUnlockedArc}
                         />
                       </section>
                     )}
@@ -1781,6 +1802,8 @@ export default function PlayPage() {
                         <InitiativePanel
                           initiative={initiatives[0]}
                           dayIndex={dayIndex}
+                          directive={directive}
+                          factions={factions}
                           submitting={initiativeSubmitting}
                           onContribute={() =>
                             handleContributeInitiative(initiatives[0].id)

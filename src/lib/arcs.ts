@@ -24,6 +24,25 @@ export async function fetchArcInstance(
   return data ?? null;
 }
 
+export async function fetchArcInstancesByKeys(
+  userId: string,
+  arcKeys: string[]
+): Promise<ArcInstance[]> {
+  if (arcKeys.length === 0) return [];
+  const { data, error } = await supabase
+    .from("arc_instances")
+    .select("id,user_id,arc_key,status,started_day_index,current_step,updated_at,meta")
+    .eq("user_id", userId)
+    .in("arc_key", arcKeys);
+
+  if (error) {
+    console.error("Failed to fetch arc instances", error);
+    throw new Error("Failed to fetch arc instances.");
+  }
+
+  return (data ?? []) as ArcInstance[];
+}
+
 export async function startArc(
   userId: string,
   arcKey: string,

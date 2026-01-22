@@ -194,7 +194,8 @@ export function selectDirectiveTemplate(
 
 export async function getOrCreateWeeklyDirective(
   cohortId: string,
-  dayIndex: number
+  dayIndex: number,
+  unlockedInitiativeKeys: string[] = []
 ): Promise<FactionDirective> {
   const weekStartDayIndex = computeWeekStart(dayIndex);
   const weekEndDayIndex = computeWeekEnd(weekStartDayIndex);
@@ -217,6 +218,12 @@ export async function getOrCreateWeeklyDirective(
 
   const factionKey = FACTION_KEYS[weekStartDayIndex % FACTION_KEYS.length];
   const template = selectDirectiveTemplate(cohortId, weekStartDayIndex, factionKey);
+  const availableKeys =
+    unlockedInitiativeKeys.length > 0 ? unlockedInitiativeKeys : [template.target_key];
+  const keyIndex =
+    (hashString(`${cohortId}${factionKey}`) + weekStartDayIndex) %
+    availableKeys.length;
+  const targetKey = availableKeys[keyIndex];
 
   const { data: created, error: createError } = await supabase
     .from("faction_directives")
@@ -228,7 +235,7 @@ export async function getOrCreateWeeklyDirective(
       title: template.title,
       description: template.description,
       target_type: template.target_type,
-      target_key: template.target_key,
+      target_key: targetKey,
       status: "active",
     })
     .select(
@@ -257,6 +264,51 @@ export async function getOrCreateWeeklyDirective(
   }
 
   return created;
+}
+
+export async function fetchStaleDirectiveForCohort(
+  cohortId: string,
+  dayIndex: number
+): Promise<FactionDirective | null> {
+  const { data, error } = await supabase
+    .from("faction_directives")
+    .select(
+      "id,cohort_id,faction_key,week_start_day_index,week_end_day_index,title,description,target_type,target_key,status,created_at"
+    )
+    .eq("cohort_id", cohortId)
+    .eq("status", "active")
+    .lt("week_end_day_index", dayIndex)
+    .order("week_end_day_index", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to fetch stale directive", error);
+    throw new Error("Failed to fetch stale directive.");
+  }
+
+  return data ?? null;
+}
+
+export async function updateDirectiveStatus(
+  directiveId: string,
+  status: "active" | "expired" | "completed"
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("faction_directives")
+    .update({ status })
+    .eq("id", directiveId)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to update directive", error);
+    throw new Error("Failed to update directive.");
+  }
+  if (!data) {
+    throw new Error("Failed to update directive.");
+  }
 }
 
 export async function fetchActiveDirectiveForCohort(

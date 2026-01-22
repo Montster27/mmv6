@@ -1,7 +1,9 @@
 import { supabase } from "@/lib/supabase/browser";
 import { applyAlignmentDelta } from "@/lib/alignment";
 import { fetchActiveDirectiveForCohort } from "@/lib/directives";
+import { fetchInitiativeCatalogByKey } from "@/lib/content/initiatives";
 import type { Initiative } from "@/types/initiatives";
+import type { FactionDirective } from "@/types/factions";
 
 const WEEK_LENGTH = 7;
 
@@ -11,7 +13,8 @@ function weekKey(dayIndex: number) {
 
 export async function getOrCreateWeeklyInitiative(
   cohortId: string,
-  dayIndex: number
+  dayIndex: number,
+  directive?: FactionDirective | null
 ): Promise<Initiative | null> {
   const key = `week_${weekKey(dayIndex)}`;
   const starts_day_index = weekKey(dayIndex) * WEEK_LENGTH + 1;
@@ -34,17 +37,23 @@ export async function getOrCreateWeeklyInitiative(
 
   if (existing) return existing;
 
+  const catalogKey = directive?.target_key ?? "campus_signal_watch";
+  const catalog =
+    catalogKey ? await fetchInitiativeCatalogByKey(catalogKey).catch(() => null) : null;
+
   const { data: created, error: createError } = await supabase
     .from("initiatives")
     .insert({
       cohort_id: cohortId,
       key,
-      title: "Quiet Logistics",
-      description: "Small, steady contributions keep the group moving.",
+      title: catalog?.title ?? "Quiet Logistics",
+      description:
+        catalog?.description ?? "Small, steady contributions keep the group moving.",
       starts_day_index,
       ends_day_index,
       status: "open",
-      goal: 100,
+      goal: catalog?.goal ?? 100,
+      meta: catalogKey ? { catalog_key: catalogKey, directive_id: directive?.id } : null,
     })
     .select(
       "id,cohort_id,key,title,description,created_at,starts_day_index,ends_day_index,status,goal,meta"
@@ -58,6 +67,46 @@ export async function getOrCreateWeeklyInitiative(
   }
 
   return created ?? null;
+}
+
+export async function fetchInitiativeForWeek(
+  cohortId: string,
+  weekStartDayIndex: number
+): Promise<Initiative | null> {
+  const { data, error } = await supabase
+    .from("initiatives")
+    .select(
+      "id,cohort_id,key,title,description,created_at,starts_day_index,ends_day_index,status,goal,meta"
+    )
+    .eq("cohort_id", cohortId)
+    .eq("starts_day_index", weekStartDayIndex)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to fetch initiative for week", error);
+    return null;
+  }
+
+  return data ?? null;
+}
+
+export async function closeInitiative(initiativeId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("initiatives")
+    .update({ status: "closed" })
+    .eq("id", initiativeId)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to close initiative", error);
+    throw new Error("Failed to close initiative.");
+  }
+  if (!data) {
+    throw new Error("Failed to close initiative.");
+  }
 }
 
 export async function fetchOpenInitiativesForCohort(

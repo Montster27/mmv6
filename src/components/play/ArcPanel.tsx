@@ -22,12 +22,21 @@ type ArcSummary = {
 
 type Props = {
   arc: ArcSummary;
+  availableArcs?: Array<{ key: string; title: string; description: string }>;
   submitting?: boolean;
   onStart: () => void;
   onAdvance: (nextStep: number, complete: boolean) => void;
+  onBeginUnlocked?: (arcKey: string) => void;
 };
 
-export function ArcPanel({ arc, submitting, onStart, onAdvance }: Props) {
+export function ArcPanel({
+  arc,
+  availableArcs,
+  submitting,
+  onStart,
+  onAdvance,
+  onBeginUnlocked,
+}: Props) {
   const stepIndex = Math.min(arc.current_step ?? 0, STEP_LABELS.length - 1);
   const stepLabel = arc.step?.title ?? STEP_LABELS[stepIndex];
   const isComplete = arc.status === "completed";
@@ -65,6 +74,26 @@ export function ArcPanel({ arc, submitting, onStart, onAdvance }: Props) {
       ) : null}
       {isComplete ? (
         <p className="text-xs text-slate-500">Completed.</p>
+      ) : null}
+
+      {availableArcs && availableArcs.length > 0 ? (
+        <div className="space-y-2 border-t border-slate-100 pt-2">
+          <p className="text-xs font-semibold text-slate-600">New thread available</p>
+          {availableArcs.map((available) => (
+            <div key={available.key} className="space-y-1">
+              <p className="text-sm text-slate-700">{available.title}</p>
+              <p className="text-xs text-slate-600">{available.description}</p>
+              <p className="text-[11px] text-slate-500">Unlocked by alignment</p>
+              <Button
+                variant="outline"
+                onClick={() => onBeginUnlocked?.(available.key)}
+                disabled={submitting || !onBeginUnlocked}
+              >
+                Begin
+              </Button>
+            </div>
+          ))}
+        </div>
       ) : null}
     </div>
   );
