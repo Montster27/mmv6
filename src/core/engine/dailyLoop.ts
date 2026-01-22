@@ -21,6 +21,9 @@ import { buildStoryletContext } from "@/core/engine/storyletContext";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { fetchArcByKey as fetchContentArcByKey } from "@/lib/content/arcs";
 import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
+import { listFactions } from "@/lib/factions";
+import { ensureUserAlignmentRows, fetchUserAlignment } from "@/lib/alignment";
+import { getOrCreateWeeklyDirective } from "@/lib/directives";
 import {
   fetchInitiativeProgress,
   fetchOpenInitiativesForCohort,
@@ -44,6 +47,7 @@ import type {
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
 const ARC_KEY = "anomaly_001";
+const WEEK_LENGTH = 7;
 
 function runsForTodayPair(runs: StoryletRun[], storyletPair: Storylet[]): StoryletRun[] {
   const ids = new Set(storyletPair.map((s) => s.id));
@@ -203,6 +207,26 @@ export async function getOrCreateDailyRun(
     initiatives = enriched;
   }
 
+  await ensureUserAlignmentRows(userId);
+  const [factions, alignmentRows] = await Promise.all([
+    listFactions(),
+    fetchUserAlignment(userId),
+  ]);
+  const alignment = alignmentRows.reduce<Record<string, number>>((acc, row) => {
+    acc[row.faction_key] = row.score;
+    return acc;
+  }, {});
+  const weekStartDayIndex =
+    Math.floor((dayIndex - 1) / WEEK_LENGTH) * WEEK_LENGTH + 1;
+  const weekEndDayIndex = weekStartDayIndex + WEEK_LENGTH - 1;
+  const directive = cohortId
+    ? await getOrCreateWeeklyDirective(
+        cohortId,
+        weekStartDayIndex,
+        weekEndDayIndex
+      ).catch(() => null)
+    : null;
+
   const arcDefinition = await fetchContentArcByKey(ARC_KEY);
   const arcInstance = arcDefinition ? await fetchArcInstance(userId, ARC_KEY) : null;
   const arcStep =
@@ -298,6 +322,19 @@ export async function getOrCreateDailyRun(
                 choices: arcStep.choices ?? [],
               }
             : null,
+        }
+      : null,
+    factions,
+    alignment,
+    directive: directive
+      ? {
+          faction_key: directive.faction_key,
+          title: directive.title,
+          description: directive.description,
+          target_type: directive.target_type,
+          target_key: directive.target_key,
+          week_end_day_index: directive.week_end_day_index,
+          status: directive.status,
         }
       : null,
     initiatives,
