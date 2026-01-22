@@ -17,28 +17,28 @@ describe("arcEngine", () => {
     const userArc: UserArc = {
       id: "a",
       user_id: "u",
-      arc_id: "roommate_v1",
+      arc_id: "familiar_stranger_v1",
       status: "active",
       step_index: 0,
       started_day_index: 2,
       last_advanced_day_index: null,
     };
-    const pool = [storylet("roommate-1"), storylet("other")];
+    const pool = [storylet("arc_stranger_1"), storylet("other")];
     const next = getArcNextStepStorylet(userArc, 2, pool, [] as StoryletRun[]);
-    expect(next?.slug).toBe("roommate-1");
+    expect(next?.slug).toBe("arc_stranger_1");
   });
 
   it("does not return an arc step if already advanced today", () => {
     const userArc: UserArc = {
       id: "a",
       user_id: "u",
-      arc_id: "roommate_v1",
+      arc_id: "familiar_stranger_v1",
       status: "active",
       step_index: 1,
       started_day_index: 2,
       last_advanced_day_index: 3,
     };
-    const pool = [storylet("roommate-2")];
+    const pool = [storylet("arc_stranger_2")];
     const next = getArcNextStepStorylet(userArc, 3, pool, [] as StoryletRun[]);
     expect(next).toBeNull();
   });

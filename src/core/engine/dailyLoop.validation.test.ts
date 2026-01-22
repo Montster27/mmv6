@@ -70,6 +70,16 @@ vi.mock("@/lib/arcs", () => ({
   fetchArcCurrentStepContent: vi.fn(),
   fetchArcInstance: vi.fn(),
 }));
+vi.mock("@/lib/factions", () => ({
+  listFactions: vi.fn(),
+}));
+vi.mock("@/lib/alignment", () => ({
+  ensureUserAlignmentRows: vi.fn(),
+  fetchUserAlignment: vi.fn(),
+}));
+vi.mock("@/lib/directives", () => ({
+  getOrCreateWeeklyDirective: vi.fn(),
+}));
 vi.mock("@/lib/initiatives", () => ({
   fetchInitiativeProgress: vi.fn(),
   fetchOpenInitiativesForCohort: vi.fn(),
@@ -105,6 +115,9 @@ import {
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { fetchArcByKey } from "@/lib/content/arcs";
 import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
+import { listFactions } from "@/lib/factions";
+import { ensureUserAlignmentRows, fetchUserAlignment } from "@/lib/alignment";
+import { getOrCreateWeeklyDirective } from "@/lib/directives";
 import {
   fetchInitiativeProgress,
   fetchOpenInitiativesForCohort,
@@ -202,6 +215,58 @@ beforeEach(() => {
   vi.mocked(fetchArcByKey).mockResolvedValue(null);
   vi.mocked(fetchArcInstance).mockResolvedValue(null);
   vi.mocked(fetchArcCurrentStepContent).mockResolvedValue(null);
+  vi.mocked(ensureUserAlignmentRows).mockResolvedValue();
+  vi.mocked(listFactions).mockResolvedValue([
+    {
+      key: "neo_assyrian",
+      name: "Neo-Assyrian Ledger",
+      ideology: "Order through leverage.",
+      aesthetic: "Steel",
+      created_at: new Date().toISOString(),
+    },
+    {
+      key: "dynastic_consortium",
+      name: "Dynastic Consortium",
+      ideology: "Knowledge as inheritance.",
+      aesthetic: "Marble",
+      created_at: new Date().toISOString(),
+    },
+    {
+      key: "templar_remnant",
+      name: "Templar Remnant",
+      ideology: "Duty before doubt.",
+      aesthetic: "Cloth",
+      created_at: new Date().toISOString(),
+    },
+    {
+      key: "bormann_network",
+      name: "Bormann Network",
+      ideology: "Secrecy survives.",
+      aesthetic: "Smoke",
+      created_at: new Date().toISOString(),
+    },
+  ]);
+  vi.mocked(fetchUserAlignment).mockResolvedValue([
+    {
+      user_id: "u",
+      faction_key: "neo_assyrian",
+      score: 1,
+      updated_at: new Date().toISOString(),
+    },
+  ]);
+  vi.mocked(getOrCreateWeeklyDirective).mockResolvedValue({
+    id: "d1",
+    cohort_id: "c1",
+    faction_key: "neo_assyrian",
+    week_start_day_index: 1,
+    week_end_day_index: 7,
+    title: "Secure the signal chain",
+    description: "Document the inconsistency.",
+    target_type: "initiative",
+    target_key: "campus_signal_watch",
+    status: "active",
+    created_at: new Date().toISOString(),
+  });
   vi.mocked(getOrCreateWeeklyInitiative).mockResolvedValue(null);
   vi.mocked(fetchOpenInitiativesForCohort).mockResolvedValue([]);
   vi.mocked(fetchUserContributionStatus).mockResolvedValue(false);
@@ -322,5 +387,8 @@ describe("daily loop validation", () => {
     expect(run.arc?.arc_key).toBe("anomaly_001");
     expect(run.initiatives?.length).toBe(1);
     expect(run.initiatives?.[0]?.contributedToday).toBe(true);
+    expect(run.factions?.length).toBeGreaterThan(0);
+    expect(run.alignment?.neo_assyrian).toBe(1);
+    expect(run.directive?.faction_key).toBe("neo_assyrian");
   });
 });

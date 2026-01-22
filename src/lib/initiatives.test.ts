@@ -13,6 +13,12 @@ const mockState = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
+vi.mock("@/lib/directives", () => ({
+  fetchActiveDirectiveForCohort: vi.fn(),
+}));
+vi.mock("@/lib/alignment", () => ({
+  applyAlignmentDelta: vi.fn(),
+}));
 
 import { contributeToInitiative } from "@/lib/initiatives";
 

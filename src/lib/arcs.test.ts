@@ -48,8 +48,15 @@ vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
 vi.mock("@/lib/content/arcs", () => ({
   fetchArcSteps: vi.fn(),
 }));
+vi.mock("@/lib/alignment", () => ({
+  applyAlignmentDelta: vi.fn(),
+  ARC_CHOICE_ALIGNMENT_DELTAS: {
+    log_it: { factionKey: "dynastic_consortium", delta: 2 },
+  },
+}));
 
 import { fetchArcSteps } from "@/lib/content/arcs";
+import { applyAlignmentDelta } from "@/lib/alignment";
 import { progressArcWithChoice, startArc } from "@/lib/arcs";
 
 describe("arcs", () => {
@@ -134,7 +141,7 @@ describe("arcs", () => {
       { data: { id: "inst-1" }, error: null },
     ]);
 
-    await progressArcWithChoice("u", "anomaly_001", "log_it");
+    await progressArcWithChoice("u", "anomaly_001", "log_it", 2);
 
     const updatePayloads = mockState.getUpdatePayloads();
     expect(updatePayloads.length).toBe(2);
@@ -143,6 +150,14 @@ describe("arcs", () => {
     });
     expect(updatePayloads[1]).toMatchObject({
       current_step: 1,
+    });
+    expect(applyAlignmentDelta).toHaveBeenCalledWith({
+      userId: "u",
+      dayIndex: 2,
+      factionKey: "dynastic_consortium",
+      delta: 2,
+      source: "arc_choice",
+      sourceRef: "anomaly_001:0:log_it",
     });
   });
 });
