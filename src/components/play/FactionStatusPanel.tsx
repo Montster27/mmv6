@@ -1,7 +1,7 @@
 import type { AlignmentEvent, Faction, FactionKey } from "@/types/factions";
 
 type DirectiveSummary = {
-  faction_key: FactionKey;
+  faction_key: string;
   title: string;
   description: string;
   target_type: "initiative" | "arc_unlock" | "signal";
