@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase/browser";
+import { applyAlignmentDelta } from "@/lib/alignment";
+import { fetchActiveDirectiveForCohort } from "@/lib/directives";
 import type { Initiative } from "@/types/initiatives";
 
 const WEEK_LENGTH = 7;
@@ -123,7 +125,8 @@ export async function contributeToInitiative(
   initiativeId: string,
   userId: string,
   dayIndex: number,
-  amount = 1
+  amount = 1,
+  cohortId?: string | null
 ): Promise<void> {
   const { error } = await supabase.from("initiative_contributions").insert({
     initiative_id: initiativeId,
@@ -138,5 +141,36 @@ export async function contributeToInitiative(
     }
     console.error("Failed to contribute", error);
     throw error;
+  }
+
+  let resolvedCohortId = cohortId ?? null;
+  if (!resolvedCohortId) {
+    const { data: initiative } = await supabase
+      .from("initiatives")
+      .select("cohort_id")
+      .eq("id", initiativeId)
+      .limit(1)
+      .maybeSingle();
+    resolvedCohortId = initiative?.cohort_id ?? null;
+  }
+
+  if (!resolvedCohortId) return;
+
+  try {
+    const directive = await fetchActiveDirectiveForCohort(resolvedCohortId, dayIndex);
+    if (directive?.faction_key) {
+      await applyAlignmentDelta({
+        userId,
+        dayIndex,
+        factionKey: directive.faction_key,
+        delta: 1,
+        source: "initiative",
+        sourceRef: initiativeId,
+      });
+    }
+  } catch (err) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Failed to apply alignment from initiative", err);
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/browser";
 import { fetchArcSteps } from "@/lib/content/arcs";
+import { applyAlignmentDelta, ARC_CHOICE_ALIGNMENT_DELTAS } from "@/lib/alignment";
 import type { ArcInstance } from "@/types/arcs";
 import type { ContentArcStep } from "@/types/content";
 
@@ -180,7 +181,8 @@ export async function applyArcChoiceFlags(
 export async function progressArcWithChoice(
   userId: string,
   arcKey: string,
-  choiceKey: string
+  choiceKey: string,
+  dayIndex?: number
 ): Promise<void> {
   const instance = await fetchArcInstance(userId, arcKey);
   if (!instance) {
@@ -202,6 +204,18 @@ export async function progressArcWithChoice(
   }
 
   await applyArcChoiceFlags(userId, arcKey, choice.flags);
+
+  const alignmentDelta = ARC_CHOICE_ALIGNMENT_DELTAS[choiceKey];
+  if (alignmentDelta && typeof dayIndex === "number") {
+    await applyAlignmentDelta({
+      userId,
+      dayIndex,
+      factionKey: alignmentDelta.factionKey,
+      delta: alignmentDelta.delta,
+      source: "arc_choice",
+      sourceRef: `${arcKey}:${instance.current_step}:${choiceKey}`,
+    });
+  }
 
   const nextStep = instance.current_step + 1;
   if (nextStep >= steps.length) {
