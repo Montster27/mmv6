@@ -41,7 +41,12 @@ const mockState = vi.hoisted(() => {
 
 vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
 
-import { getOrCreateWeeklyDirective, fetchActiveDirectiveForCohort } from "@/lib/directives";
+import {
+  getOrCreateWeeklyDirective,
+  fetchActiveDirectiveForCohort,
+  computeWeekStart,
+  selectDirectiveTemplate,
+} from "@/lib/directives";
 import { FACTION_KEYS } from "@/lib/factions";
 
 describe("directives", () => {
@@ -54,10 +59,10 @@ describe("directives", () => {
           id: "d1",
           cohort_id: "c1",
           faction_key: FACTION_KEYS[1],
-          week_start_day_index: 1,
-          week_end_day_index: 7,
-          title: "Archive",
-          description: "Collect",
+          week_start_day_index: 7,
+          week_end_day_index: 13,
+          title: "Template",
+          description: "Template",
           target_type: "initiative",
           target_key: "campus_signal_watch",
           status: "active",
@@ -67,13 +72,19 @@ describe("directives", () => {
       },
     ]);
 
-    const directive = await getOrCreateWeeklyDirective("c1", 1, 7);
-    expect(directive.week_start_day_index).toBe(1);
+    const dayIndex = 8;
+    const weekStart = computeWeekStart(dayIndex);
+    const factionKey = FACTION_KEYS[weekStart % FACTION_KEYS.length];
+    const template = selectDirectiveTemplate("c1", weekStart, factionKey);
+
+    const directive = await getOrCreateWeeklyDirective("c1", dayIndex);
+    expect(directive.week_start_day_index).toBe(weekStart);
 
     const inserts = mockState.getInsertPayloads();
     expect(inserts.length).toBe(1);
     expect(inserts[0].table).toBe("faction_directives");
-    expect(inserts[0].payload.faction_key).toBe(FACTION_KEYS[1]);
+    expect(inserts[0].payload.faction_key).toBe(factionKey);
+    expect(inserts[0].payload.title).toBe(template.title);
   });
 
   it("fetches active directive for cohort", async () => {

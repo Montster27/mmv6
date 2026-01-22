@@ -19,11 +19,17 @@ import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { buildStoryletContext } from "@/core/engine/storyletContext";
 import { ensureUserInCohort } from "@/lib/cohorts";
-import { fetchArcByKey as fetchContentArcByKey } from "@/lib/content/arcs";
+import { fetchArcByKey as fetchContentArcByKey, listActiveArcs } from "@/lib/content/arcs";
+import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
 import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
 import { listFactions } from "@/lib/factions";
-import { ensureUserAlignmentRows, fetchUserAlignment } from "@/lib/alignment";
+import {
+  ensureUserAlignmentRows,
+  fetchRecentAlignmentEvents,
+  fetchUserAlignment,
+} from "@/lib/alignment";
 import { getOrCreateWeeklyDirective } from "@/lib/directives";
+import { computeUnlockedContent } from "@/lib/unlocks";
 import {
   fetchInitiativeProgress,
   fetchOpenInitiativesForCohort,
@@ -47,7 +53,6 @@ import type {
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
 const ARC_KEY = "anomaly_001";
-const WEEK_LENGTH = 7;
 
 function runsForTodayPair(runs: StoryletRun[], storyletPair: Storylet[]): StoryletRun[] {
   const ids = new Set(storyletPair.map((s) => s.id));
@@ -208,24 +213,22 @@ export async function getOrCreateDailyRun(
   }
 
   await ensureUserAlignmentRows(userId);
-  const [factions, alignmentRows] = await Promise.all([
-    listFactions(),
-    fetchUserAlignment(userId),
-  ]);
+  const [factions, alignmentRows, contentArcs, contentInitiatives, recentEvents] =
+    await Promise.all([
+      listFactions(),
+      fetchUserAlignment(userId),
+      listActiveArcs(),
+      listActiveInitiativesCatalog(),
+      fetchRecentAlignmentEvents(userId, dayIndex).catch(() => []),
+    ]);
   const alignment = alignmentRows.reduce<Record<string, number>>((acc, row) => {
     acc[row.faction_key] = row.score;
     return acc;
   }, {});
-  const weekStartDayIndex =
-    Math.floor((dayIndex - 1) / WEEK_LENGTH) * WEEK_LENGTH + 1;
-  const weekEndDayIndex = weekStartDayIndex + WEEK_LENGTH - 1;
   const directive = cohortId
-    ? await getOrCreateWeeklyDirective(
-        cohortId,
-        weekStartDayIndex,
-        weekEndDayIndex
-      ).catch(() => null)
+    ? await getOrCreateWeeklyDirective(cohortId, dayIndex).catch(() => null)
     : null;
+  const unlocks = computeUnlockedContent(alignment, contentArcs, contentInitiatives);
 
   const arcDefinition = await fetchContentArcByKey(ARC_KEY);
   const arcInstance = arcDefinition ? await fetchArcInstance(userId, ARC_KEY) : null;
@@ -326,6 +329,11 @@ export async function getOrCreateDailyRun(
       : null,
     factions,
     alignment,
+    unlocks: {
+      arcKeys: unlocks.unlockedArcKeys,
+      initiativeKeys: unlocks.unlockedInitiativeKeys,
+    },
+    recentAlignmentEvents: recentEvents,
     directive: directive
       ? {
           faction_key: directive.faction_key,

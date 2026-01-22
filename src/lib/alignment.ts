@@ -72,6 +72,29 @@ export async function applyAlignmentDelta(params: {
 
   await ensureUserAlignmentRows(params.userId);
 
+  let deltaToApply = clampedDelta;
+  if (clampedDelta > 0) {
+    const { data: dayEvents, error: dayEventsError } = await supabase
+      .from("alignment_events")
+      .select("delta")
+      .eq("user_id", params.userId)
+      .eq("faction_key", params.factionKey)
+      .eq("day_index", params.dayIndex);
+
+    if (dayEventsError) {
+      console.error("Failed to check alignment cap", dayEventsError);
+      throw new Error("Failed to update alignment.");
+    }
+
+    const positiveTotal = (dayEvents ?? []).reduce((sum, event) => {
+      const value = typeof event.delta === "number" ? event.delta : 0;
+      return value > 0 ? sum + value : sum;
+    }, 0);
+    const remaining = 3 - positiveTotal;
+    if (remaining <= 0) return;
+    deltaToApply = Math.min(clampedDelta, remaining);
+  }
+
   const { data: existing, error: existingError } = await supabase
     .from("user_alignment")
     .select("score")
@@ -85,7 +108,7 @@ export async function applyAlignmentDelta(params: {
     throw new Error("Failed to update alignment.");
   }
 
-  const nextScore = (existing?.score ?? 0) + clampedDelta;
+  const nextScore = (existing?.score ?? 0) + deltaToApply;
 
   const { data: updated, error: updateError } = await supabase
     .from("user_alignment")
@@ -112,7 +135,7 @@ export async function applyAlignmentDelta(params: {
     user_id: params.userId,
     day_index: params.dayIndex,
     faction_key: params.factionKey,
-    delta: clampedDelta,
+    delta: deltaToApply,
     source: params.source,
     source_ref: params.sourceRef ?? null,
   });
@@ -121,4 +144,25 @@ export async function applyAlignmentDelta(params: {
     console.error("Failed to record alignment event", eventError);
     throw new Error("Failed to record alignment event.");
   }
+}
+
+export async function fetchRecentAlignmentEvents(
+  userId: string,
+  dayIndex: number,
+  limit = 5
+): Promise<AlignmentEvent[]> {
+  const { data, error } = await supabase
+    .from("alignment_events")
+    .select("id,user_id,day_index,faction_key,delta,source,source_ref,created_at")
+    .eq("user_id", userId)
+    .gte("day_index", Math.max(0, dayIndex - 6))
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("Failed to fetch alignment events", error);
+    throw new Error("Failed to fetch alignment events.");
+  }
+
+  return data ?? [];
 }

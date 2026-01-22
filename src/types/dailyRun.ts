@@ -9,7 +9,7 @@ import type {
   SkillPointAllocation,
 } from "./dailyInteraction";
 import type { Initiative } from "./initiatives";
-import type { Faction, FactionKey } from "./factions";
+import type { AlignmentEvent, Faction } from "./factions";
 
 export type DailyRunStage =
   | "setup"
@@ -52,9 +52,9 @@ export type DailyRun = {
       | null;
   } | null;
   factions?: Faction[];
-  alignment?: Record<FactionKey, number>;
+  alignment?: Record<string, number>;
   directive?: {
-    faction_key: FactionKey;
+    faction_key: string;
     title: string;
     description: string;
     target_type: "initiative" | "arc_unlock" | "signal";
@@ -62,6 +62,11 @@ export type DailyRun = {
     week_end_day_index: number;
     status: "active" | "expired" | "completed";
   } | null;
+  unlocks?: {
+    arcKeys: string[];
+    initiativeKeys: string[];
+  };
+  recentAlignmentEvents?: AlignmentEvent[];
   initiatives?: Array<Initiative & { contributedToday?: boolean; progress?: number }> | null;
   reflectionStatus: "pending" | "done";
   microTaskStatus?: "pending" | "done" | "skipped";

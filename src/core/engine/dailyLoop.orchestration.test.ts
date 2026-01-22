@@ -52,6 +52,10 @@ vi.mock("@/lib/cohorts", () => ({
 }));
 vi.mock("@/lib/content/arcs", () => ({
   fetchArcByKey: vi.fn(),
+  listActiveArcs: vi.fn(),
+}));
+vi.mock("@/lib/content/initiatives", () => ({
+  listActiveInitiativesCatalog: vi.fn(),
 }));
 vi.mock("@/lib/arcs", () => ({
   fetchArcCurrentStepContent: vi.fn(),
@@ -63,6 +67,7 @@ vi.mock("@/lib/factions", () => ({
 vi.mock("@/lib/alignment", () => ({
   ensureUserAlignmentRows: vi.fn(),
   fetchUserAlignment: vi.fn(),
+  fetchRecentAlignmentEvents: vi.fn(),
 }));
 vi.mock("@/lib/directives", () => ({
   getOrCreateWeeklyDirective: vi.fn(),
@@ -114,9 +119,15 @@ import {
 } from "@/lib/dailyInteractions";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { fetchArcByKey } from "@/lib/content/arcs";
+import { listActiveArcs } from "@/lib/content/arcs";
+import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
 import { fetchArcCurrentStepContent, fetchArcInstance } from "@/lib/arcs";
 import { listFactions } from "@/lib/factions";
-import { ensureUserAlignmentRows, fetchUserAlignment } from "@/lib/alignment";
+import {
+  ensureUserAlignmentRows,
+  fetchRecentAlignmentEvents,
+  fetchUserAlignment,
+} from "@/lib/alignment";
 import { getOrCreateWeeklyDirective } from "@/lib/directives";
 import {
   fetchInitiativeProgress,
@@ -236,6 +247,7 @@ beforeEach(() => {
   vi.mocked(fetchSkillAllocations).mockResolvedValue([]);
   vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
   vi.mocked(fetchArcByKey).mockResolvedValue(null);
+  vi.mocked(listActiveArcs).mockResolvedValue([]);
   vi.mocked(fetchArcInstance).mockResolvedValue(null);
   vi.mocked(fetchArcCurrentStepContent).mockResolvedValue(null);
   vi.mocked(ensureUserAlignmentRows).mockResolvedValue();
@@ -277,6 +289,8 @@ beforeEach(() => {
       updated_at: new Date().toISOString(),
     },
   ]);
+  vi.mocked(fetchRecentAlignmentEvents).mockResolvedValue([]);
+  vi.mocked(listActiveInitiativesCatalog).mockResolvedValue([]);
   vi.mocked(getOrCreateWeeklyDirective).mockResolvedValue({
     id: "d1",
     cohort_id: "c1",

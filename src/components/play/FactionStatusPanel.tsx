@@ -1,4 +1,4 @@
-import type { Faction, FactionKey } from "@/types/factions";
+import type { AlignmentEvent, Faction, FactionKey } from "@/types/factions";
 
 type DirectiveSummary = {
   faction_key: FactionKey;
@@ -12,8 +12,9 @@ type DirectiveSummary = {
 
 type Props = {
   factions: Faction[];
-  alignment?: Record<FactionKey, number>;
+  alignment?: Record<string, number>;
   directive?: DirectiveSummary | null;
+  recentEvents?: AlignmentEvent[];
   dayIndex: number;
 };
 
@@ -21,6 +22,7 @@ export function FactionStatusPanel({
   factions,
   alignment,
   directive,
+  recentEvents,
   dayIndex,
 }: Props) {
   const directiveFaction = directive
@@ -74,6 +76,24 @@ export function FactionStatusPanel({
           );
         })}
       </div>
+
+      {recentEvents && recentEvents.length > 0 ? (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-slate-600">Recent signals</p>
+          <ul className="space-y-1">
+            {recentEvents.slice(0, 5).map((event) => {
+              const faction = factions.find((item) => item.key === event.faction_key);
+              const label = faction?.name ?? event.faction_key;
+              const deltaLabel = `${event.delta >= 0 ? "+" : ""}${event.delta}`;
+              return (
+                <li key={event.id} className="text-xs text-slate-600">
+                  {label} {deltaLabel} · {event.source}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -66,7 +66,7 @@ import type {
   SkillPointAllocation,
 } from "@/types/dailyInteraction";
 import type { Initiative } from "@/types/initiatives";
-import type { Faction, FactionKey } from "@/types/factions";
+import type { AlignmentEvent, Faction } from "@/types/factions";
 import type { ReflectionResponse } from "@/types/reflections";
 import type { SeasonRecap } from "@/types/seasons";
 import { AuthGate } from "@/ui/components/AuthGate";
@@ -117,8 +117,11 @@ export default function PlayPage() {
   const [setupActionError, setSetupActionError] = useState<string | null>(null);
   const [dayRolloverNotice, setDayRolloverNotice] = useState<string | null>(null);
   const [factions, setFactions] = useState<Faction[]>([]);
-  const [alignment, setAlignment] = useState<Record<FactionKey, number>>({});
+  const [alignment, setAlignment] = useState<Record<string, number>>({});
   const [directive, setDirective] = useState<DailyRun["directive"] | null>(null);
+  const [recentAlignmentEvents, setRecentAlignmentEvents] = useState<AlignmentEvent[]>(
+    []
+  );
   const [cohortId, setCohortId] = useState<string | null>(null);
   const [arc, setArc] = useState<{
     arc_key: string;
@@ -446,6 +449,7 @@ export default function PlayPage() {
           setFactions(run.factions ?? []);
           setAlignment(run.alignment ?? {});
           setDirective(run.directive ?? null);
+          setRecentAlignmentEvents(run.recentAlignmentEvents ?? []);
           setCohortId(run.cohortId ?? null);
           setStorylets(run.storylets);
           setRuns(run.storyletRunsToday);
@@ -1683,6 +1687,7 @@ export default function PlayPage() {
                         factions={factions}
                         alignment={alignment}
                         directive={directive}
+                        recentEvents={recentAlignmentEvents}
                         dayIndex={dayIndex}
                       />
                     </section>

@@ -2,30 +2,202 @@ import { supabase } from "@/lib/supabase/browser";
 import { FACTION_KEYS } from "@/lib/factions";
 import type { FactionDirective, FactionKey } from "@/types/factions";
 
-const DIRECTIVE_COPY: Record<FactionKey, { title: string; description: string }> = {
-  neo_assyrian: {
-    title: "Secure the signal chain",
-    description: "Document the inconsistency, map who profits, and keep it clean.",
-  },
-  dynastic_consortium: {
-    title: "Archive the evidence",
-    description: "Collect fragments that can be cited later, without fanfare.",
-  },
-  templar_remnant: {
-    title: "Commit to the watch",
-    description: "Show discipline. Repeat the practice until it becomes habit.",
-  },
-  bormann_network: {
-    title: "Contain the anomaly",
-    description: "Keep it quiet. Better to bury it than to brandish it.",
-  },
+type DirectiveTemplate = {
+  title: string;
+  description: string;
+  target_type: "initiative";
+  target_key: string;
 };
+
+export const DIRECTIVE_TEMPLATES: Record<FactionKey, DirectiveTemplate[]> = {
+  neo_assyrian: [
+    {
+      title: "Quiet Accumulation",
+      description: "This week, focus on collecting small signals. Your cohort’s discipline creates leverage.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Balance the Ledger",
+      description: "Track every inconsistency. The cleanest advantage is the one that looks like accounting.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Pressure Without Noise",
+      description: "Operate quietly and consistently. Power grows when attention fails to notice.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Convert Panic to Position",
+      description: "Crises move assets. Record what shifts and who benefits.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Stability Under Stress",
+      description: "Keep the ledger steady. The market respects the hand that doesn’t shake.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Controlled Disclosure",
+      description: "Share only the signals that strengthen your position. Silence is an instrument.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+  ],
+  dynastic_consortium: [
+    {
+      title: "Scholars in the Margins",
+      description: "Gather small signals and annotate them. The archive grows by quiet effort.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Thread the Lattice",
+      description: "Record inconsistencies and link them. Networks remember what regimes forget.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Measured Exchange",
+      description: "Trade notes with care. Knowledge spreads best when it moves with obligation.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Quiet Patronage",
+      description: "Support the record-keepers. The archive is a relay, not a broadcast.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Inheritance of Proof",
+      description: "Catalog small divergences. Inheritance is built from evidence.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Long Memory",
+      description: "Add one durable signal each day. Time rewards the meticulous.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+  ],
+  templar_remnant: [
+    {
+      title: "Steel the Routine",
+      description: "Repeat the watch until it becomes ritual. Discipline is the first shield.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Hold the Line",
+      description: "Keep your signals consistent. Stability comes from shared resolve.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Measured Vigil",
+      description: "Observe without drift. A clean record is a sign of clear purpose.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Doctrine of Care",
+      description: "Protect the watch with steady participation. Duty is built in small acts.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Unbroken Chain",
+      description: "Do not skip the signal. Each day is another link.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Order in the Margins",
+      description: "Record what falters. The ritual clarifies what must be kept.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+  ],
+  bormann_network: [
+    {
+      title: "Seal the Gaps",
+      description: "Record the weak points and close them. Quiet containment prevents contagion.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Blackout Discipline",
+      description: "Share only what is necessary. Silence is the safest perimeter.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Purge the Noise",
+      description: "Filter the signals. Keep only what helps you identify the leak.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Containment First",
+      description: "Small signals reveal weak seams. Map them and lock them down.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Unseen Enforcement",
+      description: "Track the inconsistency without exposing yourself. The shadow keeps order.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+    {
+      title: "Remove the Soft Link",
+      description: "Record the fragile points. Strength follows excision.",
+      target_type: "initiative",
+      target_key: "campus_signal_watch",
+    },
+  ],
+};
+
+export function hashString(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash << 5) - hash + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+export function computeWeekStart(dayIndex: number) {
+  return dayIndex - (dayIndex % 7);
+}
+
+export function computeWeekEnd(weekStartDayIndex: number) {
+  return weekStartDayIndex + 6;
+}
+
+export function selectDirectiveTemplate(
+  cohortId: string,
+  weekStartDayIndex: number,
+  factionKey: FactionKey
+): DirectiveTemplate {
+  const templates = DIRECTIVE_TEMPLATES[factionKey];
+  const templateIndex =
+    (hashString(cohortId) + weekStartDayIndex) % templates.length;
+  return templates[templateIndex];
+}
 
 export async function getOrCreateWeeklyDirective(
   cohortId: string,
-  weekStartDayIndex: number,
-  weekEndDayIndex: number
+  dayIndex: number
 ): Promise<FactionDirective> {
+  const weekStartDayIndex = computeWeekStart(dayIndex);
+  const weekEndDayIndex = computeWeekEnd(weekStartDayIndex);
   const { data: existing, error: existingError } = await supabase
     .from("faction_directives")
     .select(
@@ -43,9 +215,8 @@ export async function getOrCreateWeeklyDirective(
 
   if (existing) return existing;
 
-  const factionKey =
-    FACTION_KEYS[Math.abs(weekStartDayIndex) % FACTION_KEYS.length];
-  const copy = DIRECTIVE_COPY[factionKey];
+  const factionKey = FACTION_KEYS[weekStartDayIndex % FACTION_KEYS.length];
+  const template = selectDirectiveTemplate(cohortId, weekStartDayIndex, factionKey);
 
   const { data: created, error: createError } = await supabase
     .from("faction_directives")
@@ -54,10 +225,10 @@ export async function getOrCreateWeeklyDirective(
       faction_key: factionKey,
       week_start_day_index: weekStartDayIndex,
       week_end_day_index: weekEndDayIndex,
-      title: copy.title,
-      description: copy.description,
-      target_type: "initiative",
-      target_key: "campus_signal_watch",
+      title: template.title,
+      description: template.description,
+      target_type: template.target_type,
+      target_key: template.target_key,
       status: "active",
     })
     .select(

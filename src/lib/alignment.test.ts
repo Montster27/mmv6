@@ -82,6 +82,10 @@ describe("alignment", () => {
         data: FACTION_KEYS.map((key) => ({ faction_key: key })),
         error: null,
       },
+      {
+        data: [],
+        error: null,
+      },
     ]);
     mockState.setMaybeSingleResponses([
       { data: { score: 1 }, error: null },
@@ -104,5 +108,32 @@ describe("alignment", () => {
 
     const inserts = mockState.getInsertPayloads();
     expect(inserts.some((entry) => entry.table === "alignment_events")).toBe(true);
+  });
+
+  it("caps positive alignment per faction per day", async () => {
+    mockState.reset();
+    mockState.setSelectResponses([
+      {
+        data: FACTION_KEYS.map((key) => ({ faction_key: key })),
+        error: null,
+      },
+      {
+        data: [{ delta: 2 }, { delta: 1 }],
+        error: null,
+      },
+    ]);
+    mockState.setMaybeSingleResponses([{ data: { score: 4 }, error: null }]);
+
+    await applyAlignmentDelta({
+      userId: "u",
+      dayIndex: 2,
+      factionKey: "neo_assyrian",
+      delta: 2,
+      source: "initiative",
+      sourceRef: "init-1",
+    });
+
+    const updates = mockState.getUpdatePayloads();
+    expect(updates.length).toBe(0);
   });
 });
