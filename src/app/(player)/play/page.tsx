@@ -9,6 +9,7 @@ import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
 import { ArcPanel } from "@/components/play/ArcPanel";
+import { FactionStatusPanel } from "@/components/play/FactionStatusPanel";
 import { InitiativePanel } from "@/components/play/InitiativePanel";
 import { DailySetupPanel } from "@/components/play/DailySetupPanel";
 import { signOut } from "@/lib/auth";
@@ -57,7 +58,7 @@ import {
 } from "@/lib/dailyInteractions";
 import { advanceArc, completeArc, startArc } from "@/lib/arcs";
 import { contributeToInitiative } from "@/lib/initiatives";
-import type { DailyRunStage } from "@/types/dailyRun";
+import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
   DailyTension,
@@ -65,6 +66,7 @@ import type {
   SkillPointAllocation,
 } from "@/types/dailyInteraction";
 import type { Initiative } from "@/types/initiatives";
+import type { Faction, FactionKey } from "@/types/factions";
 import type { ReflectionResponse } from "@/types/reflections";
 import type { SeasonRecap } from "@/types/seasons";
 import { AuthGate } from "@/ui/components/AuthGate";
@@ -114,6 +116,10 @@ export default function PlayPage() {
   const [submittingPosture, setSubmittingPosture] = useState(false);
   const [setupActionError, setSetupActionError] = useState<string | null>(null);
   const [dayRolloverNotice, setDayRolloverNotice] = useState<string | null>(null);
+  const [factions, setFactions] = useState<Faction[]>([]);
+  const [alignment, setAlignment] = useState<Record<FactionKey, number>>({});
+  const [directive, setDirective] = useState<DailyRun["directive"] | null>(null);
+  const [cohortId, setCohortId] = useState<string | null>(null);
   const [arc, setArc] = useState<{
     arc_key: string;
     status: "not_started" | "active" | "completed";
@@ -437,6 +443,10 @@ export default function PlayPage() {
           setSkillAllocations(run.allocations ?? []);
           setArc(run.arc ?? null);
           setInitiatives(run.initiatives ?? []);
+          setFactions(run.factions ?? []);
+          setAlignment(run.alignment ?? {});
+          setDirective(run.directive ?? null);
+          setCohortId(run.cohortId ?? null);
           setStorylets(run.storylets);
           setRuns(run.storyletRunsToday);
           setAllocationSaved(Boolean(run.allocation));
@@ -1108,7 +1118,7 @@ export default function PlayPage() {
     setInitiativeSubmitting(true);
     setError(null);
     try {
-      await contributeToInitiative(initiativeId, userId, dayIndex, 1);
+      await contributeToInitiative(initiativeId, userId, dayIndex, 1, cohortId);
       setRefreshTick((tick) => tick + 1);
     } catch (e) {
       console.error(e);
@@ -1666,6 +1676,17 @@ export default function PlayPage() {
                         />
                       </section>
                     )}
+
+                  {USE_DAILY_LOOP_ORCHESTRATOR && factions.length > 0 && (
+                    <section className="space-y-3">
+                      <FactionStatusPanel
+                        factions={factions}
+                        alignment={alignment}
+                        directive={directive}
+                        dayIndex={dayIndex}
+                      />
+                    </section>
+                  )}
 
                   {USE_DAILY_LOOP_ORCHESTRATOR && stage === "microtask" && (
                     <section className="space-y-3">
