@@ -7,6 +7,10 @@ export function computeWeekWindow(dayIndex: number) {
   return { weekStart, weekEnd };
 }
 
+function isConflictError(error: { code?: string | null; status?: number | null } | null) {
+  return Boolean(error && (error.code === "23505" || error.status === 409));
+}
+
 function normalizeInfluence(
   rows: Array<{ faction_key: string | null; delta: number | null }>
 ): Record<string, number> {
@@ -59,7 +63,7 @@ export async function getOrComputeWorldWeeklyInfluence(
   });
 
   if (insertError) {
-    if (insertError.code === "23505") {
+    if (isConflictError(insertError)) {
       const { data: retry } = await supabase
         .from("world_state_weekly")
         .select("influence")
@@ -110,12 +114,16 @@ export async function getOrComputeCohortWeeklyInfluence(
   const userIds = (members ?? []).map((row) => row.user_id).filter(Boolean);
   if (userIds.length === 0) {
     const emptyInfluence = {} as Record<string, number>;
-    await supabase.from("cohort_alignment_weekly").insert({
+    const { error: insertEmptyError } = await supabase.from("cohort_alignment_weekly").insert({
       cohort_id: cohortId,
       week_start_day_index: weekStart,
       week_end_day_index: weekEnd,
       influence: emptyInfluence,
     });
+    if (insertEmptyError && !isConflictError(insertEmptyError)) {
+      console.error("Failed to create empty cohort influence", insertEmptyError);
+      throw new Error("Failed to create cohort influence.");
+    }
     return emptyInfluence;
   }
 
@@ -141,7 +149,7 @@ export async function getOrComputeCohortWeeklyInfluence(
   });
 
   if (insertError) {
-    if (insertError.code === "23505") {
+    if (isConflictError(insertError)) {
       const { data: retry } = await supabase
         .from("cohort_alignment_weekly")
         .select("influence")
@@ -218,7 +226,7 @@ export async function getOrComputeWeeklySnapshot(
     });
 
   if (insertError) {
-    if (insertError.code === "23505") {
+    if (isConflictError(insertError)) {
       const { data: retry } = await supabase
         .from("weekly_competition_snapshot")
         .select("top_cohorts")
