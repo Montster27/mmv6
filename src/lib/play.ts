@@ -10,6 +10,8 @@ import {
 import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
+import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
+import { ensureDayStateUpToDate } from "@/lib/dayState";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -121,6 +123,38 @@ export async function saveTimeAllocation(
   if (error) {
     console.error("Failed to save time allocation", error);
     throw error;
+  }
+
+  const dayState = await ensureDayStateUpToDate(userId, dayIndex);
+  const allocationHash = hashAllocation(allocation);
+  if (dayState.allocation_hash === allocationHash) {
+    return;
+  }
+
+  const baseEnergy = dayState.pre_allocation_energy ?? dayState.energy;
+  const baseStress = dayState.pre_allocation_stress ?? dayState.stress;
+  const next = applyAllocationToDayState({
+    energy: baseEnergy,
+    stress: baseStress,
+    allocation,
+  });
+
+  const { error: updateError } = await supabase
+    .from("player_day_state")
+    .update({
+      energy: next.energy,
+      stress: next.stress,
+      pre_allocation_energy: baseEnergy,
+      pre_allocation_stress: baseStress,
+      allocation_hash: allocationHash,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .eq("day_index", dayIndex);
+
+  if (updateError) {
+    console.error("Failed to update day state from allocation", updateError);
+    throw updateError;
   }
 }
 

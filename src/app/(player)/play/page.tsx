@@ -762,6 +762,27 @@ export default function PlayPage() {
     setError(null);
     try {
       await saveTimeAllocation(userId, dayIndex, allocation);
+      if (USE_DAILY_LOOP_ORCHESTRATOR) {
+        const refreshed = await getOrCreateDailyRun(userId, new Date(), {
+          microtaskVariant,
+          experiments,
+          isAdmin: devIsAdmin,
+        });
+        setDayState(refreshed.dayState ?? null);
+      } else {
+        const ds = await fetchDailyState(userId);
+        if (ds) {
+          setDailyState({ ...ds, day_index: dayIndex });
+          setDayState({
+            energy: ds.energy,
+            stress: ds.stress,
+            money: 0,
+            study_progress: 0,
+            social_capital: 0,
+            health: 50,
+          });
+        }
+      }
       const todayTensions = await fetchTensions(userId, dayIndex);
       const unresolved = todayTensions.filter((tension) => !tension.resolved_at);
       if (
