@@ -15,6 +15,10 @@ function GroupEntry({ session }: { session: Session }) {
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [createdGroup, setCreatedGroup] = useState<{
+    name: string;
+    join_code: string;
+  } | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -48,7 +52,11 @@ function GroupEntry({ session }: { session: Session }) {
       if (!res.ok) {
         throw new Error(json.error ?? "Failed to create group.");
       }
-      router.replace("/group/feed");
+      if (json?.group?.join_code) {
+        setCreatedGroup({ name: json.group.name ?? createName.trim(), join_code: json.group.join_code });
+      } else {
+        router.replace("/group/feed");
+      }
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : "Failed to create group.");
@@ -119,6 +127,21 @@ function GroupEntry({ session }: { session: Session }) {
         <Button onClick={handleCreate} disabled={saving}>
           {saving ? "Creating..." : "Create group"}
         </Button>
+        {createdGroup ? (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 space-y-2">
+            <div className="font-semibold">Group created</div>
+            <div>
+              Share this join code:{" "}
+              <span className="font-mono">{createdGroup.join_code}</span>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => router.replace("/group/feed")}
+            >
+              Go to group
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-md border border-slate-200 bg-white p-4 space-y-3">
