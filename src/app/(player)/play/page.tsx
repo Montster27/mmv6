@@ -122,6 +122,9 @@ export default function PlayPage() {
   const [recentAlignmentEvents, setRecentAlignmentEvents] = useState<AlignmentEvent[]>(
     []
   );
+  const [worldState, setWorldState] = useState<DailyRun["worldState"] | null>(null);
+  const [cohortState, setCohortState] = useState<DailyRun["cohortState"] | null>(null);
+  const [rivalry, setRivalry] = useState<DailyRun["rivalry"] | null>(null);
   const [availableArcs, setAvailableArcs] = useState<
     Array<{ key: string; title: string; description: string }>
   >([]);
@@ -453,6 +456,9 @@ export default function PlayPage() {
           setAlignment(run.alignment ?? {});
           setDirective(run.directive ?? null);
           setRecentAlignmentEvents(run.recentAlignmentEvents ?? []);
+          setWorldState(run.worldState ?? null);
+          setCohortState(run.cohortState ?? null);
+          setRivalry(run.rivalry ?? null);
           setAvailableArcs(run.availableArcs ?? []);
           setCohortId(run.cohortId ?? null);
           setStorylets(run.storylets);
@@ -1709,6 +1715,9 @@ export default function PlayPage() {
                         alignment={alignment}
                         directive={directive}
                         recentEvents={recentAlignmentEvents}
+                        worldState={worldState ?? undefined}
+                        cohortState={cohortState ?? undefined}
+                        rivalry={rivalry ?? undefined}
                         dayIndex={dayIndex}
                       />
                     </section>

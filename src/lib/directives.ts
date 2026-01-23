@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/browser";
 import { FACTION_KEYS } from "@/lib/factions";
+import { computeWeekWindow, getOrComputeWorldWeeklyInfluence } from "@/lib/worldState";
 import type { FactionDirective, FactionKey } from "@/types/factions";
 
 type DirectiveTemplate = {
@@ -192,6 +193,42 @@ export function selectDirectiveTemplate(
   return templates[templateIndex];
 }
 
+function topFactionFromInfluence(influence: Record<string, number>): FactionKey {
+  let bestFaction: FactionKey = FACTION_KEYS[0];
+  let bestScore = Number.NEGATIVE_INFINITY;
+  FACTION_KEYS.forEach((key) => {
+    const score = influence[key] ?? 0;
+    if (score > bestScore) {
+      bestScore = score;
+      bestFaction = key;
+    }
+  });
+  return bestFaction;
+}
+
+export function selectFactionWithBias(
+  cohortId: string,
+  weekStartDayIndex: number,
+  worldInfluence: Record<string, number>
+): FactionKey {
+  const rotationFaction = FACTION_KEYS[weekStartDayIndex % FACTION_KEYS.length];
+  const topFaction = topFactionFromInfluence(worldInfluence);
+  const biasRoll = hashString(`${cohortId}${weekStartDayIndex}`) % 4;
+  return biasRoll === 0 ? topFaction : rotationFaction;
+}
+
+async function pickDirectiveFaction(
+  cohortId: string,
+  weekStartDayIndex: number
+): Promise<FactionKey> {
+  const prevWeekStart = Math.max(0, weekStartDayIndex - 7);
+  const { weekEnd } = computeWeekWindow(prevWeekStart);
+  const influence = await getOrComputeWorldWeeklyInfluence(prevWeekStart, weekEnd).catch(
+    () => ({})
+  );
+  return selectFactionWithBias(cohortId, weekStartDayIndex, influence);
+}
+
 export async function getOrCreateWeeklyDirective(
   cohortId: string,
   dayIndex: number,
@@ -216,7 +253,7 @@ export async function getOrCreateWeeklyDirective(
 
   if (existing) return existing;
 
-  const factionKey = FACTION_KEYS[weekStartDayIndex % FACTION_KEYS.length];
+  const factionKey = await pickDirectiveFaction(cohortId, weekStartDayIndex);
   const template = selectDirectiveTemplate(cohortId, weekStartDayIndex, factionKey);
   const availableKeys =
     unlockedInitiativeKeys.length > 0 ? unlockedInitiativeKeys : [template.target_key];

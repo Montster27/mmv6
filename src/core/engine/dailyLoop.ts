@@ -49,6 +49,12 @@ import {
   closeInitiative,
 } from "@/lib/initiatives";
 import {
+  computeWeekWindow,
+  getOrComputeCohortWeeklyInfluence,
+  getOrComputeWeeklySnapshot,
+  getOrComputeWorldWeeklyInfluence,
+} from "@/lib/worldState";
+import {
   ensureSkillBankUpToDate,
   ensureTensionsUpToDate,
   fetchSkillAllocations,
@@ -65,6 +71,12 @@ import type {
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
 const ARC_KEY = "anomaly_001";
+const DIRECTIVE_TAGS: Record<string, string[]> = {
+  neo_assyrian: ["work", "money", "leverage"],
+  dynastic_consortium: ["study", "research", "tech"],
+  templar_remnant: ["duty", "faith", "order"],
+  bormann_network: ["security", "secrecy", "force"],
+};
 
 function runsForTodayPair(runs: StoryletRun[], storyletPair: Storylet[]): StoryletRun[] {
   const ids = new Set(storyletPair.map((s) => s.id));
@@ -180,32 +192,8 @@ export async function getOrCreateDailyRun(
   const recentRuns =
     (await fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => [])) ?? [];
 
-  const userArc = await getOrStartArc(userId, dayIndex);
-  const arcStorylet = getArcNextStepStorylet(
-    userArc,
-    dayIndex,
-    storyletsRaw,
-    runs
-  );
-
-  const storyletsSelected = selectStorylets({
-    seed: `${userId}-${dayIndex}`,
-    userId,
-    dayIndex,
-    seasonIndex: seasonContext.currentSeason.season_index,
-    dailyState: daily ?? null,
-    allStorylets: storyletsRaw,
-    recentRuns,
-    forcedStorylet: arcStorylet ?? undefined,
-    experiments: options?.experiments,
-    isAdmin: options?.isAdmin,
-    context: buildStoryletContext({ posture, tensions }),
-  });
-
   const cohort = await ensureUserInCohort(userId).catch(() => null);
   const cohortId = cohort?.cohortId ?? null;
-
-  let initiatives = null as DailyRun["initiatives"];
 
   await ensureUserAlignmentRows(userId);
   const [factions, alignmentRows, contentArcs, contentInitiatives, recentEvents] =
@@ -228,6 +216,34 @@ export async function getOrCreateDailyRun(
         unlocks.unlockedInitiativeKeys
       ).catch(() => null)
     : null;
+  const directiveTags =
+    directive?.faction_key && DIRECTIVE_TAGS[directive.faction_key]
+      ? DIRECTIVE_TAGS[directive.faction_key]
+      : [];
+
+  const userArc = await getOrStartArc(userId, dayIndex);
+  const arcStorylet = getArcNextStepStorylet(
+    userArc,
+    dayIndex,
+    storyletsRaw,
+    runs
+  );
+
+  const storyletsSelected = selectStorylets({
+    seed: `${userId}-${dayIndex}`,
+    userId,
+    dayIndex,
+    seasonIndex: seasonContext.currentSeason.season_index,
+    dailyState: daily ?? null,
+    allStorylets: storyletsRaw,
+    recentRuns,
+    forcedStorylet: arcStorylet ?? undefined,
+    experiments: options?.experiments,
+    isAdmin: options?.isAdmin,
+    context: buildStoryletContext({ posture, tensions, directiveTags }),
+  });
+
+  let initiatives = null as DailyRun["initiatives"];
 
   if (cohortId) {
     await getOrCreateWeeklyInitiative(cohortId, dayIndex, directive);
@@ -355,6 +371,19 @@ export async function getOrCreateDailyRun(
     .filter((arc) => !startedArcKeys.has(arc.key))
     .map((arc) => ({ key: arc.key, title: arc.title, description: arc.description }));
 
+  const { weekStart, weekEnd } = computeWeekWindow(dayIndex);
+  const worldInfluence = await getOrComputeWorldWeeklyInfluence(weekStart, weekEnd).catch(
+    () => ({})
+  );
+  const cohortInfluence = cohortId
+    ? await getOrComputeCohortWeeklyInfluence(cohortId, weekStart, weekEnd).catch(
+        () => ({})
+      )
+    : null;
+  const rivalrySnapshot = await getOrComputeWeeklySnapshot(weekStart, weekEnd).catch(
+    () => ({ topCohorts: [] })
+  );
+
   return {
     userId,
     dayIndex,
@@ -399,6 +428,21 @@ export async function getOrCreateDailyRun(
     },
     availableArcs,
     recentAlignmentEvents: recentEvents,
+    worldState: {
+      weekStart,
+      weekEnd,
+      influence: worldInfluence,
+    },
+    cohortState: cohortInfluence
+      ? {
+          weekStart,
+          weekEnd,
+          influence: cohortInfluence,
+        }
+      : null,
+    rivalry: {
+      topCohorts: rivalrySnapshot.topCohorts,
+    },
     directive: directive
       ? {
           faction_key: directive.faction_key,

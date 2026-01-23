@@ -85,6 +85,12 @@ vi.mock("@/lib/initiatives", () => ({
   fetchInitiativeForWeek: vi.fn(),
   closeInitiative: vi.fn(),
 }));
+vi.mock("@/lib/worldState", () => ({
+  computeWeekWindow: vi.fn(),
+  getOrComputeCohortWeeklyInfluence: vi.fn(),
+  getOrComputeWorldWeeklyInfluence: vi.fn(),
+  getOrComputeWeeklySnapshot: vi.fn(),
+}));
 vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
 }));
@@ -154,6 +160,12 @@ import {
   fetchInitiativeForWeek,
   closeInitiative,
 } from "@/lib/initiatives";
+import {
+  computeWeekWindow,
+  getOrComputeCohortWeeklyInfluence,
+  getOrComputeWorldWeeklyInfluence,
+  getOrComputeWeeklySnapshot,
+} from "@/lib/worldState";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
 const storyletA: Storylet = {
@@ -317,6 +329,10 @@ beforeEach(() => {
   vi.mocked(closeInitiative).mockResolvedValue();
   vi.mocked(hasAlignmentEvent).mockResolvedValue(false);
   vi.mocked(applyAlignmentDelta).mockResolvedValue();
+  vi.mocked(computeWeekWindow).mockReturnValue({ weekStart: 1, weekEnd: 7 });
+  vi.mocked(getOrComputeWorldWeeklyInfluence).mockResolvedValue({});
+  vi.mocked(getOrComputeCohortWeeklyInfluence).mockResolvedValue({});
+  vi.mocked(getOrComputeWeeklySnapshot).mockResolvedValue({ topCohorts: [] });
   vi.mocked(getOrCreateWeeklyDirective).mockResolvedValue({
     id: "d1",
     cohort_id: "c1",

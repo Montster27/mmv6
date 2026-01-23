@@ -72,6 +72,19 @@ export type DailyRun = {
     description: string;
   }>;
   recentAlignmentEvents?: AlignmentEvent[];
+  worldState?: {
+    weekStart: number;
+    weekEnd: number;
+    influence: Record<string, number>;
+  };
+  cohortState?: {
+    weekStart: number;
+    weekEnd: number;
+    influence: Record<string, number>;
+  } | null;
+  rivalry?: {
+    topCohorts: Array<{ cohort_id: string; faction_key: string; score: number }>;
+  };
   initiatives?: Array<Initiative & { contributedToday?: boolean; progress?: number }> | null;
   reflectionStatus: "pending" | "done";
   microTaskStatus?: "pending" | "done" | "skipped";

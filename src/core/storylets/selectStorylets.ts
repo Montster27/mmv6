@@ -165,6 +165,11 @@ function scoreStorylet(
     bonus += 0.2;
   }
 
+  const directiveTags = context?.directiveTags ?? [];
+  if (directiveTags.length > 0 && tagsIntersect(tags, directiveTags)) {
+    bonus += 0.05;
+  }
+
   return base / (Math.max(weight, 1) * (1 + bonus));
 }
 

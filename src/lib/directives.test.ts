@@ -40,12 +40,17 @@ const mockState = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
+vi.mock("@/lib/worldState", () => ({
+  computeWeekWindow: vi.fn(() => ({ weekStart: 0, weekEnd: 6 })),
+  getOrComputeWorldWeeklyInfluence: vi.fn(() => Promise.resolve({})),
+}));
 
 import {
   getOrCreateWeeklyDirective,
   fetchActiveDirectiveForCohort,
   computeWeekStart,
   selectDirectiveTemplate,
+  selectFactionWithBias,
 } from "@/lib/directives";
 import { FACTION_KEYS } from "@/lib/factions";
 
@@ -139,5 +144,24 @@ describe("directives", () => {
       "market_whisper",
     ]);
     expect(directive.target_key).toBe("market_whisper");
+  });
+
+  it("biases directive faction toward world leader deterministically", () => {
+    const worldInfluence = { bormann_network: 10, neo_assyrian: 2 };
+    const weekStart = 0;
+
+    let biasedCohort: string | null = null;
+    let rotationCohort: string | null = null;
+
+    for (let i = 0; i < 50; i += 1) {
+      const cohortId = `cohort-${i}`;
+      const faction = selectFactionWithBias(cohortId, weekStart, worldInfluence);
+      if (faction === "bormann_network" && !biasedCohort) biasedCohort = cohortId;
+      if (faction !== "bormann_network" && !rotationCohort) rotationCohort = cohortId;
+      if (biasedCohort && rotationCohort) break;
+    }
+
+    expect(biasedCohort).not.toBeNull();
+    expect(rotationCohort).not.toBeNull();
   });
 });
