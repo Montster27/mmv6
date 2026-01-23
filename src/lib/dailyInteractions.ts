@@ -31,6 +31,25 @@ export async function fetchTensions(
   return data ?? [];
 }
 
+export async function fetchUnresolvedTensions(
+  userId: string,
+  dayIndex: number
+): Promise<Array<{ key: string; severity?: number | null }>> {
+  const { data, error } = await supabase
+    .from("daily_tensions")
+    .select("key,severity")
+    .eq("user_id", userId)
+    .eq("day_index", dayIndex)
+    .is("resolved_at", null);
+
+  if (error) {
+    console.error("Failed to fetch unresolved tensions", error);
+    return [];
+  }
+
+  return data ?? [];
+}
+
 export async function upsertTension(tension: DailyTension): Promise<void> {
   const { error } = await supabase.from("daily_tensions").upsert(tension, {
     onConflict: "user_id,day_index,key",

@@ -132,6 +132,9 @@ export function DailySetupPanel({
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
         <h3 className="text-sm font-semibold text-slate-800">Tensions</h3>
+        <p className="text-xs text-slate-500">
+          Unresolved pressures will affect tomorrow.
+        </p>
         {activeTensions.length === 0 ? (
           <p className="text-sm text-slate-600">No active tensions.</p>
         ) : (

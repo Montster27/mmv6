@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase/browser";
 import type { PlayerDayState } from "@/types/dayState";
 import { resolveEndOfDay } from "@/core/sim/endOfDay";
 import type { Allocation } from "@/core/sim/allocationEffects";
+import { applyTensionPenalties } from "@/core/sim/tensionPenalties";
+import { fetchUnresolvedTensions } from "@/lib/dailyInteractions";
 
 const DEFAULT_STATE = {
   energy: 70,
@@ -140,6 +142,12 @@ export async function finalizeDay(userId: string, dayIndex: number): Promise<voi
     stress: dayState.stress,
     allocation,
   });
+  const unresolvedTensions = await fetchUnresolvedTensions(userId, dayIndex);
+  const penalized = applyTensionPenalties({
+    nextEnergy: resolved.nextEnergy,
+    nextStress: resolved.nextStress,
+    tensions: unresolvedTensions,
+  });
 
   const { error: updateError } = await supabase
     .from("player_day_state")
@@ -147,8 +155,8 @@ export async function finalizeDay(userId: string, dayIndex: number): Promise<voi
       resolved_at: new Date().toISOString(),
       end_energy: resolved.endEnergy,
       end_stress: resolved.endStress,
-      next_energy: resolved.nextEnergy,
-      next_stress: resolved.nextStress,
+      next_energy: penalized.nextEnergy,
+      next_stress: penalized.nextStress,
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", userId)

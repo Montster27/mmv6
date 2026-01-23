@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const mockState = vi.hoisted(() => {
   let maybeSingleResponses: Array<{ data: any; error: any }> = [];
+  let selectResponses: Array<{ data: any; error: any }> = [];
   const insertPayloads: Array<{ table: string; payload: any }> = [];
   const updatePayloads: Array<{ table: string; payload: any }> = [];
 
@@ -21,7 +22,7 @@ const mockState = vi.hoisted(() => {
       return builder;
     }),
     then: (resolve: any) =>
-      Promise.resolve({ data: null, error: null }).then(resolve),
+      Promise.resolve(selectResponses.shift() ?? { data: null, error: null }).then(resolve),
   };
 
   const supabase = {
@@ -37,10 +38,14 @@ const mockState = vi.hoisted(() => {
     setMaybeSingleResponses: (responses: Array<{ data: any; error: any }>) => {
       maybeSingleResponses = [...responses];
     },
+    setSelectResponses: (responses: Array<{ data: any; error: any }>) => {
+      selectResponses = [...responses];
+    },
     getInsertPayloads: () => insertPayloads,
     getUpdatePayloads: () => updatePayloads,
     reset: () => {
       maybeSingleResponses = [];
+      selectResponses = [];
       insertPayloads.length = 0;
       updatePayloads.length = 0;
     },
@@ -79,6 +84,7 @@ describe("finalizeDay", () => {
       { data: baseDayState, error: null },
       { data: { allocation: { study: 40, work: 20, social: 10, health: 20, fun: 10 } }, error: null },
     ]);
+    mockState.setSelectResponses([{ data: [{ key: "unfinished_assignment", severity: 1 }], error: null }]);
 
     await finalizeDay("u", 2);
 
@@ -89,7 +95,7 @@ describe("finalizeDay", () => {
       end_energy: 70,
       end_stress: 20,
       next_energy: 86,
-      next_stress: 13,
+      next_stress: 18,
     });
   });
 
