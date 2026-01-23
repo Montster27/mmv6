@@ -486,7 +486,14 @@ export default function PlayPage() {
           if (ds) {
             setDailyState({ ...ds, day_index: run.dayIndex });
             if (!run.dayState) {
-              setDayState({ energy: ds.energy, stress: ds.stress });
+              setDayState({
+                energy: ds.energy,
+                stress: ds.stress,
+                money: 0,
+                study_progress: 0,
+                social_capital: 0,
+                health: 50,
+              });
             }
           }
 
@@ -529,6 +536,10 @@ export default function PlayPage() {
             setDayState({
               energy: ds.energy,
               stress: ds.stress,
+              money: 0,
+              study_progress: 0,
+              social_capital: 0,
+              health: 50,
             });
           }
           const day = cadence.dayIndex;
