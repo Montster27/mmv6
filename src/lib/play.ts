@@ -11,7 +11,7 @@ import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
 import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
-import { ensureDayStateUpToDate } from "@/lib/dayState";
+import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -373,4 +373,6 @@ export async function markDailyComplete(
     console.error("Failed to mark daily complete", error);
     throw error;
   }
+
+  await finalizeDay(userId, dayIndex);
 }

@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase/browser";
 import type { PlayerDayState } from "@/types/dayState";
+import { resolveEndOfDay } from "@/core/sim/endOfDay";
+import type { Allocation } from "@/core/sim/allocationEffects";
 
 const DEFAULT_STATE = {
   energy: 70,
@@ -21,7 +23,7 @@ export async function fetchDayState(
   const { data, error } = await supabase
     .from("player_day_state")
     .select(
-      "user_id,day_index,energy,stress,money,study_progress,social_capital,health,allocation_hash,pre_allocation_energy,pre_allocation_stress,created_at,updated_at"
+      "user_id,day_index,energy,stress,money,study_progress,social_capital,health,allocation_hash,pre_allocation_energy,pre_allocation_stress,resolved_at,end_energy,end_stress,next_energy,next_stress,created_at,updated_at"
     )
     .eq("user_id", userId)
     .eq("day_index", dayIndex)
@@ -45,9 +47,14 @@ export async function createDayStateFromPrevious(
     source = await fetchDayState(userId, dayIndex - 1).catch(() => null);
   }
 
+  const baseEnergy =
+    source?.next_energy ?? source?.energy ?? DEFAULT_STATE.energy;
+  const baseStress =
+    source?.next_stress ?? source?.stress ?? DEFAULT_STATE.stress;
+
   const nextState = {
-    energy: clamp(source?.energy ?? DEFAULT_STATE.energy, 0, 100),
-    stress: clamp(source?.stress ?? DEFAULT_STATE.stress, 0, 100),
+    energy: clamp(baseEnergy, 0, 100),
+    stress: clamp(baseStress, 0, 100),
     money: source?.money ?? DEFAULT_STATE.money,
     study_progress: source?.study_progress ?? DEFAULT_STATE.study_progress,
     social_capital: source?.social_capital ?? DEFAULT_STATE.social_capital,
@@ -95,5 +102,61 @@ export async function ensureDayStateUpToDate(
       if (retry) return retry;
     }
     throw error;
+  }
+}
+
+function normalizeAllocation(raw: unknown): Allocation | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  return {
+    study: typeof record.study === "number" ? record.study : 0,
+    work: typeof record.work === "number" ? record.work : 0,
+    social: typeof record.social === "number" ? record.social : 0,
+    health: typeof record.health === "number" ? record.health : 0,
+    fun: typeof record.fun === "number" ? record.fun : 0,
+  };
+}
+
+export async function finalizeDay(userId: string, dayIndex: number): Promise<void> {
+  const dayState = await ensureDayStateUpToDate(userId, dayIndex);
+  if (dayState.resolved_at) return;
+
+  const { data: allocationRow, error: allocationError } = await supabase
+    .from("time_allocations")
+    .select("allocation")
+    .eq("user_id", userId)
+    .eq("day_index", dayIndex)
+    .limit(1)
+    .maybeSingle();
+
+  if (allocationError) {
+    console.error("Failed to fetch allocation for finalize", allocationError);
+    throw allocationError;
+  }
+
+  const allocation = normalizeAllocation(allocationRow?.allocation ?? null);
+  const resolved = resolveEndOfDay({
+    energy: dayState.energy,
+    stress: dayState.stress,
+    allocation,
+  });
+
+  const { error: updateError } = await supabase
+    .from("player_day_state")
+    .update({
+      resolved_at: new Date().toISOString(),
+      end_energy: resolved.endEnergy,
+      end_stress: resolved.endStress,
+      next_energy: resolved.nextEnergy,
+      next_stress: resolved.nextStress,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .eq("day_index", dayIndex)
+    .is("resolved_at", null);
+
+  if (updateError) {
+    console.error("Failed to finalize day state", updateError);
+    throw updateError;
   }
 }
