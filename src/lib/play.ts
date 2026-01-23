@@ -126,7 +126,14 @@ export async function saveTimeAllocation(
   }
 
   const dayState = await ensureDayStateUpToDate(userId, dayIndex);
-  const allocationHash = hashAllocation(allocation);
+  const normalizedAllocation = {
+    study: allocation.study ?? 0,
+    work: allocation.work ?? 0,
+    social: allocation.social ?? 0,
+    health: allocation.health ?? 0,
+    fun: allocation.fun ?? 0,
+  };
+  const allocationHash = hashAllocation(normalizedAllocation);
   if (dayState.allocation_hash === allocationHash) {
     return;
   }
@@ -136,7 +143,7 @@ export async function saveTimeAllocation(
   const next = applyAllocationToDayState({
     energy: baseEnergy,
     stress: baseStress,
-    allocation,
+    allocation: normalizedAllocation,
   });
 
   const { error: updateError } = await supabase
