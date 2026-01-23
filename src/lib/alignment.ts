@@ -40,6 +40,9 @@ export async function ensureUserAlignmentRows(userId: string): Promise<void> {
     .insert(insertPayload);
 
   if (insertError) {
+    if (insertError.code === "23505") {
+      return;
+    }
     console.error("Failed to initialize alignment", insertError);
     throw new Error("Failed to initialize alignment.");
   }
