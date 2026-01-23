@@ -105,15 +105,12 @@ function devLogStage(snapshot: Record<string, unknown>) {
 }
 
 function needsSetup({
-  tensions,
   skillBank,
   posture,
 }: {
-  tensions: DailyTension[];
   skillBank: SkillBank | null;
   posture: DailyPosture | null;
 }) {
-  if (tensions.some((t) => !t.resolved_at)) return true;
   if (skillBank && skillBank.available_points > 0) return true;
   if (!posture) return true;
   return false;
@@ -320,7 +317,7 @@ export async function getOrCreateDailyRun(
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
   const canBoost = !boosted;
-  const setupNeeded = needsSetup({ tensions, skillBank, posture });
+  const setupNeeded = needsSetup({ skillBank, posture });
   const baseStage = computeStage(
     Boolean(allocation),
     runsForPair.length,

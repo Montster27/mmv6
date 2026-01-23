@@ -349,6 +349,7 @@ describe("getOrCreateDailyRun", () => {
         meta: null,
       },
     ]);
+    vi.mocked(fetchPosture).mockResolvedValue(null);
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("setup");
     expect(run.tensions?.length).toBe(1);
@@ -373,7 +374,7 @@ describe("getOrCreateDailyRun", () => {
       last_awarded_day_index: 2,
     });
     const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.stage).toBe("setup");
+    expect(run.stage).toBe("storylet_1");
   });
 
   it("returns allocation when tensions are resolved", async () => {
