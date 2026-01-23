@@ -245,6 +245,18 @@ export async function getOrCreateWeeklyDirective(
     .maybeSingle();
 
   if (createError) {
+    if (createError.code === "23505") {
+      const { data: retry } = await supabase
+        .from("faction_directives")
+        .select(
+          "id,cohort_id,faction_key,week_start_day_index,week_end_day_index,title,description,target_type,target_key,status,created_at"
+        )
+        .eq("cohort_id", cohortId)
+        .eq("week_start_day_index", weekStartDayIndex)
+        .limit(1)
+        .maybeSingle();
+      if (retry) return retry;
+    }
     const { data: retry } = await supabase
       .from("faction_directives")
       .select(

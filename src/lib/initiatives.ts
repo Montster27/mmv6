@@ -62,6 +62,18 @@ export async function getOrCreateWeeklyInitiative(
     .maybeSingle();
 
   if (createError) {
+    if (createError.code === "23505") {
+      const { data: retry } = await supabase
+        .from("initiatives")
+        .select(
+          "id,cohort_id,key,title,description,created_at,starts_day_index,ends_day_index,status,goal,meta"
+        )
+        .eq("cohort_id", cohortId)
+        .eq("key", key)
+        .limit(1)
+        .maybeSingle();
+      if (retry) return retry;
+    }
     console.error("Failed to create initiative", createError);
     return null;
   }
