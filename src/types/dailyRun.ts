@@ -10,6 +10,7 @@ import type {
 } from "./dailyInteraction";
 import type { Initiative } from "./initiatives";
 import type { AlignmentEvent, Faction } from "./factions";
+import type { PlayerDayState } from "./dayState";
 
 export type DailyRunStage =
   | "setup"
@@ -91,6 +92,10 @@ export type DailyRun = {
   funPulseEligible?: boolean;
   funPulseDone?: boolean;
   dailyState?: DailyState | null;
+  dayState?: Pick<
+    PlayerDayState,
+    "energy" | "stress" | "money" | "study_progress" | "social_capital" | "health"
+  > | null;
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;
   seasonRecap?: SeasonRecap | null;

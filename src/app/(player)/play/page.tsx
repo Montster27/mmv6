@@ -90,6 +90,7 @@ export default function PlayPage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [dailyState, setDailyState] = useState<DailyState | null>(null);
+  const [dayState, setDayState] = useState<DailyRun["dayState"] | null>(null);
   const [allocation, setAllocation] =
     useState<AllocationPayload>(defaultAllocation);
   const [allocationSaved, setAllocationSaved] = useState(false);
@@ -463,6 +464,7 @@ export default function PlayPage() {
           setCohortId(run.cohortId ?? null);
           setStorylets(run.storylets);
           setRuns(run.storyletRunsToday);
+          setDayState(run.dayState ?? null);
           setAllocationSaved(Boolean(run.allocation));
           setAllocation({ ...defaultAllocation, ...(run.allocation ?? {}) });
           setHasSentBoost(!run.canBoost);
@@ -481,7 +483,12 @@ export default function PlayPage() {
           }
           const ds =
             run.dailyState ?? (await fetchDailyState(bootstrapUserId));
-          if (ds) setDailyState({ ...ds, day_index: run.dayIndex });
+          if (ds) {
+            setDailyState({ ...ds, day_index: run.dayIndex });
+            if (!run.dayState) {
+              setDayState({ energy: ds.energy, stress: ds.stress });
+            }
+          }
 
           const servedKey = `${run.dayIndex}:${run.storylets
             .map((s) => s.id)
@@ -519,6 +526,10 @@ export default function PlayPage() {
           const ds = await fetchDailyState(bootstrapUserId);
           if (ds) {
             setDailyState({ ...ds, day_index: cadence.dayIndex });
+            setDayState({
+              energy: ds.energy,
+              stress: ds.stress,
+            });
           }
           const day = cadence.dayIndex;
 
@@ -1272,8 +1283,9 @@ export default function PlayPage() {
             <div>
               <h1 className="text-2xl font-semibold">Play</h1>
               <p className="text-slate-700">
-                Day {dayIndex} · Energy {dailyState?.energy ?? "—"} · Stress{" "}
-                {dailyState?.stress ?? "—"}
+                Day {dayIndex} · Energy{" "}
+                {dayState?.energy ?? dailyState?.energy ?? "—"} · Stress{" "}
+                {dayState?.stress ?? dailyState?.stress ?? "—"}
               </p>
               <div className="mt-2 text-sm text-slate-600">
                 <p className="font-medium text-slate-700">

@@ -62,6 +62,7 @@ import {
   fetchSkillBank,
   fetchTensions,
 } from "@/lib/dailyInteractions";
+import { ensureDayStateUpToDate } from "@/lib/dayState";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
@@ -168,6 +169,7 @@ export async function getOrCreateDailyRun(
 
   const [
     daily,
+    dayState,
     allocation,
     runs,
     storyletsRaw,
@@ -178,6 +180,7 @@ export async function getOrCreateDailyRun(
     allocations,
   ] = await Promise.all([
     fetchDailyState(userId),
+    ensureDayStateUpToDate(userId, dayIndex).catch(() => null),
     fetchTimeAllocation(userId, dayIndex),
     fetchTodayRuns(userId, dayIndex),
     fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
@@ -460,6 +463,16 @@ export async function getOrCreateDailyRun(
     funPulseEligible,
     funPulseDone,
     dailyState: daily,
+    dayState: dayState
+      ? {
+          energy: dayState.energy,
+          stress: dayState.stress,
+          money: dayState.money,
+          study_progress: dayState.study_progress,
+          social_capital: dayState.social_capital,
+          health: dayState.health,
+        }
+      : null,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
     seasonRecap: seasonResetNeeded ? seasonRecap : undefined,

@@ -60,6 +60,9 @@ vi.mock("@/lib/dailyInteractions", () => ({
   fetchSkillBank: vi.fn(),
   fetchPosture: vi.fn(),
 }));
+vi.mock("@/lib/dayState", () => ({
+  ensureDayStateUpToDate: vi.fn(),
+}));
 vi.mock("@/lib/cohorts", () => ({
   ensureUserInCohort: vi.fn(),
 }));
@@ -130,6 +133,7 @@ import {
   fetchSkillBank,
   fetchTensions,
 } from "@/lib/dailyInteractions";
+import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { fetchArcByKey } from "@/lib/content/arcs";
 import { listActiveArcs } from "@/lib/content/arcs";
@@ -188,6 +192,19 @@ const dailyState: DailyState = {
   vectors: {},
 };
 
+const dayState = {
+  user_id: "u",
+  day_index: 2,
+  energy: 70,
+  stress: 20,
+  money: 0,
+  study_progress: 0,
+  social_capital: 0,
+  health: 50,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 beforeEach(() => {
   vi.mocked(getSeasonContext).mockResolvedValue({
     currentSeason: {
@@ -218,6 +235,7 @@ beforeEach(() => {
     alreadyCompletedToday: false,
   });
   vi.mocked(fetchDailyState).mockResolvedValue(dailyState);
+  vi.mocked(ensureDayStateUpToDate).mockResolvedValue(dayState);
   vi.mocked(fetchTimeAllocation).mockResolvedValue({
     study: 20,
     work: 20,
