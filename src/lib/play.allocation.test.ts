@@ -35,16 +35,24 @@ const mockState = vi.hoisted(() => {
 
 vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
 vi.mock("@/lib/dayState", () => ({ ensureDayStateUpToDate: vi.fn() }));
+vi.mock("@/lib/dailyInteractions", () => ({ fetchSkillLevels: vi.fn() }));
 
 import { saveTimeAllocation } from "@/lib/play";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { hashAllocation } from "@/core/sim/allocationEffects";
+import { fetchSkillLevels } from "@/lib/dailyInteractions";
 
 const allocation = { study: 40, work: 20, social: 10, health: 20, fun: 10 };
 
 describe("saveTimeAllocation", () => {
   it("applies allocation effects on first submit", async () => {
     mockState.reset();
+    vi.mocked(fetchSkillLevels).mockResolvedValue({
+      focus: 0,
+      memory: 0,
+      networking: 0,
+      grit: 0,
+    });
     vi.mocked(ensureDayStateUpToDate).mockResolvedValue({
       user_id: "u",
       day_index: 2,
@@ -77,6 +85,12 @@ describe("saveTimeAllocation", () => {
 
   it("is idempotent for the same allocation", async () => {
     mockState.reset();
+    vi.mocked(fetchSkillLevels).mockResolvedValue({
+      focus: 0,
+      memory: 0,
+      networking: 0,
+      grit: 0,
+    });
     const sameHash = hashAllocation(allocation);
     vi.mocked(ensureDayStateUpToDate).mockResolvedValue({
       user_id: "u",
@@ -101,6 +115,12 @@ describe("saveTimeAllocation", () => {
 
   it("recomputes from pre-allocation baseline when allocation changes", async () => {
     mockState.reset();
+    vi.mocked(fetchSkillLevels).mockResolvedValue({
+      focus: 0,
+      memory: 0,
+      networking: 0,
+      grit: 0,
+    });
     vi.mocked(ensureDayStateUpToDate).mockResolvedValue({
       user_id: "u",
       day_index: 2,

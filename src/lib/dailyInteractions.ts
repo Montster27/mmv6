@@ -303,7 +303,7 @@ export async function fetchSkillAllocations(
 
 export async function fetchSkillLevels(
   userId: string
-): Promise<Array<{ skill_key: string; level: number }>> {
+): Promise<{ focus: number; memory: number; networking: number; grit: number }> {
   const { data, error } = await supabase
     .from("skill_point_allocations")
     .select("skill_key")
@@ -311,7 +311,7 @@ export async function fetchSkillLevels(
 
   if (error) {
     console.error("Failed to fetch skill levels", error);
-    return [];
+    return { focus: 0, memory: 0, networking: 0, grit: 0 };
   }
 
   const counts = new Map<string, number>();
@@ -321,10 +321,12 @@ export async function fetchSkillLevels(
     counts.set(key, (counts.get(key) ?? 0) + 1);
   });
 
-  return Array.from(counts.entries()).map(([skill_key, level]) => ({
-    skill_key,
-    level,
-  }));
+  return {
+    focus: counts.get("focus") ?? 0,
+    memory: counts.get("memory") ?? 0,
+    networking: counts.get("networking") ?? 0,
+    grit: counts.get("grit") ?? 0,
+  };
 }
 
 export async function allocateSkillPoint(params: {

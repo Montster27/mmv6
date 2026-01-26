@@ -12,6 +12,7 @@ import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
 import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
 import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
+import { fetchSkillLevels } from "@/lib/dailyInteractions";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -141,11 +142,13 @@ export async function saveTimeAllocation(
 
   const baseEnergy = dayState.pre_allocation_energy ?? dayState.energy;
   const baseStress = dayState.pre_allocation_stress ?? dayState.stress;
+  const skills = await fetchSkillLevels(userId);
   const next = applyAllocationToDayState({
     energy: baseEnergy,
     stress: baseStress,
     allocation: normalizedAllocation,
     posture,
+    skills,
   });
 
   const { error: updateError } = await supabase

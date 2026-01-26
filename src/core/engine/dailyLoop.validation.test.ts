@@ -273,7 +273,12 @@ beforeEach(() => {
     created_at: new Date().toISOString(),
   });
   vi.mocked(fetchSkillAllocations).mockResolvedValue([]);
-  vi.mocked(fetchSkillLevels).mockResolvedValue([]);
+  vi.mocked(fetchSkillLevels).mockResolvedValue({
+    focus: 0,
+    memory: 0,
+    networking: 0,
+    grit: 0,
+  });
   vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
   vi.mocked(fetchArcByKey).mockResolvedValue(null);
   vi.mocked(listActiveArcs).mockResolvedValue([]);
