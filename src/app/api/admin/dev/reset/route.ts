@@ -73,6 +73,13 @@ export async function POST(request: Request) {
   await supabaseServer.from("reflections").delete().eq("user_id", userId);
   await supabaseServer.from("micro_task_runs").delete().eq("user_id", userId);
   await supabaseServer.from("time_allocations").delete().eq("user_id", userId);
+  await supabaseServer.from("daily_tensions").delete().eq("user_id", userId);
+  await supabaseServer.from("skill_bank").delete().eq("user_id", userId);
+  await supabaseServer.from("daily_posture").delete().eq("user_id", userId);
+  await supabaseServer.from("skill_point_allocations").delete().eq("user_id", userId);
+  await supabaseServer.from("user_alignment").delete().eq("user_id", userId);
+  await supabaseServer.from("alignment_events").delete().eq("user_id", userId);
+  await supabaseServer.from("arc_instances").delete().eq("user_id", userId);
   await supabaseServer.from("player_day_state").delete().eq("user_id", userId);
   await supabaseServer.from("events").delete().eq("user_id", userId);
   await supabaseServer.from("user_anomalies").delete().eq("user_id", userId);
