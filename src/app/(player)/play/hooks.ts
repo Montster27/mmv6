@@ -179,7 +179,7 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     [setDailyProgress]
   );
   const setMicroTaskStatus = useCallback(
-    (microTaskStatus: \"pending\" | \"done\" | \"skipped\") =>
+    (microTaskStatus: "pending" | "done" | "skipped") =>
       setDailyProgress({ microTaskStatus }),
     [setDailyProgress]
   );
