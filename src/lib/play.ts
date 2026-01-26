@@ -109,7 +109,8 @@ export function toChoices(storylet: Storylet | any): StoryletChoice[] {
 export async function saveTimeAllocation(
   userId: string,
   dayIndex: number,
-  allocation: AllocationPayload
+  allocation: AllocationPayload,
+  posture?: string | null
 ) {
   const { error } = await supabase.from("time_allocations").upsert(
     {
@@ -144,6 +145,7 @@ export async function saveTimeAllocation(
     energy: baseEnergy,
     stress: baseStress,
     allocation: normalizedAllocation,
+    posture,
   });
 
   const { error: updateError } = await supabase

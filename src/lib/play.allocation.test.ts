@@ -61,14 +61,14 @@ describe("saveTimeAllocation", () => {
       updated_at: new Date().toISOString(),
     });
 
-    await saveTimeAllocation("u", 2, allocation);
+    await saveTimeAllocation("u", 2, allocation, "steady");
 
     const updates = mockState.getUpdatePayloads();
     expect(updates.length).toBe(1);
     expect(updates[0].table).toBe("player_day_state");
     expect(updates[0].payload).toMatchObject({
-      energy: 61,
-      stress: 24,
+      energy: 60,
+      stress: 23,
       pre_allocation_energy: 70,
       pre_allocation_stress: 20,
       allocation_hash: hashAllocation(allocation),
@@ -94,7 +94,7 @@ describe("saveTimeAllocation", () => {
       updated_at: new Date().toISOString(),
     });
 
-    await saveTimeAllocation("u", 2, allocation);
+    await saveTimeAllocation("u", 2, allocation, "steady");
 
     expect(mockState.getUpdatePayloads().length).toBe(0);
   });
@@ -125,7 +125,7 @@ describe("saveTimeAllocation", () => {
       fun: 10,
     };
 
-    await saveTimeAllocation("u", 2, nextAllocation);
+    await saveTimeAllocation("u", 2, nextAllocation, "steady");
 
     const updates = mockState.getUpdatePayloads();
     expect(updates.length).toBe(1);
@@ -134,7 +134,7 @@ describe("saveTimeAllocation", () => {
       pre_allocation_stress: 10,
       allocation_hash: hashAllocation(nextAllocation),
     });
-    expect(updates[0].payload.energy).toBe(51);
-    expect(updates[0].payload.stress).toBe(14);
+    expect(updates[0].payload.energy).toBe(50);
+    expect(updates[0].payload.stress).toBe(13);
   });
 });

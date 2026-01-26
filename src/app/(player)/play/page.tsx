@@ -792,7 +792,7 @@ export default function PlayPage() {
     setSavingAllocation(true);
     setError(null);
     try {
-      await saveTimeAllocation(userId, dayIndex, allocation);
+      await saveTimeAllocation(userId, dayIndex, allocation, posture?.posture ?? null);
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         const refreshed = await getOrCreateDailyRun(userId, new Date(), {
           microtaskVariant,
