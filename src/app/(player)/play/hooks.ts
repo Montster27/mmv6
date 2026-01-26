@@ -21,6 +21,7 @@ export type DailyProgressState = {
   dailyState: DailyState | null;
   dayState: DailyRun["dayState"] | null;
   allocation: AllocationPayload;
+  allocationSummary: AllocationPayload;
   allocationSaved: boolean;
   storylets: any[];
   runs: StoryletRun[];
@@ -56,6 +57,7 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     dailyState: null,
     dayState: null,
     allocation: initialAllocation,
+    allocationSummary: initialAllocation,
     allocationSaved: false,
     storylets: [],
     runs: [],
@@ -99,6 +101,11 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
   );
   const setAllocation = useCallback(
     (allocation: AllocationPayload) => setDailyProgress({ allocation }),
+    [setDailyProgress]
+  );
+  const setAllocationSummary = useCallback(
+    (allocationSummary: AllocationPayload) =>
+      setDailyProgress({ allocationSummary }),
     [setDailyProgress]
   );
   const setAllocationSaved = useCallback(
@@ -220,6 +227,7 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     setDailyState,
     setDayState,
     setAllocation,
+    setAllocationSummary,
     setAllocationSaved,
     setStorylets,
     setRuns,

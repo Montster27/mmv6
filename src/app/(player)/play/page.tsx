@@ -87,6 +87,7 @@ export default function PlayPage() {
     dailyState,
     dayState,
     allocation,
+    allocationSummary,
     allocationSaved,
     storylets,
     runs,
@@ -113,6 +114,7 @@ export default function PlayPage() {
     setDailyState,
     setDayState,
     setAllocation,
+    setAllocationSummary,
     setAllocationSaved,
     setStorylets,
     setRuns,
@@ -485,6 +487,10 @@ export default function PlayPage() {
               ...defaultAllocation,
               ...(run.allocation ?? run.allocationSeed ?? {}),
             },
+            allocationSummary: {
+              ...defaultAllocation,
+              ...(run.allocation ?? run.allocationSeed ?? {}),
+            },
             microTaskStatus: run.microTaskStatus ?? "pending",
             seasonContext: run.seasonContext ?? null,
             funPulseEligible: Boolean(run.funPulseEligible),
@@ -582,11 +588,13 @@ export default function PlayPage() {
           if (existingAllocation) {
             setDailyProgress({
               allocation: { ...defaultAllocation, ...existingAllocation },
+              allocationSummary: { ...defaultAllocation, ...existingAllocation },
               allocationSaved: true,
             });
           } else {
             setDailyProgress({
               allocation: { ...defaultAllocation },
+              allocationSummary: { ...defaultAllocation },
               allocationSaved: false,
             });
           }
@@ -838,6 +846,7 @@ export default function PlayPage() {
         await resolveTension(userId, dayIndex, "fatigue");
       }
       setAllocationSaved(true);
+      setAllocationSummary(allocation);
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         setStage("storylet_1");
       }
@@ -1891,7 +1900,7 @@ export default function PlayPage() {
               <ProgressPanel
                 dailyState={dailyState}
                 dayState={dayState}
-                allocation={allocation}
+                allocation={allocationSummary}
                 skillBank={skillBank}
                 lastAppliedDeltas={outcomeDeltas}
                 boostsReceivedCount={boostsReceived.length}
