@@ -18,6 +18,7 @@ type Props = {
   dayState?: DailyRun["dayState"] | null;
   allocation?: AllocationMap | null;
   skillBank?: { available_points: number; cap: number } | null;
+  skills?: DailyRun["skills"] | null;
   lastAppliedDeltas?: DeltaInfo | null;
   boostsReceivedCount?: number;
 };
@@ -72,6 +73,7 @@ function ProgressPanelComponent({
   dayState,
   allocation,
   skillBank,
+  skills,
   lastAppliedDeltas,
   boostsReceivedCount,
 }: Props) {
@@ -80,6 +82,12 @@ function ProgressPanelComponent({
   const stress = dayState?.stress ?? dailyState?.stress;
   const vectors = toVectors(dailyState?.vectors ?? {});
   const allocationTotals = allocation ?? {};
+  const skillLevels = skills ?? {
+    focus: 0,
+    memory: 0,
+    networking: 0,
+    grit: 0,
+  };
 
   const vectorKeys =
     Object.keys(vectors).length > 0
@@ -161,6 +169,24 @@ function ProgressPanelComponent({
               ? `${skillBank.available_points} / ${skillBank.cap}`
               : "—"}
           </span>
+        </div>
+        <div className="mt-2 space-y-1 text-slate-600">
+          <div className="flex items-center justify-between">
+            <span>Focus</span>
+            <span>{skillLevels.focus}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Memory</span>
+            <span>{skillLevels.memory}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Networking</span>
+            <span>{skillLevels.networking}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Grit</span>
+            <span>{skillLevels.grit}</span>
+          </div>
         </div>
       </div>
 

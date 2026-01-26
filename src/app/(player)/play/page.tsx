@@ -98,6 +98,7 @@ export default function PlayPage() {
     skillBank,
     posture,
     skillAllocations,
+    skills,
     seasonResetPending,
     seasonRecap,
     seasonIndex,
@@ -122,6 +123,7 @@ export default function PlayPage() {
     setSkillBank,
     setPosture,
     setSkillAllocations,
+    setSkills,
     setSeasonResetPending,
     setSeasonRecap,
     setSeasonIndex,
@@ -471,6 +473,7 @@ export default function PlayPage() {
             skillBank: run.skillBank ?? null,
             posture: run.posture ?? null,
             skillAllocations: run.allocations ?? [],
+            skills: run.skills ?? null,
             storylets: run.storylets,
             runs: run.storyletRunsToday,
             dayState: run.dayState ?? null,
@@ -1873,6 +1876,7 @@ export default function PlayPage() {
                 skillBank={skillBank}
                 lastAppliedDeltas={outcomeDeltas}
                 boostsReceivedCount={boostsReceived.length}
+                skills={skills}
               />
             </div>
           </div>

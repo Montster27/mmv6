@@ -33,6 +33,7 @@ export type DailyProgressState = {
   skillBank: SkillBank | null;
   posture: DailyPosture | null;
   skillAllocations: SkillPointAllocation[];
+  skills: DailyRun["skills"] | null;
   seasonResetPending: boolean;
   seasonRecap: SeasonRecap | null;
   seasonIndex: number | null;
@@ -66,6 +67,7 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     skillBank: null,
     posture: null,
     skillAllocations: [],
+    skills: null,
     seasonResetPending: false,
     seasonRecap: null,
     seasonIndex: null,
@@ -154,6 +156,10 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
       setDailyProgress({ skillAllocations }),
     [setDailyProgress]
   );
+  const setSkills = useCallback(
+    (skills: DailyRun["skills"] | null) => setDailyProgress({ skills }),
+    [setDailyProgress]
+  );
   const setSeasonResetPending = useCallback(
     (seasonResetPending: boolean) => setDailyProgress({ seasonResetPending }),
     [setDailyProgress]
@@ -220,6 +226,7 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     setSkillBank,
     setPosture,
     setSkillAllocations,
+    setSkills,
     setSeasonResetPending,
     setSeasonRecap,
     setSeasonIndex,
