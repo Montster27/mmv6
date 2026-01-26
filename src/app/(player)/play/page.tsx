@@ -1927,6 +1927,8 @@ export default function PlayPage() {
             <div className="space-y-4">
               <ProgressPanel
                 dailyState={dailyState}
+                dayState={dayState}
+                allocation={allocation}
                 lastAppliedDeltas={outcomeDeltas}
                 boostsReceivedCount={boostsReceived.length}
               />

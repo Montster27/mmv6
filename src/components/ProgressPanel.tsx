@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import type { DailyState } from "@/types/daily";
+import type { DailyState, AllocationMap } from "@/types/daily";
+import type { DailyRun } from "@/types/dailyRun";
 import type { SevenVectors } from "@/types/vectors";
 import { summarizeVectors } from "@/core/ui/vectorSummary";
 
@@ -14,6 +15,8 @@ type DeltaInfo = {
 
 type Props = {
   dailyState?: Pick<DailyState, "energy" | "stress" | "vectors"> | null;
+  dayState?: DailyRun["dayState"] | null;
+  allocation?: AllocationMap | null;
   lastAppliedDeltas?: DeltaInfo | null;
   boostsReceivedCount?: number;
 };
@@ -65,13 +68,16 @@ function deltaBadge(delta?: number, highlight?: boolean) {
 
 export function ProgressPanel({
   dailyState,
+  dayState,
+  allocation,
   lastAppliedDeltas,
   boostsReceivedCount,
 }: Props) {
   const [highlight, setHighlight] = useState<DeltaInfo | null>(null);
-  const energy = dailyState?.energy;
-  const stress = dailyState?.stress;
+  const energy = dayState?.energy ?? dailyState?.energy;
+  const stress = dayState?.stress ?? dailyState?.stress;
   const vectors = toVectors(dailyState?.vectors ?? {});
+  const allocationTotals = allocation ?? {};
 
   const vectorKeys =
     Object.keys(vectors).length > 0
@@ -93,6 +99,7 @@ export function ProgressPanel({
 
   return (
     <aside className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-4">
+      <h2 className="text-sm font-semibold text-slate-800">Resources</h2>
       <div className="space-y-2">
         <div
           className={`flex items-center justify-between text-sm ${
@@ -122,6 +129,29 @@ export function ProgressPanel({
           </span>
         </div>
         {bar(stress, highlightStress)}
+      </div>
+
+      <div className="space-y-1 text-sm text-slate-700">
+        <div className="flex items-center justify-between">
+          <span>Study</span>
+          <span>{allocationTotals.study ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Work</span>
+          <span>{allocationTotals.work ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Social</span>
+          <span>{allocationTotals.social ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Health</span>
+          <span>{allocationTotals.health ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Fun</span>
+          <span>{allocationTotals.fun ?? 0}</span>
+        </div>
       </div>
 
       <div className="space-y-2">
