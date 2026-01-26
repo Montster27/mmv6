@@ -1555,6 +1555,7 @@ export default function PlayPage() {
                         posture={posture}
                         dayIndex={dayIndex}
                         allocations={skillAllocations}
+                        skills={skills ?? undefined}
                         onAllocateSkillPoint={handleAllocateSkillPoint}
                         submitting={allocatingSkill}
                         onSubmitPosture={handleSubmitPosture}

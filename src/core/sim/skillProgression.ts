@@ -1,5 +1,5 @@
 export function skillCostForLevel(level: number): number {
-  return Math.round((level * level) / 2) + 1;
+  return Math.max(1, Math.round((level * level) / 2));
 }
 
 export function canLevelSkill(params: {

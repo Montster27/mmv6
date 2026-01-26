@@ -5,6 +5,8 @@ import type {
   SkillBank,
   SkillPointAllocation,
 } from "@/types/dailyInteraction";
+import type { CheckSkillLevels } from "@/types/checks";
+import { skillCostForLevel } from "@/core/sim/skillProgression";
 
 type Props = {
   tensions: DailyTension[];
@@ -12,6 +14,7 @@ type Props = {
   posture: DailyPosture | null;
   dayIndex: number;
   allocations: SkillPointAllocation[];
+  skills?: CheckSkillLevels | null;
   onAllocateSkillPoint: (skillKey: string) => void;
   submitting?: boolean;
   onSubmitPosture: (posture: DailyPosture["posture"]) => void;
@@ -32,6 +35,7 @@ export function DailySetupPanel({
   posture,
   dayIndex,
   allocations,
+  skills,
   onAllocateSkillPoint,
   submitting,
   onSubmitPosture,
@@ -42,6 +46,12 @@ export function DailySetupPanel({
   const points = skillBank?.available_points ?? 0;
   const cap = skillBank?.cap ?? 0;
   const unresolvedCount = activeTensions.length;
+  const skillLevels: CheckSkillLevels = {
+    focus: skills?.focus ?? 0,
+    memory: skills?.memory ?? 0,
+    networking: skills?.networking ?? 0,
+    grit: skills?.grit ?? 0,
+  };
   const getHint = (tension: DailyTension) => {
     const meta = tension.meta as Record<string, unknown> | null;
     return meta && typeof meta.hint === "string" ? meta.hint : null;
@@ -95,15 +105,21 @@ export function DailySetupPanel({
         )}
         <div className="flex flex-wrap gap-2">
           {SKILLS.map((skill) => (
-            <Button
-              key={skill}
-              variant="outline"
-              disabled={submitting || points <= 0}
-              onClick={() => onAllocateSkillPoint(skill)}
-              className="capitalize"
-            >
-              Allocate 1 · {skill}
-            </Button>
+            (() => {
+              const level = skillLevels[skill as keyof CheckSkillLevels] ?? 0;
+              const cost = skillCostForLevel(level + 1);
+              return (
+                <Button
+                  key={skill}
+                  variant="outline"
+                  disabled={submitting || points < cost}
+                  onClick={() => onAllocateSkillPoint(skill)}
+                  className="capitalize"
+                >
+                  Allocate {cost} · {skill}
+                </Button>
+              );
+            })()
           ))}
         </div>
       </div>
