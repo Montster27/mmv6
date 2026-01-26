@@ -337,19 +337,7 @@ export async function applyOutcomeForChoice(
   };
   resolvedOutcomeId?: string;
   resolvedOutcomeAnomalies?: string[];
-  lastCheck?: {
-    storyletId: string;
-    checkId: string;
-    chance: number;
-    success: boolean;
-    contributions: {
-      base: number;
-      skills: number;
-      energy: number;
-      stress: number;
-      posture: number;
-    };
-  };
+  lastCheck?: CheckResult;
 }> {
   const choice = toChoices(storylet).find((c) => c.id === choiceId);
   let resolvedOutcome: StoryletOutcome | undefined = choice?.outcome;
