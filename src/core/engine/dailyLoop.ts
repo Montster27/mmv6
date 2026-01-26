@@ -195,6 +195,13 @@ export async function getOrCreateDailyRun(
     // Note: we fetch recent history separately below.
   ]);
 
+  let allocationSeed = null as DailyRun["allocationSeed"];
+  if (!allocation && dayIndex > 0) {
+    allocationSeed = await fetchTimeAllocation(userId, dayIndex - 1).catch(
+      () => null
+    );
+  }
+
   const recentRuns =
     (await fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => [])) ?? [];
 
@@ -396,6 +403,7 @@ export async function getOrCreateDailyRun(
     date: todayUtc,
     stage,
     allocation: allocation ?? null,
+    allocationSeed,
     storylets: hasStorylets ? storylets : [fallbackStorylet(), fallbackStorylet()],
     storyletRunsToday: runs,
     canBoost,

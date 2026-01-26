@@ -481,7 +481,10 @@ export default function PlayPage() {
             runs: run.storyletRunsToday,
             dayState: run.dayState ?? null,
             allocationSaved: Boolean(run.allocation),
-            allocation: { ...defaultAllocation, ...(run.allocation ?? {}) },
+            allocation: {
+              ...defaultAllocation,
+              ...(run.allocation ?? run.allocationSeed ?? {}),
+            },
             microTaskStatus: run.microTaskStatus ?? "pending",
             seasonContext: run.seasonContext ?? null,
             funPulseEligible: Boolean(run.funPulseEligible),

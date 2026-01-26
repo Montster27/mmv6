@@ -29,6 +29,7 @@ export type DailyRun = {
   date: string; // UTC YYYY-MM-DD
   stage: DailyRunStage;
   allocation?: AllocationMap | null;
+  allocationSeed?: AllocationMap | null;
   storylets: Storylet[];
   storyletRunsToday: StoryletRun[];
   canBoost: boolean;
