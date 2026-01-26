@@ -64,6 +64,7 @@ import {
   fetchTensions,
 } from "@/lib/dailyInteractions";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
+import { skillCostForLevel } from "@/core/sim/skillProgression";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
@@ -121,11 +122,29 @@ function devLogStage(snapshot: Record<string, unknown>) {
 function needsSetup({
   skillBank,
   posture,
+  skillLevels,
 }: {
   skillBank: SkillBank | null;
   posture: DailyPosture | null;
+  skillLevels: { focus: number; memory: number; networking: number; grit: number } | null;
 }) {
-  if (skillBank && skillBank.available_points > 0) return true;
+  if (skillBank && skillBank.available_points > 0) {
+    const levels = skillLevels ?? {
+      focus: 0,
+      memory: 0,
+      networking: 0,
+      grit: 0,
+    };
+    const minCost = Math.min(
+      skillCostForLevel(levels.focus + 1),
+      skillCostForLevel(levels.memory + 1),
+      skillCostForLevel(levels.networking + 1),
+      skillCostForLevel(levels.grit + 1)
+    );
+    if (skillBank.available_points >= minCost) {
+      return true;
+    }
+  }
   if (!posture) return true;
   return false;
 }
@@ -346,7 +365,7 @@ export async function getOrCreateDailyRun(
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
   const canBoost = !boosted;
-  const setupNeeded = needsSetup({ skillBank, posture });
+  const setupNeeded = needsSetup({ skillBank, posture, skillLevels: skills ?? null });
   const baseStage = computeStage(
     Boolean(allocation),
     runsForPair.length,
