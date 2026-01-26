@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { AlignmentEvent, Faction, FactionKey } from "@/types/factions";
 
 type DirectiveSummary = {
@@ -53,7 +54,7 @@ function cohortLabel(cohortId: string) {
   return `Cohort ${String.fromCharCode(65 + index)}`;
 }
 
-export function FactionStatusPanel({
+function FactionStatusPanelComponent({
   factions,
   alignment,
   directive,
@@ -170,3 +171,5 @@ export function FactionStatusPanel({
     </div>
   );
 }
+
+export const FactionStatusPanel = memo(FactionStatusPanelComponent);

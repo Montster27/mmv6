@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 import type { DailyState, AllocationMap } from "@/types/daily";
 import type { DailyRun } from "@/types/dailyRun";
@@ -66,7 +66,7 @@ function deltaBadge(delta?: number, highlight?: boolean) {
   );
 }
 
-export function ProgressPanel({
+function ProgressPanelComponent({
   dailyState,
   dayState,
   allocation,
@@ -198,3 +198,5 @@ export function ProgressPanel({
     </aside>
   );
 }
+
+export const ProgressPanel = memo(ProgressPanelComponent);

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -38,16 +39,12 @@ import {
   toChoices,
   type AllocationPayload,
 } from "@/lib/play";
-import type { DailyState } from "@/types/daily";
-import type { StoryletRun } from "@/types/storylets";
 import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
 import {
   fetchPublicProfiles,
   fetchTodayReceivedBoosts,
   hasSentBoostToday,
   sendBoost,
-  type PublicProfile,
-  type ReceivedBoost,
 } from "@/lib/social";
 import { upsertReflection } from "@/lib/reflections";
 import {
@@ -58,23 +55,19 @@ import {
 } from "@/lib/dailyInteractions";
 import { advanceArc, completeArc, startArc } from "@/lib/arcs";
 import { contributeToInitiative } from "@/lib/initiatives";
-import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
+import type { DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
-  DailyTension,
-  SkillBank,
-  SkillPointAllocation,
 } from "@/types/dailyInteraction";
-import type { Initiative } from "@/types/initiatives";
-import type { AlignmentEvent, Faction } from "@/types/factions";
 import type { ReflectionResponse } from "@/types/reflections";
-import type { SeasonRecap } from "@/types/seasons";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { ProgressPanel } from "@/components/ProgressPanel";
 import { SeasonBadge } from "@/components/SeasonBadge";
-import type { SeasonContext } from "@/types/season";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
+import { useDailyProgress, useGameContent, useUserSocial } from "./hooks";
+
+const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
 const defaultAllocation: AllocationPayload = {
   study: 0,
@@ -89,71 +82,106 @@ const USE_DAILY_LOOP_ORCHESTRATOR = true;
 export default function PlayPage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
-  const [dailyState, setDailyState] = useState<DailyState | null>(null);
-  const [dayState, setDayState] = useState<DailyRun["dayState"] | null>(null);
-  const [allocation, setAllocation] =
-    useState<AllocationPayload>(defaultAllocation);
-  const [allocationSaved, setAllocationSaved] = useState(false);
-  const [storylets, setStorylets] = useState<any[]>([]);
-  const [runs, setRuns] = useState<StoryletRun[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const {
+    dailyState,
+    dayState,
+    allocation,
+    allocationSaved,
+    storylets,
+    runs,
+    currentIndex,
+    loading,
+    alreadyCompletedToday,
+    dayIndexState,
+    stage,
+    tensions,
+    skillBank,
+    posture,
+    skillAllocations,
+    seasonResetPending,
+    seasonRecap,
+    seasonIndex,
+    seasonContext,
+    funPulseEligible,
+    funPulseDone,
+    microTaskStatus,
+    outcomeMessage,
+    outcomeDeltas,
+    setDailyState,
+    setDayState,
+    setAllocation,
+    setAllocationSaved,
+    setStorylets,
+    setRuns,
+    setCurrentIndex,
+    setLoading,
+    setAlreadyCompletedToday,
+    setDayIndexState,
+    setStage,
+    setTensions,
+    setSkillBank,
+    setPosture,
+    setSkillAllocations,
+    setSeasonResetPending,
+    setSeasonRecap,
+    setSeasonIndex,
+    setSeasonContext,
+    setFunPulseEligible,
+    setFunPulseDone,
+    setMicroTaskStatus,
+    setOutcomeMessage,
+    setOutcomeDeltas,
+    setDailyProgress,
+  } = useDailyProgress(defaultAllocation);
   const [savingAllocation, setSavingAllocation] = useState(false);
   const [savingChoice, setSavingChoice] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [publicProfiles, setPublicProfiles] = useState<PublicProfile[]>([]);
-  const [selectedRecipient, setSelectedRecipient] = useState<string>("");
-  const [boostsReceived, setBoostsReceived] = useState<ReceivedBoost[]>([]);
-  const [hasSentBoost, setHasSentBoost] = useState(false);
-  const [loadingSocial, setLoadingSocial] = useState(false);
-  const [alreadyCompletedToday, setAlreadyCompletedToday] = useState(false);
-  const [dayIndexState, setDayIndexState] = useState(1);
-  const [stage, setStage] = useState<DailyRunStage>("allocation");
-  const [tensions, setTensions] = useState<DailyTension[]>([]);
-  const [skillBank, setSkillBank] = useState<SkillBank | null>(null);
-  const [posture, setPosture] = useState<DailyPosture | null>(null);
-  const [skillAllocations, setSkillAllocations] = useState<SkillPointAllocation[]>([]);
+  const {
+    publicProfiles,
+    selectedRecipient,
+    boostsReceived,
+    hasSentBoost,
+    loadingSocial,
+    boostMessage,
+    setPublicProfiles,
+    setSelectedRecipient,
+    setBoostsReceived,
+    setHasSentBoost,
+    setLoadingSocial,
+    setBoostMessage,
+    setUserSocial,
+  } = useUserSocial();
   const [allocatingSkill, setAllocatingSkill] = useState(false);
   const [submittingPosture, setSubmittingPosture] = useState(false);
   const [setupActionError, setSetupActionError] = useState<string | null>(null);
   const [dayRolloverNotice, setDayRolloverNotice] = useState<string | null>(null);
-  const [factions, setFactions] = useState<Faction[]>([]);
-  const [alignment, setAlignment] = useState<Record<string, number>>({});
-  const [directive, setDirective] = useState<DailyRun["directive"] | null>(null);
-  const [recentAlignmentEvents, setRecentAlignmentEvents] = useState<AlignmentEvent[]>(
-    []
-  );
-  const [worldState, setWorldState] = useState<DailyRun["worldState"] | null>(null);
-  const [cohortState, setCohortState] = useState<DailyRun["cohortState"] | null>(null);
-  const [rivalry, setRivalry] = useState<DailyRun["rivalry"] | null>(null);
-  const [availableArcs, setAvailableArcs] = useState<
-    Array<{ key: string; title: string; description: string }>
-  >([]);
-  const [cohortId, setCohortId] = useState<string | null>(null);
-  const [arc, setArc] = useState<{
-    arc_key: string;
-    status: "not_started" | "active" | "completed";
-    title: string;
-    description: string;
-    current_step: number | null;
-    step?: {
-      step_index: number;
-      title: string;
-      body: string;
-      choices: Array<{ key: string; label: string; flags?: Record<string, boolean> }>;
-    } | null;
-  } | null>(null);
-  const [initiatives, setInitiatives] = useState<
-    Array<Initiative & { contributedToday?: boolean; progress?: number }>
-  >([]);
+  const {
+    factions,
+    alignment,
+    directive,
+    recentAlignmentEvents,
+    worldState,
+    cohortState,
+    rivalry,
+    availableArcs,
+    cohortId,
+    arc,
+    initiatives,
+    setFactions,
+    setAlignment,
+    setDirective,
+    setRecentAlignmentEvents,
+    setWorldState,
+    setCohortState,
+    setRivalry,
+    setAvailableArcs,
+    setCohortId,
+    setArc,
+    setInitiatives,
+    setGameContent,
+  } = useGameContent();
   const [arcSubmitting, setArcSubmitting] = useState(false);
   const [initiativeSubmitting, setInitiativeSubmitting] = useState(false);
-  const [seasonResetPending, setSeasonResetPending] = useState(false);
-  const [seasonRecap, setSeasonRecap] = useState<SeasonRecap | null>(null);
-  const [seasonIndex, setSeasonIndex] = useState<number | null>(null);
-  const [seasonContext, setSeasonContext] = useState<SeasonContext | null>(null);
-  const [funPulseEligible, setFunPulseEligible] = useState(false);
-  const [funPulseDone, setFunPulseDone] = useState(false);
   const [funPulseSaving, setFunPulseSaving] = useState(false);
   const [bootstrapAssignments, setBootstrapAssignments] = useState<
     Record<string, string>
@@ -189,16 +217,7 @@ export default function PlayPage() {
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
   const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
-  const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
-  const [outcomeDeltas, setOutcomeDeltas] = useState<{
-    energy?: number;
-    stress?: number;
-    vectors?: Record<string, number>;
-  } | null>(null);
-  const [boostMessage, setBoostMessage] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
-  const [microTaskStatus, setMicroTaskStatus] =
-    useState<"pending" | "done" | "skipped">("pending");
   const [microTaskSaving, setMicroTaskSaving] = useState(false);
   const [consequenceActive, setConsequenceActive] = useState(false);
   const sessionStartTracked = useRef(false);
@@ -444,43 +463,41 @@ export default function PlayPage() {
             setDayRolloverNotice("New day has started.");
           }
           lastRunDayIndexRef.current = run.dayIndex;
-          setDayIndexState(run.dayIndex);
-          setStage(run.stage);
-          setAlreadyCompletedToday(run.stage === "complete");
-          setTensions(run.tensions ?? []);
-          setSkillBank(run.skillBank ?? null);
-          setPosture(run.posture ?? null);
-          setSkillAllocations(run.allocations ?? []);
-          setArc(run.arc ?? null);
-          setInitiatives(run.initiatives ?? []);
-          setFactions(run.factions ?? []);
-          setAlignment(run.alignment ?? {});
-          setDirective(run.directive ?? null);
-          setRecentAlignmentEvents(run.recentAlignmentEvents ?? []);
-          setWorldState(run.worldState ?? null);
-          setCohortState(run.cohortState ?? null);
-          setRivalry(run.rivalry ?? null);
-          setAvailableArcs(run.availableArcs ?? []);
-          setCohortId(run.cohortId ?? null);
-          setStorylets(run.storylets);
-          setRuns(run.storyletRunsToday);
-          setDayState(run.dayState ?? null);
-          setAllocationSaved(Boolean(run.allocation));
-          setAllocation({ ...defaultAllocation, ...(run.allocation ?? {}) });
-          setHasSentBoost(!run.canBoost);
-          setMicroTaskStatus(run.microTaskStatus ?? "pending");
-          setSeasonContext(run.seasonContext ?? null);
-          setFunPulseEligible(Boolean(run.funPulseEligible));
-          setFunPulseDone(Boolean(run.funPulseDone));
-          if (run.seasonResetNeeded) {
-            setSeasonResetPending(true);
-            setSeasonIndex(run.newSeasonIndex ?? null);
-            setSeasonRecap(run.seasonRecap ?? null);
-          } else {
-            setSeasonResetPending(false);
-            setSeasonIndex(null);
-            setSeasonRecap(null);
-          }
+          setDailyProgress({
+            dayIndexState: run.dayIndex,
+            stage: run.stage,
+            alreadyCompletedToday: run.stage === "complete",
+            tensions: run.tensions ?? [],
+            skillBank: run.skillBank ?? null,
+            posture: run.posture ?? null,
+            skillAllocations: run.allocations ?? [],
+            storylets: run.storylets,
+            runs: run.storyletRunsToday,
+            dayState: run.dayState ?? null,
+            allocationSaved: Boolean(run.allocation),
+            allocation: { ...defaultAllocation, ...(run.allocation ?? {}) },
+            microTaskStatus: run.microTaskStatus ?? "pending",
+            seasonContext: run.seasonContext ?? null,
+            funPulseEligible: Boolean(run.funPulseEligible),
+            funPulseDone: Boolean(run.funPulseDone),
+            seasonResetPending: Boolean(run.seasonResetNeeded),
+            seasonIndex: run.seasonResetNeeded ? run.newSeasonIndex ?? null : null,
+            seasonRecap: run.seasonResetNeeded ? run.seasonRecap ?? null : null,
+          });
+          setGameContent({
+            arc: run.arc ?? null,
+            initiatives: run.initiatives ?? [],
+            factions: run.factions ?? [],
+            alignment: run.alignment ?? {},
+            directive: run.directive ?? null,
+            recentAlignmentEvents: run.recentAlignmentEvents ?? [],
+            worldState: run.worldState ?? null,
+            cohortState: run.cohortState ?? null,
+            rivalry: run.rivalry ?? null,
+            availableArcs: run.availableArcs ?? [],
+            cohortId: run.cohortId ?? null,
+          });
+          setUserSocial({ hasSentBoost: !run.canBoost });
           const ds =
             run.dailyState ?? (await fetchDailyState(bootstrapUserId));
           if (ds) {
@@ -521,16 +538,26 @@ export default function PlayPage() {
             fetchPublicProfiles(bootstrapUserId),
             fetchTodayReceivedBoosts(bootstrapUserId, run.dayIndex),
           ]);
-          setPublicProfiles(profiles);
-          setSelectedRecipient(profiles[0]?.user_id ?? "");
-          setBoostsReceived(received);
+          setUserSocial({
+            publicProfiles: profiles,
+            selectedRecipient: profiles[0]?.user_id ?? "",
+            boostsReceived: received,
+          });
         } else {
           const cadence = await ensureCadenceUpToDate(bootstrapUserId);
-          setDayIndexState(cadence.dayIndex);
-          setAlreadyCompletedToday(cadence.alreadyCompletedToday);
-          setSeasonContext(null);
+          setDailyProgress({
+            dayIndexState: cadence.dayIndex,
+            alreadyCompletedToday: cadence.alreadyCompletedToday,
+            seasonContext: null,
+          });
 
-          const ds = await fetchDailyState(bootstrapUserId);
+          const day = cadence.dayIndex;
+          const [ds, existingAllocation, existingRuns, candidates] = await Promise.all([
+            fetchDailyState(bootstrapUserId),
+            fetchTimeAllocation(bootstrapUserId, day),
+            fetchTodayRuns(bootstrapUserId, day),
+            fetchTodayStoryletCandidates(),
+          ]);
           if (ds) {
             setDailyState({ ...ds, day_index: cadence.dayIndex });
             setDayState({
@@ -542,37 +569,36 @@ export default function PlayPage() {
               health: 50,
             });
           }
-          const day = cadence.dayIndex;
 
-          const existingAllocation = await fetchTimeAllocation(bootstrapUserId, day);
           if (existingAllocation) {
-            setAllocation({ ...defaultAllocation, ...existingAllocation });
-            setAllocationSaved(true);
+            setDailyProgress({
+              allocation: { ...defaultAllocation, ...existingAllocation },
+              allocationSaved: true,
+            });
           }
 
-          const existingRuns = await fetchTodayRuns(bootstrapUserId, day);
           setRuns(existingRuns);
 
-          const candidates = await fetchTodayStoryletCandidates();
           const used = new Set(existingRuns.map((r) => r.storylet_id));
-          const next = candidates
-            .filter((c) => !used.has(c.id))
-            .slice(0, 2);
+          const next = candidates.filter((c) => !used.has(c.id)).slice(0, 2);
           setStorylets(next);
 
+          const allocationExists = Boolean(existingAllocation);
           const [profiles, received, sent] = await Promise.all([
             fetchPublicProfiles(bootstrapUserId),
             fetchTodayReceivedBoosts(bootstrapUserId, day),
             hasSentBoostToday(bootstrapUserId, day),
           ]);
-          setPublicProfiles(profiles);
-          setSelectedRecipient(profiles[0]?.user_id ?? "");
-          setBoostsReceived(received);
-          setHasSentBoost(sent);
+          setUserSocial({
+            publicProfiles: profiles,
+            selectedRecipient: profiles[0]?.user_id ?? "",
+            boostsReceived: received,
+            hasSentBoost: sent,
+          });
           setStage(
             cadence.alreadyCompletedToday
               ? "complete"
-              : allocationSaved
+              : allocationExists
               ? "storylet_1"
               : "allocation"
           );
@@ -753,7 +779,7 @@ export default function PlayPage() {
   const HEALTH_TENSION_THRESHOLD = 30;
 
   const handleAllocationChange = (key: keyof AllocationPayload, value: number) => {
-    setAllocation((prev) => ({ ...prev, [key]: value }));
+    setAllocation({ ...allocation, [key]: value });
   };
 
   const handleSaveAllocation = async () => {
@@ -1372,113 +1398,23 @@ export default function PlayPage() {
           </div>
 
           {showDevMenu ? (
-            <section className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Dev menu</h2>
-                <div className="flex items-center gap-2">
-                  <Button variant="secondary" asChild>
-                    <Link href="/admin/storylets/validate">Validate storylets</Link>
-                  </Button>
-                  <Button variant="ghost" onClick={() => setShowDevMenu(false)}>
-                    Close
-                  </Button>
-                </div>
-              </div>
-              <p className="text-sm text-slate-600">
-                Reset accounts or advance the day for testing.
-              </p>
-              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span>Test mode (your account).</span>
-                  <Button
-                    variant="secondary"
-                    onClick={handleToggleTestMode}
-                    disabled={devSettingsLoading || devSettingsSaving}
-                  >
-                    {devSettings.test_mode ? "Disable" : "Enable"}
-                  </Button>
-                </div>
-                {devSettings.test_mode ? (
-                  <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-amber-300 bg-amber-100/80 px-2 py-2 text-amber-900">
-                    <span>Fast-forward your day (TEST MODE).</span>
-                    <Button
-                      variant="outline"
-                      onClick={handleFastForward}
-                      className="border-amber-400 text-amber-900 hover:bg-amber-200/70"
-                    >
-                      ⏩ Fast Forward: Next Day (TEST MODE)
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-              {devError ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {devError}
-                </div>
-              ) : null}
-              {devLoading ? (
-                <p className="text-sm text-slate-700">Loading…</p>
-              ) : devCharacters.length === 0 ? (
-                <p className="text-sm text-slate-700">No characters found.</p>
-              ) : (
-                <div className="space-y-2">
-                  {devCharacters.map((row) => (
-                    <div
-                      key={row.user_id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2 text-sm"
-                    >
-                      <div>
-                        <p className="font-medium text-slate-900">
-                          {row.username ?? "Unknown"}
-                          {row.is_admin ? (
-                            <span className="ml-2 rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
-                              admin
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {row.email ?? "no-email"} · Day{" "}
-                          {row.day_index ?? "—"}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          variant="secondary"
-                          disabled={advancingUserId === row.user_id}
-                          onClick={() => handleAdvanceDay(row.user_id)}
-                        >
-                          {advancingUserId === row.user_id
-                            ? "Advancing..."
-                            : "Next day"}
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={resettingUserId === row.user_id}
-                          onClick={() => handleResetAccount(row.user_id)}
-                        >
-                          {resettingUserId === row.user_id
-                            ? "Resetting..."
-                            : "Reset to day one"}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          disabled={togglingAdminId === row.user_id}
-                          onClick={() =>
-                            handleToggleAdmin(row.user_id, !row.is_admin)
-                          }
-                        >
-                          {togglingAdminId === row.user_id
-                            ? "Updating..."
-                            : row.is_admin
-                              ? "Revoke admin"
-                              : "Make admin"}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+            <DevMenu
+              devSettings={devSettings}
+              devSettingsLoading={devSettingsLoading}
+              devSettingsSaving={devSettingsSaving}
+              devLoading={devLoading}
+              devError={devError}
+              devCharacters={devCharacters}
+              advancingUserId={advancingUserId}
+              resettingUserId={resettingUserId}
+              togglingAdminId={togglingAdminId}
+              onToggleTestMode={handleToggleTestMode}
+              onFastForward={handleFastForward}
+              onClose={() => setShowDevMenu(false)}
+              onAdvanceDay={handleAdvanceDay}
+              onResetAccount={handleResetAccount}
+              onToggleAdmin={handleToggleAdmin}
+            />
           ) : null}
 
           {seasonResetPending ? (

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 
 const STEP_LABELS = [
@@ -29,7 +30,7 @@ type Props = {
   onBeginUnlocked?: (arcKey: string) => void;
 };
 
-export function ArcPanel({
+function ArcPanelComponent({
   arc,
   availableArcs,
   submitting,
@@ -98,3 +99,5 @@ export function ArcPanel({
     </div>
   );
 }
+
+export const ArcPanel = memo(ArcPanelComponent);
