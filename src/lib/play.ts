@@ -15,7 +15,6 @@ import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
 import { resolveCheck } from "@/core/sim/checkResolver";
 import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
 import type { CheckResult, CheckSkillLevels } from "@/types/checks";
-import { fetchSkillLevels } from "@/lib/dailyInteractions";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
