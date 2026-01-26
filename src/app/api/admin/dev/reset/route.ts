@@ -73,6 +73,7 @@ export async function POST(request: Request) {
   await supabaseServer.from("reflections").delete().eq("user_id", userId);
   await supabaseServer.from("micro_task_runs").delete().eq("user_id", userId);
   await supabaseServer.from("time_allocations").delete().eq("user_id", userId);
+  await supabaseServer.from("player_day_state").delete().eq("user_id", userId);
   await supabaseServer.from("events").delete().eq("user_id", userId);
   await supabaseServer.from("user_anomalies").delete().eq("user_id", userId);
   const { data: hypothesisRows } = await supabaseServer
