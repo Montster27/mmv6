@@ -12,6 +12,7 @@ const mockState = vi.hoisted(() => {
     eq: vi.fn(() => builder),
     limit: vi.fn(() => builder),
     is: vi.fn(() => builder),
+    or: vi.fn(() => builder),
     maybeSingle: vi.fn(async () => maybeSingleResponses.shift() ?? { data: null, error: null }),
     insert: vi.fn(async (payload: any) => {
       insertPayloads.push({ table: builder.table, payload });
@@ -83,6 +84,8 @@ describe("finalizeDay", () => {
     mockState.setMaybeSingleResponses([
       { data: baseDayState, error: null },
       { data: { allocation: { study: 40, work: 20, social: 10, health: 20, fun: 10 } }, error: null },
+      { data: { user_id: "u", day_index: 2, posture: "steady", created_at: new Date().toISOString() }, error: null },
+      { data: { user_id: "u", available_points: 0, cap: 10, last_awarded_day_index: 2 }, error: null },
     ]);
     mockState.setSelectResponses([{ data: [{ key: "unfinished_assignment", severity: 1 }], error: null }]);
 
@@ -140,6 +143,61 @@ describe("finalizeDay", () => {
     expect(inserts[0].payload).toMatchObject({
       energy: 88,
       stress: 9,
+    });
+  });
+
+  it("does not award skill points before day 2", async () => {
+    mockState.reset();
+    mockState.setMaybeSingleResponses([
+      { data: { ...baseDayState, day_index: 1 }, error: null },
+      { data: { allocation: { study: 20, work: 20, social: 20, health: 20, fun: 20 } }, error: null },
+    ]);
+    mockState.setSelectResponses([{ data: [], error: null }]);
+
+    await finalizeDay("u", 1);
+
+    const updates = mockState.getUpdatePayloads();
+    expect(updates.length).toBe(1);
+    expect(updates[0].table).toBe("player_day_state");
+  });
+
+  it("awards skill points after day 2 when conditions met", async () => {
+    mockState.reset();
+    mockState.setMaybeSingleResponses([
+      { data: { ...baseDayState, energy: 60, stress: 60 }, error: null },
+      { data: { allocation: { study: 20, work: 20, social: 20, health: 20, fun: 20 } }, error: null },
+      { data: { user_id: "u", day_index: 2, posture: "push", created_at: new Date().toISOString() }, error: null },
+      { data: { user_id: "u", available_points: 1, cap: 10, last_awarded_day_index: 1 }, error: null },
+    ]);
+    mockState.setSelectResponses([{ data: [], error: null }]);
+
+    await finalizeDay("u", 2);
+
+    const updates = mockState.getUpdatePayloads();
+    const skillUpdate = updates.find((item) => item.table === "skill_bank");
+    expect(skillUpdate?.payload).toMatchObject({
+      available_points: 3,
+      last_awarded_day_index: 2,
+    });
+  });
+
+  it("does not award points when stress is high and posture is not driven", async () => {
+    mockState.reset();
+    mockState.setMaybeSingleResponses([
+      { data: { ...baseDayState, energy: 60, stress: 80 }, error: null },
+      { data: { allocation: { study: 20, work: 20, social: 20, health: 20, fun: 20 } }, error: null },
+      { data: { user_id: "u", day_index: 2, posture: "steady", created_at: new Date().toISOString() }, error: null },
+      { data: { user_id: "u", available_points: 5, cap: 10, last_awarded_day_index: 1 }, error: null },
+    ]);
+    mockState.setSelectResponses([{ data: [], error: null }]);
+
+    await finalizeDay("u", 2);
+
+    const updates = mockState.getUpdatePayloads();
+    const skillUpdate = updates.find((item) => item.table === "skill_bank");
+    expect(skillUpdate?.payload).toMatchObject({
+      available_points: 5,
+      last_awarded_day_index: 2,
     });
   });
 });

@@ -5,6 +5,7 @@ import type {
   SkillBank,
   SkillPointAllocation,
 } from "@/types/dailyInteraction";
+import { skillCostForLevel } from "@/core/sim/skillProgression";
 
 export type {
   DailyPosture,
@@ -208,9 +209,9 @@ export async function ensureSkillBankUpToDate(
   if (!data) {
     const { error: insertError } = await supabase.from("skill_bank").insert({
       user_id: userId,
-      available_points: 1,
-      cap: 2,
-      last_awarded_day_index: dayIndex,
+      available_points: 0,
+      cap: 10,
+      last_awarded_day_index: null,
     });
     if (insertError) {
       console.error("Failed to create skill bank", insertError);
@@ -218,29 +219,7 @@ export async function ensureSkillBankUpToDate(
     return;
   }
 
-  if (
-    typeof data.last_awarded_day_index === "number" &&
-    data.last_awarded_day_index >= dayIndex
-  ) {
-    return;
-  }
-
-  const cap = data.cap > 0 ? data.cap : 2;
-  const nextAvailable = Math.min(cap, data.available_points + 1);
-
-  const { error: updateError } = await supabase
-    .from("skill_bank")
-    .update({
-      available_points: nextAvailable,
-      cap,
-      last_awarded_day_index: dayIndex,
-    })
-    .eq("user_id", userId)
-    .or(`last_awarded_day_index.is.null,last_awarded_day_index.lt.${dayIndex}`);
-
-  if (updateError) {
-    console.error("Failed to award skill point", updateError);
-  }
+  return;
 }
 
 export async function upsertSkillBank(skillBank: SkillBank): Promise<void> {
@@ -322,6 +301,32 @@ export async function fetchSkillAllocations(
   return data ?? [];
 }
 
+export async function fetchSkillLevels(
+  userId: string
+): Promise<Array<{ skill_key: string; level: number }>> {
+  const { data, error } = await supabase
+    .from("skill_point_allocations")
+    .select("skill_key")
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Failed to fetch skill levels", error);
+    return [];
+  }
+
+  const counts = new Map<string, number>();
+  (data ?? []).forEach((row) => {
+    const key = row.skill_key;
+    if (!key) return;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries()).map(([skill_key, level]) => ({
+    skill_key,
+    level,
+  }));
+}
+
 export async function allocateSkillPoint(params: {
   userId: string;
   dayIndex: number;
@@ -348,11 +353,29 @@ export async function allocateSkillPoint(params: {
     throw new Error("No skill points available.");
   }
 
+  const { data: priorAllocations, error: priorError } = await supabase
+    .from("skill_point_allocations")
+    .select("skill_key")
+    .eq("user_id", params.userId)
+    .eq("skill_key", skillKey);
+
+  if (priorError) {
+    console.error("Failed to load skill level", priorError);
+    throw priorError;
+  }
+
+  const currentLevel = (priorAllocations ?? []).length;
+  const nextLevel = currentLevel + 1;
+  const cost = skillCostForLevel(nextLevel);
+  if (bank.available_points < cost) {
+    throw new Error("Not enough skill points for this level.");
+  }
+
   const allocationPayload = {
     user_id: params.userId,
     day_index: params.dayIndex,
     skill_key: skillKey,
-    points: 1,
+    points: cost,
   };
 
   const { error: insertError } = await supabase
@@ -369,9 +392,9 @@ export async function allocateSkillPoint(params: {
 
   const { data: updated, error: updateError } = await supabase
     .from("skill_bank")
-    .update({ available_points: bank.available_points - 1 })
+    .update({ available_points: bank.available_points - cost })
     .eq("user_id", params.userId)
-    .gte("available_points", 1)
+    .gte("available_points", cost)
     .select("available_points");
 
   if (updateError || !updated || updated.length === 0) {

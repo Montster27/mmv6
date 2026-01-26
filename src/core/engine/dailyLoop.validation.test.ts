@@ -56,6 +56,7 @@ vi.mock("@/lib/dailyInteractions", () => ({
   ensureSkillBankUpToDate: vi.fn(),
   ensureTensionsUpToDate: vi.fn(),
   fetchSkillAllocations: vi.fn(),
+  fetchSkillLevels: vi.fn(),
   fetchTensions: vi.fn(),
   fetchSkillBank: vi.fn(),
   fetchPosture: vi.fn(),
@@ -130,6 +131,7 @@ import {
   ensureTensionsUpToDate,
   fetchPosture,
   fetchSkillAllocations,
+  fetchSkillLevels,
   fetchSkillBank,
   fetchTensions,
 } from "@/lib/dailyInteractions";
@@ -271,6 +273,7 @@ beforeEach(() => {
     created_at: new Date().toISOString(),
   });
   vi.mocked(fetchSkillAllocations).mockResolvedValue([]);
+  vi.mocked(fetchSkillLevels).mockResolvedValue([]);
   vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
   vi.mocked(fetchArcByKey).mockResolvedValue(null);
   vi.mocked(listActiveArcs).mockResolvedValue([]);

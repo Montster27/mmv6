@@ -3,7 +3,7 @@ import type { PlayerDayState } from "@/types/dayState";
 import { resolveEndOfDay } from "@/core/sim/endOfDay";
 import type { Allocation } from "@/core/sim/allocationEffects";
 import { applyTensionPenalties } from "@/core/sim/tensionPenalties";
-import { fetchUnresolvedTensions } from "@/lib/dailyInteractions";
+import { fetchPosture, fetchUnresolvedTensions } from "@/lib/dailyInteractions";
 
 const DEFAULT_STATE = {
   energy: 70,
@@ -148,6 +148,69 @@ export async function finalizeDay(userId: string, dayIndex: number): Promise<voi
     nextStress: resolved.nextStress,
     tensions: unresolvedTensions,
   });
+
+  if (dayIndex >= 2) {
+    const postureRow = await fetchPosture(userId, dayIndex);
+    const { data: bank, error: bankError } = await supabase
+      .from("skill_bank")
+      .select("user_id,available_points,cap,last_awarded_day_index")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (bankError) {
+      console.error("Failed to load skill bank", bankError);
+      throw bankError;
+    }
+
+    const currentBank =
+      bank ??
+      (await supabase
+        .from("skill_bank")
+        .insert({
+          user_id: userId,
+          available_points: 0,
+          cap: 10,
+          last_awarded_day_index: null,
+        })
+        .select("user_id,available_points,cap,last_awarded_day_index")
+        .maybeSingle()
+        .then((result) => result.data));
+
+    if (currentBank) {
+      const alreadyAwarded =
+        typeof currentBank.last_awarded_day_index === "number" &&
+        currentBank.last_awarded_day_index >= dayIndex;
+      if (!alreadyAwarded) {
+        let baseAward = 0;
+        if (dayState.stress < 70 && dayState.energy > 30) {
+          baseAward = 1;
+        }
+        if (postureRow?.posture === "push" && dayState.stress < 85) {
+          baseAward += 1;
+        }
+        const award = Math.min(baseAward, 2);
+        const nextAvailable = currentBank.available_points + award;
+
+        const { error: awardError } = await supabase
+          .from("skill_bank")
+          .update({
+            available_points: nextAvailable,
+            cap: currentBank.cap > 0 ? currentBank.cap : 10,
+            last_awarded_day_index: dayIndex,
+          })
+          .eq("user_id", userId)
+          .or(
+            `last_awarded_day_index.is.null,last_awarded_day_index.lt.${dayIndex}`
+          );
+
+        if (awardError) {
+          console.error("Failed to award skill points", awardError);
+          throw awardError;
+        }
+      }
+    }
+  }
 
   const { error: updateError } = await supabase
     .from("player_day_state")

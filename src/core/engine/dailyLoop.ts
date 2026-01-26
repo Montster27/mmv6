@@ -58,6 +58,7 @@ import {
   ensureSkillBankUpToDate,
   ensureTensionsUpToDate,
   fetchSkillAllocations,
+  fetchSkillLevels,
   fetchPosture,
   fetchSkillBank,
   fetchTensions,
@@ -178,6 +179,7 @@ export async function getOrCreateDailyRun(
     skillBank,
     posture,
     allocations,
+    skills,
   ] = await Promise.all([
     fetchDailyState(userId),
     ensureDayStateUpToDate(userId, dayIndex).catch(() => null),
@@ -189,6 +191,7 @@ export async function getOrCreateDailyRun(
     fetchSkillBank(userId),
     fetchPosture(userId, dayIndex),
     fetchSkillAllocations(userId, dayIndex),
+    fetchSkillLevels(userId),
     // Note: we fetch recent history separately below.
   ]);
 
@@ -400,6 +403,8 @@ export async function getOrCreateDailyRun(
     skillBank,
     posture,
     allocations,
+    skills,
+    nextSkillUnlockDay: 2,
     cohortId,
     arc: arcDefinition
       ? {

@@ -36,6 +36,8 @@ export type DailyRun = {
   skillBank?: SkillBank | null;
   posture?: DailyPosture | null;
   allocations?: SkillPointAllocation[];
+  skills?: Array<{ skill_key: string; level: number }>;
+  nextSkillUnlockDay?: number;
   cohortId?: string | null;
   arc?: {
     arc_key: string;
