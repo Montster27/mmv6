@@ -42,23 +42,16 @@ export async function awardAnomalies(payload: {
 
   for (const anomalyId of payload.anomalyIds) {
     try {
-      const { error } = await supabase.from("user_anomalies").insert({
-        user_id: payload.userId,
-        anomaly_id: anomalyId,
-        day_index: payload.dayIndex,
-        source: payload.source ?? null,
-      });
+      const { error } = await supabase.from("user_anomalies").upsert(
+        {
+          user_id: payload.userId,
+          anomaly_id: anomalyId,
+          day_index: payload.dayIndex,
+          source: payload.source ?? null,
+        },
+        { onConflict: "user_id,anomaly_id", ignoreDuplicates: true }
+      );
       if (error) {
-        const { data: existing } = await supabase
-          .from("user_anomalies")
-          .select("id")
-          .eq("user_id", payload.userId)
-          .eq("anomaly_id", anomalyId)
-          .limit(1)
-          .maybeSingle();
-        if (existing) {
-          continue;
-        }
         if (process.env.NODE_ENV !== "production") {
           console.warn("Failed to award anomaly", error);
         }

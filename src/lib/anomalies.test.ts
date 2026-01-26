@@ -1,15 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 const mockState = vi.hoisted(() => {
-  let insertCalls = 0;
   const builder = {
-    insert: vi.fn(async () => {
-      insertCalls += 1;
-      if (insertCalls === 1) {
-        return { error: { message: "duplicate key" } };
-      }
-      return { error: null };
-    }),
+    upsert: vi.fn(async () => ({ error: null })),
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     limit: vi.fn(() => builder),
@@ -23,7 +16,7 @@ const mockState = vi.hoisted(() => {
   return {
     supabase,
     reset: () => {
-      insertCalls = 0;
+      builder.upsert.mockClear();
     },
   };
 });

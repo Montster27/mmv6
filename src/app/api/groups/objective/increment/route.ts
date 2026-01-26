@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   }
 
   const groupId = await fetchMembership(user.id);
-  if (!groupId) return NextResponse.json({ error: "No group" }, { status: 404 });
+  if (!groupId) return NextResponse.json({ skipped: true }, { status: 200 });
 
   const key = weekKey();
 
