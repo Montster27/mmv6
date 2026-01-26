@@ -62,6 +62,7 @@ import type {
 import type { ReflectionResponse } from "@/types/reflections";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { ProgressPanel } from "@/components/ProgressPanel";
+import { OutcomeExplain } from "@/components/play/OutcomeExplain";
 import { SeasonBadge } from "@/components/SeasonBadge";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
@@ -108,6 +109,7 @@ export default function PlayPage() {
     microTaskStatus,
     outcomeMessage,
     outcomeDeltas,
+    lastCheck,
     setDailyState,
     setDayState,
     setAllocation,
@@ -133,6 +135,7 @@ export default function PlayPage() {
     setMicroTaskStatus,
     setOutcomeMessage,
     setOutcomeDeltas,
+    setLastCheck,
     setDailyProgress,
   } = useDailyProgress(defaultAllocation);
   const [savingAllocation, setSavingAllocation] = useState(false);
@@ -856,6 +859,7 @@ export default function PlayPage() {
     setError(null);
     setOutcomeMessage(null);
     setOutcomeDeltas(null);
+    setLastCheck(null);
     try {
       const runId = await createStoryletRun(
         userId,
@@ -880,6 +884,7 @@ export default function PlayPage() {
           appliedMessage,
           resolvedOutcomeId,
           resolvedOutcomeAnomalies,
+          lastCheck: resolvedCheck,
         } =
           await applyOutcomeForChoice(
             state,
@@ -905,6 +910,9 @@ export default function PlayPage() {
           appliedMessage || (hasDeltas ? "Choice recorded." : null)
         );
         setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
+        if (resolvedCheck) {
+          setLastCheck(resolvedCheck);
+        }
         if (resolvedOutcomeAnomalies?.length) {
           await awardAnomalies({
             userId,
@@ -1667,6 +1675,9 @@ export default function PlayPage() {
                                         )
                                       : null}
                                   </ul>
+                                ) : null}
+                                {lastCheck ? (
+                                  <OutcomeExplain check={lastCheck} />
                                 ) : null}
                               </div>
                             )}

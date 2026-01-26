@@ -10,3 +10,17 @@ export type Check = {
 };
 
 export type CheckSkillLevels = Record<CheckSkillKey, number>;
+
+export type CheckResult = {
+  storyletId: string;
+  checkId: string;
+  chance: number;
+  success: boolean;
+  contributions: {
+    base: number;
+    skills: Record<CheckSkillKey, number>;
+    energy: number;
+    stress: number;
+    posture: number;
+  };
+};

@@ -98,6 +98,7 @@ export type DailyRun = {
     PlayerDayState,
     "energy" | "stress" | "money" | "study_progress" | "social_capital" | "health"
   > | null;
+  lastCheck?: import("./checks").CheckResult | null;
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;
   seasonRecap?: SeasonRecap | null;

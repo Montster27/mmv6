@@ -47,6 +47,7 @@ export type DailyProgressState = {
     stress?: number;
     vectors?: Record<string, number>;
   } | null;
+  lastCheck: DailyRun["lastCheck"] | null;
   reflectionResponse?: ReflectionResponse | null;
 };
 
@@ -77,6 +78,7 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     microTaskStatus: "pending",
     outcomeMessage: null,
     outcomeDeltas: null,
+    lastCheck: null,
     reflectionResponse: null,
   });
 
@@ -207,6 +209,10 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
       })),
     []
   );
+  const setLastCheck = useCallback(
+    (lastCheck: DailyRun["lastCheck"] | null) => setDailyProgress({ lastCheck }),
+    [setDailyProgress]
+  );
 
   return {
     ...state,
@@ -236,6 +242,7 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     setMicroTaskStatus,
     setOutcomeMessage,
     setOutcomeDeltas,
+    setLastCheck,
   };
 }
 

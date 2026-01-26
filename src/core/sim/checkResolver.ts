@@ -1,4 +1,4 @@
-import type { Check, CheckSkillLevels } from "@/types/checks";
+import type { Check, CheckResult, CheckSkillLevels } from "@/types/checks";
 import { hashToUnitFloat } from "@/core/engine/deterministicRoll";
 
 type ResolveParams = {
@@ -14,7 +14,7 @@ export function resolveCheck(params: ResolveParams): {
   success: boolean;
   contributions: {
     base: number;
-    skills: number;
+    skills: Record<keyof CheckSkillLevels, number>;
     energy: number;
     stress: number;
     posture: number;
@@ -26,12 +26,19 @@ export function resolveCheck(params: ResolveParams): {
   const energyWeight = check.energyWeight ?? 0;
   const stressWeight = check.stressWeight ?? 0;
 
-  let skillBonus = 0;
+  const skillContrib = {
+    focus: 0,
+    memory: 0,
+    networking: 0,
+    grit: 0,
+  } as Record<keyof CheckSkillLevels, number>;
   (Object.keys(skillWeights) as Array<keyof CheckSkillLevels>).forEach((key) => {
     const weight = skillWeights[key];
     if (typeof weight !== "number") return;
-    skillBonus += (skills[key] ?? 0) * weight;
+    const bonus = (skills[key] ?? 0) * weight;
+    skillContrib[key] = bonus;
   });
+  const skillBonus = Object.values(skillContrib).reduce((sum, value) => sum + value, 0);
 
   const energySteps = Math.floor(dayState.energy / 10);
   const stressSteps = Math.floor(dayState.stress / 10);
@@ -51,7 +58,7 @@ export function resolveCheck(params: ResolveParams): {
     success,
     contributions: {
       base,
-      skills: skillBonus,
+      skills: skillContrib,
       energy: energyBonus,
       stress: stressBonus,
       posture: postureBonus,

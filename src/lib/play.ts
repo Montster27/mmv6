@@ -14,7 +14,7 @@ import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocation
 import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
 import { resolveCheck } from "@/core/sim/checkResolver";
 import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
-import type { CheckSkillLevels } from "@/types/checks";
+import type { CheckResult, CheckSkillLevels } from "@/types/checks";
 import { fetchSkillLevels } from "@/lib/dailyInteractions";
 
 export type StoryletListItem = Storylet;
@@ -356,21 +356,7 @@ export async function applyOutcomeForChoice(
   let resolvedOutcome: StoryletOutcome | undefined = choice?.outcome;
   let resolvedOutcomeId: string | undefined;
   let resolvedOutcomeAnomalies: string[] | undefined = choice?.outcome?.anomalies;
-  let lastCheck:
-    | {
-        storyletId: string;
-        checkId: string;
-        chance: number;
-        success: boolean;
-        contributions: {
-          base: number;
-          skills: number;
-          energy: number;
-          stress: number;
-          posture: number;
-        };
-      }
-    | undefined;
+  let lastCheck: CheckResult | undefined;
 
   if (!resolvedOutcome && choice?.check && choice?.outcomes && choice.outcomes.length > 0) {
     const skills =
