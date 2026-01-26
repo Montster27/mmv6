@@ -17,6 +17,7 @@ type Props = {
   dailyState?: Pick<DailyState, "energy" | "stress" | "vectors"> | null;
   dayState?: DailyRun["dayState"] | null;
   allocation?: AllocationMap | null;
+  skillBank?: { available_points: number; cap: number } | null;
   lastAppliedDeltas?: DeltaInfo | null;
   boostsReceivedCount?: number;
 };
@@ -70,6 +71,7 @@ function ProgressPanelComponent({
   dailyState,
   dayState,
   allocation,
+  skillBank,
   lastAppliedDeltas,
   boostsReceivedCount,
 }: Props) {
@@ -151,6 +153,14 @@ function ProgressPanelComponent({
         <div className="flex items-center justify-between">
           <span>Fun</span>
           <span>{allocationTotals.fun ?? 0}</span>
+        </div>
+        <div className="flex items-center justify-between text-slate-600">
+          <span>Skill points</span>
+          <span>
+            {typeof skillBank?.available_points === "number"
+              ? `${skillBank.available_points} / ${skillBank.cap}`
+              : "—"}
+          </span>
         </div>
       </div>
 

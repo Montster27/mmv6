@@ -575,6 +575,11 @@ export default function PlayPage() {
               allocation: { ...defaultAllocation, ...existingAllocation },
               allocationSaved: true,
             });
+          } else {
+            setDailyProgress({
+              allocation: { ...defaultAllocation },
+              allocationSaved: false,
+            });
           }
 
           setRuns(existingRuns);
@@ -1865,6 +1870,7 @@ export default function PlayPage() {
                 dailyState={dailyState}
                 dayState={dayState}
                 allocation={allocation}
+                skillBank={skillBank}
                 lastAppliedDeltas={outcomeDeltas}
                 boostsReceivedCount={boostsReceived.length}
               />
