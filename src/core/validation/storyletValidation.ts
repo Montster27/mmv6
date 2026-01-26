@@ -4,6 +4,7 @@ import type {
   StoryletOutcome,
   StoryletOutcomeOption,
 } from "@/types/storylets";
+import type { Check } from "@/types/checks";
 import type { JsonObject } from "@/types/vectors";
 import { ARC_DEFINITIONS } from "@/content/arcs/arcDefinitions";
 
@@ -24,11 +25,16 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
   const outcomes = outcomesRaw
     ?.map((item) => coerceOutcomeOption(item))
     .filter((item): item is StoryletOutcomeOption => Boolean(item));
+  const checkRaw =
+    obj.check && typeof obj.check === "object" && !Array.isArray(obj.check)
+      ? (obj.check as Check)
+      : undefined;
   return {
     id: obj.id,
     label: obj.label,
     outcome: outcomeObj as StoryletOutcome | undefined,
     outcomes,
+    check: checkRaw,
   };
 }
 
@@ -299,6 +305,81 @@ export function validateStoryletIssues(
               storylet,
               `choices[${idx}].outcomes`,
               "Total outcome weight is unusually high"
+            );
+          }
+        }
+      }
+      if ((choice as any).check) {
+        const check = (choice as any).check as Check;
+        if (!check || typeof check !== "object") {
+          addIssue(
+            errors,
+            storylet,
+            `choices[${idx}].check`,
+            "Check must be an object"
+          );
+        } else {
+          if (!isString(check.id) || !check.id) {
+            addIssue(
+              errors,
+              storylet,
+              `choices[${idx}].check.id`,
+              "Check id must be a string"
+            );
+          }
+          if (typeof check.baseChance !== "number") {
+            addIssue(
+              errors,
+              storylet,
+              `choices[${idx}].check.baseChance`,
+              "Check baseChance must be a number"
+            );
+          } else if (check.baseChance < 0 || check.baseChance > 1) {
+            addIssue(
+              errors,
+              storylet,
+              `choices[${idx}].check.baseChance`,
+              "Check baseChance must be between 0 and 1"
+            );
+          }
+          if (
+            check.skillWeights &&
+            (typeof check.skillWeights !== "object" ||
+              Array.isArray(check.skillWeights))
+          ) {
+            addIssue(
+              errors,
+              storylet,
+              `choices[${idx}].check.skillWeights`,
+              "Check skillWeights must be an object"
+            );
+          }
+          if (check.energyWeight !== undefined && typeof check.energyWeight !== "number") {
+            addIssue(
+              errors,
+              storylet,
+              `choices[${idx}].check.energyWeight`,
+              "Check energyWeight must be a number"
+            );
+          }
+          if (check.stressWeight !== undefined && typeof check.stressWeight !== "number") {
+            addIssue(
+              errors,
+              storylet,
+              `choices[${idx}].check.stressWeight`,
+              "Check stressWeight must be a number"
+            );
+          }
+          if (
+            check.postureBonus &&
+            (typeof check.postureBonus !== "object" ||
+              Array.isArray(check.postureBonus))
+          ) {
+            addIssue(
+              errors,
+              storylet,
+              `choices[${idx}].check.postureBonus`,
+              "Check postureBonus must be an object"
             );
           }
         }

@@ -886,7 +886,12 @@ export default function PlayPage() {
             choiceId,
             currentStorylet,
             userId,
-            dayIndex
+            dayIndex,
+            {
+              dayState,
+              posture: posture?.posture ?? null,
+              skills: skills ?? undefined,
+            }
           );
         setDailyState(nextDailyState);
         const hasVectorDeltas =

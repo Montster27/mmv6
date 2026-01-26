@@ -61,6 +61,25 @@ describe("storyletValidation", () => {
     expect(res.ok).toBe(true);
   });
 
+  it("accepts checks on choices", () => {
+    const withCheck = {
+      ...valid,
+      choices: [
+        {
+          id: "A",
+          label: "Option A",
+          check: { id: "focus_check", baseChance: 0.5, skillWeights: { focus: 0.02 } },
+          outcomes: [
+            { id: "success", weight: 1, text: "ok" },
+            { id: "failure", weight: 1, text: "nope" },
+          ],
+        },
+      ],
+    };
+    const res = validateStorylet(withCheck);
+    expect(res.ok).toBe(true);
+  });
+
   it("rejects invalid probabilistic outcomes", () => {
     const withBadOutcomes = {
       ...valid,

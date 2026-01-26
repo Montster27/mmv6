@@ -12,6 +12,9 @@ import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
 import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
 import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
+import { resolveCheck } from "@/core/sim/checkResolver";
+import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
+import type { CheckSkillLevels } from "@/types/checks";
 import { fetchSkillLevels } from "@/lib/dailyInteractions";
 
 export type StoryletListItem = Storylet;
@@ -32,6 +35,8 @@ function parseChoices(raw: unknown): StoryletChoice[] {
             id: (item as any).id,
             label: (item as any).label,
             outcome: (item as any).outcome,
+            outcomes: (item as any).outcomes,
+            check: (item as any).check,
           } as StoryletChoice;
         }
         return null;
@@ -317,7 +322,12 @@ export async function applyOutcomeForChoice(
   choiceId: string,
   storylet: Storylet,
   userId: string,
-  dayIndex: number
+  dayIndex: number,
+  options?: {
+    dayState?: { energy: number; stress: number } | null;
+    skills?: CheckSkillLevels | null;
+    posture?: string | null;
+  }
 ): Promise<{
   nextDailyState: DailyState;
   appliedMessage: string;
@@ -328,13 +338,91 @@ export async function applyOutcomeForChoice(
   };
   resolvedOutcomeId?: string;
   resolvedOutcomeAnomalies?: string[];
+  lastCheck?: {
+    storyletId: string;
+    checkId: string;
+    chance: number;
+    success: boolean;
+    contributions: {
+      base: number;
+      skills: number;
+      energy: number;
+      stress: number;
+      posture: number;
+    };
+  };
 }> {
   const choice = toChoices(storylet).find((c) => c.id === choiceId);
   let resolvedOutcome: StoryletOutcome | undefined = choice?.outcome;
   let resolvedOutcomeId: string | undefined;
   let resolvedOutcomeAnomalies: string[] | undefined = choice?.outcome?.anomalies;
+  let lastCheck:
+    | {
+        storyletId: string;
+        checkId: string;
+        chance: number;
+        success: boolean;
+        contributions: {
+          base: number;
+          skills: number;
+          energy: number;
+          stress: number;
+          posture: number;
+        };
+      }
+    | undefined;
 
-  if (!resolvedOutcome && choice?.outcomes && choice.outcomes.length > 0) {
+  if (!resolvedOutcome && choice?.check && choice?.outcomes && choice.outcomes.length > 0) {
+    const skills =
+      options?.skills ??
+      (await fetchSkillLevels(userId).catch(() => ({
+        focus: 0,
+        memory: 0,
+        networking: 0,
+        grit: 0,
+      })));
+    const posture =
+      options?.posture ??
+      (await fetchPosture(userId, dayIndex).then((row) => row?.posture ?? null));
+    const energy =
+      typeof options?.dayState?.energy === "number"
+        ? options.dayState.energy
+        : dailyState.energy;
+    const stress =
+      typeof options?.dayState?.stress === "number"
+        ? options.dayState.stress
+        : dailyState.stress;
+
+    const seed = `${userId}:${dayIndex}:${storylet.id}:${choiceId}:${choice.check.id}`;
+    const resolved = resolveCheck({
+      check: choice.check,
+      skills,
+      dayState: { energy, stress },
+      posture,
+      seed,
+    });
+    const outcomeId = resolved.success ? "success" : "failure";
+    const outcome =
+      choice.outcomes.find((item) => item.id === outcomeId) ??
+      choice.outcomes[resolved.success ? 0 : 1] ??
+      choice.outcomes[0];
+    if (outcome) {
+      resolvedOutcome = {
+        text: outcome.text,
+        deltas: outcome.deltas,
+        anomalies: outcome.anomalies,
+      };
+      resolvedOutcomeId = outcome.id;
+      resolvedOutcomeAnomalies = outcome.anomalies;
+    }
+    lastCheck = {
+      storyletId: storylet.id,
+      checkId: choice.check.id,
+      chance: resolved.chance,
+      success: resolved.success,
+      contributions: resolved.contributions,
+    };
+  } else if (!resolvedOutcome && choice?.outcomes && choice.outcomes.length > 0) {
     const seed = `${userId}:${dayIndex}:${storylet.id}:${choiceId}`;
     const resolved = chooseWeightedOutcome(seed, choice.outcomes, dailyState.vectors);
     resolvedOutcome = {
@@ -357,6 +445,7 @@ export async function applyOutcomeForChoice(
     appliedDeltas,
     resolvedOutcomeId,
     resolvedOutcomeAnomalies,
+    lastCheck,
   };
 }
 
