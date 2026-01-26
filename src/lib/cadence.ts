@@ -49,12 +49,37 @@ export async function ensureCadenceUpToDate(userId: string): Promise<{
     daily.last_day_index_completed === daily.day_index;
 
   if (expectedDayIndex > daily.day_index) {
+    const { data: priorDayState } = await supabase
+      .from("player_day_state")
+      .select("next_energy,next_stress,energy,stress")
+      .eq("user_id", userId)
+      .eq("day_index", expectedDayIndex - 1)
+      .limit(1)
+      .maybeSingle();
+
+    const clamp = (value: number, min = 0, max = 100) =>
+      Math.min(max, Math.max(min, value));
+    const carryEnergy = clamp(
+      typeof priorDayState?.next_energy === "number"
+        ? priorDayState.next_energy
+        : typeof priorDayState?.energy === "number"
+          ? priorDayState.energy
+          : daily.energy
+    );
+    const carryStress = clamp(
+      typeof priorDayState?.next_stress === "number"
+        ? priorDayState.next_stress
+        : typeof priorDayState?.stress === "number"
+          ? priorDayState.stress
+          : daily.stress
+    );
+
     const { error } = await supabase
       .from("daily_states")
       .update({
         day_index: expectedDayIndex,
-        energy: 100,
-        stress: 0,
+        energy: carryEnergy,
+        stress: carryStress,
         updated_at: new Date().toISOString(),
       })
       .eq("id", daily.id);
