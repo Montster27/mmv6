@@ -54,10 +54,15 @@ vi.mock("@/lib/alignment", () => ({
     log_it: { factionKey: "dynastic_consortium", delta: 2 },
   },
 }));
+vi.mock("@/lib/play", () => ({
+  fetchDailyState: vi.fn(),
+  updateDailyState: vi.fn(),
+}));
 
 import { fetchArcSteps } from "@/lib/content/arcs";
 import { applyAlignmentDelta } from "@/lib/alignment";
 import { progressArcWithChoice, startArc } from "@/lib/arcs";
+import { fetchDailyState, updateDailyState } from "@/lib/play";
 
 describe("arcs", () => {
   it("starts an arc when missing", async () => {
@@ -96,7 +101,7 @@ describe("arcs", () => {
           {
             key: "log_it",
             label: "Log it",
-            flags: { arc_anomaly_001_logged: true },
+            flags: { arc_anomaly_001_logged: true, research: true },
           },
         ],
         created_at: new Date().toISOString(),
@@ -140,6 +145,14 @@ describe("arcs", () => {
       { data: { id: "inst-1" }, error: null },
       { data: { id: "inst-1" }, error: null },
     ]);
+    vi.mocked(fetchDailyState).mockResolvedValue({
+      id: "d1",
+      user_id: "u",
+      day_index: 2,
+      energy: 70,
+      stress: 20,
+      vectors: {},
+    });
 
     await progressArcWithChoice("u", "anomaly_001", "log_it", 2);
 
@@ -158,6 +171,11 @@ describe("arcs", () => {
       delta: 2,
       source: "arc_choice",
       sourceRef: "anomaly_001:0:log_it",
+    });
+    expect(updateDailyState).toHaveBeenCalledWith("u", {
+      energy: 70,
+      stress: 20,
+      vectors: { curiosity: 2 },
     });
   });
 });

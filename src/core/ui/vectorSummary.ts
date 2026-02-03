@@ -1,3 +1,5 @@
+import { VECTOR_KEYS } from "@/core/vectors/vectorKeys";
+
 type VectorMap = Record<string, number>;
 
 function maxEntry(obj: VectorMap): [string, number] | null {
@@ -13,10 +15,17 @@ export function summarizeVectors(
   vectors?: VectorMap | null,
   deltas?: { vectors?: VectorMap }
 ): string {
-  const safeVectors = vectors && typeof vectors === "object" ? vectors : {};
+  const safeVectors =
+    vectors && typeof vectors === "object"
+      ? Object.fromEntries(
+          Object.entries(vectors).filter(([key]) => VECTOR_KEYS.includes(key as any))
+        )
+      : {};
   const deltaVectors =
     deltas?.vectors && typeof deltas.vectors === "object"
-      ? deltas.vectors
+      ? Object.fromEntries(
+          Object.entries(deltas.vectors).filter(([key]) => VECTOR_KEYS.includes(key as any))
+        )
       : undefined;
 
   if (deltaVectors) {

@@ -1,6 +1,9 @@
 import { supabase } from "@/lib/supabase/browser";
 import { fetchArcSteps } from "@/lib/content/arcs";
 import { applyAlignmentDelta, ARC_CHOICE_ALIGNMENT_DELTAS } from "@/lib/alignment";
+import { flagToVectorDeltas } from "@/core/vectors/flagToVectorDeltas";
+import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
+import { fetchDailyState, updateDailyState } from "@/lib/play";
 import type { ArcInstance } from "@/types/arcs";
 import type { ContentArcStep } from "@/types/content";
 
@@ -234,6 +237,22 @@ export async function progressArcWithChoice(
       source: "arc_choice",
       sourceRef: `${arcKey}:${instance.current_step}:${choiceKey}`,
     });
+  }
+
+  const vectorDeltas = flagToVectorDeltas(choice.flags);
+  if (Object.keys(vectorDeltas).length > 0) {
+    const daily = await fetchDailyState(userId);
+    if (daily) {
+      const { nextDailyState } = applyOutcomeToDailyState(daily, {
+        deltas: { vectors: vectorDeltas },
+        text: "",
+      } as any);
+      await updateDailyState(userId, {
+        energy: nextDailyState.energy,
+        stress: nextDailyState.stress,
+        vectors: nextDailyState.vectors,
+      });
+    }
   }
 
   const nextStep = instance.current_step + 1;

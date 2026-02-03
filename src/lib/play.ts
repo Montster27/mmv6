@@ -11,6 +11,7 @@ import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
 import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
+import { allocationToVectorDeltas } from "@/core/vectors/allocationToVectorDeltas";
 import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
 import { resolveCheck } from "@/core/sim/checkResolver";
 import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
@@ -140,6 +141,7 @@ export async function saveTimeAllocation(
     fun: allocation.fun ?? 0,
   };
   const allocationHash = hashAllocation(normalizedAllocation);
+  const sameAllocation = dayState.allocation_hash === allocationHash;
   const previousTotals =
     dayIndex > 0
       ? await ensureDayStateUpToDate(userId, dayIndex - 1)
@@ -197,6 +199,24 @@ export async function saveTimeAllocation(
   if (updateError) {
     console.error("Failed to update day state from allocation", updateError);
     throw updateError;
+  }
+
+  if (!sameAllocation) {
+    const vectorDeltas = allocationToVectorDeltas(normalizedAllocation);
+    if (Object.keys(vectorDeltas).length > 0) {
+      const daily = await fetchDailyState(userId);
+      if (daily) {
+        const { nextDailyState } = applyOutcomeToDailyState(daily, {
+          deltas: { vectors: vectorDeltas },
+          text: "",
+        } as any);
+        await updateDailyState(userId, {
+          energy: nextDailyState.energy,
+          stress: nextDailyState.stress,
+          vectors: nextDailyState.vectors,
+        });
+      }
+    }
   }
 }
 
