@@ -58,11 +58,15 @@ vi.mock("@/lib/play", () => ({
   fetchDailyState: vi.fn(),
   updateDailyState: vi.fn(),
 }));
+vi.mock("@/lib/dayState", () => ({
+  ensureDayStateUpToDate: vi.fn(),
+}));
 
 import { fetchArcSteps } from "@/lib/content/arcs";
 import { applyAlignmentDelta } from "@/lib/alignment";
 import { progressArcWithChoice, startArc } from "@/lib/arcs";
 import { fetchDailyState, updateDailyState } from "@/lib/play";
+import { ensureDayStateUpToDate } from "@/lib/dayState";
 
 describe("arcs", () => {
   it("starts an arc when missing", async () => {
@@ -145,6 +149,18 @@ describe("arcs", () => {
       { data: { id: "inst-1" }, error: null },
       { data: { id: "inst-1" }, error: null },
     ]);
+    vi.mocked(ensureDayStateUpToDate).mockResolvedValue({
+      user_id: "u",
+      day_index: 2,
+      energy: 70,
+      stress: 20,
+      money: 0,
+      study_progress: 0,
+      social_capital: 0,
+      health: 50,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any);
     vi.mocked(fetchDailyState).mockResolvedValue({
       id: "d1",
       user_id: "u",
@@ -177,5 +193,56 @@ describe("arcs", () => {
       stress: 20,
       vectors: { curiosity: 2 },
     });
+  });
+
+  it("blocks arc choice when costs are not affordable", async () => {
+    mockState.reset();
+    vi.mocked(fetchArcSteps).mockResolvedValue([
+      {
+        arc_key: "anomaly_001",
+        step_index: 0,
+        title: "Step 0",
+        body: "Body",
+        choices: [
+          {
+            key: "ask_casually",
+            label: "Ask",
+            costs: { money: 2 },
+          },
+        ],
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    mockState.setMaybeSingleResponses([
+      {
+        data: {
+          id: "inst-1",
+          user_id: "u",
+          arc_key: "anomaly_001",
+          status: "active",
+          started_day_index: 2,
+          current_step: 0,
+          updated_at: new Date().toISOString(),
+          meta: { flags: {} },
+        },
+        error: null,
+      },
+    ]);
+    vi.mocked(ensureDayStateUpToDate).mockResolvedValue({
+      user_id: "u",
+      day_index: 2,
+      energy: 70,
+      stress: 20,
+      money: 1,
+      study_progress: 0,
+      social_capital: 0,
+      health: 50,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any);
+
+    await expect(
+      progressArcWithChoice("u", "anomaly_001", "ask_casually", 2)
+    ).rejects.toThrow("INSUFFICIENT_RESOURCES:money");
   });
 });

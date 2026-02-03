@@ -17,25 +17,56 @@ type ArcSummary = {
     step_index: number;
     title: string;
     body: string;
-    choices: Array<{ key: string; label: string; flags?: Record<string, boolean> }>;
+    choices: Array<{
+      key: string;
+      label: string;
+      flags?: Record<string, boolean>;
+      costs?: Partial<{
+        money: number;
+        energy: number;
+        stress: number;
+        study_progress: number;
+        social_capital: number;
+        health: number;
+      }>;
+      rewards?: Partial<{
+        money: number;
+        energy: number;
+        stress: number;
+        study_progress: number;
+        social_capital: number;
+        health: number;
+      }>;
+    }>;
   } | null;
 };
 
 type Props = {
   arc: ArcSummary;
   availableArcs?: Array<{ key: string; title: string; description: string }>;
+  dayState?: {
+    energy: number;
+    stress: number;
+    money: number;
+    study_progress: number;
+    social_capital: number;
+    health: number;
+  } | null;
   submitting?: boolean;
   onStart: () => void;
   onAdvance: (nextStep: number, complete: boolean) => void;
+  onChoose?: (choiceKey: string) => void;
   onBeginUnlocked?: (arcKey: string) => void;
 };
 
 function ArcPanelComponent({
   arc,
   availableArcs,
+  dayState,
   submitting,
   onStart,
   onAdvance,
+  onChoose,
   onBeginUnlocked,
 }: Props) {
   const stepIndex = Math.min(arc.current_step ?? 0, STEP_LABELS.length - 1);
@@ -46,6 +77,30 @@ function ArcPanelComponent({
     isActive &&
     typeof arc.current_step === "number" &&
     arc.current_step < STEP_LABELS.length;
+  const choices = arc.step?.choices ?? [];
+
+  const resourcePool = dayState ?? {
+    energy: 0,
+    stress: 0,
+    money: 0,
+    study_progress: 0,
+    social_capital: 0,
+    health: 0,
+  };
+
+  const getCostBlocker = (costs?: Record<string, number>) => {
+    if (!costs) return null;
+    const entries = Object.entries(costs).filter(([, value]) =>
+      typeof value === "number" && value > 0
+    ) as Array<[string, number]>;
+    for (const [key, value] of entries) {
+      const current = (resourcePool as Record<string, number>)[key] ?? 0;
+      if (current < value) {
+        return `Not enough ${key.replace(/_/g, " ")}`;
+      }
+    }
+    return null;
+  };
 
   return (
     <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
@@ -61,16 +116,44 @@ function ArcPanelComponent({
       {isActive ? (
         <div className="space-y-2">
           <p className="text-sm text-slate-600">{stepLabel}</p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              const nextStep = (arc.current_step ?? 0) + 1;
-              onAdvance(nextStep, nextStep >= STEP_LABELS.length);
-            }}
-            disabled={submitting || !canAdvance}
-          >
-            Continue
-          </Button>
+          {arc.step?.body ? (
+            <p className="text-sm text-slate-700 whitespace-pre-wrap">
+              {arc.step.body}
+            </p>
+          ) : null}
+          {choices.length > 0 ? (
+            <div className="space-y-2">
+              {choices.map((choice) => {
+                const blocker = getCostBlocker(choice.costs);
+                return (
+                  <div key={choice.key} className="space-y-1">
+                    <Button
+                      variant="outline"
+                      onClick={() => onChoose?.(choice.key)}
+                      disabled={submitting || !onChoose || Boolean(blocker)}
+                      className="w-full justify-start"
+                    >
+                      {choice.label}
+                    </Button>
+                    {blocker ? (
+                      <p className="text-[11px] text-rose-600">{blocker}</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => {
+                const nextStep = (arc.current_step ?? 0) + 1;
+                onAdvance(nextStep, nextStep >= STEP_LABELS.length);
+              }}
+              disabled={submitting || !canAdvance}
+            >
+              Continue
+            </Button>
+          )}
         </div>
       ) : null}
       {isComplete ? (

@@ -15,6 +15,10 @@ export type PlayerDayState = {
   allocation_hash?: string | null;
   pre_allocation_energy?: number | null;
   pre_allocation_stress?: number | null;
+  pre_allocation_money?: number | null;
+  pre_allocation_study_progress?: number | null;
+  pre_allocation_social_capital?: number | null;
+  pre_allocation_health?: number | null;
   resolved_at?: string | null;
   end_energy?: number | null;
   end_stress?: number | null;

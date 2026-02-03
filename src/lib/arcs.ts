@@ -4,6 +4,7 @@ import { applyAlignmentDelta, ARC_CHOICE_ALIGNMENT_DELTAS } from "@/lib/alignmen
 import { flagToVectorDeltas } from "@/core/vectors/flagToVectorDeltas";
 import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { fetchDailyState, updateDailyState } from "@/lib/play";
+import { ensureDayStateUpToDate } from "@/lib/dayState";
 import type { ArcInstance } from "@/types/arcs";
 import type { ContentArcStep } from "@/types/content";
 
@@ -223,6 +224,92 @@ export async function progressArcWithChoice(
   const choice = (currentStep.choices ?? []).find((item) => item.key === choiceKey);
   if (!choice) {
     throw new Error("Arc choice missing.");
+  }
+
+  if (choice.costs || choice.rewards) {
+    if (typeof dayIndex !== "number") {
+      throw new Error("Day index required for arc choice.");
+    }
+    const dayState = await ensureDayStateUpToDate(userId, dayIndex);
+    const costs = choice.costs ?? {};
+    const rewards = choice.rewards ?? {};
+    const resourceBase = {
+      money: dayState.money ?? 0,
+      energy: dayState.energy ?? 0,
+      stress: dayState.stress ?? 0,
+      study_progress: dayState.study_progress ?? 0,
+      social_capital: dayState.social_capital ?? 0,
+      health: dayState.health ?? 0,
+    };
+
+    const affordabilityChecks: Array<[keyof typeof resourceBase, number]> = [
+      ["money", costs.money ?? 0],
+      ["energy", costs.energy ?? 0],
+      ["stress", costs.stress ?? 0],
+      ["study_progress", costs.study_progress ?? 0],
+      ["social_capital", costs.social_capital ?? 0],
+      ["health", costs.health ?? 0],
+    ];
+    for (const [key, value] of affordabilityChecks) {
+      if (value > 0 && resourceBase[key] < value) {
+        throw new Error(`INSUFFICIENT_RESOURCES:${key}`);
+      }
+    }
+
+    const clamp100 = (value: number) => Math.max(0, Math.min(100, value));
+    const nextResources = {
+      money: resourceBase.money - (costs.money ?? 0) + (rewards.money ?? 0),
+      energy: clamp100(
+        resourceBase.energy - (costs.energy ?? 0) + (rewards.energy ?? 0)
+      ),
+      stress: clamp100(
+        resourceBase.stress - (costs.stress ?? 0) + (rewards.stress ?? 0)
+      ),
+      study_progress:
+        resourceBase.study_progress -
+        (costs.study_progress ?? 0) +
+        (rewards.study_progress ?? 0),
+      social_capital:
+        resourceBase.social_capital -
+        (costs.social_capital ?? 0) +
+        (rewards.social_capital ?? 0),
+      health: clamp100(
+        resourceBase.health - (costs.health ?? 0) + (rewards.health ?? 0)
+      ),
+    };
+
+    const { error: updateError } = await supabase
+      .from("player_day_state")
+      .update({
+        money: nextResources.money,
+        energy: nextResources.energy,
+        stress: nextResources.stress,
+        study_progress: nextResources.study_progress,
+        social_capital: nextResources.social_capital,
+        health: nextResources.health,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId)
+      .eq("day_index", dayIndex);
+
+    if (updateError) {
+      console.error("Failed to apply arc choice costs/rewards", updateError);
+      throw new Error("Failed to apply arc choice.");
+    }
+
+    if (
+      nextResources.energy !== resourceBase.energy ||
+      nextResources.stress !== resourceBase.stress
+    ) {
+      const daily = await fetchDailyState(userId);
+      if (daily) {
+        await updateDailyState(userId, {
+          energy: nextResources.energy,
+          stress: nextResources.stress,
+          vectors: daily.vectors,
+        });
+      }
+    }
   }
 
   await applyArcChoiceFlags(userId, arcKey, choice.flags);

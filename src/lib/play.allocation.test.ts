@@ -65,6 +65,10 @@ describe("saveTimeAllocation", () => {
       allocation_hash: null,
       pre_allocation_energy: null,
       pre_allocation_stress: null,
+      pre_allocation_money: null,
+      pre_allocation_study_progress: null,
+      pre_allocation_social_capital: null,
+      pre_allocation_health: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -77,8 +81,16 @@ describe("saveTimeAllocation", () => {
     expect(updates[0].payload).toMatchObject({
       energy: 60,
       stress: 23,
+      money: 2,
+      study_progress: 4,
+      social_capital: 1,
+      health: 51,
       pre_allocation_energy: 70,
       pre_allocation_stress: 20,
+      pre_allocation_money: 0,
+      pre_allocation_study_progress: 0,
+      pre_allocation_social_capital: 0,
+      pre_allocation_health: 50,
       allocation_hash: hashAllocation(allocation),
     });
   });
@@ -104,6 +116,10 @@ describe("saveTimeAllocation", () => {
       allocation_hash: sameHash,
       pre_allocation_energy: 70,
       pre_allocation_stress: 20,
+      pre_allocation_money: 0,
+      pre_allocation_study_progress: 0,
+      pre_allocation_social_capital: 0,
+      pre_allocation_health: 50,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -133,6 +149,10 @@ describe("saveTimeAllocation", () => {
       allocation_hash: "old",
       pre_allocation_energy: 60,
       pre_allocation_stress: 10,
+      pre_allocation_money: 5,
+      pre_allocation_study_progress: 3,
+      pre_allocation_social_capital: 1,
+      pre_allocation_health: 40,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -152,6 +172,10 @@ describe("saveTimeAllocation", () => {
     expect(updates[0].payload).toMatchObject({
       pre_allocation_energy: 60,
       pre_allocation_stress: 10,
+      pre_allocation_money: 5,
+      pre_allocation_study_progress: 3,
+      pre_allocation_social_capital: 1,
+      pre_allocation_health: 40,
       allocation_hash: hashAllocation(nextAllocation),
     });
     expect(updates[0].payload.energy).toBe(50);

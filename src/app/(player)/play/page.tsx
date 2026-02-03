@@ -53,7 +53,7 @@ import {
   resolveTension,
   submitPosture,
 } from "@/lib/dailyInteractions";
-import { advanceArc, completeArc, startArc } from "@/lib/arcs";
+import { advanceArc, completeArc, progressArcWithChoice, startArc } from "@/lib/arcs";
 import { contributeToInitiative } from "@/lib/initiatives";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type {
@@ -1339,6 +1339,27 @@ export default function PlayPage() {
     }
   };
 
+  const handleArcChoice = async (choiceKey: string) => {
+    if (!userId || !arc) return;
+    setArcSubmitting(true);
+    setError(null);
+    try {
+      await progressArcWithChoice(userId, arc.arc_key, choiceKey, dayIndex);
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error(e);
+      const message =
+        e instanceof Error && e.message.startsWith("INSUFFICIENT_RESOURCES")
+          ? "Not enough resources to choose that."
+          : e instanceof Error
+            ? e.message
+            : "Failed to apply arc choice.";
+      setError(message);
+    } finally {
+      setArcSubmitting(false);
+    }
+  };
+
   const handleBeginUnlockedArc = async (arcKey: string) => {
     if (!userId) return;
     setArcSubmitting(true);
@@ -1855,9 +1876,11 @@ export default function PlayPage() {
                         <ArcPanel
                           arc={arc}
                           availableArcs={availableArcs}
+                          dayState={dayState}
                           submitting={arcSubmitting}
                           onStart={handleStartArc}
                           onAdvance={handleAdvanceArc}
+                          onChoose={handleArcChoice}
                           onBeginUnlocked={handleBeginUnlockedArc}
                         />
                       </section>

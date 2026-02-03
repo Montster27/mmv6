@@ -142,6 +142,9 @@ export async function saveTimeAllocation(
   };
   const allocationHash = hashAllocation(normalizedAllocation);
   const sameAllocation = dayState.allocation_hash === allocationHash;
+  if (sameAllocation) {
+    return;
+  }
   const previousTotals =
     dayIndex > 0
       ? await ensureDayStateUpToDate(userId, dayIndex - 1)
@@ -169,6 +172,11 @@ export async function saveTimeAllocation(
 
   const baseEnergy = dayState.pre_allocation_energy ?? dayState.energy;
   const baseStress = dayState.pre_allocation_stress ?? dayState.stress;
+  const baseMoney = dayState.pre_allocation_money ?? dayState.money;
+  const baseStudy = dayState.pre_allocation_study_progress ?? dayState.study_progress;
+  const baseSocial =
+    dayState.pre_allocation_social_capital ?? dayState.social_capital;
+  const baseHealth = dayState.pre_allocation_health ?? dayState.health;
   const skills = await fetchSkillLevels(userId);
   const next = applyAllocationToDayState({
     energy: baseEnergy,
@@ -177,12 +185,24 @@ export async function saveTimeAllocation(
     posture,
     skills,
   });
+  const moneyGain = Math.floor(normalizedAllocation.work / 10);
+  const studyGain = Math.floor(normalizedAllocation.study / 10);
+  const socialGain = Math.floor(normalizedAllocation.social / 10);
+  const healthGain = Math.floor(normalizedAllocation.health / 20);
+  const nextMoney = baseMoney + moneyGain;
+  const nextStudy = baseStudy + studyGain;
+  const nextSocial = baseSocial + socialGain;
+  const nextHealth = Math.min(100, Math.max(0, baseHealth + healthGain));
 
   const { error: updateError } = await supabase
     .from("player_day_state")
     .update({
       energy: next.energy,
       stress: next.stress,
+      money: nextMoney,
+      study_progress: nextStudy,
+      social_capital: nextSocial,
+      health: nextHealth,
       total_study: previousTotals.total_study + normalizedAllocation.study,
       total_work: previousTotals.total_work + normalizedAllocation.work,
       total_social: previousTotals.total_social + normalizedAllocation.social,
@@ -190,6 +210,10 @@ export async function saveTimeAllocation(
       total_fun: previousTotals.total_fun + normalizedAllocation.fun,
       pre_allocation_energy: baseEnergy,
       pre_allocation_stress: baseStress,
+      pre_allocation_money: baseMoney,
+      pre_allocation_study_progress: baseStudy,
+      pre_allocation_social_capital: baseSocial,
+      pre_allocation_health: baseHealth,
       allocation_hash: allocationHash,
       updated_at: new Date().toISOString(),
     })
@@ -201,21 +225,19 @@ export async function saveTimeAllocation(
     throw updateError;
   }
 
-  if (!sameAllocation) {
-    const vectorDeltas = allocationToVectorDeltas(normalizedAllocation);
-    if (Object.keys(vectorDeltas).length > 0) {
-      const daily = await fetchDailyState(userId);
-      if (daily) {
-        const { nextDailyState } = applyOutcomeToDailyState(daily, {
-          deltas: { vectors: vectorDeltas },
-          text: "",
-        } as any);
-        await updateDailyState(userId, {
-          energy: nextDailyState.energy,
-          stress: nextDailyState.stress,
-          vectors: nextDailyState.vectors,
-        });
-      }
+  const vectorDeltas = allocationToVectorDeltas(normalizedAllocation);
+  if (Object.keys(vectorDeltas).length > 0) {
+    const daily = await fetchDailyState(userId);
+    if (daily) {
+      const { nextDailyState } = applyOutcomeToDailyState(daily, {
+        deltas: { vectors: vectorDeltas },
+        text: "",
+      } as any);
+      await updateDailyState(userId, {
+        energy: nextDailyState.energy,
+        stress: nextDailyState.stress,
+        vectors: nextDailyState.vectors,
+      });
     }
   }
 }

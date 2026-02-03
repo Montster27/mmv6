@@ -11,6 +11,22 @@ export type ContentArcStepChoice = {
   key: string;
   label: string;
   flags?: Record<string, boolean>;
+  costs?: Partial<{
+    money: number;
+    energy: number;
+    stress: number;
+    study_progress: number;
+    social_capital: number;
+    health: number;
+  }>;
+  rewards?: Partial<{
+    money: number;
+    energy: number;
+    stress: number;
+    study_progress: number;
+    social_capital: number;
+    health: number;
+  }>;
 };
 
 export type ContentArcStep = {

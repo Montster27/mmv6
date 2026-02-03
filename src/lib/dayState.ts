@@ -30,7 +30,7 @@ export async function fetchDayState(
   const { data, error } = await supabase
     .from("player_day_state")
     .select(
-      "user_id,day_index,energy,stress,money,study_progress,social_capital,health,total_study,total_work,total_social,total_health,total_fun,allocation_hash,pre_allocation_energy,pre_allocation_stress,resolved_at,end_energy,end_stress,next_energy,next_stress,created_at,updated_at"
+      "user_id,day_index,energy,stress,money,study_progress,social_capital,health,total_study,total_work,total_social,total_health,total_fun,allocation_hash,pre_allocation_energy,pre_allocation_stress,pre_allocation_money,pre_allocation_study_progress,pre_allocation_social_capital,pre_allocation_health,resolved_at,end_energy,end_stress,next_energy,next_stress,created_at,updated_at"
     )
     .eq("user_id", userId)
     .eq("day_index", dayIndex)
