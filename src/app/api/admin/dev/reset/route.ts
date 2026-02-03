@@ -115,6 +115,18 @@ export async function POST(request: Request) {
     })
     .eq("user_id", userId);
 
+  await supabaseServer.from("player_day_state").insert({
+    user_id: userId,
+    day_index: 1,
+    energy: 100,
+    stress: 0,
+    money: 0,
+    study_progress: 0,
+    social_capital: 0,
+    health: 50,
+    updated_at: now,
+  });
+
   if (currentSeasonIndex) {
     await supabaseServer
       .from("user_seasons")
