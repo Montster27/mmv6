@@ -70,6 +70,7 @@ import { useDailyProgress, useGameContent, useUserSocial } from "./hooks";
 import { MessageCard } from "@/components/ux/MessageCard";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
+import { getAppMode } from "@/lib/mode";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -236,6 +237,7 @@ export default function PlayPage() {
       }),
     []
   );
+  const testerMode = useMemo(() => getAppMode().testerMode, []);
   const testerNote = useMemo(
     () =>
       testerMessage("Tester: Set posture, allocate time, then pick a storylet.", {
@@ -243,6 +245,8 @@ export default function PlayPage() {
       }),
     []
   );
+  const [testerIntroMessage, setTesterIntroMessage] =
+    useState<ReturnType<typeof testerMessage> | null>(null);
   const testerFastForwardNote = useMemo(
     () => testerMessage("Test mode only.", { tone: "warning" }),
     []
@@ -821,6 +825,26 @@ export default function PlayPage() {
     funPulseShownTracked.current = true;
     trackWithSeason({ event_type: "fun_pulse_shown", day_index: dayIndex, stage });
   }, [stage, userId, dayIndex, loading]);
+
+  useEffect(() => {
+    if (!testerMode) return;
+    if (testerIntroMessage) return;
+    try {
+      const seen = localStorage.getItem("mmv_tester_intro_seen");
+      if (seen === "1") return;
+      const intro = testerMessage(
+        "You’re testing an early slice of MMV: a daily-life time-loop in a slightly-wrong version of college. Your job is to push on the system and tell us what feels clear, confusing, or pointless.",
+        {
+          title: "Welcome to the MMV Playtest",
+          details:
+            "• Posture + allocation changes Energy/Stress now and carries into tomorrow. • Threads (Arcs) are short narrative investigations. • After Day 2, skill points start and get harder over time. • Start here: begin “Anomaly 001” in the Threads panel.",
+          tone: "warning",
+        }
+      );
+      setTesterIntroMessage(intro);
+      localStorage.setItem("mmv_tester_intro_seen", "1");
+    } catch {}
+  }, [testerMode, testerIntroMessage]);
 
   useEffect(() => {
     if (!dayState) return;
@@ -1471,6 +1495,11 @@ export default function PlayPage() {
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
                 </TesterOnly>
+                {testerIntroMessage ? (
+                  <TesterOnly>
+                    <MessageCard message={testerIntroMessage} variant="inline" />
+                  </TesterOnly>
+                ) : null}
                 {testerDeltaMessage ? (
                   <TesterOnly>
                     <MessageCard message={testerDeltaMessage} variant="inline" />
