@@ -67,6 +67,9 @@ import { SeasonBadge } from "@/components/SeasonBadge";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
 import { useDailyProgress, useGameContent, useUserSocial } from "./hooks";
+import { MessageCard } from "@/components/ux/MessageCard";
+import { TesterOnly } from "@/components/ux/TesterOnly";
+import { gameMessage, testerMessage } from "@/lib/messages";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -225,6 +228,52 @@ export default function PlayPage() {
   const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+
+  const gameNote = useMemo(
+    () =>
+      gameMessage("The day opens like a file you didn't finish yesterday.", {
+        tone: "neutral",
+      }),
+    []
+  );
+  const testerNote = useMemo(
+    () =>
+      testerMessage("Tester: Set posture, allocate time, then pick a storylet.", {
+        tone: "warning",
+      }),
+    []
+  );
+  const testerFastForwardNote = useMemo(
+    () => testerMessage("Test mode only.", { tone: "warning" }),
+    []
+  );
+  const [testerDeltaNote, setTesterDeltaNote] = useState<string | null>(null);
+  const testerDeltaMessage = useMemo(
+    () =>
+      testerDeltaNote
+        ? testerMessage(testerDeltaNote, { tone: "neutral" })
+        : null,
+    [testerDeltaNote]
+  );
+  const pendingDeltaSourceRef = useRef<string | null>(null);
+  const previousDayStateRef = useRef<{ energy: number; stress: number } | null>(
+    null
+  );
+  const seasonResetGameNote = useMemo(
+    () =>
+      gameMessage("The ledger blurs. You begin again with what you can hold.", {
+        tone: "neutral",
+      }),
+    []
+  );
+  const seasonResetTesterNote = useMemo(
+    () =>
+      testerMessage(
+        "Tester: Season reset clears the daily ledger (energy, stress, vectors).",
+        { tone: "warning" }
+      ),
+    []
+  );
   const [microTaskSaving, setMicroTaskSaving] = useState(false);
   const [consequenceActive, setConsequenceActive] = useState(false);
   const sessionStartTracked = useRef(false);
@@ -774,6 +823,27 @@ export default function PlayPage() {
   }, [stage, userId, dayIndex, loading]);
 
   useEffect(() => {
+    if (!dayState) return;
+    const prev = previousDayStateRef.current;
+    const source = pendingDeltaSourceRef.current;
+    if (prev && source) {
+      const parts: string[] = [];
+      if (dayState.energy !== prev.energy) {
+        parts.push(`Energy ${prev.energy}→${dayState.energy} (${source})`);
+      }
+      if (dayState.stress !== prev.stress) {
+        parts.push(`Stress ${prev.stress}→${dayState.stress} (${source})`);
+      }
+      setTesterDeltaNote(parts.length ? parts.join(", ") : null);
+    }
+    previousDayStateRef.current = {
+      energy: dayState.energy,
+      stress: dayState.stress,
+    };
+    pendingDeltaSourceRef.current = null;
+  }, [dayState?.energy, dayState?.stress]);
+
+  useEffect(() => {
     return () => {
       if (!userId || sessionEndTracked.current) return;
       sessionEndTracked.current = true;
@@ -808,6 +878,7 @@ export default function PlayPage() {
     if (!userId || !allocationValid) return;
     setSavingAllocation(true);
     setError(null);
+    pendingDeltaSourceRef.current = "allocation";
     try {
       await saveTimeAllocation(userId, dayIndex, allocation, posture?.posture ?? null);
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
@@ -1395,6 +1466,17 @@ export default function PlayPage() {
               <p className="text-slate-600 text-sm">
                 Signed in as {session.user.email ?? "unknown user"}.
               </p>
+              <div className="mt-3 space-y-2">
+                <MessageCard message={gameNote} variant="inline" />
+                <TesterOnly>
+                  <MessageCard message={testerNote} variant="inline" />
+                </TesterOnly>
+                {testerDeltaMessage ? (
+                  <TesterOnly>
+                    <MessageCard message={testerDeltaMessage} variant="inline" />
+                  </TesterOnly>
+                ) : null}
+              </div>
               {dayRolloverNotice ? (
                 <p className="mt-2 text-xs text-slate-500">{dayRolloverNotice}</p>
               ) : null}
@@ -1458,9 +1540,14 @@ export default function PlayPage() {
               <p className="text-slate-200">
                 You remember: anomalies and theories.
               </p>
-              <p className="text-slate-200">
-                You forget: the daily ledger (energy, stress, vectors reset).
-              </p>
+              <TesterOnly>
+                <div className="mt-2">
+                  <MessageCard message={seasonResetTesterNote} variant="inline" />
+                </div>
+              </TesterOnly>
+              <div className="mt-2">
+                <MessageCard message={seasonResetGameNote} variant="inline" />
+              </div>
               {seasonRecap ? (
                 <div className="rounded-md border border-slate-500/40 bg-slate-900/40 px-3 py-3 text-sm text-slate-200 space-y-1">
                   <p>Last season recap:</p>
@@ -1512,9 +1599,14 @@ export default function PlayPage() {
                           >
                             ⏩ Fast Forward: Next Day (TEST MODE)
                           </Button>
-                          <p className="text-xs text-slate-500 mt-2">
-                            Test mode only.
-                          </p>
+                          <TesterOnly>
+                            <div className="mt-2">
+                              <MessageCard
+                                message={testerFastForwardNote}
+                                variant="inline"
+                              />
+                            </div>
+                          </TesterOnly>
                         </div>
                       ) : null}
                     </section>
@@ -1690,7 +1782,9 @@ export default function PlayPage() {
                                   </ul>
                                 ) : null}
                                 {lastCheck ? (
-                                  <OutcomeExplain check={lastCheck} />
+                                  <TesterOnly>
+                                    <OutcomeExplain check={lastCheck} />
+                                  </TesterOnly>
                                 ) : null}
                               </div>
                             )}

@@ -1,6 +1,8 @@
 "use client";
 
 import type { CheckResult, CheckSkillKey } from "@/types/checks";
+import { MessageCard } from "@/components/ux/MessageCard";
+import { testerMessage } from "@/lib/messages";
 
 type Props = {
   check: CheckResult;
@@ -41,22 +43,19 @@ export function OutcomeExplain({ check }: Props) {
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .slice(0, 2);
   const chancePct = Math.round(check.chance * 100);
-
-  return (
-    <div className="mt-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-700">
-      <div className="flex items-center justify-between">
-        <span>Check</span>
-        <span className={check.success ? "text-emerald-700" : "text-rose-700"}>
-          {chancePct}% · {check.success ? "success" : "failure"}
-        </span>
-      </div>
-      {topFactors.length > 0 ? (
-        <p className="mt-1 text-slate-600">
-          {topFactors
-            .map((factor) => `${factor.label} ${formatPercent(factor.value)}`)
-            .join(" · ")}
-        </p>
-      ) : null}
-    </div>
+  const details =
+    topFactors.length > 0
+      ? topFactors
+          .map((factor) => `${factor.label} ${formatPercent(factor.value)}`)
+          .join(" · ")
+      : undefined;
+  const message = testerMessage(
+    `Chance ${chancePct}% · ${check.success ? "success" : "failure"}`,
+    {
+      title: "Check breakdown",
+      details,
+    }
   );
+
+  return <MessageCard message={message} variant="inline" />;
 }
