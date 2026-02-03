@@ -55,6 +55,15 @@ export type DailyRun = {
             key: string;
             label: string;
             flags?: Record<string, boolean>;
+            vector_deltas?: Partial<{
+              reflection: number;
+              focus: number;
+              ambition: number;
+              social: number;
+              stability: number;
+              curiosity: number;
+              agency: number;
+            }>;
             costs?: Partial<{
               money: number;
               energy: number;

@@ -226,7 +226,15 @@ export async function progressArcWithChoice(
     throw new Error("Arc choice missing.");
   }
 
-  if (choice.costs || choice.rewards) {
+  const vectorFromChoice =
+    choice.vector_deltas &&
+    typeof choice.vector_deltas === "object" &&
+    !Array.isArray(choice.vector_deltas)
+      ? (choice.vector_deltas as Record<string, number>)
+      : {};
+
+  const hasResourceEffects = Boolean(choice.costs || choice.rewards);
+  if (hasResourceEffects) {
     if (typeof dayIndex !== "number") {
       throw new Error("Day index required for arc choice.");
     }
@@ -297,18 +305,17 @@ export async function progressArcWithChoice(
       throw new Error("Failed to apply arc choice.");
     }
 
-    if (
-      nextResources.energy !== resourceBase.energy ||
-      nextResources.stress !== resourceBase.stress
-    ) {
-      const daily = await fetchDailyState(userId);
-      if (daily) {
-        await updateDailyState(userId, {
-          energy: nextResources.energy,
-          stress: nextResources.stress,
-          vectors: daily.vectors,
-        });
-      }
+    const daily = await fetchDailyState(userId);
+    if (daily) {
+      const { nextDailyState } = applyOutcomeToDailyState(daily, {
+        deltas: { vectors: vectorFromChoice },
+        text: "",
+      } as any);
+      await updateDailyState(userId, {
+        energy: nextResources.energy,
+        stress: nextResources.stress,
+        vectors: nextDailyState.vectors,
+      });
     }
   }
 
@@ -326,19 +333,24 @@ export async function progressArcWithChoice(
     });
   }
 
-  const vectorDeltas = flagToVectorDeltas(choice.flags);
-  if (Object.keys(vectorDeltas).length > 0) {
-    const daily = await fetchDailyState(userId);
-    if (daily) {
-      const { nextDailyState } = applyOutcomeToDailyState(daily, {
-        deltas: { vectors: vectorDeltas },
-        text: "",
-      } as any);
-      await updateDailyState(userId, {
-        energy: nextDailyState.energy,
-        stress: nextDailyState.stress,
-        vectors: nextDailyState.vectors,
-      });
+  if (!hasResourceEffects) {
+    const vectorDeltas = {
+      ...flagToVectorDeltas(choice.flags),
+      ...vectorFromChoice,
+    };
+    if (Object.keys(vectorDeltas).length > 0) {
+      const daily = await fetchDailyState(userId);
+      if (daily) {
+        const { nextDailyState } = applyOutcomeToDailyState(daily, {
+          deltas: { vectors: vectorDeltas },
+          text: "",
+        } as any);
+        await updateDailyState(userId, {
+          energy: nextDailyState.energy,
+          stress: nextDailyState.stress,
+          vectors: nextDailyState.vectors,
+        });
+      }
     }
   }
 
