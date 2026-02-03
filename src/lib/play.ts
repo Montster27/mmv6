@@ -140,9 +140,30 @@ export async function saveTimeAllocation(
     fun: allocation.fun ?? 0,
   };
   const allocationHash = hashAllocation(normalizedAllocation);
-  if (dayState.allocation_hash === allocationHash) {
-    return;
-  }
+  const previousTotals =
+    dayIndex > 0
+      ? await ensureDayStateUpToDate(userId, dayIndex - 1)
+          .then((prev) => ({
+            total_study: prev.total_study ?? 0,
+            total_work: prev.total_work ?? 0,
+            total_social: prev.total_social ?? 0,
+            total_health: prev.total_health ?? 0,
+            total_fun: prev.total_fun ?? 0,
+          }))
+          .catch(() => ({
+            total_study: 0,
+            total_work: 0,
+            total_social: 0,
+            total_health: 0,
+            total_fun: 0,
+          }))
+      : {
+          total_study: 0,
+          total_work: 0,
+          total_social: 0,
+          total_health: 0,
+          total_fun: 0,
+        };
 
   const baseEnergy = dayState.pre_allocation_energy ?? dayState.energy;
   const baseStress = dayState.pre_allocation_stress ?? dayState.stress;
@@ -160,6 +181,11 @@ export async function saveTimeAllocation(
     .update({
       energy: next.energy,
       stress: next.stress,
+      total_study: previousTotals.total_study + normalizedAllocation.study,
+      total_work: previousTotals.total_work + normalizedAllocation.work,
+      total_social: previousTotals.total_social + normalizedAllocation.social,
+      total_health: previousTotals.total_health + normalizedAllocation.health,
+      total_fun: previousTotals.total_fun + normalizedAllocation.fun,
       pre_allocation_energy: baseEnergy,
       pre_allocation_stress: baseStress,
       allocation_hash: allocationHash,

@@ -12,6 +12,11 @@ const DEFAULT_STATE = {
   study_progress: 0,
   social_capital: 0,
   health: 50,
+  total_study: 0,
+  total_work: 0,
+  total_social: 0,
+  total_health: 0,
+  total_fun: 0,
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -25,7 +30,7 @@ export async function fetchDayState(
   const { data, error } = await supabase
     .from("player_day_state")
     .select(
-      "user_id,day_index,energy,stress,money,study_progress,social_capital,health,allocation_hash,pre_allocation_energy,pre_allocation_stress,resolved_at,end_energy,end_stress,next_energy,next_stress,created_at,updated_at"
+      "user_id,day_index,energy,stress,money,study_progress,social_capital,health,total_study,total_work,total_social,total_health,total_fun,allocation_hash,pre_allocation_energy,pre_allocation_stress,resolved_at,end_energy,end_stress,next_energy,next_stress,created_at,updated_at"
     )
     .eq("user_id", userId)
     .eq("day_index", dayIndex)
@@ -61,6 +66,11 @@ export async function createDayStateFromPrevious(
     study_progress: source?.study_progress ?? DEFAULT_STATE.study_progress,
     social_capital: source?.social_capital ?? DEFAULT_STATE.social_capital,
     health: source?.health ?? DEFAULT_STATE.health,
+    total_study: source?.total_study ?? DEFAULT_STATE.total_study,
+    total_work: source?.total_work ?? DEFAULT_STATE.total_work,
+    total_social: source?.total_social ?? DEFAULT_STATE.total_social,
+    total_health: source?.total_health ?? DEFAULT_STATE.total_health,
+    total_fun: source?.total_fun ?? DEFAULT_STATE.total_fun,
   };
 
   const insertPayload = {

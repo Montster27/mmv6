@@ -503,6 +503,11 @@ export async function getOrCreateDailyRun(
           study_progress: dayState.study_progress,
           social_capital: dayState.social_capital,
           health: dayState.health,
+          total_study: dayState.total_study,
+          total_work: dayState.total_work,
+          total_social: dayState.total_social,
+          total_health: dayState.total_health,
+          total_fun: dayState.total_fun,
         }
       : null,
     seasonResetNeeded,

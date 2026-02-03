@@ -578,6 +578,11 @@ export default function PlayPage() {
                 study_progress: 0,
                 social_capital: 0,
                 health: 50,
+                total_study: 0,
+                total_work: 0,
+                total_social: 0,
+                total_health: 0,
+                total_fun: 0,
               });
             }
           }
@@ -635,6 +640,11 @@ export default function PlayPage() {
               study_progress: 0,
               social_capital: 0,
               health: 50,
+              total_study: 0,
+              total_work: 0,
+              total_social: 0,
+              total_health: 0,
+              total_fun: 0,
             });
           }
 
@@ -923,6 +933,11 @@ export default function PlayPage() {
             study_progress: 0,
             social_capital: 0,
             health: 50,
+            total_study: 0,
+            total_work: 0,
+            total_social: 0,
+            total_health: 0,
+            total_fun: 0,
           });
         }
       }

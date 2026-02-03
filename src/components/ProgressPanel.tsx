@@ -81,7 +81,15 @@ function ProgressPanelComponent({
   const energy = dayState?.energy ?? dailyState?.energy;
   const stress = dayState?.stress ?? dailyState?.stress;
   const vectors = toVectors(dailyState?.vectors ?? {});
-  const allocationTotals = allocation ?? {};
+  const allocationTotals = dayState
+    ? {
+        study: dayState.total_study ?? 0,
+        work: dayState.total_work ?? 0,
+        social: dayState.total_social ?? 0,
+        health: dayState.total_health ?? 0,
+        fun: dayState.total_fun ?? 0,
+      }
+    : allocation ?? {};
   const skillLevels = skills ?? {
     focus: 0,
     memory: 0,

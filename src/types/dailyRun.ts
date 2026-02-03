@@ -97,7 +97,17 @@ export type DailyRun = {
   dailyState?: DailyState | null;
   dayState?: Pick<
     PlayerDayState,
-    "energy" | "stress" | "money" | "study_progress" | "social_capital" | "health"
+    | "energy"
+    | "stress"
+    | "money"
+    | "study_progress"
+    | "social_capital"
+    | "health"
+    | "total_study"
+    | "total_work"
+    | "total_social"
+    | "total_health"
+    | "total_fun"
   > | null;
   lastCheck?: import("./checks").CheckResult | null;
   seasonResetNeeded?: boolean;

@@ -7,6 +7,11 @@ export type PlayerDayState = {
   study_progress: number;
   social_capital: number;
   health: number;
+  total_study: number;
+  total_work: number;
+  total_social: number;
+  total_health: number;
+  total_fun: number;
   allocation_hash?: string | null;
   pre_allocation_energy?: number | null;
   pre_allocation_stress?: number | null;
