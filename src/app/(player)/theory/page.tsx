@@ -1,54 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import type { Session } from "@supabase/supabase-js";
 
 import { useSession } from "@/contexts/SessionContext";
 import { Button } from "@/components/ui/button";
-import {
-  listHypotheses,
-  createHypothesis,
-  listHypothesisAnomalies,
-} from "@/lib/hypotheses";
-import type { Hypothesis } from "@/types/hypotheses";
+import { createHypothesis } from "@/lib/hypotheses";
 import { TheorySkeleton } from "@/components/skeletons/TheorySkeleton";
+import { useTheoryData } from "@/hooks/queries/useTheoryData";
 
 function TheoryContent() {
   const session = useSession();
-  const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(false);
+  const { data, isLoading, isError, refetch } = useTheoryData(session.user.id);
+  const hypotheses = data?.hypotheses ?? [];
+  const counts = data?.counts ?? {};
   const [error, setError] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [newBody, setNewBody] = useState("");
   const [creating, setCreating] = useState(false);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const list = await listHypotheses(session.user.id);
-      setHypotheses(list);
-      const map: Record<string, number> = {};
-      await Promise.all(
-        list.map(async (item) => {
-          const links = await listHypothesisAnomalies(item.id);
-          map[item.id] = links.length;
-        })
-      );
-      setCounts(map);
-    } catch (e) {
-      console.error(e);
-      setError("Failed to load hypotheses.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, [session.user.id]);
 
   return (
     <div className="p-6 space-y-4">
@@ -87,13 +56,15 @@ function TheoryContent() {
               return;
             }
             setCreating(true);
-            let created: Hypothesis | null = null;
             try {
-              created = await createHypothesis({
+              await createHypothesis({
                 userId: session.user.id,
                 title: newTitle.trim(),
                 body: newBody.trim(),
               });
+              setNewTitle("");
+              setNewBody("");
+              await refetch();
             } catch (e) {
               console.error(e);
               setError(
@@ -101,13 +72,6 @@ function TheoryContent() {
               );
             }
             setCreating(false);
-            if (created) {
-              setNewTitle("");
-              setNewBody("");
-              await load();
-            } else {
-              setError("Failed to create hypothesis.");
-            }
           }}
           disabled={creating}
         >
@@ -115,15 +79,15 @@ function TheoryContent() {
         </Button>
       </div>
 
-      {error ? (
+      {error || isError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          {error ?? "Failed to load hypotheses."}
         </div>
       ) : null}
 
-      {loading ? <TheorySkeleton /> : null}
+      {isLoading ? <TheorySkeleton /> : null}
 
-      {hypotheses.length === 0 && !loading ? (
+      {hypotheses.length === 0 && !isLoading ? (
         <p className="text-slate-700">No hypotheses yet.</p>
       ) : (
         <div className="space-y-3">

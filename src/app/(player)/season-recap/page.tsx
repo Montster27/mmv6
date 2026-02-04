@@ -1,18 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase/browser";
 import { trackEvent } from "@/lib/events";
-import type { PersonalRecap, WorldDriftRecap } from "@/types/recap";
 import { SeasonRecapSkeleton } from "@/components/skeletons/SeasonRecapSkeleton";
-
-type RecapResponse = {
-  personal: PersonalRecap;
-  world: WorldDriftRecap;
-};
+import { useSeasonRecap } from "@/hooks/queries/useSeasonRecap";
 
 function formatPercent(value: number | null) {
   if (value === null || Number.isNaN(value)) return "—";
@@ -27,46 +21,15 @@ function formatDuration(value: number | null | undefined) {
 
 function RecapContent({ seasonIndex }: { seasonIndex: number | null }) {
   const router = useRouter();
-  const [recap, setRecap] = useState<RecapResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data: recap, isLoading, isError } = useSeasonRecap(seasonIndex);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        if (!token) {
-          setError("Not signed in.");
-          return;
-        }
-
-        const params = seasonIndex ? `?season_index=${seasonIndex}` : "";
-        const response = await fetch(`/api/season/recap${params}`, {
-          headers: { authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) {
-          throw new Error("Failed to load recap.");
-        }
-        const payload = (await response.json()) as RecapResponse;
-        setRecap(payload);
-
-        trackEvent({
-          event_type: "season_recap_viewed",
-          payload: { season_index: payload.personal.seasonIndex },
-        });
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load recap.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-  }, [seasonIndex]);
+    if (!recap) return;
+    trackEvent({
+      event_type: "season_recap_viewed",
+      payload: { season_index: recap.personal.seasonIndex },
+    });
+  }, [recap]);
 
   return (
     <div className="p-6 space-y-6 max-w-2xl min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-blue-100/50">
@@ -77,13 +40,13 @@ function RecapContent({ seasonIndex }: { seasonIndex: number | null }) {
         </p>
       </div>
 
-      {error ? (
+      {isError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          Failed to load recap.
         </div>
       ) : null}
 
-      {loading && !recap ? <SeasonRecapSkeleton /> : null}
+      {isLoading && !recap ? <SeasonRecapSkeleton /> : null}
 
       {recap ? (
         <>

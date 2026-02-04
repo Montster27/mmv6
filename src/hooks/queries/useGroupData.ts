@@ -21,7 +21,15 @@ type GroupData = {
   group: Group | null;
   feed: GroupFeedItem[];
   members: ProfileRow[];
+  objective: ObjectiveRow | null;
   objectives: ObjectiveRow[];
+  clues: Array<{
+    id: string;
+    from_display_name: string | null;
+    anomaly_title: string | null;
+    anomaly_description: string | null;
+    created_at: string;
+  }>;
   userAnomalyIds: string[];
   anomalyCatalog: Record<string, Anomaly>;
   joinCode: string;
@@ -46,14 +54,28 @@ export function useGroupFeedData(userId: string, accessToken: string) {
       const memberJson = memberRes.ok ? await memberRes.json() : { members: [] };
 
       const objRes = await fetch(
-        `/api/groups/objectives?group_id=${membership.group_id}`,
+        `/api/groups/objective/current?group_id=${membership.group_id}`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      const objJson = objRes.ok ? await objRes.json() : { objectives: [] };
+      const objJson = objRes.ok ? await objRes.json() : { objective: null };
+
+      const clueRes = await fetch("/api/group/clues/inbox", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const clueJson = clueRes.ok ? await clueRes.json() : { clues: [] };
 
       const userAnomalies = await fetchUserAnomalies(userId);
       const userAnomalyIds = userAnomalies.map((a) => a.anomaly_id);
-      const anomalies = await fetchAnomaliesByIds(userAnomalyIds);
+      const feedAnomalyIds = Array.from(
+        new Set(
+          (feed ?? [])
+            .map((row) => row.payload?.anomaly_id)
+            .filter((id): id is string => typeof id === "string")
+        )
+      );
+      const anomalies = await fetchAnomaliesByIds(
+        Array.from(new Set([...userAnomalyIds, ...feedAnomalyIds]))
+      );
       const anomalyCatalog = anomalies.reduce<Record<string, Anomaly>>(
         (acc, item) => {
           acc[item.id] = item;
@@ -66,7 +88,9 @@ export function useGroupFeedData(userId: string, accessToken: string) {
         group,
         feed,
         members: memberJson.members ?? [],
+        objective: objJson.objective ?? null,
         objectives: objJson.objectives ?? [],
+        clues: clueJson.clues ?? [],
         userAnomalyIds,
         anomalyCatalog,
         joinCode: group?.join_code ?? "",
