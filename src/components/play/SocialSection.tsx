@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { InitiativePanel } from "@/components/play/InitiativePanel";
 import type { Faction } from "@/types/factions";
+import type { Initiative } from "@/types/initiatives";
 
 type PublicProfile = {
   user_id: string;
@@ -14,9 +15,9 @@ type ReceivedBoost = {
   [key: string]: unknown;
 };
 
-type Initiative = {
-  id: string;
-  [key: string]: unknown;
+type InitiativeWithStatus = Initiative & {
+  contributedToday?: boolean;
+  progress?: number;
 };
 
 type SocialSectionProps = {
@@ -26,7 +27,7 @@ type SocialSectionProps = {
   selectedRecipient: string;
   boostsReceived: ReceivedBoost[];
   loadingSocial: boolean;
-  initiatives: Initiative[];
+  initiatives: InitiativeWithStatus[];
   dayIndex: number;
   directive?: {
     faction_key: string;
