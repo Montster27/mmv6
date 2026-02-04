@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
@@ -281,8 +281,9 @@ export default function PlayPage() {
       }),
     []
   );
-  const [testerIntroMessage, setTesterIntroMessage] =
-    useState<ReturnType<typeof testerMessage> | null>(null);
+  const [testerMessages, setTesterMessages] = useState<
+    Array<ReturnType<typeof testerMessage>>
+  >([]);
   const testerFastForwardNote = useMemo(
     () => testerMessage("Test mode only.", { tone: "warning" }),
     []
@@ -848,23 +849,35 @@ export default function PlayPage() {
 
   useEffect(() => {
     if (!testerMode) return;
-    if (testerIntroMessage) return;
-    try {
-      const seen = localStorage.getItem("mmv_tester_intro_seen");
-      if (seen === "1") return;
-      const intro = testerMessage(
-        "You’re testing an early slice of MMV: a daily-life time-loop in a slightly-wrong version of college. Your job is to push on the system and tell us what feels clear, confusing, or pointless.",
-        {
-          title: "Welcome to the MMV Playtest",
-          details:
-            "• Posture + allocation changes Energy/Stress now and carries into tomorrow. • Threads (Arcs) are short narrative investigations. • After Day 2, skill points start and get harder over time. • Start here: begin “Anomaly 001” in the Threads panel.",
-          tone: "warning",
-        }
-      );
-      setTesterIntroMessage(intro);
-      localStorage.setItem("mmv_tester_intro_seen", "1");
-    } catch {}
-  }, [testerMode, testerIntroMessage]);
+    const push = (key: string, message: ReturnType<typeof testerMessage>) => {
+      try {
+        if (localStorage.getItem(key) === "1") return;
+        localStorage.setItem(key, "1");
+        setTesterMessages((prev) => [...prev, message]);
+      } catch {}
+    };
+    push(
+      "mmv_tester_intro_seen",
+      testerMessage("You’re testing an early systems slice of MMV.", {
+        title: "Welcome to the MMV Playtest",
+        details:
+          "This game is about daily pressure and long-term drift, not optimization. Your choices today shape what’s possible tomorrow. • Posture changes allocation impact • Energy and stress carry forward • Resources enable or block story options • Start with the thread “Anomaly 001.”",
+        tone: "warning",
+      })
+    );
+  }, [testerMode]);
+
+  const pushTesterMessage = useCallback(
+    (key: string, message: ReturnType<typeof testerMessage>) => {
+      if (!testerMode) return;
+      try {
+        if (localStorage.getItem(key) === "1") return;
+        localStorage.setItem(key, "1");
+        setTesterMessages((prev) => [...prev, message]);
+      } catch {}
+    },
+    [testerMode]
+  );
 
   useEffect(() => {
     if (!dayState) return;
@@ -886,6 +899,33 @@ export default function PlayPage() {
     };
     pendingDeltaSourceRef.current = null;
   }, [dayState?.energy, dayState?.stress]);
+
+  useEffect(() => {
+    if (!testerMode) return;
+    if (!Number.isFinite(dayIndex)) return;
+    if (dayIndex >= 3) {
+      pushTesterMessage(
+        "mmv_tester_day3_skills",
+        testerMessage("Skill points unlock after Day 2.", {
+          title: "Skills Reflect Consistency",
+          details:
+            "They are: • Conditional (energy & stress matter) • Progressive (each level costs more) • Subtle (small multipliers, not power spikes). Skills represent who you are over time, not tactical choices.",
+          tone: "warning",
+        })
+      );
+    }
+    if (dayIndex >= 5) {
+      pushTesterMessage(
+        "mmv_tester_day5_drift",
+        testerMessage("By now, patterns should be forming.", {
+          title: "Look for Drift",
+          details:
+            "Ask yourself: • What kind of person is this character becoming? • Which pressures feel self‑inflicted? • Which tradeoffs surprised you? That sense of drift is the core of the game.",
+          tone: "warning",
+        })
+      );
+    }
+  }, [dayIndex, testerMode, pushTesterMessage]);
 
   useEffect(() => {
     return () => {
@@ -925,6 +965,15 @@ export default function PlayPage() {
     pendingDeltaSourceRef.current = "allocation";
     try {
       await saveTimeAllocation(userId, dayIndex, allocation, posture?.posture ?? null);
+      pushTesterMessage(
+        "mmv_tester_after_allocation",
+        testerMessage("Time allocation sets pressure, not success.", {
+          title: "Allocation ≠ Outcome",
+          details:
+            "Energy and stress are the key signals. Pay attention to how today’s choices affect tomorrow’s baseline. Try repeating the same allocation under a different posture.",
+          tone: "warning",
+        })
+      );
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         const refreshed = await getOrCreateDailyRun(userId, new Date(), {
           microtaskVariant,
@@ -1044,6 +1093,15 @@ export default function PlayPage() {
         setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
         if (resolvedCheck) {
           setLastCheck(resolvedCheck);
+          pushTesterMessage(
+            "mmv_tester_first_check",
+            testerMessage("Some results depend on your current state:", {
+              title: "Outcomes Are State-Driven",
+              details:
+                "• Skills • Energy & stress • Posture. Success isn’t guaranteed — but it isn’t random either. Ask whether the outcome makes sense given how you’ve been playing.",
+              tone: "warning",
+            })
+          );
         }
         if (resolvedOutcomeAnomalies?.length) {
           await awardAnomalies({
@@ -1364,6 +1422,20 @@ export default function PlayPage() {
           : e instanceof Error
             ? e.message
             : "Failed to apply arc choice.";
+      if (e instanceof Error && e.message.startsWith("INSUFFICIENT_RESOURCES")) {
+        pushTesterMessage(
+          "mmv_tester_arc_cost_blocked",
+          testerMessage(
+            "Some story options require resources like money, energy, or social capital.",
+            {
+              title: "Narrative Has a Cost",
+              details:
+                "If an option is unavailable, it’s usually because of how you spent your time earlier. This is intentional. Try changing how you allocate a future day and see what opens up.",
+              tone: "warning",
+            }
+          )
+        );
+      }
       setError(message);
     } finally {
       setArcSubmitting(false);
@@ -1539,9 +1611,13 @@ export default function PlayPage() {
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
                 </TesterOnly>
-                {testerIntroMessage ? (
+                {testerMessages.length > 0 ? (
                   <TesterOnly>
-                    <MessageCard message={testerIntroMessage} variant="inline" />
+                    <div className="space-y-2">
+                      {testerMessages.map((message) => (
+                        <MessageCard key={message.id} message={message} variant="inline" />
+                      ))}
+                    </div>
                   </TesterOnly>
                 ) : null}
                 {testerDeltaMessage ? (
