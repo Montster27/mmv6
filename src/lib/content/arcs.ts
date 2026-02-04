@@ -1,5 +1,29 @@
 import { supabase } from "@/lib/supabase/browser";
-import type { ContentArc, ContentArcStep } from "@/types/content";
+import type { ContentArc, ContentArcStep, ContentArcStepChoice } from "@/types/content";
+import { mapLegacyResourceKey } from "@/core/resources/resourceMap";
+
+function normalizeChoice(choice: ContentArcStepChoice): ContentArcStepChoice {
+  const normalizeCosts = (input?: Record<string, number>) => {
+    if (!input) return undefined;
+    const output: Record<string, number> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (typeof value !== "number") continue;
+      if (key === "energy" || key === "stress") {
+        output[key] = value;
+        continue;
+      }
+      const mapped = mapLegacyResourceKey(key) ?? key;
+      output[mapped] = (output[mapped] ?? 0) + value;
+    }
+    return output;
+  };
+
+  return {
+    ...choice,
+    costs: normalizeCosts(choice.costs as Record<string, number> | undefined),
+    rewards: normalizeCosts(choice.rewards as Record<string, number> | undefined),
+  };
+}
 
 export async function listActiveArcs(): Promise<ContentArc[]> {
   const { data, error } = await supabase
@@ -44,7 +68,12 @@ export async function fetchArcSteps(arcKey: string): Promise<ContentArcStep[]> {
     throw new Error("Failed to fetch content arc steps.");
   }
 
-  return (data ?? []) as ContentArcStep[];
+  return (data ?? []).map((step) => ({
+    ...step,
+    choices: Array.isArray(step.choices)
+      ? step.choices.map((choice: ContentArcStepChoice) => normalizeChoice(choice))
+      : [],
+  })) as ContentArcStep[];
 }
 
 export async function fetchArcWithSteps(

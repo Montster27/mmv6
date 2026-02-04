@@ -65,20 +65,20 @@ export type DailyRun = {
               agency: number;
             }>;
             costs?: Partial<{
-              money: number;
+              cashOnHand: number;
               energy: number;
               stress: number;
-              study_progress: number;
-              social_capital: number;
-              health: number;
+              knowledge: number;
+              socialLeverage: number;
+              physicalResilience: number;
             }>;
             rewards?: Partial<{
-              money: number;
+              cashOnHand: number;
               energy: number;
               stress: number;
-              study_progress: number;
-              social_capital: number;
-              health: number;
+              knowledge: number;
+              socialLeverage: number;
+              physicalResilience: number;
             }>;
           }>;
         }
@@ -128,10 +128,10 @@ export type DailyRun = {
     PlayerDayState,
     | "energy"
     | "stress"
-    | "money"
-    | "study_progress"
-    | "social_capital"
-    | "health"
+    | "cashOnHand"
+    | "knowledge"
+    | "socialLeverage"
+    | "physicalResilience"
     | "total_study"
     | "total_work"
     | "total_social"

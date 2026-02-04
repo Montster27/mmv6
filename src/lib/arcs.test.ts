@@ -106,8 +106,8 @@ describe("arcs", () => {
             key: "log_it",
             label: "Log it",
             flags: { arc_anomaly_001_logged: true, research: true },
-            costs: { money: 1 },
-            rewards: { social_capital: 1 },
+            costs: { cashOnHand: 1 },
+            rewards: { socialLeverage: 1 },
             vector_deltas: { curiosity: 2 },
           },
         ],
@@ -157,10 +157,10 @@ describe("arcs", () => {
       day_index: 2,
       energy: 70,
       stress: 20,
-      money: 5,
-      study_progress: 0,
-      social_capital: 0,
-      health: 50,
+      cashOnHand: 5,
+      knowledge: 0,
+      socialLeverage: 0,
+      physicalResilience: 50,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     } as any);
@@ -210,7 +210,7 @@ describe("arcs", () => {
           {
             key: "ask_casually",
             label: "Ask",
-            costs: { money: 2 },
+            costs: { cashOnHand: 2 },
           },
         ],
         created_at: new Date().toISOString(),
@@ -236,16 +236,16 @@ describe("arcs", () => {
       day_index: 2,
       energy: 70,
       stress: 20,
-      money: 1,
-      study_progress: 0,
-      social_capital: 0,
-      health: 50,
+      cashOnHand: 1,
+      knowledge: 0,
+      socialLeverage: 0,
+      physicalResilience: 50,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     } as any);
 
     await expect(
       progressArcWithChoice("u", "anomaly_001", "ask_casually", 2)
-    ).rejects.toThrow("INSUFFICIENT_RESOURCES:money");
+    ).rejects.toThrow("INSUFFICIENT_RESOURCES:cashOnHand");
   });
 });

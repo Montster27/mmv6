@@ -172,11 +172,13 @@ export async function saveTimeAllocation(
 
   const baseEnergy = dayState.pre_allocation_energy ?? dayState.energy;
   const baseStress = dayState.pre_allocation_stress ?? dayState.stress;
-  const baseMoney = dayState.pre_allocation_money ?? dayState.money;
-  const baseStudy = dayState.pre_allocation_study_progress ?? dayState.study_progress;
-  const baseSocial =
-    dayState.pre_allocation_social_capital ?? dayState.social_capital;
-  const baseHealth = dayState.pre_allocation_health ?? dayState.health;
+  const baseCashOnHand =
+    dayState.pre_allocation_cashOnHand ?? dayState.cashOnHand;
+  const baseKnowledge = dayState.pre_allocation_knowledge ?? dayState.knowledge;
+  const baseSocialLeverage =
+    dayState.pre_allocation_socialLeverage ?? dayState.socialLeverage;
+  const basePhysicalResilience =
+    dayState.pre_allocation_physicalResilience ?? dayState.physicalResilience;
   const skills = await fetchSkillLevels(userId);
   const next = applyAllocationToDayState({
     energy: baseEnergy,
@@ -185,24 +187,27 @@ export async function saveTimeAllocation(
     posture,
     skills,
   });
-  const moneyGain = Math.floor(normalizedAllocation.work / 10);
-  const studyGain = Math.floor(normalizedAllocation.study / 10);
+  const cashGain = Math.floor(normalizedAllocation.work / 10);
+  const knowledgeGain = Math.floor(normalizedAllocation.study / 10);
   const socialGain = Math.floor(normalizedAllocation.social / 10);
-  const healthGain = Math.floor(normalizedAllocation.health / 20);
-  const nextMoney = baseMoney + moneyGain;
-  const nextStudy = baseStudy + studyGain;
-  const nextSocial = baseSocial + socialGain;
-  const nextHealth = Math.min(100, Math.max(0, baseHealth + healthGain));
+  const resilienceGain = Math.floor(normalizedAllocation.health / 20);
+  const nextCashOnHand = baseCashOnHand + cashGain;
+  const nextKnowledge = baseKnowledge + knowledgeGain;
+  const nextSocialLeverage = baseSocialLeverage + socialGain;
+  const nextPhysicalResilience = Math.min(
+    100,
+    Math.max(0, basePhysicalResilience + resilienceGain)
+  );
 
   const { error: updateError } = await supabase
     .from("player_day_state")
     .update({
       energy: next.energy,
       stress: next.stress,
-      money: nextMoney,
-      study_progress: nextStudy,
-      social_capital: nextSocial,
-      health: nextHealth,
+      money: nextCashOnHand,
+      study_progress: nextKnowledge,
+      social_capital: nextSocialLeverage,
+      health: nextPhysicalResilience,
       total_study: previousTotals.total_study + normalizedAllocation.study,
       total_work: previousTotals.total_work + normalizedAllocation.work,
       total_social: previousTotals.total_social + normalizedAllocation.social,
@@ -210,10 +215,10 @@ export async function saveTimeAllocation(
       total_fun: previousTotals.total_fun + normalizedAllocation.fun,
       pre_allocation_energy: baseEnergy,
       pre_allocation_stress: baseStress,
-      pre_allocation_money: baseMoney,
-      pre_allocation_study_progress: baseStudy,
-      pre_allocation_social_capital: baseSocial,
-      pre_allocation_health: baseHealth,
+      pre_allocation_money: baseCashOnHand,
+      pre_allocation_study_progress: baseKnowledge,
+      pre_allocation_social_capital: baseSocialLeverage,
+      pre_allocation_health: basePhysicalResilience,
       allocation_hash: allocationHash,
       updated_at: new Date().toISOString(),
     })

@@ -574,10 +574,10 @@ export default function PlayPage() {
               setDayState({
                 energy: ds.energy,
                 stress: ds.stress,
-                money: 0,
-                study_progress: 0,
-                social_capital: 0,
-                health: 50,
+                cashOnHand: 0,
+                knowledge: 0,
+                socialLeverage: 0,
+                physicalResilience: 50,
                 total_study: 0,
                 total_work: 0,
                 total_social: 0,
@@ -636,10 +636,10 @@ export default function PlayPage() {
             setDayState({
               energy: ds.energy,
               stress: ds.stress,
-              money: 0,
-              study_progress: 0,
-              social_capital: 0,
-              health: 50,
+              cashOnHand: 0,
+              knowledge: 0,
+              socialLeverage: 0,
+              physicalResilience: 50,
               total_study: 0,
               total_work: 0,
               total_social: 0,
@@ -929,10 +929,10 @@ export default function PlayPage() {
           setDayState({
             energy: ds.energy,
             stress: ds.stress,
-            money: 0,
-            study_progress: 0,
-            social_capital: 0,
-            health: 50,
+            cashOnHand: 0,
+            knowledge: 0,
+            socialLeverage: 0,
+            physicalResilience: 50,
             total_study: 0,
             total_work: 0,
             total_social: 0,
@@ -2098,7 +2098,6 @@ export default function PlayPage() {
                 <ProgressPanel
                   dailyState={dailyState}
                   dayState={dayState}
-                  allocation={allocationSummary}
                   skillBank={skillBank}
                   lastAppliedDeltas={outcomeDeltas}
                   boostsReceivedCount={boostsReceived.length}

@@ -5,6 +5,7 @@ import { flagToVectorDeltas } from "@/core/vectors/flagToVectorDeltas";
 import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { fetchDailyState, updateDailyState } from "@/lib/play";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
+import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 import type { ArcInstance } from "@/types/arcs";
 import type { ContentArcStep } from "@/types/content";
 
@@ -242,21 +243,21 @@ export async function progressArcWithChoice(
     const costs = choice.costs ?? {};
     const rewards = choice.rewards ?? {};
     const resourceBase = {
-      money: dayState.money ?? 0,
+      cashOnHand: dayState.cashOnHand ?? 0,
       energy: dayState.energy ?? 0,
       stress: dayState.stress ?? 0,
-      study_progress: dayState.study_progress ?? 0,
-      social_capital: dayState.social_capital ?? 0,
-      health: dayState.health ?? 0,
+      knowledge: dayState.knowledge ?? 0,
+      socialLeverage: dayState.socialLeverage ?? 0,
+      physicalResilience: dayState.physicalResilience ?? 0,
     };
 
     const affordabilityChecks: Array<[keyof typeof resourceBase, number]> = [
-      ["money", costs.money ?? 0],
+      ["cashOnHand", costs.cashOnHand ?? 0],
       ["energy", costs.energy ?? 0],
       ["stress", costs.stress ?? 0],
-      ["study_progress", costs.study_progress ?? 0],
-      ["social_capital", costs.social_capital ?? 0],
-      ["health", costs.health ?? 0],
+      ["knowledge", costs.knowledge ?? 0],
+      ["socialLeverage", costs.socialLeverage ?? 0],
+      ["physicalResilience", costs.physicalResilience ?? 0],
     ];
     for (const [key, value] of affordabilityChecks) {
       if (value > 0 && resourceBase[key] < value) {
@@ -266,35 +267,37 @@ export async function progressArcWithChoice(
 
     const clamp100 = (value: number) => Math.max(0, Math.min(100, value));
     const nextResources = {
-      money: resourceBase.money - (costs.money ?? 0) + (rewards.money ?? 0),
+      cashOnHand:
+        resourceBase.cashOnHand -
+        (costs.cashOnHand ?? 0) +
+        (rewards.cashOnHand ?? 0),
       energy: clamp100(
         resourceBase.energy - (costs.energy ?? 0) + (rewards.energy ?? 0)
       ),
       stress: clamp100(
         resourceBase.stress - (costs.stress ?? 0) + (rewards.stress ?? 0)
       ),
-      study_progress:
-        resourceBase.study_progress -
-        (costs.study_progress ?? 0) +
-        (rewards.study_progress ?? 0),
-      social_capital:
-        resourceBase.social_capital -
-        (costs.social_capital ?? 0) +
-        (rewards.social_capital ?? 0),
-      health: clamp100(
-        resourceBase.health - (costs.health ?? 0) + (rewards.health ?? 0)
+      knowledge:
+        resourceBase.knowledge -
+        (costs.knowledge ?? 0) +
+        (rewards.knowledge ?? 0),
+      socialLeverage:
+        resourceBase.socialLeverage -
+        (costs.socialLeverage ?? 0) +
+        (rewards.socialLeverage ?? 0),
+      physicalResilience: clamp100(
+        resourceBase.physicalResilience -
+          (costs.physicalResilience ?? 0) +
+          (rewards.physicalResilience ?? 0)
       ),
     };
 
     const { error: updateError } = await supabase
       .from("player_day_state")
       .update({
-        money: nextResources.money,
+        ...toLegacyResourceUpdates(nextResources),
         energy: nextResources.energy,
         stress: nextResources.stress,
-        study_progress: nextResources.study_progress,
-        social_capital: nextResources.social_capital,
-        health: nextResources.health,
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", userId)

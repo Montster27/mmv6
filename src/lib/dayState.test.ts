@@ -53,10 +53,10 @@ describe("dayState", () => {
           day_index: 2,
           energy: 80,
           stress: 10,
-          money: 0,
-          study_progress: 0,
-          social_capital: 0,
-          health: 50,
+          cashOnHand: 0,
+          knowledge: 0,
+          socialLeverage: 0,
+          physicalResilience: 50,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -66,6 +66,8 @@ describe("dayState", () => {
 
     const result = await ensureDayStateUpToDate("u", 2);
     expect(result.energy).toBe(80);
+    expect(result.cashOnHand).toBe(0);
+    expect(result.knowledge).toBe(0);
     expect(mockState.getInsertPayloads().length).toBe(0);
   });
 
@@ -79,10 +81,10 @@ describe("dayState", () => {
           day_index: 1,
           energy: 120,
           stress: -5,
-          money: 5,
-          study_progress: 3,
-          social_capital: 2,
-          health: 45,
+          cashOnHand: 5,
+          knowledge: 3,
+          socialLeverage: 2,
+          physicalResilience: 45,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -94,10 +96,10 @@ describe("dayState", () => {
           day_index: 2,
           energy: 100,
           stress: 0,
-          money: 5,
-          study_progress: 3,
-          social_capital: 2,
-          health: 45,
+          cashOnHand: 5,
+          knowledge: 3,
+          socialLeverage: 2,
+          physicalResilience: 45,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -108,6 +110,8 @@ describe("dayState", () => {
     const result = await ensureDayStateUpToDate("u", 2);
     expect(result.energy).toBe(100);
     expect(result.stress).toBe(0);
+    expect(result.cashOnHand).toBe(5);
+    expect(result.knowledge).toBe(3);
 
     const inserts = mockState.getInsertPayloads();
     expect(inserts.length).toBe(1);

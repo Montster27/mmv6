@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { isUserAdmin } from "@/lib/adminAuthServer";
+import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 
 function utcToday(): string {
   const now = new Date();
@@ -120,10 +121,12 @@ export async function POST(request: Request) {
     day_index: 1,
     energy: 100,
     stress: 0,
-    money: 0,
-    study_progress: 0,
-    social_capital: 0,
-    health: 50,
+    ...toLegacyResourceUpdates({
+      cashOnHand: 0,
+      knowledge: 0,
+      socialLeverage: 0,
+      physicalResilience: 50,
+    }),
     updated_at: now,
   });
 

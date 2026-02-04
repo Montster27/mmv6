@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState } from "react";
 
-import type { DailyState, AllocationMap } from "@/types/daily";
+import type { DailyState } from "@/types/daily";
 import type { DailyRun } from "@/types/dailyRun";
 import type { SevenVectors } from "@/types/vectors";
 import { summarizeVectors } from "@/core/ui/vectorSummary";
@@ -16,7 +16,6 @@ type DeltaInfo = {
 type Props = {
   dailyState?: Pick<DailyState, "energy" | "stress" | "vectors"> | null;
   dayState?: DailyRun["dayState"] | null;
-  allocation?: AllocationMap | null;
   skillBank?: { available_points: number; cap: number } | null;
   skills?: DailyRun["skills"] | null;
   lastAppliedDeltas?: DeltaInfo | null;
@@ -71,7 +70,6 @@ function deltaBadge(delta?: number, highlight?: boolean) {
 function ProgressPanelComponent({
   dailyState,
   dayState,
-  allocation,
   skillBank,
   skills,
   lastAppliedDeltas,
@@ -80,16 +78,11 @@ function ProgressPanelComponent({
   const [highlight, setHighlight] = useState<DeltaInfo | null>(null);
   const energy = dayState?.energy ?? dailyState?.energy;
   const stress = dayState?.stress ?? dailyState?.stress;
+  const morale =
+    typeof energy === "number" && typeof stress === "number"
+      ? clamp(Math.round(50 + energy - stress))
+      : undefined;
   const vectors = toVectors(dailyState?.vectors ?? {});
-  const allocationTotals = dayState
-    ? {
-        study: dayState.total_study ?? 0,
-        work: dayState.total_work ?? 0,
-        social: dayState.total_social ?? 0,
-        health: dayState.total_health ?? 0,
-        fun: dayState.total_fun ?? 0,
-      }
-    : allocation ?? {};
   const skillLevels = skills ?? {
     focus: 0,
     memory: 0,
@@ -151,24 +144,24 @@ function ProgressPanelComponent({
 
       <div className="space-y-1 text-sm text-slate-700">
         <div className="flex items-center justify-between">
-          <span>Study</span>
-          <span>{allocationTotals.study ?? 0}</span>
+          <span>Knowledge</span>
+          <span>{dayState?.knowledge ?? 0}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>Work</span>
-          <span>{allocationTotals.work ?? 0}</span>
+          <span>Cash on Hand</span>
+          <span>{dayState?.cashOnHand ?? 0}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>Social</span>
-          <span>{allocationTotals.social ?? 0}</span>
+          <span>Social Leverage</span>
+          <span>{dayState?.socialLeverage ?? 0}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>Health</span>
-          <span>{allocationTotals.health ?? 0}</span>
+          <span>Physical Resilience</span>
+          <span>{dayState?.physicalResilience ?? 0}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>Fun</span>
-          <span>{allocationTotals.fun ?? 0}</span>
+          <span>Morale</span>
+          <span>{typeof morale === "number" ? morale : "—"}</span>
         </div>
         <div className="flex items-center justify-between text-slate-600">
           <span>Skill points</span>

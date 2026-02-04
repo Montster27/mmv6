@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
+import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
 
 const STEP_LABELS = [
   "A thread you keep pulling.",
@@ -31,20 +32,20 @@ type ArcSummary = {
         agency: number;
       }>;
       costs?: Partial<{
-        money: number;
+        cashOnHand: number;
         energy: number;
         stress: number;
-        study_progress: number;
-        social_capital: number;
-        health: number;
+        knowledge: number;
+        socialLeverage: number;
+        physicalResilience: number;
       }>;
       rewards?: Partial<{
-        money: number;
+        cashOnHand: number;
         energy: number;
         stress: number;
-        study_progress: number;
-        social_capital: number;
-        health: number;
+        knowledge: number;
+        socialLeverage: number;
+        physicalResilience: number;
       }>;
     }>;
   } | null;
@@ -56,10 +57,10 @@ type Props = {
   dayState?: {
     energy: number;
     stress: number;
-    money: number;
-    study_progress: number;
-    social_capital: number;
-    health: number;
+    cashOnHand: number;
+    knowledge: number;
+    socialLeverage: number;
+    physicalResilience: number;
   } | null;
   submitting?: boolean;
   onStart: () => void;
@@ -91,10 +92,10 @@ function ArcPanelComponent({
   const resourcePool = dayState ?? {
     energy: 0,
     stress: 0,
-    money: 0,
-    study_progress: 0,
-    social_capital: 0,
-    health: 0,
+    cashOnHand: 0,
+    knowledge: 0,
+    socialLeverage: 0,
+    physicalResilience: 0,
   };
 
   const getCostBlocker = (costs?: Record<string, number>) => {
@@ -103,9 +104,17 @@ function ArcPanelComponent({
       typeof value === "number" && value > 0
     ) as Array<[string, number]>;
     for (const [key, value] of entries) {
-      const current = (resourcePool as Record<string, number>)[key] ?? 0;
+      if (key === "energy" || key === "stress") {
+        const current = (resourcePool as Record<string, number>)[key] ?? 0;
+        if (current < value) {
+          return `Not enough ${key}`;
+        }
+        continue;
+      }
+      const mapped = mapLegacyResourceKey(key) ?? (key as keyof typeof resourcePool);
+      const current = (resourcePool as Record<string, number>)[mapped] ?? 0;
       if (current < value) {
-        return `Not enough ${key.replace(/_/g, " ")}`;
+        return `Not enough ${resourceLabel(mapped as any)}`;
       }
     }
     return null;
@@ -127,7 +136,7 @@ function ArcPanelComponent({
           <p className="text-sm text-slate-600">{stepLabel}</p>
           {arc.step?.body ? (
             <p className="text-sm text-slate-700 whitespace-pre-wrap">
-              {arc.step.body}
+              {arc.step.body.replace(/\\n/g, "\n")}
             </p>
           ) : null}
           {choices.length > 0 ? (

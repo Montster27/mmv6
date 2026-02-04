@@ -4,14 +4,18 @@ import { resolveEndOfDay } from "@/core/sim/endOfDay";
 import type { Allocation } from "@/core/sim/allocationEffects";
 import { applyTensionPenalties } from "@/core/sim/tensionPenalties";
 import { fetchPosture, fetchUnresolvedTensions } from "@/lib/dailyInteractions";
+import {
+  mapLegacyResourceRecord,
+  toLegacyResourceUpdates,
+} from "@/core/resources/resourceMap";
 
 const DEFAULT_STATE = {
   energy: 70,
   stress: 20,
-  money: 0,
-  study_progress: 0,
-  social_capital: 0,
-  health: 50,
+  cashOnHand: 0,
+  knowledge: 0,
+  socialLeverage: 0,
+  physicalResilience: 50,
   total_study: 0,
   total_work: 0,
   total_social: 0,
@@ -42,7 +46,34 @@ export async function fetchDayState(
     throw new Error("Failed to load day state.");
   }
 
-  return data ?? null;
+  if (!data) return null;
+  const resources = mapLegacyResourceRecord(data as Record<string, unknown>);
+  return {
+    user_id: data.user_id,
+    day_index: data.day_index,
+    energy: data.energy,
+    stress: data.stress,
+    ...resources,
+    total_study: data.total_study ?? 0,
+    total_work: data.total_work ?? 0,
+    total_social: data.total_social ?? 0,
+    total_health: data.total_health ?? 0,
+    total_fun: data.total_fun ?? 0,
+    allocation_hash: data.allocation_hash ?? null,
+    pre_allocation_energy: data.pre_allocation_energy ?? null,
+    pre_allocation_stress: data.pre_allocation_stress ?? null,
+    pre_allocation_cashOnHand: data.pre_allocation_money ?? null,
+    pre_allocation_knowledge: data.pre_allocation_study_progress ?? null,
+    pre_allocation_socialLeverage: data.pre_allocation_social_capital ?? null,
+    pre_allocation_physicalResilience: data.pre_allocation_health ?? null,
+    resolved_at: data.resolved_at ?? null,
+    end_energy: data.end_energy ?? null,
+    end_stress: data.end_stress ?? null,
+    next_energy: data.next_energy ?? null,
+    next_stress: data.next_stress ?? null,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+  };
 }
 
 export async function createDayStateFromPrevious(
@@ -62,10 +93,11 @@ export async function createDayStateFromPrevious(
   const nextState = {
     energy: clamp(baseEnergy, 0, 100),
     stress: clamp(baseStress, 0, 100),
-    money: source?.money ?? DEFAULT_STATE.money,
-    study_progress: source?.study_progress ?? DEFAULT_STATE.study_progress,
-    social_capital: source?.social_capital ?? DEFAULT_STATE.social_capital,
-    health: source?.health ?? DEFAULT_STATE.health,
+    cashOnHand: source?.cashOnHand ?? DEFAULT_STATE.cashOnHand,
+    knowledge: source?.knowledge ?? DEFAULT_STATE.knowledge,
+    socialLeverage: source?.socialLeverage ?? DEFAULT_STATE.socialLeverage,
+    physicalResilience:
+      source?.physicalResilience ?? DEFAULT_STATE.physicalResilience,
     total_study: source?.total_study ?? DEFAULT_STATE.total_study,
     total_work: source?.total_work ?? DEFAULT_STATE.total_work,
     total_social: source?.total_social ?? DEFAULT_STATE.total_social,
@@ -76,7 +108,14 @@ export async function createDayStateFromPrevious(
   const insertPayload = {
     user_id: userId,
     day_index: dayIndex,
-    ...nextState,
+    ...toLegacyResourceUpdates(nextState),
+    energy: nextState.energy,
+    stress: nextState.stress,
+    total_study: nextState.total_study,
+    total_work: nextState.total_work,
+    total_social: nextState.total_social,
+    total_health: nextState.total_health,
+    total_fun: nextState.total_fun,
     updated_at: new Date().toISOString(),
   };
 

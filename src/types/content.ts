@@ -21,20 +21,20 @@ export type ContentArcStepChoice = {
     agency: number;
   }>;
   costs?: Partial<{
-    money: number;
+    cashOnHand: number;
     energy: number;
     stress: number;
-    study_progress: number;
-    social_capital: number;
-    health: number;
+    knowledge: number;
+    socialLeverage: number;
+    physicalResilience: number;
   }>;
   rewards?: Partial<{
-    money: number;
+    cashOnHand: number;
     energy: number;
     stress: number;
-    study_progress: number;
-    social_capital: number;
-    health: number;
+    knowledge: number;
+    socialLeverage: number;
+    physicalResilience: number;
   }>;
 };
 

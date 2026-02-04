@@ -75,7 +75,7 @@ import type { Storylet, StoryletRun } from "@/types/storylets";
 
 const ARC_KEY = "anomaly_001";
 const DIRECTIVE_TAGS: Record<string, string[]> = {
-  neo_assyrian: ["work", "money", "leverage"],
+  neo_assyrian: ["work", "cash", "leverage"],
   dynastic_consortium: ["study", "research", "tech"],
   templar_remnant: ["duty", "faith", "order"],
   bormann_network: ["security", "secrecy", "force"],
@@ -499,10 +499,10 @@ export async function getOrCreateDailyRun(
       ? {
           energy: dayState.energy,
           stress: dayState.stress,
-          money: dayState.money,
-          study_progress: dayState.study_progress,
-          social_capital: dayState.social_capital,
-          health: dayState.health,
+          cashOnHand: dayState.cashOnHand,
+          knowledge: dayState.knowledge,
+          socialLeverage: dayState.socialLeverage,
+          physicalResilience: dayState.physicalResilience,
           total_study: dayState.total_study,
           total_work: dayState.total_work,
           total_social: dayState.total_social,
