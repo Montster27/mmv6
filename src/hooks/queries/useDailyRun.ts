@@ -3,6 +3,10 @@ import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
 type DailyRunOptions = {
   experiments: Record<string, string>;
+  microtaskVariant?: string;
+  isAdmin?: boolean;
+  enabled?: boolean;
+  refreshKey?: number;
 };
 
 export function useDailyRun(
@@ -10,12 +14,16 @@ export function useDailyRun(
   options: DailyRunOptions
 ) {
   return useQuery({
-    queryKey: ["daily-run", userId],
+    queryKey: ["daily-run", userId, options.microtaskVariant, options.refreshKey],
     queryFn: () => {
       if (!userId) throw new Error("No userId");
-      return getOrCreateDailyRun(userId, new Date(), options);
+      return getOrCreateDailyRun(userId, new Date(), {
+        experiments: options.experiments,
+        microtaskVariant: options.microtaskVariant,
+        isAdmin: options.isAdmin,
+      });
     },
-    enabled: !!userId,
+    enabled: options.enabled ?? !!userId,
     staleTime: Infinity,
   });
 }

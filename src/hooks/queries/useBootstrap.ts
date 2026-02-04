@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase/browser";
 
 type BootstrapData = {
   userId: string;
+  email: string | null;
   isAdmin: boolean;
   experiments: Record<string, string>;
 };
@@ -21,8 +22,9 @@ export function useBootstrap() {
       if (!res.ok) throw new Error("Bootstrap failed");
       const json = await res.json();
       return {
-        userId: json.user_id,
-        isAdmin: json.is_admin ?? false,
+        userId: json.userId,
+        email: json.email ?? null,
+        isAdmin: json.isAdmin ?? false,
         experiments: json.experiments ?? {},
       };
     },

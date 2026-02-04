@@ -74,6 +74,8 @@ import { MessageCard } from "@/components/ux/MessageCard";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
 import { getAppMode } from "@/lib/mode";
+import { useBootstrap } from "@/hooks/queries/useBootstrap";
+import { useDailyRun } from "@/hooks/queries/useDailyRun";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -91,6 +93,7 @@ export default function PlayPage() {
   const session = useSession();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
+  const bootstrapQuery = useBootstrap();
   const {
     dailyState,
     dayState,
@@ -204,11 +207,25 @@ export default function PlayPage() {
   const [bootstrapIsAdmin, setBootstrapIsAdmin] = useState(false);
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [bootstrapUserId, setBootstrapUserId] = useState<string | null>(null);
-  const [bootstrapEmail, setBootstrapEmail] = useState<string | null>(null);
   const { assignments, getVariant, ready: experimentsReady } = useExperiments([
     "microtask_freq_v1",
   ], bootstrapAssignments);
   const microtaskVariant = getVariant("microtask_freq_v1", "A");
+  const isAdmin =
+    Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
+    devIsAdmin ||
+    bootstrapIsAdmin;
+  const dailyRunQuery = useDailyRun(bootstrapUserId, {
+    experiments,
+    microtaskVariant,
+    isAdmin,
+    enabled:
+      USE_DAILY_LOOP_ORCHESTRATOR &&
+      bootstrapReady &&
+      experimentsReady &&
+      !!bootstrapUserId,
+    refreshKey: refreshTick,
+  });
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
   const [showDevMenu, setShowDevMenu] = useState(false);
@@ -233,6 +250,19 @@ export default function PlayPage() {
   const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+
+  useEffect(() => {
+    if (bootstrapQuery.isError) {
+      setError("Failed to load play state.");
+      return;
+    }
+    if (!bootstrapQuery.data) return;
+    setBootstrapReady(true);
+    setBootstrapUserId(bootstrapQuery.data.userId);
+    setBootstrapIsAdmin(Boolean(bootstrapQuery.data.isAdmin));
+    setBootstrapAssignments(bootstrapQuery.data.experiments ?? {});
+    setUserId(bootstrapQuery.data.userId);
+  }, [bootstrapQuery.data, bootstrapQuery.isError]);
 
   const gameNote = useMemo(
     () =>
@@ -476,50 +506,26 @@ export default function PlayPage() {
   };
 
   useEffect(() => {
-    const loadBootstrap = async () => {
-      setError(null);
-      try {
-        const sessionData = await supabase.auth.getSession();
-        const token = sessionData.data.session?.access_token;
-        if (!token) throw new Error("No session found.");
-        const bootRes = await fetch("/api/bootstrap", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const bootJson = await bootRes.json();
-        if (!bootRes.ok) {
-          throw new Error(bootJson.error ?? "Failed to load bootstrap.");
-        }
-        setUserId(bootJson.userId);
-        setBootstrapUserId(bootJson.userId);
-        setBootstrapEmail(bootJson.email ?? null);
-        setBootstrapAssignments(bootJson.experiments ?? {});
-        setBootstrapIsAdmin(Boolean(bootJson.isAdmin));
-        setBootstrapReady(true);
-      } catch (e) {
-        console.error(e);
-        setError("Failed to load play state.");
-      }
-    };
-
-    loadBootstrap();
-  }, []);
-
-  useEffect(() => {
     const init = async () => {
       if (!bootstrapReady || !bootstrapUserId) return;
-      if (!experimentsReady) return;
+      if (USE_DAILY_LOOP_ORCHESTRATOR) {
+        if (!experimentsReady) return;
+        if (dailyRunQuery.isLoading) {
+          setLoading(true);
+          return;
+        }
+        if (dailyRunQuery.isError) {
+          setError("Failed to load play state.");
+          setLoading(false);
+          return;
+        }
+      }
       setLoading(true);
       setError(null);
       try {
-        const isAdmin =
-          isEmailAllowed(bootstrapEmail) || devIsAdmin || bootstrapIsAdmin;
-
         if (USE_DAILY_LOOP_ORCHESTRATOR) {
-          const run = await getOrCreateDailyRun(bootstrapUserId, new Date(), {
-            microtaskVariant,
-            experiments,
-            isAdmin,
-          });
+          const run = dailyRunQuery.data;
+          if (!run) return;
           if (
             typeof lastRunDayIndexRef.current === "number" &&
             lastRunDayIndexRef.current !== run.dayIndex
@@ -705,11 +711,9 @@ export default function PlayPage() {
     bootstrapReady,
     bootstrapUserId,
     experimentsReady,
-    microtaskVariant,
-    experiments,
-    devIsAdmin,
-    bootstrapEmail,
-    bootstrapIsAdmin,
+    dailyRunQuery.data,
+    dailyRunQuery.isLoading,
+    dailyRunQuery.isError,
     refreshTick,
   ]);
 
