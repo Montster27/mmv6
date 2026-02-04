@@ -207,25 +207,11 @@ export default function PlayPage() {
   const [bootstrapIsAdmin, setBootstrapIsAdmin] = useState(false);
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [bootstrapUserId, setBootstrapUserId] = useState<string | null>(null);
-  const { assignments, getVariant, ready: experimentsReady } = useExperiments([
-    "microtask_freq_v1",
-  ], bootstrapAssignments);
+  const { assignments, getVariant, ready: experimentsReady } = useExperiments(
+    ["microtask_freq_v1"],
+    bootstrapAssignments
+  );
   const microtaskVariant = getVariant("microtask_freq_v1", "A");
-  const isAdmin =
-    Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
-    devIsAdmin ||
-    bootstrapIsAdmin;
-  const dailyRunQuery = useDailyRun(bootstrapUserId, {
-    experiments,
-    microtaskVariant,
-    isAdmin,
-    enabled:
-      USE_DAILY_LOOP_ORCHESTRATOR &&
-      bootstrapReady &&
-      experimentsReady &&
-      !!bootstrapUserId,
-    refreshKey: refreshTick,
-  });
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
   const [showDevMenu, setShowDevMenu] = useState(false);
@@ -250,6 +236,22 @@ export default function PlayPage() {
   const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+
+  const isAdmin =
+    Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
+    devIsAdmin ||
+    bootstrapIsAdmin;
+  const dailyRunQuery = useDailyRun(bootstrapUserId, {
+    experiments,
+    microtaskVariant,
+    isAdmin,
+    enabled:
+      USE_DAILY_LOOP_ORCHESTRATOR &&
+      bootstrapReady &&
+      experimentsReady &&
+      !!bootstrapUserId,
+    refreshKey: refreshTick,
+  });
 
   useEffect(() => {
     if (bootstrapQuery.isError) {
