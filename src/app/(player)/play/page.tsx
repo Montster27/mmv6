@@ -1496,6 +1496,11 @@ export default function PlayPage() {
     }
   }, [stage, alreadyCompletedToday, userId, dayIndex]);
 
+  const showOpeningArcFirst =
+    Boolean(arc) &&
+    arc?.arc_key === "anomaly_001" &&
+    arc?.current_step === 0 &&
+    Boolean(arc?.step);
 
   return (
     <AuthGate>
@@ -1704,6 +1709,24 @@ export default function PlayPage() {
                   </>
                 ) : (
                   <>
+                  {showOpeningArcFirst ? (
+                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                      <ArcPanel
+                        arc={arc}
+                        availableArcs={availableArcs}
+                        dayState={dayState}
+                        submitting={arcSubmitting}
+                        onStart={handleStartArc}
+                        onAdvance={handleAdvanceArc}
+                        onChoose={handleArcChoice}
+                        onBeginUnlocked={handleBeginUnlockedArc}
+                      />
+                      <p className="text-sm text-slate-600">
+                        You still have a day to get through.
+                      </p>
+                    </section>
+                  ) : null}
+
                   <section className="rounded-md border border-slate-200 bg-white px-4 py-4 text-slate-700">
                     Today you’re balancing pressure, opportunity, and what you’re willing
                     to push.
@@ -1895,6 +1918,7 @@ export default function PlayPage() {
                     stage !== "storylet_1" &&
                     stage !== "storylet_2" && (
                       <section className="space-y-3">
+                        {showOpeningArcFirst && arc?.current_step === 0 ? null : (
                         <ArcPanel
                           arc={arc}
                           availableArcs={availableArcs}
@@ -1905,6 +1929,7 @@ export default function PlayPage() {
                           onChoose={handleArcChoice}
                           onBeginUnlocked={handleBeginUnlockedArc}
                         />
+                        )}
                       </section>
                     )}
 
