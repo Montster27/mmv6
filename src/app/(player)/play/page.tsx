@@ -1638,8 +1638,7 @@ export default function PlayPage() {
               </Button>
             </section>
           ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr]">
-              <div className="space-y-6">
+            <div className="space-y-6">
                 {error ? (
                   <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {error}
@@ -1704,6 +1703,27 @@ export default function PlayPage() {
                   </>
                 ) : (
                   <>
+                  <section className="rounded-md border border-slate-200 bg-white px-4 py-4 text-slate-700">
+                    Today you’re balancing pressure, opportunity, and what you’re willing
+                    to push.
+                  </section>
+
+                  {(stage === "social" ||
+                    (!USE_DAILY_LOOP_ORCHESTRATOR &&
+                      allocationSaved &&
+                      !currentStorylet)) && initiatives.length > 0 ? (
+                    <section className="space-y-3">
+                      <InitiativePanel
+                        initiative={initiatives[0]}
+                        dayIndex={dayIndex}
+                        directive={directive}
+                        factions={factions}
+                        submitting={initiativeSubmitting}
+                        onContribute={() => handleContributeInitiative(initiatives[0].id)}
+                      />
+                    </section>
+                  ) : null}
+
                   {USE_DAILY_LOOP_ORCHESTRATOR && stage === "setup" && (
                     <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
                       <DailySetupPanel
@@ -1721,6 +1741,19 @@ export default function PlayPage() {
                       />
                     </section>
                   )}
+
+                  <section className="space-y-3">
+                    <ProgressPanel
+                      dailyState={dailyState}
+                      dayState={dayState}
+                      allocation={allocationSummary}
+                      skillBank={skillBank}
+                      lastAppliedDeltas={outcomeDeltas}
+                      boostsReceivedCount={boostsReceived.length}
+                      skills={skills}
+                    />
+                  </section>
+
                   {(stage === "allocation" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
                     <section className="space-y-3">
@@ -1760,7 +1793,7 @@ export default function PlayPage() {
                         {savingAllocation ? "Saving..." : "Save allocation"}
                       </Button>
                     </section>
-                  )}
+                    )}
 
                   {(stage === "storylet_1" ||
                     stage === "storylet_2" ||
@@ -1864,7 +1897,7 @@ export default function PlayPage() {
                         </div>
                       )}
                     </section>
-                  )}
+                    )}
 
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     arc &&
@@ -1899,7 +1932,7 @@ export default function PlayPage() {
                         dayIndex={dayIndex}
                       />
                     </section>
-                  )}
+                    )}
 
                   {USE_DAILY_LOOP_ORCHESTRATOR && stage === "microtask" && (
                     <section className="space-y-3">
@@ -1924,18 +1957,6 @@ export default function PlayPage() {
                   {(stage === "social" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved && !currentStorylet)) && (
                     <section className="space-y-3">
-                      {initiatives.length > 0 ? (
-                        <InitiativePanel
-                          initiative={initiatives[0]}
-                          dayIndex={dayIndex}
-                          directive={directive}
-                          factions={factions}
-                          submitting={initiativeSubmitting}
-                          onContribute={() =>
-                            handleContributeInitiative(initiatives[0].id)
-                          }
-                        />
-                      ) : null}
                       <h2 className="text-xl font-semibold">Send a Boost</h2>
                       {boostMessage ? (
                         <p className="text-sm text-slate-700">{boostMessage}</p>
@@ -2058,19 +2079,6 @@ export default function PlayPage() {
                 </>
               )}
             </div>
-
-            <div className="space-y-4">
-              <ProgressPanel
-                dailyState={dailyState}
-                dayState={dayState}
-                allocation={allocationSummary}
-                skillBank={skillBank}
-                lastAppliedDeltas={outcomeDeltas}
-                boostsReceivedCount={boostsReceived.length}
-                skills={skills}
-              />
-            </div>
-          </div>
           )}
         </div>
       )}
