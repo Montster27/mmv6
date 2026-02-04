@@ -5,6 +5,7 @@ import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { OutcomeExplain } from "@/components/play/OutcomeExplain";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import type { DailyRunStage } from "@/types/dailyRun";
+import type { CheckResult } from "@/types/checks";
 
 type DeltaInfo = {
   energy?: number;
@@ -38,7 +39,7 @@ type StoryletSectionProps = {
   outcomeMessage: string | null;
   outcomeDeltas: DeltaInfo;
   consequenceActive: boolean;
-  lastCheck: { chance: number; success: boolean; factors: Array<{ label: string; weight: number }> } | null;
+  lastCheck?: CheckResult | null;
   onChoice: (choiceId: string) => void;
   onFinishConsequence: () => void;
   toChoices: (storylet: Storylet) => Choice[];
