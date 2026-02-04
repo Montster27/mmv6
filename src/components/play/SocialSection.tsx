@@ -28,7 +28,15 @@ type SocialSectionProps = {
   loadingSocial: boolean;
   initiatives: Initiative[];
   dayIndex: number;
-  directive: { faction_id: string; text: string; days_remaining: number } | null;
+  directive?: {
+    faction_key: string;
+    title: string;
+    description: string;
+    target_type: "initiative" | "arc_unlock" | "signal";
+    target_key: string | null;
+    week_end_day_index: number;
+    status: "active" | "expired" | "completed";
+  } | null;
   factions: Faction[];
   initiativeSubmitting: boolean;
   onSendBoost: () => void;
