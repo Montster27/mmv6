@@ -1638,7 +1638,8 @@ export default function PlayPage() {
               </Button>
             </section>
           ) : (
-            <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr]">
+              <div className="space-y-6">
                 {error ? (
                   <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {error}
@@ -1741,18 +1742,6 @@ export default function PlayPage() {
                       />
                     </section>
                   )}
-
-                  <section className="space-y-3">
-                    <ProgressPanel
-                      dailyState={dailyState}
-                      dayState={dayState}
-                      allocation={allocationSummary}
-                      skillBank={skillBank}
-                      lastAppliedDeltas={outcomeDeltas}
-                      boostsReceivedCount={boostsReceived.length}
-                      skills={skills}
-                    />
-                  </section>
 
                   {(stage === "allocation" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
@@ -2078,6 +2067,19 @@ export default function PlayPage() {
               )}
                 </>
               )}
+              </div>
+
+              <div className="space-y-4">
+                <ProgressPanel
+                  dailyState={dailyState}
+                  dayState={dayState}
+                  allocation={allocationSummary}
+                  skillBank={skillBank}
+                  lastAppliedDeltas={outcomeDeltas}
+                  boostsReceivedCount={boostsReceived.length}
+                  skills={skills}
+                />
+              </div>
             </div>
           )}
         </div>
