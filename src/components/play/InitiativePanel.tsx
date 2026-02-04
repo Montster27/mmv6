@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import type { Initiative } from "@/types/initiatives";
 import type { Faction } from "@/types/factions";
+import { TesterOnly } from "@/components/ux/TesterOnly";
 
 type InitiativeWithStatus = Initiative & {
   contributedToday?: boolean;
@@ -60,12 +61,18 @@ export function InitiativePanel({
         Progress: {progress}/{initiative.goal} · {remaining} days left
       </p>
       <Button
-        variant="outline"
+        className="w-full"
         onClick={onContribute}
         disabled={submitting || initiative.contributedToday}
       >
-        {initiative.contributedToday ? "Contribution recorded" : "Contribute today"}
+        {initiative.contributedToday ? "Backing recorded" : "Back an Initiative"}
       </Button>
+      <p className="text-xs text-slate-600">Enough backing will change what becomes possible.</p>
+      <TesterOnly>
+        <p className="text-xs text-slate-500">
+          Tester note: Initiatives are how individual play aggregates into world-level change.
+        </p>
+      </TesterOnly>
     </div>
   );
 }
