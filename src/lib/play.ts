@@ -16,6 +16,7 @@ import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
 import { resolveCheck } from "@/core/sim/checkResolver";
 import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
 import type { CheckResult, CheckSkillLevels } from "@/types/checks";
+import { getFeatureFlags } from "@/lib/featureFlags";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -179,13 +180,14 @@ export async function saveTimeAllocation(
     dayState.pre_allocation_socialLeverage ?? dayState.socialLeverage;
   const basePhysicalResilience =
     dayState.pre_allocation_physicalResilience ?? dayState.physicalResilience;
-  const skills = await fetchSkillLevels(userId);
+  const featureFlags = getFeatureFlags();
+  const skills = featureFlags.skills ? await fetchSkillLevels(userId) : null;
   const next = applyAllocationToDayState({
     energy: baseEnergy,
     stress: baseStress,
     allocation: normalizedAllocation,
     posture,
-    skills,
+    skills: featureFlags.skills ? skills ?? undefined : undefined,
   });
   const cashGain = Math.floor(normalizedAllocation.work / 10);
   const knowledgeGain = Math.floor(normalizedAllocation.study / 10);
@@ -419,14 +421,16 @@ export async function applyOutcomeForChoice(
   let lastCheck: CheckResult | undefined;
 
   if (!resolvedOutcome && choice?.check && choice?.outcomes && choice.outcomes.length > 0) {
-    const skills =
-      options?.skills ??
-      (await fetchSkillLevels(userId).catch(() => ({
-        focus: 0,
-        memory: 0,
-        networking: 0,
-        grit: 0,
-      })));
+    const featureFlags = getFeatureFlags();
+    const skills = featureFlags.skills
+      ? options?.skills ??
+        (await fetchSkillLevels(userId).catch(() => ({
+          focus: 0,
+          memory: 0,
+          networking: 0,
+          grit: 0,
+        })))
+      : { focus: 0, memory: 0, networking: 0, grit: 0 };
     const posture =
       options?.posture ??
       (await fetchPosture(userId, dayIndex).then((row) => row?.posture ?? null));

@@ -15,6 +15,7 @@ type Props = {
   dayIndex: number;
   allocations: SkillPointAllocation[];
   skills?: CheckSkillLevels | null;
+  skillsEnabled?: boolean;
   onAllocateSkillPoint: (skillKey: string) => void;
   submitting?: boolean;
   onSubmitPosture: (posture: DailyPosture["posture"]) => void;
@@ -36,6 +37,7 @@ export function DailySetupPanel({
   dayIndex,
   allocations,
   skills,
+  skillsEnabled = true,
   onAllocateSkillPoint,
   submitting,
   onSubmitPosture,
@@ -76,7 +78,7 @@ export function DailySetupPanel({
         <h3 className="text-sm font-semibold text-slate-800">Setup checklist</h3>
         <ul className="text-sm text-slate-700 space-y-1">
           <li>Posture set: {posture ? "yes" : "no"}</li>
-          <li>Skill points remaining: {points}</li>
+          {skillsEnabled ? <li>Skill points remaining: {points}</li> : null}
           <li>Unresolved tensions: {unresolvedCount}</li>
         </ul>
         {actionError ? (
@@ -84,45 +86,47 @@ export function DailySetupPanel({
         ) : null}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800">Skill points</h3>
-        <p className="text-sm text-slate-700">
-          {points} available · cap {cap}
-        </p>
-        {allocations.length > 0 ? (
-          <ul className="text-xs text-slate-600">
-            {allocations.map((allocation) => (
-              <li
-                key={`${allocation.user_id}-${allocation.day_index}-${allocation.skill_key}`}
-                className="capitalize"
-              >
-                {formatKey(allocation.skill_key)} · {allocation.points}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-xs text-slate-500">No allocations yet.</p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          {SKILLS.map((skill) => (
-            (() => {
-              const level = skillLevels[skill as keyof CheckSkillLevels] ?? 0;
-              const cost = skillCostForLevel(level + 1);
-              return (
-                <Button
-                  key={skill}
-                  variant="outline"
-                  disabled={submitting || points < cost}
-                  onClick={() => onAllocateSkillPoint(skill)}
+      {skillsEnabled ? (
+        <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
+          <h3 className="text-sm font-semibold text-slate-800">Skill points</h3>
+          <p className="text-sm text-slate-700">
+            {points} available · cap {cap}
+          </p>
+          {allocations.length > 0 ? (
+            <ul className="text-xs text-slate-600">
+              {allocations.map((allocation) => (
+                <li
+                  key={`${allocation.user_id}-${allocation.day_index}-${allocation.skill_key}`}
                   className="capitalize"
                 >
-                  Allocate {cost} · {skill}
-                </Button>
-              );
-            })()
-          ))}
+                  {formatKey(allocation.skill_key)} · {allocation.points}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-slate-500">No allocations yet.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {SKILLS.map((skill) => (
+              (() => {
+                const level = skillLevels[skill as keyof CheckSkillLevels] ?? 0;
+                const cost = skillCostForLevel(level + 1);
+                return (
+                  <Button
+                    key={skill}
+                    variant="outline"
+                    disabled={submitting || points < cost}
+                    onClick={() => onAllocateSkillPoint(skill)}
+                    className="capitalize"
+                  >
+                    Allocate {cost} · {skill}
+                  </Button>
+                );
+              })()
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
         <h3 className="text-sm font-semibold text-slate-800">Choose today's posture</h3>

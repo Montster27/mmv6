@@ -6,6 +6,7 @@ import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { fetchDailyState, updateDailyState } from "@/lib/play";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
+import { getFeatureFlags } from "@/lib/featureFlags";
 import type { ArcInstance } from "@/types/arcs";
 import type { ContentArcStep } from "@/types/content";
 
@@ -239,9 +240,22 @@ export async function progressArcWithChoice(
     if (typeof dayIndex !== "number") {
       throw new Error("Day index required for arc choice.");
     }
+    const featureFlags = getFeatureFlags();
     const dayState = await ensureDayStateUpToDate(userId, dayIndex);
     const costs = choice.costs ?? {};
     const rewards = choice.rewards ?? {};
+    const effectiveCosts = featureFlags.resources
+      ? costs
+      : {
+          energy: costs.energy ?? 0,
+          stress: costs.stress ?? 0,
+        };
+    const effectiveRewards = featureFlags.resources
+      ? rewards
+      : {
+          energy: rewards.energy ?? 0,
+          stress: rewards.stress ?? 0,
+        };
     const resourceBase = {
       cashOnHand: dayState.cashOnHand ?? 0,
       energy: dayState.energy ?? 0,
@@ -252,12 +266,12 @@ export async function progressArcWithChoice(
     };
 
     const affordabilityChecks: Array<[keyof typeof resourceBase, number]> = [
-      ["cashOnHand", costs.cashOnHand ?? 0],
-      ["energy", costs.energy ?? 0],
-      ["stress", costs.stress ?? 0],
-      ["knowledge", costs.knowledge ?? 0],
-      ["socialLeverage", costs.socialLeverage ?? 0],
-      ["physicalResilience", costs.physicalResilience ?? 0],
+      ["cashOnHand", (effectiveCosts as any).cashOnHand ?? 0],
+      ["energy", effectiveCosts.energy ?? 0],
+      ["stress", effectiveCosts.stress ?? 0],
+      ["knowledge", (effectiveCosts as any).knowledge ?? 0],
+      ["socialLeverage", (effectiveCosts as any).socialLeverage ?? 0],
+      ["physicalResilience", (effectiveCosts as any).physicalResilience ?? 0],
     ];
     for (const [key, value] of affordabilityChecks) {
       if (value > 0 && resourceBase[key] < value) {
@@ -269,26 +283,30 @@ export async function progressArcWithChoice(
     const nextResources = {
       cashOnHand:
         resourceBase.cashOnHand -
-        (costs.cashOnHand ?? 0) +
-        (rewards.cashOnHand ?? 0),
+        ((effectiveCosts as any).cashOnHand ?? 0) +
+        ((effectiveRewards as any).cashOnHand ?? 0),
       energy: clamp100(
-        resourceBase.energy - (costs.energy ?? 0) + (rewards.energy ?? 0)
+        resourceBase.energy -
+          (effectiveCosts.energy ?? 0) +
+          (effectiveRewards.energy ?? 0)
       ),
       stress: clamp100(
-        resourceBase.stress - (costs.stress ?? 0) + (rewards.stress ?? 0)
+        resourceBase.stress -
+          (effectiveCosts.stress ?? 0) +
+          (effectiveRewards.stress ?? 0)
       ),
       knowledge:
         resourceBase.knowledge -
-        (costs.knowledge ?? 0) +
-        (rewards.knowledge ?? 0),
+        ((effectiveCosts as any).knowledge ?? 0) +
+        ((effectiveRewards as any).knowledge ?? 0),
       socialLeverage:
         resourceBase.socialLeverage -
-        (costs.socialLeverage ?? 0) +
-        (rewards.socialLeverage ?? 0),
+        ((effectiveCosts as any).socialLeverage ?? 0) +
+        ((effectiveRewards as any).socialLeverage ?? 0),
       physicalResilience: clamp100(
         resourceBase.physicalResilience -
-          (costs.physicalResilience ?? 0) +
-          (rewards.physicalResilience ?? 0)
+          ((effectiveCosts as any).physicalResilience ?? 0) +
+          ((effectiveRewards as any).physicalResilience ?? 0)
       ),
     };
 

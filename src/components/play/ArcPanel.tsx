@@ -62,6 +62,7 @@ type Props = {
     socialLeverage: number;
     physicalResilience: number;
   } | null;
+  resourcesEnabled?: boolean;
   submitting?: boolean;
   onStart: () => void;
   onAdvance: (nextStep: number, complete: boolean) => void;
@@ -73,6 +74,7 @@ function ArcPanelComponent({
   arc,
   availableArcs,
   dayState,
+  resourcesEnabled = true,
   submitting,
   onStart,
   onAdvance,
@@ -109,6 +111,9 @@ function ArcPanelComponent({
         if (current < value) {
           return `Not enough ${key}`;
         }
+        continue;
+      }
+      if (!resourcesEnabled) {
         continue;
       }
       const mapped = mapLegacyResourceKey(key) ?? (key as keyof typeof resourcePool);

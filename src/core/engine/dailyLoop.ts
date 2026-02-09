@@ -65,6 +65,7 @@ import {
 } from "@/lib/dailyInteractions";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
+import { getFeatureFlags } from "@/lib/featureFlags";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
@@ -184,7 +185,10 @@ export async function getOrCreateDailyRun(
   const cadence = await ensureCadenceUpToDate(userId);
   const dayIndex = cadence.dayIndex;
 
-  await ensureSkillBankUpToDate(userId, dayIndex);
+  const featureFlags = getFeatureFlags();
+  if (featureFlags.skills) {
+    await ensureSkillBankUpToDate(userId, dayIndex);
+  }
   await ensureTensionsUpToDate(userId, dayIndex);
 
   const [
@@ -195,10 +199,10 @@ export async function getOrCreateDailyRun(
     storyletsRaw,
     boosted,
     tensions,
-    skillBank,
+    skillBank: featureFlags.skills ? skillBank : null,
     posture,
-    allocations,
-    skills,
+    allocations: featureFlags.skills ? allocations : [],
+    skills: featureFlags.skills ? skills : null,
   ] = await Promise.all([
     fetchDailyState(userId),
     ensureDayStateUpToDate(userId, dayIndex).catch(() => null),
@@ -207,10 +211,10 @@ export async function getOrCreateDailyRun(
     fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
     hasSentBoostToday(userId, dayIndex),
     fetchTensions(userId, dayIndex),
-    fetchSkillBank(userId),
+    featureFlags.skills ? fetchSkillBank(userId) : Promise.resolve(null),
     fetchPosture(userId, dayIndex),
-    fetchSkillAllocations(userId, dayIndex),
-    fetchSkillLevels(userId),
+    featureFlags.skills ? fetchSkillAllocations(userId, dayIndex) : Promise.resolve([]),
+    featureFlags.skills ? fetchSkillLevels(userId) : Promise.resolve(null),
     // Note: we fetch recent history separately below.
   ]);
 
@@ -227,39 +231,51 @@ export async function getOrCreateDailyRun(
   const cohort = await ensureUserInCohort(userId).catch(() => null);
   const cohortId = cohort?.cohortId ?? null;
 
-  await ensureUserAlignmentRows(userId);
-  const [factions, alignmentRows, contentArcs, contentInitiatives, recentEvents] =
-    await Promise.all([
-      listFactions(),
-      fetchUserAlignment(userId),
-      listActiveArcs(),
-      listActiveInitiativesCatalog(),
-      fetchRecentAlignmentEvents(userId, dayIndex).catch(() => []),
-    ]);
-  const alignment = alignmentRows.reduce<Record<string, number>>((acc, row) => {
-    acc[row.faction_key] = row.score;
-    return acc;
-  }, {});
-  const unlocks = computeUnlockedContent(alignment, contentArcs, contentInitiatives);
-  const directive = cohortId
-    ? await getOrCreateWeeklyDirective(
-        cohortId,
-        dayIndex,
-        unlocks.unlockedInitiativeKeys
-      ).catch(() => null)
-    : null;
+  let factions: DailyRun["factions"] = [];
+  let alignment = {} as Record<string, number>;
+  let contentArcs = [] as Awaited<ReturnType<typeof listActiveArcs>>;
+  let contentInitiatives = [] as Awaited<ReturnType<typeof listActiveInitiativesCatalog>>;
+  let recentEvents = [] as DailyRun["recentAlignmentEvents"];
+  let unlocks = { unlockedArcKeys: [], unlockedInitiativeKeys: [] };
+  let directive = null as DailyRun["directive"];
+
+  await ensureUserAlignmentRows(userId).catch(() => {});
+  if (featureFlags.alignment) {
+    const [factionsResult, alignmentRows, arcsResult, initiativesResult, events] =
+      await Promise.all([
+        listFactions(),
+        fetchUserAlignment(userId),
+        listActiveArcs(),
+        listActiveInitiativesCatalog(),
+        fetchRecentAlignmentEvents(userId, dayIndex).catch(() => []),
+      ]);
+    factions = factionsResult;
+    contentArcs = arcsResult;
+    contentInitiatives = initiativesResult;
+    recentEvents = events;
+    alignment = alignmentRows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.faction_key] = row.score;
+      return acc;
+    }, {});
+    unlocks = computeUnlockedContent(alignment, contentArcs, contentInitiatives);
+    directive = cohortId
+      ? await getOrCreateWeeklyDirective(
+          cohortId,
+          dayIndex,
+          unlocks.unlockedInitiativeKeys
+        ).catch(() => null)
+      : null;
+  }
   const directiveTags =
     directive?.faction_key && DIRECTIVE_TAGS[directive.faction_key]
       ? DIRECTIVE_TAGS[directive.faction_key]
       : [];
 
-  const userArc = await getOrStartArc(userId, dayIndex);
-  const arcStorylet = getArcNextStepStorylet(
-    userArc,
-    dayIndex,
-    storyletsRaw,
-    runs
-  );
+  const userArc = featureFlags.arcs ? await getOrStartArc(userId, dayIndex) : null;
+  const arcStorylet =
+    featureFlags.arcs && userArc
+      ? getArcNextStepStorylet(userArc, dayIndex, storyletsRaw, runs)
+      : null;
 
   const storyletsSelected = selectStorylets({
     seed: `${userId}-${dayIndex}`,
@@ -332,20 +348,26 @@ export async function getOrCreateDailyRun(
     initiatives = enriched;
   }
 
-  const arcDefinition = await fetchContentArcByKey(ARC_KEY);
-  const arcInstance = arcDefinition ? await fetchArcInstance(userId, ARC_KEY) : null;
+  const arcDefinition = featureFlags.arcs
+    ? await fetchContentArcByKey(ARC_KEY)
+    : null;
+  const arcInstance =
+    featureFlags.arcs && arcDefinition ? await fetchArcInstance(userId, ARC_KEY) : null;
   const arcStep =
-    arcDefinition && arcInstance?.status === "active"
+    featureFlags.arcs && arcDefinition && arcInstance?.status === "active"
       ? await fetchArcCurrentStepContent(ARC_KEY, arcInstance.current_step)
       : null;
 
   const reflection = await getReflection(userId, dayIndex);
   const reflectionDone = isReflectionDone(reflection);
-  const funPulseEligible = shouldShowFunPulse(dayIndex, currentSeasonIndex);
-  const funPulseRow = funPulseEligible
-    ? await getFunPulse(userId, currentSeasonIndex, dayIndex)
-    : null;
-  const funPulseDone = Boolean(funPulseRow);
+  const funPulseEligible = featureFlags.funPulse
+    ? shouldShowFunPulse(dayIndex, currentSeasonIndex)
+    : false;
+  const funPulseRow =
+    funPulseEligible && featureFlags.funPulse
+      ? await getFunPulse(userId, currentSeasonIndex, dayIndex)
+      : null;
+  const funPulseDone = featureFlags.funPulse ? Boolean(funPulseRow) : false;
   const microTaskVariant = options?.microtaskVariant ?? "A";
   const microTaskEligible = isMicrotaskEligible(dayIndex, microTaskVariant);
   const microTaskRun = microTaskEligible
@@ -393,28 +415,39 @@ export async function getOrCreateDailyRun(
     stage,
   });
 
-  const unlockedInstances = await fetchArcInstancesByKeys(
-    userId,
-    unlocks.unlockedArcKeys
-  ).catch(() => []);
-  const startedArcKeys = new Set(unlockedInstances.map((item) => item.arc_key));
-  const availableArcs = contentArcs
-    .filter((arc) => unlocks.unlockedArcKeys.includes(arc.key))
-    .filter((arc) => !startedArcKeys.has(arc.key))
-    .map((arc) => ({ key: arc.key, title: arc.title, description: arc.description }));
+  const availableArcs = featureFlags.alignment
+    ? await fetchArcInstancesByKeys(userId, unlocks.unlockedArcKeys)
+        .catch(() => [])
+        .then((unlockedInstances) => {
+          const startedArcKeys = new Set(
+            unlockedInstances.map((item) => item.arc_key)
+          );
+          return contentArcs
+            .filter((arc) => unlocks.unlockedArcKeys.includes(arc.key))
+            .filter((arc) => !startedArcKeys.has(arc.key))
+            .map((arc) => ({
+              key: arc.key,
+              title: arc.title,
+              description: arc.description,
+            }));
+        })
+    : [];
 
   const { weekStart, weekEnd } = computeWeekWindow(dayIndex);
-  const worldInfluence = await getOrComputeWorldWeeklyInfluence(weekStart, weekEnd).catch(
-    () => ({})
-  );
-  const cohortInfluence = cohortId
-    ? await getOrComputeCohortWeeklyInfluence(cohortId, weekStart, weekEnd).catch(
-        () => ({})
-      )
+  const worldInfluence = featureFlags.alignment
+    ? await getOrComputeWorldWeeklyInfluence(weekStart, weekEnd).catch(() => ({}))
     : null;
-  const rivalrySnapshot = await getOrComputeWeeklySnapshot(weekStart, weekEnd).catch(
-    () => ({ topCohorts: [] })
-  );
+  const cohortInfluence =
+    featureFlags.alignment && cohortId
+      ? await getOrComputeCohortWeeklyInfluence(cohortId, weekStart, weekEnd).catch(
+          () => ({})
+        )
+      : null;
+  const rivalrySnapshot = featureFlags.alignment
+    ? await getOrComputeWeeklySnapshot(weekStart, weekEnd).catch(
+        () => ({ topCohorts: [] })
+      )
+    : { topCohorts: [] };
 
   return {
     userId,
@@ -433,7 +466,7 @@ export async function getOrCreateDailyRun(
     skills,
     nextSkillUnlockDay: 2,
     cohortId,
-    arc: arcDefinition
+    arc: featureFlags.arcs && arcDefinition
       ? {
           arc_key: arcDefinition.key,
           status:
@@ -455,30 +488,37 @@ export async function getOrCreateDailyRun(
             : null,
         }
       : null,
-    factions,
-    alignment,
-    unlocks: {
-      arcKeys: unlocks.unlockedArcKeys,
-      initiativeKeys: unlocks.unlockedInitiativeKeys,
-    },
-    availableArcs,
-    recentAlignmentEvents: recentEvents,
-    worldState: {
-      weekStart,
-      weekEnd,
-      influence: worldInfluence,
-    },
-    cohortState: cohortInfluence
+    factions: featureFlags.alignment ? factions : [],
+    alignment: featureFlags.alignment ? alignment : undefined,
+    unlocks: featureFlags.alignment
+      ? {
+          arcKeys: unlocks.unlockedArcKeys,
+          initiativeKeys: unlocks.unlockedInitiativeKeys,
+        }
+      : undefined,
+    availableArcs: featureFlags.alignment ? availableArcs : [],
+    recentAlignmentEvents: featureFlags.alignment ? recentEvents : undefined,
+    worldState: featureFlags.alignment
       ? {
           weekStart,
           weekEnd,
-          influence: cohortInfluence,
+          influence: worldInfluence ?? {},
         }
-      : null,
-    rivalry: {
-      topCohorts: rivalrySnapshot.topCohorts,
-    },
-    directive: directive
+      : undefined,
+    cohortState:
+      featureFlags.alignment && cohortInfluence
+        ? {
+            weekStart,
+            weekEnd,
+            influence: cohortInfluence,
+          }
+        : null,
+    rivalry: featureFlags.alignment
+      ? {
+          topCohorts: rivalrySnapshot.topCohorts,
+        }
+      : undefined,
+    directive: featureFlags.alignment && directive
       ? {
           faction_key: directive.faction_key,
           title: directive.title,

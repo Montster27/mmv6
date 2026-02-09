@@ -20,6 +20,12 @@ type Props = {
   skills?: DailyRun["skills"] | null;
   lastAppliedDeltas?: DeltaInfo | null;
   boostsReceivedCount?: number;
+  resourcesEnabled?: boolean;
+  skillsEnabled?: boolean;
+  onResourcesHoverStart?: () => void;
+  onResourcesHoverEnd?: () => void;
+  onVectorsHoverStart?: () => void;
+  onVectorsHoverEnd?: () => void;
 };
 
 const HIGHLIGHT_MS = 250;
@@ -74,6 +80,12 @@ function ProgressPanelComponent({
   skills,
   lastAppliedDeltas,
   boostsReceivedCount,
+  resourcesEnabled = true,
+  skillsEnabled = true,
+  onResourcesHoverStart,
+  onResourcesHoverEnd,
+  onVectorsHoverStart,
+  onVectorsHoverEnd,
 }: Props) {
   const [highlight, setHighlight] = useState<DeltaInfo | null>(null);
   const energy = dayState?.energy ?? dailyState?.energy;
@@ -111,7 +123,11 @@ function ProgressPanelComponent({
   return (
     <aside className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-4">
       <h2 className="text-sm font-semibold text-slate-800">Resources</h2>
-      <div className="space-y-2">
+      <div
+        className="space-y-2"
+        onMouseEnter={onResourcesHoverStart}
+        onMouseLeave={onResourcesHoverEnd}
+      >
         <div
           className={`flex items-center justify-between text-sm ${
             highlightEnergy
@@ -143,55 +159,71 @@ function ProgressPanelComponent({
       </div>
 
       <div className="space-y-1 text-sm text-slate-700">
-        <div className="flex items-center justify-between">
-          <span>Knowledge</span>
-          <span>{dayState?.knowledge ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Cash on Hand</span>
-          <span>{dayState?.cashOnHand ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Social Leverage</span>
-          <span>{dayState?.socialLeverage ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Physical Resilience</span>
-          <span>{dayState?.physicalResilience ?? 0}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span>Morale</span>
-          <span>{typeof morale === "number" ? morale : "—"}</span>
-        </div>
-        <div className="flex items-center justify-between text-slate-600">
-          <span>Skill points</span>
-          <span>
-            {typeof skillBank?.available_points === "number"
-              ? `${skillBank.available_points} / ${skillBank.cap}`
-              : "—"}
-          </span>
-        </div>
-        <div className="mt-2 space-y-1 text-slate-600">
-          <div className="flex items-center justify-between">
-            <span>Focus</span>
-            <span>{skillLevels.focus}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Memory</span>
-            <span>{skillLevels.memory}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Networking</span>
-            <span>{skillLevels.networking}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Grit</span>
-            <span>{skillLevels.grit}</span>
-          </div>
-        </div>
+        {resourcesEnabled ? (
+          <>
+            <div className="flex items-center justify-between">
+              <span>Knowledge</span>
+              <span>{dayState?.knowledge ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Cash on Hand</span>
+              <span>{dayState?.cashOnHand ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Social Leverage</span>
+              <span>{dayState?.socialLeverage ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Physical Resilience</span>
+              <span>{dayState?.physicalResilience ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Morale</span>
+              <span>{typeof morale === "number" ? morale : "—"}</span>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-slate-600">
+            Your reserves shift quietly beneath the day.
+          </p>
+        )}
+        {skillsEnabled ? (
+          <>
+            <div className="flex items-center justify-between text-slate-600">
+              <span>Skill points</span>
+              <span>
+                {typeof skillBank?.available_points === "number"
+                  ? `${skillBank.available_points} / ${skillBank.cap}`
+                  : "—"}
+              </span>
+            </div>
+            <div className="mt-2 space-y-1 text-slate-600">
+              <div className="flex items-center justify-between">
+                <span>Focus</span>
+                <span>{skillLevels.focus}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Memory</span>
+                <span>{skillLevels.memory}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Networking</span>
+                <span>{skillLevels.networking}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Grit</span>
+                <span>{skillLevels.grit}</span>
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
 
-      <div className="space-y-2">
+      <div
+        className="space-y-2"
+        onMouseEnter={onVectorsHoverStart}
+        onMouseLeave={onVectorsHoverEnd}
+      >
         <p className="text-sm font-semibold text-slate-800">Vectors</p>
         {vectorKeys.length === 0 ? (
           <p className="text-sm text-slate-700">No vectors yet.</p>

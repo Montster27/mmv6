@@ -71,6 +71,7 @@ import { MessageCard } from "@/components/ux/MessageCard";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
 import { getAppMode } from "@/lib/mode";
+import { getFeatureFlags } from "@/lib/featureFlags";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -238,6 +239,7 @@ export default function PlayPage() {
     []
   );
   const testerMode = useMemo(() => getAppMode().testerMode, []);
+  const featureFlags = useMemo(() => getFeatureFlags(), []);
   const testerNote = useMemo(
     () =>
       testerMessage("Tester: Set posture, allocate time, then pick a storylet.", {
@@ -263,6 +265,14 @@ export default function PlayPage() {
   const previousDayStateRef = useRef<{ energy: number; stress: number } | null>(
     null
   );
+  const hoverStartRef = useRef<Record<string, number | null>>({});
+  const stagePauseTimerRef = useRef<number | null>(null);
+  const stageInteractionRef = useRef(false);
+  const [lastCompletedStage, setLastCompletedStage] =
+    useState<DailyRunStage | null>(null);
+  const [testerStageResponses, setTesterStageResponses] = useState<
+    Record<string, string>
+  >({});
   const seasonResetGameNote = useMemo(
     () =>
       gameMessage("The ledger blurs. You begin again with what you can hold.", {
@@ -776,6 +786,29 @@ export default function PlayPage() {
     });
   };
 
+  const recordInteraction = () => {
+    stageInteractionRef.current = true;
+  };
+
+  const startHover = (key: string) => {
+    if (!userId) return;
+    if (hoverStartRef.current[key]) return;
+    hoverStartRef.current[key] = Date.now();
+  };
+
+  const endHover = (key: string) => {
+    if (!userId) return;
+    const startedAt = hoverStartRef.current[key];
+    if (!startedAt) return;
+    hoverStartRef.current[key] = null;
+    trackWithSeason({
+      event_type: "ui_focus",
+      day_index: dayIndex,
+      stage,
+      payload: { element: key, duration_ms: Date.now() - startedAt },
+    });
+  };
+
   useEffect(() => {
     if (!userId || loading || sessionStartTracked.current) return;
     sessionStartTracked.current = true;
@@ -791,6 +824,20 @@ export default function PlayPage() {
       stageRef.current = stage;
       stageStartedAtRef.current = now;
       trackWithSeason({ event_type: "stage_enter", day_index: dayIndex, stage });
+      stageInteractionRef.current = false;
+      if (stagePauseTimerRef.current) {
+        window.clearTimeout(stagePauseTimerRef.current);
+      }
+      stagePauseTimerRef.current = window.setTimeout(() => {
+        if (!stageInteractionRef.current && stageRef.current === stage) {
+          trackWithSeason({
+            event_type: "stage_pause",
+            day_index: dayIndex,
+            stage,
+            payload: { duration_ms: 5000 },
+          });
+        }
+      }, 5000);
       return;
     }
 
@@ -806,11 +853,26 @@ export default function PlayPage() {
         stage: previousStage,
         payload: { duration_ms: now - startedAt },
       });
+      setLastCompletedStage(previousStage);
     }
 
     stageRef.current = stage;
     stageStartedAtRef.current = now;
     trackWithSeason({ event_type: "stage_enter", day_index: dayIndex, stage });
+    stageInteractionRef.current = false;
+    if (stagePauseTimerRef.current) {
+      window.clearTimeout(stagePauseTimerRef.current);
+    }
+    stagePauseTimerRef.current = window.setTimeout(() => {
+      if (!stageInteractionRef.current && stageRef.current === stage) {
+        trackWithSeason({
+          event_type: "stage_pause",
+          day_index: dayIndex,
+          stage,
+          payload: { duration_ms: 5000 },
+        });
+      }
+    }, 5000);
 
     if (stage === "complete" && !sessionEndTracked.current) {
       sessionEndTracked.current = true;
@@ -855,6 +917,68 @@ export default function PlayPage() {
       localStorage.setItem("mmv_tester_intro_seen", "1");
     } catch {}
   }, [testerMode, testerIntroMessage]);
+
+  const stagePrompt = useMemo(() => {
+    if (!testerMode || !lastCompletedStage) return null;
+    const prompts: Record<
+      string,
+      { id: string; body: string; options: string[] }
+    > = {
+      setup: {
+        id: "setup_meaning",
+        body: "Did the setup step feel meaningful?",
+        options: ["Yes", "Neutral", "No"],
+      },
+      allocation: {
+        id: "allocation_meaning",
+        body: "Did time allocation feel meaningful?",
+        options: ["Yes", "Neutral", "No"],
+      },
+      storylet_1: {
+        id: "storylet_1_clarity",
+        body: "Did you understand why that outcome happened?",
+        options: ["Yes", "Mostly", "No"],
+      },
+      microtask: {
+        id: "microtask_value",
+        body: "Would you miss the micro interaction if it were gone?",
+        options: ["Yes", "Maybe", "No"],
+      },
+      storylet_2: {
+        id: "storylet_2_clarity",
+        body: "Did the second storylet feel distinct?",
+        options: ["Yes", "Neutral", "No"],
+      },
+      social: {
+        id: "social_value",
+        body: "Did the social step feel worth doing?",
+        options: ["Yes", "Neutral", "No"],
+      },
+      reflection: {
+        id: "reflection_value",
+        body: "Did the reflection feel useful?",
+        options: ["Yes", "Neutral", "No"],
+      },
+    };
+    const prompt = prompts[lastCompletedStage];
+    if (!prompt) return null;
+    if (testerStageResponses[prompt.id]) return null;
+    return { stage: lastCompletedStage, ...prompt };
+  }, [testerMode, lastCompletedStage, testerStageResponses]);
+
+  const handleStagePromptResponse = (response: string) => {
+    if (!stagePrompt) return;
+    setTesterStageResponses((prev) => ({
+      ...prev,
+      [stagePrompt.id]: response,
+    }));
+    trackWithSeason({
+      event_type: "tester_stage_prompt",
+      day_index: dayIndex,
+      stage: stagePrompt.stage,
+      payload: { question_id: stagePrompt.id, response },
+    });
+  };
 
   useEffect(() => {
     if (!dayState) return;
@@ -905,11 +1029,13 @@ export default function PlayPage() {
   const HEALTH_TENSION_THRESHOLD = 30;
 
   const handleAllocationChange = (key: keyof AllocationPayload, value: number) => {
+    recordInteraction();
     setAllocation({ ...allocation, [key]: value });
   };
 
   const handleSaveAllocation = async () => {
     if (!userId || !allocationValid) return;
+    recordInteraction();
     setSavingAllocation(true);
     setError(null);
     pendingDeltaSourceRef.current = "allocation";
@@ -977,6 +1103,7 @@ export default function PlayPage() {
 
   const handleChoice = async (choiceId: string) => {
     if (!userId || !currentStorylet) return;
+    recordInteraction();
     setSavingChoice(true);
     setError(null);
     setOutcomeMessage(null);
@@ -989,6 +1116,12 @@ export default function PlayPage() {
         dayIndex,
         choiceId
       );
+      trackWithSeason({
+        event_type: "storylet_choice",
+        day_index: dayIndex,
+        stage,
+        payload: { storylet_id: currentStorylet.id, choice_id: choiceId },
+      });
 
       const alreadyRecorded = Boolean(runId);
       if (!alreadyRecorded) {
@@ -1017,7 +1150,7 @@ export default function PlayPage() {
             {
               dayState,
               posture: posture?.posture ?? null,
-              skills: skills ?? undefined,
+              skills: featureFlags.skills ? skills ?? undefined : undefined,
             }
           );
         setDailyState(nextDailyState);
@@ -1178,6 +1311,7 @@ export default function PlayPage() {
 
   const handleSendBoost = async () => {
     if (!userId || !selectedRecipient) return;
+    recordInteraction();
     setError(null);
     setBoostMessage(null);
     setLoadingSocial(true);
@@ -1341,6 +1475,7 @@ export default function PlayPage() {
 
   const handleArcChoice = async (choiceKey: string) => {
     if (!userId || !arc) return;
+    recordInteraction();
     setArcSubmitting(true);
     setError(null);
     try {
@@ -1377,6 +1512,7 @@ export default function PlayPage() {
 
   const handleContributeInitiative = async (initiativeId: string) => {
     if (!userId) return;
+    recordInteraction();
     setInitiativeSubmitting(true);
     setError(null);
     try {
@@ -1392,6 +1528,7 @@ export default function PlayPage() {
 
   const handleReflection = async (response: ReflectionResponse | "skip") => {
     if (!userId) return;
+    recordInteraction();
     setError(null);
     setReflectionSaving(true);
     try {
@@ -1497,6 +1634,7 @@ export default function PlayPage() {
   }, [stage, alreadyCompletedToday, userId, dayIndex]);
 
   const showOpeningArcFirst =
+    featureFlags.arcs &&
     Boolean(arc) &&
     arc?.arc_key === "anomaly_001" &&
     arc?.current_step === 0 &&
@@ -1710,11 +1848,16 @@ export default function PlayPage() {
                 ) : (
                   <>
                   {showOpeningArcFirst ? (
-                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                    <section
+                      className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4"
+                      onMouseEnter={() => startHover("arc_panel")}
+                      onMouseLeave={() => endHover("arc_panel")}
+                    >
                       <ArcPanel
                         arc={arc}
                         availableArcs={availableArcs}
                         dayState={dayState}
+                        resourcesEnabled={featureFlags.resources}
                         submitting={arcSubmitting}
                         onStart={handleStartArc}
                         onAdvance={handleAdvanceArc}
@@ -1731,6 +1874,27 @@ export default function PlayPage() {
                     Today you’re balancing pressure, opportunity, and what you’re willing
                     to push.
                   </section>
+                  {stagePrompt ? (
+                    <TesterOnly>
+                      <section className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
+                        <p className="text-sm text-amber-900">
+                          {stagePrompt.body}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {stagePrompt.options.map((option) => (
+                            <Button
+                              key={option}
+                              variant="outline"
+                              onClick={() => handleStagePromptResponse(option)}
+                              className="border-amber-300 text-amber-900 hover:bg-amber-100"
+                            >
+                              {option}
+                            </Button>
+                          ))}
+                        </div>
+                      </section>
+                    </TesterOnly>
+                  ) : null}
 
                   {(stage === "social" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR &&
@@ -1757,6 +1921,7 @@ export default function PlayPage() {
                         dayIndex={dayIndex}
                         allocations={skillAllocations}
                         skills={skills ?? undefined}
+                        skillsEnabled={featureFlags.skills}
                         onAllocateSkillPoint={handleAllocateSkillPoint}
                         submitting={allocatingSkill}
                         onSubmitPosture={handleSubmitPosture}
@@ -1879,7 +2044,7 @@ export default function PlayPage() {
                                         {outcomeDeltas.stress}
                                       </li>
                                     ) : null}
-                                    {outcomeDeltas.vectors
+                                    {featureFlags.resources && outcomeDeltas.vectors
                                       ? Object.entries(outcomeDeltas.vectors).map(
                                           ([key, delta]) => (
                                             <li key={key}>
@@ -1912,17 +2077,23 @@ export default function PlayPage() {
                     )}
 
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
+                    featureFlags.arcs &&
                     arc &&
                     stage !== "setup" &&
                     stage !== "allocation" &&
                     stage !== "storylet_1" &&
                     stage !== "storylet_2" && (
-                      <section className="space-y-3">
+                      <section
+                        className="space-y-3"
+                        onMouseEnter={() => startHover("arc_panel")}
+                        onMouseLeave={() => endHover("arc_panel")}
+                      >
                         {showOpeningArcFirst && arc?.current_step === 0 ? null : (
                         <ArcPanel
                           arc={arc}
                           availableArcs={availableArcs}
                           dayState={dayState}
+                          resourcesEnabled={featureFlags.resources}
                           submitting={arcSubmitting}
                           onStart={handleStartArc}
                           onAdvance={handleAdvanceArc}
@@ -1933,7 +2104,9 @@ export default function PlayPage() {
                       </section>
                     )}
 
-                  {USE_DAILY_LOOP_ORCHESTRATOR && factions.length > 0 && (
+                  {USE_DAILY_LOOP_ORCHESTRATOR &&
+                    featureFlags.alignment &&
+                    factions.length > 0 && (
                     <section className="space-y-3">
                       <FactionStatusPanel
                         factions={factions}
@@ -2081,7 +2254,9 @@ export default function PlayPage() {
                   </p>
                 </section>
               )}
-              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "fun_pulse" && (
+              {USE_DAILY_LOOP_ORCHESTRATOR &&
+                featureFlags.funPulse &&
+                stage === "fun_pulse" && (
                 <section className="space-y-3 rounded-md border border-purple-200 bg-purple-50/70 px-4 py-4">
                   <FunPulse
                     onSelect={handleFunPulseSelect}
@@ -2102,6 +2277,12 @@ export default function PlayPage() {
                   lastAppliedDeltas={outcomeDeltas}
                   boostsReceivedCount={boostsReceived.length}
                   skills={skills}
+                  resourcesEnabled={featureFlags.resources}
+                  skillsEnabled={featureFlags.skills}
+                  onResourcesHoverStart={() => startHover("resources_panel")}
+                  onResourcesHoverEnd={() => endHover("resources_panel")}
+                  onVectorsHoverStart={() => startHover("vectors_panel")}
+                  onVectorsHoverEnd={() => endHover("vectors_panel")}
                 />
               </div>
             </div>
