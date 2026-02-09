@@ -199,10 +199,10 @@ export async function getOrCreateDailyRun(
     storyletsRaw,
     boosted,
     tensions,
-    skillBank: featureFlags.skills ? skillBank : null,
+    skillBankRaw,
     posture,
-    allocations: featureFlags.skills ? allocations : [],
-    skills: featureFlags.skills ? skills : null,
+    allocationsRaw,
+    skillsRaw,
   ] = await Promise.all([
     fetchDailyState(userId),
     ensureDayStateUpToDate(userId, dayIndex).catch(() => null),
@@ -217,6 +217,9 @@ export async function getOrCreateDailyRun(
     featureFlags.skills ? fetchSkillLevels(userId) : Promise.resolve(null),
     // Note: we fetch recent history separately below.
   ]);
+  const skillBank = featureFlags.skills ? skillBankRaw : null;
+  const allocations = featureFlags.skills ? allocationsRaw : [];
+  const skills = featureFlags.skills ? skillsRaw : null;
 
   let allocationSeed = null as DailyRun["allocationSeed"];
   if (!allocation && dayIndex > 0) {
