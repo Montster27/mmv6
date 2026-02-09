@@ -13,6 +13,18 @@ function parseFlag(value: string | undefined): boolean | null {
   return null;
 }
 
+function getOverrideFlags(): Partial<FeatureFlags> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem("mmv_feature_overrides");
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<FeatureFlags>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export function getFeatureFlags(): FeatureFlags {
   const set = process.env.NEXT_PUBLIC_FEATURE_SET;
   const base: FeatureFlags =
@@ -40,5 +52,6 @@ export function getFeatureFlags(): FeatureFlags {
     funPulse: parseFlag(process.env.NEXT_PUBLIC_FEATURE_FUN_PULSE) ?? undefined,
   };
 
-  return { ...base, ...overrides };
+  const localOverrides = getOverrideFlags();
+  return { ...base, ...overrides, ...localOverrides };
 }

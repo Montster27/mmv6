@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import type { FeatureFlags } from "@/lib/featureFlags";
+import { getFeatureFlags } from "@/lib/featureFlags";
 
 type DevCharacter = {
   user_id: string;
@@ -31,6 +34,29 @@ type Props = {
   onToggleAdmin: (userId: string, next: boolean) => void;
 };
 
+function readOverrides(): Partial<FeatureFlags> {
+  try {
+    const raw = window.localStorage.getItem("mmv_feature_overrides");
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<FeatureFlags>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeOverrides(overrides: Partial<FeatureFlags>) {
+  window.localStorage.setItem("mmv_feature_overrides", JSON.stringify(overrides));
+}
+
+const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
+  ["arcs", "Arcs"],
+  ["resources", "Resources"],
+  ["skills", "Skills"],
+  ["alignment", "Alignment/Directives"],
+  ["funPulse", "Fun pulse"],
+];
+
 export default function DevMenu({
   devSettings,
   devSettingsLoading,
@@ -48,6 +74,29 @@ export default function DevMenu({
   onResetAccount,
   onToggleAdmin,
 }: Props) {
+  const [flagOverrides, setFlagOverrides] = useState<Partial<FeatureFlags>>({});
+  const flags = getFeatureFlags();
+
+  useEffect(() => {
+    setFlagOverrides(readOverrides());
+  }, []);
+
+  const handleToggleFlag = (key: keyof FeatureFlags) => {
+    const nextOverrides = {
+      ...flagOverrides,
+      [key]: !(flagOverrides[key] ?? flags[key]),
+    };
+    setFlagOverrides(nextOverrides);
+    writeOverrides(nextOverrides);
+    window.location.reload();
+  };
+
+  const handleResetFlags = () => {
+    setFlagOverrides({});
+    writeOverrides({});
+    window.location.reload();
+  };
+
   return (
     <section className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -87,6 +136,36 @@ export default function DevMenu({
             </Button>
           </div>
         ) : null}
+      </div>
+      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-medium">Feature toggles</span>
+          <Button variant="ghost" onClick={handleResetFlags}>
+            Reset
+          </Button>
+        </div>
+        <p className="text-xs text-slate-500">
+          Overrides are local to this browser. Page reloads when you toggle.
+        </p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {FLAG_LABELS.map(([key, label]) => {
+            const active = flagOverrides[key] ?? flags[key];
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between rounded border border-slate-200 bg-white px-2 py-2"
+              >
+                <span>{label}</span>
+                <Button
+                  variant={active ? "secondary" : "outline"}
+                  onClick={() => handleToggleFlag(key)}
+                >
+                  {active ? "On" : "Off"}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
       </div>
       {devError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
