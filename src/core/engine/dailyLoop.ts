@@ -243,7 +243,8 @@ export async function getOrCreateDailyRun(
     unlockedArcKeys: [],
     unlockedInitiativeKeys: [],
   };
-  let directive = null as DailyRun["directive"];
+  let directiveRow = null as Awaited<ReturnType<typeof getOrCreateWeeklyDirective>> | null;
+  let directiveSummary = null as DailyRun["directive"];
 
   await ensureUserAlignmentRows(userId).catch(() => {});
   if (featureFlags.alignment) {
@@ -264,17 +265,28 @@ export async function getOrCreateDailyRun(
       return acc;
     }, {});
     unlocks = computeUnlockedContent(alignment, contentArcs, contentInitiatives);
-    directive = cohortId
+    directiveRow = cohortId
       ? await getOrCreateWeeklyDirective(
           cohortId,
           dayIndex,
           unlocks.unlockedInitiativeKeys
         ).catch(() => null)
       : null;
+    directiveSummary = directiveRow
+      ? {
+          faction_key: directiveRow.faction_key,
+          title: directiveRow.title,
+          description: directiveRow.description,
+          target_type: directiveRow.target_type,
+          target_key: directiveRow.target_key,
+          week_end_day_index: directiveRow.week_end_day_index,
+          status: directiveRow.status,
+        }
+      : null;
   }
   const directiveTags =
-    directive?.faction_key && DIRECTIVE_TAGS[directive.faction_key]
-      ? DIRECTIVE_TAGS[directive.faction_key]
+    directiveRow?.faction_key && DIRECTIVE_TAGS[directiveRow.faction_key]
+      ? DIRECTIVE_TAGS[directiveRow.faction_key]
       : [];
 
   const userArc = featureFlags.arcs ? await getOrStartArc(userId, dayIndex) : null;
@@ -300,7 +312,7 @@ export async function getOrCreateDailyRun(
   let initiatives = null as DailyRun["initiatives"];
 
   if (cohortId) {
-    await getOrCreateWeeklyInitiative(cohortId, dayIndex, directive);
+    await getOrCreateWeeklyInitiative(cohortId, dayIndex, directiveRow);
   }
 
   if (cohortId) {
@@ -524,17 +536,7 @@ export async function getOrCreateDailyRun(
           topCohorts: rivalrySnapshot.topCohorts,
         }
       : undefined,
-    directive: featureFlags.alignment && directive
-      ? {
-          faction_key: directive.faction_key,
-          title: directive.title,
-          description: directive.description,
-          target_type: directive.target_type,
-          target_key: directive.target_key,
-          week_end_day_index: directive.week_end_day_index,
-          status: directive.status,
-        }
-      : null,
+    directive: featureFlags.alignment ? directiveSummary : null,
     initiatives,
     reflectionStatus: reflectionDone ? "done" : "pending",
     microTaskStatus,
