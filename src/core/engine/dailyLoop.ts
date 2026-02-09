@@ -239,7 +239,10 @@ export async function getOrCreateDailyRun(
   let contentArcs = [] as Awaited<ReturnType<typeof listActiveArcs>>;
   let contentInitiatives = [] as Awaited<ReturnType<typeof listActiveInitiativesCatalog>>;
   let recentEvents = [] as DailyRun["recentAlignmentEvents"];
-  let unlocks = { unlockedArcKeys: [], unlockedInitiativeKeys: [] };
+  let unlocks: ReturnType<typeof computeUnlockedContent> = {
+    unlockedArcKeys: [],
+    unlockedInitiativeKeys: [],
+  };
   let directive = null as DailyRun["directive"];
 
   await ensureUserAlignmentRows(userId).catch(() => {});
