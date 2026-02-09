@@ -478,11 +478,11 @@ export async function getOrCreateDailyRun(
     storyletRunsToday: runs,
     canBoost,
     tensions,
-    skillBank,
+    skillBank: featureFlags.skills ? skillBank : null,
     posture,
-    allocations,
-    skills,
-    nextSkillUnlockDay: 2,
+    allocations: featureFlags.skills ? allocations : [],
+    skills: featureFlags.skills ? skills ?? undefined : undefined,
+    nextSkillUnlockDay: featureFlags.skills ? 2 : undefined,
     cohortId,
     arc: featureFlags.arcs && arcDefinition
       ? {
