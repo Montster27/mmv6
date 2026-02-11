@@ -1,6 +1,9 @@
 import { supabase } from "@/lib/supabase/browser";
+import { trackEvent } from "@/lib/events";
+import { getFeatureFlags } from "@/lib/featureFlags";
 
-const COHORT_CAP = 30;
+const DEFAULT_COHORT_CAP = 30;
+const ROOKIE_COHORT_CAP = 5;
 
 export async function fetchUserCohort(
   userId: string
@@ -23,9 +26,14 @@ export async function fetchUserCohort(
 export async function ensureUserInCohort(
   userId: string
 ): Promise<{ cohortId: string }> {
+  const featureFlags = getFeatureFlags();
+  const useRookieCap =
+    featureFlags.rookieCircleEnabled || featureFlags.verticalSlice30Enabled;
+  const cohortCap = useRookieCap ? ROOKIE_COHORT_CAP : DEFAULT_COHORT_CAP;
   const existing = await fetchUserCohort(userId);
   if (existing) return existing;
 
+  let createdCohort = false;
   const { data: candidate, error: candidateError } = await supabase
     .from("cohorts")
     .select("id")
@@ -47,7 +55,7 @@ export async function ensureUserInCohort(
     if (countError) {
       console.error("Failed to count cohort members", countError);
     }
-    if (count !== null && count >= COHORT_CAP) {
+    if (count !== null && count >= cohortCap) {
       cohortId = null;
     }
   }
@@ -64,6 +72,7 @@ export async function ensureUserInCohort(
       throw createError;
     }
     cohortId = created?.id ?? null;
+    createdCohort = Boolean(cohortId);
   }
 
   if (!cohortId) {
@@ -80,5 +89,59 @@ export async function ensureUserInCohort(
     throw insertError;
   }
 
+  if (useRookieCap) {
+    if (createdCohort) {
+      trackEvent({
+        event_type: "rookie_circle_created",
+        payload: { cohort_id: cohortId },
+      });
+    }
+    trackEvent({
+      event_type: "rookie_circle_assigned",
+      payload: { cohort_id: cohortId },
+    });
+  }
+
   return { cohortId };
+}
+
+export async function fetchCohortRoster(cohortId: string): Promise<{
+  count: number;
+  handles: string[];
+}> {
+  const { data: members, error: memberError } = await supabase
+    .from("cohort_members")
+    .select("user_id")
+    .eq("cohort_id", cohortId);
+
+  if (memberError) {
+    console.error("Failed to fetch cohort roster", memberError);
+    return { count: 0, handles: [] };
+  }
+
+  const memberIds = (members ?? []).map((row) => row.user_id);
+  if (memberIds.length === 0) {
+    return { count: 0, handles: [] };
+  }
+
+  const { data: profiles, error: profileError } = await supabase
+    .from("public_profiles")
+    .select("user_id,display_name")
+    .in("user_id", memberIds);
+
+  if (profileError) {
+    console.error("Failed to fetch cohort handles", profileError);
+    return { count: memberIds.length, handles: [] };
+  }
+
+  const profileMap = new Map(
+    (profiles ?? []).map((row) => [row.user_id, row.display_name])
+  );
+
+  const handles = memberIds.map((userId, index) => {
+    const raw = profileMap.get(userId);
+    return raw && raw.trim().length > 0 ? raw : `Handle ${index + 1}`;
+  });
+
+  return { count: memberIds.length, handles };
 }

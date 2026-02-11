@@ -54,6 +54,7 @@ import {
   submitPosture,
 } from "@/lib/dailyInteractions";
 import { advanceArc, completeArc, progressArcWithChoice, startArc } from "@/lib/arcs";
+import { fetchCohortRoster } from "@/lib/cohorts";
 import { contributeToInitiative } from "@/lib/initiatives";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type {
@@ -231,6 +232,10 @@ export default function PlayPage() {
   const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+  const [cohortRoster, setCohortRoster] = useState<{
+    count: number;
+    handles: string[];
+  } | null>(null);
 
   const gameNote = useMemo(
     () =>
@@ -824,6 +829,24 @@ export default function PlayPage() {
     sessionStartAtRef.current = Date.now();
     trackWithSeason({ event_type: "session_start", day_index: dayIndex, stage });
   }, [userId, dayIndex, stage, loading, seasonContext]);
+
+  useEffect(() => {
+    if (!testerMode || !featureFlags.rookieCircleEnabled || !cohortId) {
+      setCohortRoster(null);
+      return;
+    }
+    let active = true;
+    fetchCohortRoster(cohortId)
+      .then((roster) => {
+        if (active) setCohortRoster(roster);
+      })
+      .catch(() => {
+        if (active) setCohortRoster(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [testerMode, featureFlags.rookieCircleEnabled, cohortId]);
 
   useEffect(() => {
     if (!featureFlags.verticalSlice30Enabled) return;
@@ -1727,6 +1750,25 @@ export default function PlayPage() {
                     <p className="text-xs text-slate-500">
                       Phase: {slicePhaseLabel}
                     </p>
+                  </TesterOnly>
+                ) : null}
+                {testerMode &&
+                featureFlags.rookieCircleEnabled &&
+                cohortId ? (
+                  <TesterOnly>
+                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      <p>
+                        Rookie Circle: {cohortId}
+                        {cohortRoster
+                          ? ` · ${cohortRoster.count} members`
+                          : ""}
+                      </p>
+                      {cohortRoster?.handles?.length ? (
+                        <p className="mt-1">
+                          Handles: {cohortRoster.handles.join(", ")}
+                        </p>
+                      ) : null}
+                    </div>
                   </TesterOnly>
                 ) : null}
                 {testerIntroMessage ? (

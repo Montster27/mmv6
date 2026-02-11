@@ -56,6 +56,7 @@ const mockState = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
+vi.mock("@/lib/events", () => ({ trackEvent: vi.fn() }));
 
 import { ensureUserInCohort, fetchUserCohort } from "@/lib/cohorts";
 
