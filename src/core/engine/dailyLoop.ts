@@ -66,6 +66,13 @@ import {
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import {
+  applyRemnantEffectForDay,
+  fetchActiveRemnant,
+  fetchUnlockedRemnants,
+  getRemnantDefinition,
+  listRemnantDefinitions,
+} from "@/lib/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
@@ -193,7 +200,7 @@ export async function getOrCreateDailyRun(
 
   const [
     daily,
-    dayState,
+    dayStateRaw,
     allocation,
     runs,
     storyletsRaw,
@@ -217,6 +224,7 @@ export async function getOrCreateDailyRun(
     featureFlags.skills ? fetchSkillLevels(userId) : Promise.resolve(null),
     // Note: we fetch recent history separately below.
   ]);
+  let dayState = dayStateRaw;
   const skillBank = featureFlags.skills ? skillBankRaw : null;
   const allocations = featureFlags.skills ? allocationsRaw : [];
   const skills = featureFlags.skills ? skillsRaw : null;
@@ -233,6 +241,35 @@ export async function getOrCreateDailyRun(
 
   const cohort = await ensureUserInCohort(userId).catch(() => null);
   const cohortId = cohort?.cohortId ?? null;
+
+  let remnantState: DailyRun["remnant"] = null;
+  if (featureFlags.remnantSystemEnabled) {
+    const unlockedKeys = await fetchUnlockedRemnants(userId).catch(() => []);
+    const activeSelection = await fetchActiveRemnant(userId).catch(() => null);
+    const unlockedDefs = listRemnantDefinitions().filter((remnant) =>
+      unlockedKeys.includes(remnant.key)
+    );
+    const activeDef = activeSelection?.remnant_key
+      ? getRemnantDefinition(activeSelection.remnant_key)
+      : null;
+    let applied = false;
+    if (dayState) {
+      const appliedResult = await applyRemnantEffectForDay({
+        userId,
+        dayIndex,
+        dayState,
+      });
+      applied = appliedResult.applied;
+      if (appliedResult.dayState) {
+        dayState = appliedResult.dayState;
+      }
+    }
+    remnantState = {
+      unlocked: unlockedDefs,
+      active: activeDef ?? null,
+      applied,
+    };
+  }
 
   let factions: DailyRun["factions"] = [];
   let alignment = {} as Record<string, number>;
@@ -558,6 +595,7 @@ export async function getOrCreateDailyRun(
           total_fun: dayState.total_fun,
         }
       : null,
+    remnant: featureFlags.remnantSystemEnabled ? remnantState : null,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
     seasonRecap: seasonResetNeeded ? seasonRecap : undefined,

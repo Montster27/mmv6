@@ -11,6 +11,7 @@ import type {
 import type { Initiative } from "./initiatives";
 import type { AlignmentEvent, Faction } from "./factions";
 import type { PlayerDayState } from "./dayState";
+import type { RemnantDefinition } from "./remnants";
 
 export type DailyRunStage =
   | "setup"
@@ -138,6 +139,11 @@ export type DailyRun = {
     | "total_health"
     | "total_fun"
   > | null;
+  remnant?: {
+    unlocked: RemnantDefinition[];
+    active: RemnantDefinition | null;
+    applied: boolean;
+  } | null;
   lastCheck?: import("./checks").CheckResult | null;
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;

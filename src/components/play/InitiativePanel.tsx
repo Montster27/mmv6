@@ -39,7 +39,7 @@ export function InitiativePanel({
     <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
       {directive ? (
         <div className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 space-y-1">
-          <p className="text-xs font-semibold text-slate-600">This week’s focus</p>
+          <p className="text-xs font-semibold text-slate-600">This week&apos;s focus</p>
           <p className="text-sm text-slate-700">
             {directiveFaction?.name ?? directive.faction_key}
           </p>
@@ -53,11 +53,11 @@ export function InitiativePanel({
         </div>
       ) : null}
       <div>
-        <h3 className="text-sm font-semibold text-slate-800">Initiative</h3>
-        <p className="text-sm text-slate-700">{initiative.title}</p>
+        <h3 className="text-sm font-semibold text-slate-800">Initiative to back</h3>
+        <p className="text-base text-slate-800">{initiative.title}</p>
       </div>
-      <p className="text-xs text-slate-600">{initiative.description}</p>
-      <p className="text-xs text-slate-600">
+      <p className="text-sm text-slate-700">{initiative.description}</p>
+      <p className="text-sm text-slate-600">
         Progress: {progress}/{initiative.goal} · {remaining} days left
       </p>
       <Button
@@ -67,7 +67,9 @@ export function InitiativePanel({
       >
         {initiative.contributedToday ? "Backing recorded" : "Back an Initiative"}
       </Button>
-      <p className="text-xs text-slate-600">Enough backing will change what becomes possible.</p>
+      <p className="text-sm text-slate-600">
+        Enough backing will change what becomes possible.
+      </p>
       <TesterOnly>
         <p className="text-xs text-slate-500">
           Tester note: Initiatives are how individual play aggregates into world-level change.

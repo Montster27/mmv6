@@ -69,7 +69,15 @@ import {
   submitRationale,
   type CompareSnapshot,
 } from "@/lib/afterActionCompare";
-import type { DailyRunStage } from "@/types/dailyRun";
+import {
+  listRemnantDefinitions,
+  pickRemnantKeyForUnlock,
+  selectRemnant,
+  unlockRemnant,
+} from "@/lib/remnants";
+import type { RemnantKey } from "@/types/remnants";
+import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
+import type { TelemetryEvent } from "@/types/telemetry";
 import type {
   DailyPosture,
 } from "@/types/dailyInteraction";
@@ -268,6 +276,19 @@ export default function PlayPage() {
   const [compareChoiceId, setCompareChoiceId] = useState<string | null>(null);
   const [compareNote, setCompareNote] = useState("");
   const [compareSending, setCompareSending] = useState(false);
+  const [remnantState, setRemnantState] = useState<DailyRun["remnant"] | null>(
+    null
+  );
+  const [testerEventLog, setTesterEventLog] = useState<TelemetryEvent[]>([]);
+  const [runResetting, setRunResetting] = useState(false);
+  const sessionIdRef = useRef(
+    `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  );
+  const remnantAppliedRef = useRef(false);
+  const nextRunTrackedRef = useRef(false);
+  const remnantUnlockAttemptedRef = useRef(false);
+  const firstChoiceTrackedRef = useRef(false);
+  const cliffhangerShownRef = useRef(false);
   const [cohortRoster, setCohortRoster] = useState<{
     count: number;
     handles: string[];
@@ -282,12 +303,29 @@ export default function PlayPage() {
   );
   const testerMode = useMemo(() => getAppMode().testerMode, []);
   const featureFlags = useMemo(() => getFeatureFlags(), []);
+  const slicePhaseId = useMemo(() => {
+    if (!featureFlags.verticalSlice30Enabled) return null;
+    return phaseRef.current;
+  }, [
+    featureFlags.verticalSlice30Enabled,
+    stage,
+    allocationSaved,
+    runs.length,
+    hasSentBoost,
+  ]);
   const slicePhaseLabel = useMemo(() => {
     if (!featureFlags.verticalSlice30Enabled) return null;
     const phaseId = phaseRef.current;
     if (!phaseId) return null;
     return SLICE_PHASES.find((phase) => phase.id === phaseId)?.label ?? phaseId;
-  }, [featureFlags.verticalSlice30Enabled, stage, allocationSaved, runs.length]);
+  }, [
+    featureFlags.verticalSlice30Enabled,
+    stage,
+    allocationSaved,
+    runs.length,
+    hasSentBoost,
+  ]);
+  const remnantDefinitions = useMemo(() => listRemnantDefinitions(), []);
   const testerNote = useMemo(
     () =>
       testerMessage("Tester: Set posture, allocate time, then pick a storylet.", {
@@ -625,6 +663,7 @@ export default function PlayPage() {
             availableArcs: run.availableArcs ?? [],
             cohortId: run.cohortId ?? null,
           });
+          setRemnantState(run.remnant ?? null);
           setUserSocial({ hasSentBoost: !run.canBoost });
           const ds =
             run.dailyState ?? (await fetchDailyState(bootstrapUserId));
@@ -683,6 +722,7 @@ export default function PlayPage() {
             alreadyCompletedToday: cadence.alreadyCompletedToday,
             seasonContext: null,
           });
+          setRemnantState(null);
 
           const day = cadence.dayIndex;
           const [ds, existingAllocation, existingRuns, candidates] = await Promise.all([
@@ -827,12 +867,26 @@ export default function PlayPage() {
     payload?: Record<string, unknown>;
   }) => {
     const seasonIndexValue = seasonContext?.currentSeason.season_index;
+    const payload = {
+      ...(params.payload ?? {}),
+      ...(seasonIndexValue ? { season_index: seasonIndexValue } : {}),
+      session_id: sessionIdRef.current,
+      phase: slicePhaseId ?? null,
+      ...(cohortId ? { cohort_id: cohortId } : {}),
+    };
+    if (testerMode) {
+      const eventRecord: TelemetryEvent = {
+        event_type: params.event_type,
+        day_index: params.day_index,
+        stage: params.stage ?? null,
+        payload,
+        ts: new Date().toISOString(),
+      };
+      setTesterEventLog((prev) => [eventRecord, ...prev].slice(0, 25));
+    }
     trackEvent({
       ...params,
-      payload: {
-        ...(params.payload ?? {}),
-        ...(seasonIndexValue ? { season_index: seasonIndexValue } : {}),
-      },
+      payload,
     });
   };
 
@@ -980,6 +1034,75 @@ export default function PlayPage() {
   }, [featureFlags.buddySystemEnabled, cohortId, userId]);
 
   useEffect(() => {
+    if (!featureFlags.remnantSystemEnabled) return;
+    if (dayIndex === 1 && !nextRunTrackedRef.current) {
+      trackWithSeason({ event_type: "next_run_started", day_index: dayIndex });
+      nextRunTrackedRef.current = true;
+    }
+  }, [featureFlags.remnantSystemEnabled, dayIndex]);
+
+  useEffect(() => {
+    if (!featureFlags.remnantSystemEnabled) return;
+    if (remnantState?.applied && !remnantAppliedRef.current) {
+      remnantAppliedRef.current = true;
+      trackWithSeason({
+        event_type: "remnant_applied",
+        day_index: dayIndex,
+        payload: { remnant_key: remnantState.active?.key ?? null },
+      });
+    }
+  }, [featureFlags.remnantSystemEnabled, remnantState, dayIndex]);
+
+  useEffect(() => {
+    if (!featureFlags.verticalSlice30Enabled) return;
+    if (slicePhaseId !== "cliffhanger") return;
+    if (cliffhangerShownRef.current) return;
+    cliffhangerShownRef.current = true;
+    trackWithSeason({ event_type: "cliffhanger_shown", day_index: dayIndex });
+  }, [featureFlags.verticalSlice30Enabled, slicePhaseId, dayIndex]);
+
+  useEffect(() => {
+    if (!featureFlags.remnantSystemEnabled || !userId) return;
+    if (slicePhaseId !== "remnant_reveal") return;
+    if (remnantState?.unlocked?.length) return;
+    if (remnantUnlockAttemptedRef.current) return;
+    remnantUnlockAttemptedRef.current = true;
+    const key = pickRemnantKeyForUnlock({
+      dailyState,
+      dayState: null,
+    });
+    unlockRemnant(userId, key).then((created) => {
+      if (!created) return;
+      const def = listRemnantDefinitions().find((rem) => rem.key === key) ?? null;
+      if (def) {
+        setRemnantState({
+          unlocked: [def],
+          active: remnantState?.active ?? null,
+          applied: false,
+        });
+        trackWithSeason({
+          event_type: "remnant_discovered",
+          day_index: dayIndex,
+          payload: { remnant_key: key },
+        });
+        trackWithSeason({
+          event_type: "remnant_earned",
+          day_index: dayIndex,
+          payload: { remnant_key: key },
+        });
+      }
+    });
+  }, [
+    featureFlags.remnantSystemEnabled,
+    slicePhaseId,
+    userId,
+    dailyState,
+    dayState,
+    remnantState,
+    dayIndex,
+  ]);
+
+  useEffect(() => {
     if (!featureFlags.verticalSlice30Enabled) return;
     if (!sessionStartAtRef.current) return;
     if (!userId || loading) return;
@@ -1081,6 +1204,24 @@ export default function PlayPage() {
       trackWithSeason({ event_type: "session_end", day_index: dayIndex, stage });
     }
   }, [stage, userId, dayIndex, loading]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (sessionEndTracked.current) return;
+      trackWithSeason({
+        event_type: "dropoff_point",
+        day_index: dayIndex,
+        stage,
+        payload: { reason: "visibility_hidden" },
+      });
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [userId, dayIndex, stage]);
 
   useEffect(() => {
     if (!userId || loading) return;
@@ -1310,6 +1451,17 @@ export default function PlayPage() {
   const handleChoice = async (choiceId: string) => {
     if (!userId || !currentStorylet) return;
     recordInteraction();
+    if (!firstChoiceTrackedRef.current && sessionStartAtRef.current) {
+      firstChoiceTrackedRef.current = true;
+      trackWithSeason({
+        event_type: "first_choice_time",
+        day_index: dayIndex,
+        stage,
+        payload: {
+          ms_since_session_start: Date.now() - sessionStartAtRef.current,
+        },
+      });
+    }
     setSavingChoice(true);
     setError(null);
     setOutcomeMessage(null);
@@ -1440,6 +1592,15 @@ export default function PlayPage() {
             },
           });
         }
+        trackWithSeason({
+          event_type: "storylet_complete",
+          day_index: dayIndex,
+          stage,
+          payload: {
+            storylet_id: currentStorylet.id,
+            choice_id: choiceId,
+          },
+        });
 
         if (
           featureFlags.afterActionCompareEnabled &&
@@ -1570,6 +1731,55 @@ export default function PlayPage() {
     });
     setCompareSnapshot(snapshot);
     setCompareSending(false);
+  };
+
+  const handleSelectRemnant = async (key: RemnantKey) => {
+    if (!userId) return;
+    const ok = await selectRemnant(userId, key);
+    if (!ok) return;
+    const def = remnantDefinitions.find((rem) => rem.key === key) ?? null;
+    setRemnantState((prev) => ({
+      unlocked: prev?.unlocked ?? [],
+      active: def,
+      applied: prev?.applied ?? false,
+    }));
+    trackWithSeason({
+      event_type: "remnant_selected",
+      day_index: dayIndex,
+      payload: { remnant_key: key },
+    });
+  };
+
+  const handleRunReset = async () => {
+    setRunResetting(true);
+    setError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setError("No session found.");
+        return;
+      }
+      trackWithSeason({ event_type: "next_run_cta_clicked", day_index: dayIndex });
+      const res = await fetch("/api/run/reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to reset run.");
+      }
+      trackWithSeason({ event_type: "run_reset_completed", day_index: dayIndex });
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to reset run.");
+    } finally {
+      setRunResetting(false);
+    }
   };
 
   const loadSocialData = async (uid: string, day: number) => {
@@ -1987,6 +2197,22 @@ export default function PlayPage() {
                     <MessageCard message={testerDeltaMessage} variant="inline" />
                   </TesterOnly>
                 ) : null}
+                {testerMode && testerEventLog.length > 0 ? (
+                  <TesterOnly>
+                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      <p className="font-semibold text-slate-700">
+                        Recent events
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {testerEventLog.slice(0, 8).map((event, idx) => (
+                          <li key={`${event.event_type}-${event.ts}-${idx}`}>
+                            {event.event_type}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </TesterOnly>
+                ) : null}
               </div>
               {dayRolloverNotice ? (
                 <p className="mt-2 text-xs text-slate-500">{dayRolloverNotice}</p>
@@ -2238,16 +2464,19 @@ export default function PlayPage() {
                     (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
                     <section className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">Step 1: Time Allocation</h2>
+                        <h2 className="text-xl font-semibold">Time Allocation</h2>
                         <span className="text-sm text-slate-600">
-                          Total must equal 100 (current: {totalAllocation})
+                          Total: {totalAllocation}/100
                         </span>
                       </div>
+                      <p className="text-base text-slate-700">
+                        Set your day in percentages. Total must be 100.
+                      </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {Object.keys(allocation).map((key) => (
                           <label
                             key={key}
-                            className="flex flex-col gap-1 text-sm text-slate-700"
+                            className="flex flex-col gap-1 text-base text-slate-700"
                           >
                             <span className="capitalize">{key}</span>
                             <input
@@ -2270,8 +2499,11 @@ export default function PlayPage() {
                         onClick={handleSaveAllocation}
                         disabled={!allocationValid || savingAllocation}
                       >
-                        {savingAllocation ? "Saving..." : "Save allocation"}
+                        {savingAllocation ? "Saving..." : "Save time plan"}
                       </Button>
+                      <p className="text-sm text-slate-600">
+                        Next: choose a storylet.
+                      </p>
                     </section>
                     )}
 
@@ -2280,11 +2512,14 @@ export default function PlayPage() {
                     (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
                     <section className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">Step 2: Storylets</h2>
+                        <h2 className="text-xl font-semibold">Storylets</h2>
                         <span className="text-sm text-slate-600">
                           Progress: {Math.min(runs.length, 2)}/2
                         </span>
                       </div>
+                      <p className="text-base text-slate-700">
+                        Pick one choice. You can do two today.
+                      </p>
 
                       {!currentStorylet ? (
                         <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
@@ -2760,6 +2995,74 @@ export default function PlayPage() {
                             </ul>
                           )}
                         </div>
+                    </section>
+                  )}
+
+                  {featureFlags.remnantSystemEnabled &&
+                    slicePhaseId === "remnant_reveal" && (
+                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                      <div>
+                        <h2 className="text-xl font-semibold">Remnant reveal</h2>
+                        <p className="text-sm text-slate-600">
+                          One fragment carries into the next run.
+                        </p>
+                      </div>
+                      {remnantState?.unlocked?.length ? (
+                        <div className="space-y-3">
+                          {remnantState.unlocked.map((remnant) => {
+                            const selected = remnantState.active?.key === remnant.key;
+                            return (
+                              <div
+                                key={remnant.key}
+                                className="rounded-md border border-slate-200 px-3 py-3"
+                              >
+                                <p className="font-semibold text-slate-900">
+                                  {remnant.name}
+                                </p>
+                                <p className="text-sm text-slate-600">
+                                  {remnant.description}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {remnant.effect}
+                                </p>
+                                <Button
+                                  variant={selected ? "secondary" : "outline"}
+                                  onClick={() =>
+                                    handleSelectRemnant(remnant.key as RemnantKey)
+                                  }
+                                  className="mt-2"
+                                >
+                                  {selected ? "Selected" : "Select remnant"}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-600">
+                          No remnant yet. Stay with the thread a little longer.
+                        </p>
+                      )}
+                    </section>
+                  )}
+
+                  {featureFlags.verticalSlice30Enabled &&
+                    slicePhaseId === "cliffhanger" && (
+                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                      <div>
+                        <h2 className="text-xl font-semibold">Cliffhanger</h2>
+                        <p className="text-sm text-slate-700">
+                          Something follows you out of today. The next run starts
+                          with what you chose to keep.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleRunReset}
+                        disabled={runResetting}
+                        className="w-full"
+                      >
+                        {runResetting ? "Starting next run..." : "Start Next Run"}
+                      </Button>
                     </section>
                   )}
 

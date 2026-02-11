@@ -68,14 +68,14 @@ export function DailySetupPanel({
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold">Before you plan your day</h2>
-        <p className="text-sm text-slate-600">
-          A few loose threads still need attention.
+        <h2 className="text-xl font-semibold">Start your day</h2>
+        <p className="text-base text-slate-700">
+          Set your posture, then plan your time.
         </p>
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800">Setup checklist</h3>
+        <h3 className="text-sm font-semibold text-slate-800">Quick check</h3>
         <ul className="text-sm text-slate-700 space-y-1">
           <li>Posture set: {posture ? "yes" : "no"}</li>
           {skillsEnabled ? <li>Skill points remaining: {points}</li> : null}
@@ -88,9 +88,11 @@ export function DailySetupPanel({
 
       {skillsEnabled ? (
         <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-          <h3 className="text-sm font-semibold text-slate-800">Skill points</h3>
+          <h3 className="text-sm font-semibold text-slate-800">
+            Skill points (optional)
+          </h3>
           <p className="text-sm text-slate-700">
-            {points} available · cap {cap}
+            {points} available · cap {cap}. Spend points to grow skills.
           </p>
           {allocations.length > 0 ? (
             <ul className="text-xs text-slate-600">
@@ -119,7 +121,7 @@ export function DailySetupPanel({
                     onClick={() => onAllocateSkillPoint(skill)}
                     className="capitalize"
                   >
-                    Allocate {cost} · {skill}
+                    Spend {cost} · {skill}
                   </Button>
                 );
               })()
@@ -129,12 +131,17 @@ export function DailySetupPanel({
       ) : null}
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800">Choose today's posture</h3>
+        <h3 className="text-sm font-semibold text-slate-800">
+          Choose a posture for today
+        </h3>
         {posture ? (
           <p className="text-sm text-slate-700 capitalize">{posture.posture}</p>
         ) : (
           <p className="text-sm text-slate-600">Not set yet.</p>
         )}
+        <p className="text-xs text-slate-500">
+          Next step: set your time allocation.
+        </p>
         <div className="flex flex-wrap gap-2">
           {POSTURES.map((option) => (
             <Button
@@ -151,9 +158,9 @@ export function DailySetupPanel({
       </div>
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800">Tensions</h3>
+        <h3 className="text-sm font-semibold text-slate-800">Open pressures</h3>
         <p className="text-xs text-slate-500">
-          Unresolved pressures will affect tomorrow.
+          Leaving these open will affect tomorrow.
         </p>
         {activeTensions.length === 0 ? (
           <p className="text-sm text-slate-600">No active tensions.</p>
