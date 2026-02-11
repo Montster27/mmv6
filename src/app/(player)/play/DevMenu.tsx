@@ -55,6 +55,12 @@ const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
   ["skills", "Skills"],
   ["alignment", "Alignment/Directives"],
   ["funPulse", "Fun pulse"],
+  ["verticalSlice30Enabled", "Vertical Slice 30"],
+  ["rookieCircleEnabled", "Rookie Circle"],
+  ["askOfferBoardEnabled", "Ask/Offer Board"],
+  ["buddySystemEnabled", "Buddy System"],
+  ["afterActionCompareEnabled", "After-Action Compare"],
+  ["remnantSystemEnabled", "Remnant System"],
 ];
 
 export default function DevMenu({

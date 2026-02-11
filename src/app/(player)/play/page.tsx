@@ -72,6 +72,7 @@ import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
 import { getAppMode } from "@/lib/mode";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { getSlicePhase, SLICE_PHASES } from "@/core/verticalSlice/phases";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -240,6 +241,12 @@ export default function PlayPage() {
   );
   const testerMode = useMemo(() => getAppMode().testerMode, []);
   const featureFlags = useMemo(() => getFeatureFlags(), []);
+  const slicePhaseLabel = useMemo(() => {
+    if (!featureFlags.verticalSlice30Enabled) return null;
+    const phaseId = phaseRef.current;
+    if (!phaseId) return null;
+    return SLICE_PHASES.find((phase) => phase.id === phaseId)?.label ?? phaseId;
+  }, [featureFlags.verticalSlice30Enabled, stage, allocationSaved, runs.length]);
   const testerNote = useMemo(
     () =>
       testerMessage("Tester: Set posture, allocate time, then pick a storylet.", {
@@ -268,6 +275,8 @@ export default function PlayPage() {
   const hoverStartRef = useRef<Record<string, number | null>>({});
   const stagePauseTimerRef = useRef<number | null>(null);
   const stageInteractionRef = useRef(false);
+  const sessionStartAtRef = useRef<number | null>(null);
+  const phaseRef = useRef<string | null>(null);
   const [lastCompletedStage, setLastCompletedStage] =
     useState<DailyRunStage | null>(null);
   const [testerStageResponses, setTesterStageResponses] = useState<
@@ -812,8 +821,47 @@ export default function PlayPage() {
   useEffect(() => {
     if (!userId || loading || sessionStartTracked.current) return;
     sessionStartTracked.current = true;
+    sessionStartAtRef.current = Date.now();
     trackWithSeason({ event_type: "session_start", day_index: dayIndex, stage });
   }, [userId, dayIndex, stage, loading, seasonContext]);
+
+  useEffect(() => {
+    if (!featureFlags.verticalSlice30Enabled) return;
+    if (!sessionStartAtRef.current) return;
+    if (!userId || loading) return;
+    const elapsedMinutes = (Date.now() - sessionStartAtRef.current) / 60000;
+    const phase = getSlicePhase({
+      elapsedMinutes,
+      allocationSaved,
+      storyletRuns: runs.length,
+      socialComplete: Boolean(hasSentBoost),
+      reflectionDone: stage === "complete" || stage === "reflection",
+    });
+    if (phaseRef.current !== phase) {
+      if (phaseRef.current) {
+        trackWithSeason({
+          event_type: "phase_completed",
+          day_index: dayIndex,
+          stage: phaseRef.current,
+        });
+      }
+      phaseRef.current = phase;
+      trackWithSeason({
+        event_type: "phase_entered",
+        day_index: dayIndex,
+        stage: phase,
+      });
+    }
+  }, [
+    featureFlags.verticalSlice30Enabled,
+    userId,
+    loading,
+    dayIndex,
+    allocationSaved,
+    runs.length,
+    hasSentBoost,
+    stage,
+  ]);
 
   useEffect(() => {
     if (!userId || loading) return;
@@ -1674,6 +1722,13 @@ export default function PlayPage() {
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
                 </TesterOnly>
+                {testerMode && slicePhaseLabel ? (
+                  <TesterOnly>
+                    <p className="text-xs text-slate-500">
+                      Phase: {slicePhaseLabel}
+                    </p>
+                  </TesterOnly>
+                ) : null}
                 {testerIntroMessage ? (
                   <TesterOnly>
                     <MessageCard message={testerIntroMessage} variant="inline" />

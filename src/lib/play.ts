@@ -10,6 +10,7 @@ import {
 import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
+import { getFeatureFlags } from "@/lib/featureFlags";
 import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
 import { allocationToVectorDeltas } from "@/core/vectors/allocationToVectorDeltas";
 import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
@@ -252,6 +253,7 @@ export async function saveTimeAllocation(
 export async function fetchTodayStoryletCandidates(
   seasonIndex?: number
 ): Promise<Storylet[]> {
+  const featureFlags = getFeatureFlags();
   const fetcher = async () => {
     const { data, error } = await supabase
       .from("storylets")
@@ -278,7 +280,36 @@ export async function fetchTodayStoryletCandidates(
     );
   };
 
-  return fetchStoryletCatalog(seasonIndex, fetcher);
+  const storylets = await fetchStoryletCatalog(seasonIndex, fetcher);
+  if (!featureFlags.verticalSlice30Enabled) {
+    return storylets;
+  }
+  const filtered = storylets.filter((storylet) =>
+    (storylet.tags ?? []).includes("slice30_pack_v1")
+  );
+  validateSlicePack(filtered);
+  return filtered;
+}
+
+function validateSlicePack(storylets: Storylet[]) {
+  const ids = new Set<string>();
+  const slugs = new Set<string>();
+  const duplicateIds: string[] = [];
+  const duplicateSlugs: string[] = [];
+
+  storylets.forEach((storylet) => {
+    if (ids.has(storylet.id)) duplicateIds.push(storylet.id);
+    else ids.add(storylet.id);
+    if (slugs.has(storylet.slug)) duplicateSlugs.push(storylet.slug);
+    else slugs.add(storylet.slug);
+  });
+
+  if (duplicateIds.length || duplicateSlugs.length) {
+    console.warn("Slice30 storylet pack has duplicates", {
+      duplicateIds,
+      duplicateSlugs,
+    });
+  }
 }
 
 export async function fetchTodayRuns(
