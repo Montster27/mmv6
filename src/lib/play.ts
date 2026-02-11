@@ -10,7 +10,6 @@ import {
 import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
 import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
-import { getFeatureFlags } from "@/lib/featureFlags";
 import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
 import { allocationToVectorDeltas } from "@/core/vectors/allocationToVectorDeltas";
 import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
