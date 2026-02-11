@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
@@ -56,6 +56,19 @@ import {
 import { advanceArc, completeArc, progressArcWithChoice, startArc } from "@/lib/arcs";
 import { fetchCohortRoster } from "@/lib/cohorts";
 import { contributeToInitiative } from "@/lib/initiatives";
+import {
+  createCohortPost,
+  fetchCohortBoard,
+  markPostHelpful,
+  sendCohortReply,
+} from "@/lib/askOfferBoard";
+import type { AskOfferPostView } from "@/types/askOffer";
+import { getBuddyNudges, getOrAssignBuddy, trackBuddyNudge } from "@/lib/buddy";
+import {
+  fetchCompareSnapshot,
+  submitRationale,
+  type CompareSnapshot,
+} from "@/lib/afterActionCompare";
 import type { DailyRunStage } from "@/types/dailyRun";
 import type {
   DailyPosture,
@@ -232,6 +245,29 @@ export default function PlayPage() {
   const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+  const [askOfferPosts, setAskOfferPosts] = useState<AskOfferPostView[]>([]);
+  const [askOfferLoading, setAskOfferLoading] = useState(false);
+  const [askOfferError, setAskOfferError] = useState<string | null>(null);
+  const [askOfferType, setAskOfferType] = useState<"ask" | "offer">("ask");
+  const [askOfferBody, setAskOfferBody] = useState("");
+  const [askOfferPosting, setAskOfferPosting] = useState(false);
+  const [replyNotes, setReplyNotes] = useState<Record<string, string>>({});
+  const [replySending, setReplySending] = useState<Record<string, boolean>>({});
+  const [helpfulSending, setHelpfulSending] = useState<Record<string, boolean>>({});
+  const [buddyAssignment, setBuddyAssignment] = useState<{
+    buddy_type: "human" | "ai";
+    buddy_user_id: string | null;
+  } | null>(null);
+  const [buddyNudge, setBuddyNudge] = useState<string | null>(null);
+  const [compareSnapshot, setCompareSnapshot] = useState<CompareSnapshot | null>(
+    null
+  );
+  const [compareVisible, setCompareVisible] = useState(false);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
+  const [compareChoiceId, setCompareChoiceId] = useState<string | null>(null);
+  const [compareNote, setCompareNote] = useState("");
+  const [compareSending, setCompareSending] = useState(false);
   const [cohortRoster, setCohortRoster] = useState<{
     count: number;
     handles: string[];
@@ -830,6 +866,78 @@ export default function PlayPage() {
     trackWithSeason({ event_type: "session_start", day_index: dayIndex, stage });
   }, [userId, dayIndex, stage, loading, seasonContext]);
 
+  const refreshAskOfferBoard = useCallback(async () => {
+    if (!userId || !cohortId || !featureFlags.askOfferBoardEnabled) return;
+    setAskOfferLoading(true);
+    setAskOfferError(null);
+    try {
+      const res = await fetchCohortBoard(cohortId, userId);
+      setAskOfferPosts(res.posts);
+    } catch (err) {
+      console.error(err);
+      setAskOfferError("Unable to load the board right now.");
+    } finally {
+      setAskOfferLoading(false);
+    }
+  }, [userId, cohortId, featureFlags.askOfferBoardEnabled]);
+
+  useEffect(() => {
+    if (!featureFlags.askOfferBoardEnabled || !cohortId || !userId) return;
+    refreshAskOfferBoard();
+  }, [featureFlags.askOfferBoardEnabled, cohortId, userId, refreshAskOfferBoard]);
+
+  const handleCreateAskOffer = async () => {
+    if (!userId || !cohortId) return;
+    setAskOfferPosting(true);
+    setAskOfferError(null);
+    const res = await createCohortPost({
+      cohortId,
+      userId,
+      postType: askOfferType,
+      body: askOfferBody,
+    });
+    if (!res.ok) {
+      setAskOfferError(res.error ?? "Unable to post right now.");
+      setAskOfferPosting(false);
+      return;
+    }
+    setAskOfferBody("");
+    await refreshAskOfferBoard();
+    setAskOfferPosting(false);
+  };
+
+  const handleSendReply = async (postId: string, templateKey: string) => {
+    if (!userId) return;
+    setReplySending((prev) => ({ ...prev, [postId]: true }));
+    const res = await sendCohortReply({
+      postId,
+      userId,
+      templateKey,
+      body: replyNotes[postId],
+    });
+    if (!res.ok) {
+      setAskOfferError(res.error ?? "Unable to send reply.");
+      setReplySending((prev) => ({ ...prev, [postId]: false }));
+      return;
+    }
+    setReplyNotes((prev) => ({ ...prev, [postId]: "" }));
+    await refreshAskOfferBoard();
+    setReplySending((prev) => ({ ...prev, [postId]: false }));
+  };
+
+  const handleHelpful = async (postId: string) => {
+    if (!userId) return;
+    setHelpfulSending((prev) => ({ ...prev, [postId]: true }));
+    const res = await markPostHelpful({ postId, userId });
+    if (!res.ok) {
+      setAskOfferError(res.error ?? "Unable to save reaction.");
+      setHelpfulSending((prev) => ({ ...prev, [postId]: false }));
+      return;
+    }
+    await refreshAskOfferBoard();
+    setHelpfulSending((prev) => ({ ...prev, [postId]: false }));
+  };
+
   useEffect(() => {
     if (!testerMode || !featureFlags.rookieCircleEnabled || !cohortId) {
       setCohortRoster(null);
@@ -847,6 +955,29 @@ export default function PlayPage() {
       active = false;
     };
   }, [testerMode, featureFlags.rookieCircleEnabled, cohortId]);
+
+  useEffect(() => {
+    if (!featureFlags.buddySystemEnabled || !cohortId || !userId) {
+      setBuddyAssignment(null);
+      return;
+    }
+    let active = true;
+    getOrAssignBuddy(userId, cohortId)
+      .then((assignment) => {
+        if (!active) return;
+        setBuddyAssignment({
+          buddy_type: assignment.buddy_type,
+          buddy_user_id: assignment.buddy_user_id,
+        });
+      })
+      .catch((err) => {
+        console.error(err);
+        if (active) setBuddyAssignment(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [featureFlags.buddySystemEnabled, cohortId, userId]);
 
   useEffect(() => {
     if (!featureFlags.verticalSlice30Enabled) return;
@@ -1171,6 +1302,10 @@ export default function PlayPage() {
       : stage === "storylet_2"
       ? storylets[1]
       : storylets[currentIndex];
+  const choiceLabelMap = useMemo(() => {
+    if (!currentStorylet) return new Map<string, string>();
+    return new Map(toChoices(currentStorylet).map((choice) => [choice.id, choice.label]));
+  }, [currentStorylet]);
 
   const handleChoice = async (choiceId: string) => {
     if (!userId || !currentStorylet) return;
@@ -1180,6 +1315,11 @@ export default function PlayPage() {
     setOutcomeMessage(null);
     setOutcomeDeltas(null);
     setLastCheck(null);
+    setCompareVisible(false);
+    setCompareSnapshot(null);
+    setCompareError(null);
+    setCompareChoiceId(null);
+    setCompareNote("");
     try {
       const runId = await createStoryletRun(
         userId,
@@ -1300,6 +1440,36 @@ export default function PlayPage() {
             },
           });
         }
+
+        if (
+          featureFlags.afterActionCompareEnabled &&
+          cohortId &&
+          (currentStorylet.tags ?? []).includes("compare")
+        ) {
+          setCompareLoading(true);
+          try {
+            const snapshot = await fetchCompareSnapshot({
+              cohortId,
+              storyletId: currentStorylet.id,
+              choiceIds: toChoices(currentStorylet).map((c) => c.id),
+            });
+            setCompareSnapshot(snapshot);
+            setCompareVisible(true);
+            setCompareChoiceId(choiceId);
+            trackWithSeason({
+              event_type: "compare_view_opened",
+              day_index: dayIndex,
+              stage,
+              payload: { storylet_id: currentStorylet.id },
+            });
+          } catch (compareErr) {
+            console.error(compareErr);
+            setCompareError("Not enough data yet.");
+            setCompareVisible(true);
+          } finally {
+            setCompareLoading(false);
+          }
+        }
         if (process.env.NODE_ENV !== "production") {
           console.debug("[choice-outcome]", {
             storyletId: currentStorylet.id,
@@ -1364,6 +1534,42 @@ export default function PlayPage() {
     } finally {
       setSavingChoice(false);
     }
+  };
+
+  const handleCompareDismiss = () => {
+    setCompareVisible(false);
+    if (!currentStorylet) return;
+    trackWithSeason({
+      event_type: "compare_view_dismissed",
+      day_index: dayIndex,
+      stage,
+      payload: { storylet_id: currentStorylet.id },
+    });
+  };
+
+  const handleCompareSubmit = async () => {
+    if (!compareChoiceId || !currentStorylet || !cohortId || !userId) return;
+    setCompareSending(true);
+    const res = await submitRationale({
+      cohortId,
+      userId,
+      storyletId: currentStorylet.id,
+      choiceId: compareChoiceId,
+      body: compareNote,
+    });
+    if (!res.ok) {
+      setCompareError(res.error ?? "Unable to save note.");
+      setCompareSending(false);
+      return;
+    }
+    setCompareNote("");
+    const snapshot = await fetchCompareSnapshot({
+      cohortId,
+      storyletId: currentStorylet.id,
+      choiceIds: toChoices(currentStorylet).map((c) => c.id),
+    });
+    setCompareSnapshot(snapshot);
+    setCompareSending(false);
   };
 
   const loadSocialData = async (uid: string, day: number) => {
@@ -2158,6 +2364,72 @@ export default function PlayPage() {
                                     <OutcomeExplain check={lastCheck} />
                                   </TesterOnly>
                                 ) : null}
+                                {featureFlags.afterActionCompareEnabled &&
+                                compareVisible ? (
+                                  <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+                                    <div className="flex items-center justify-between">
+                                      <p className="font-semibold">
+                                        Cohort comparison
+                                      </p>
+                                      <Button
+                                        variant="ghost"
+                                        onClick={handleCompareDismiss}
+                                      >
+                                        Dismiss
+                                      </Button>
+                                    </div>
+                                    {compareLoading ? (
+                                      <p className="text-sm text-slate-600">
+                                        Loading…
+                                      </p>
+                                    ) : compareSnapshot ? (
+                                      <div className="space-y-2">
+                                        <ul className="space-y-1">
+                                          {compareSnapshot.options.map((opt) => (
+                                            <li key={opt.choice_id}>
+                                              {choiceLabelMap.get(opt.choice_id) ??
+                                                opt.choice_id}
+                                              : {opt.percent}%
+                                            </li>
+                                          ))}
+                                        </ul>
+                                        {compareSnapshot.rationale ? (
+                                          <p className="text-xs text-slate-600">
+                                            {compareSnapshot.rationale.handle}:{" "}
+                                            {compareSnapshot.rationale.text}
+                                          </p>
+                                        ) : (
+                                          <p className="text-xs text-slate-500">
+                                            Not enough data yet.
+                                          </p>
+                                        )}
+                                      </div>
+                                    ) : compareError ? (
+                                      <p className="text-xs text-slate-500">
+                                        {compareError}
+                                      </p>
+                                    ) : null}
+                                    <div className="mt-3 space-y-2">
+                                      <label className="block text-xs text-slate-500">
+                                        Share a short note (optional)
+                                      </label>
+                                      <input
+                                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                        value={compareNote}
+                                        onChange={(e) =>
+                                          setCompareNote(e.target.value)
+                                        }
+                                      />
+                                      <Button
+                                        variant="outline"
+                                        onClick={handleCompareSubmit}
+                                        disabled={compareSending}
+                                      >
+                                        {compareSending ? "Saving..." : "Share note"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : null}
                               </div>
                             )}
                             {consequenceActive && (
@@ -2241,6 +2513,191 @@ export default function PlayPage() {
                   {(stage === "social" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved && !currentStorylet)) && (
                     <section className="space-y-3">
+                      {featureFlags.askOfferBoardEnabled && cohortId ? (
+                        <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                          <div>
+                            <h2 className="text-xl font-semibold">Ask / Offer Board</h2>
+                            <p className="text-sm text-slate-600">
+                              Share a short ask or offer with your circle.
+                            </p>
+                            {featureFlags.buddySystemEnabled && buddyAssignment ? (
+                              <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                                <p>
+                                  Buddy:{" "}
+                                  {buddyAssignment.buddy_type === "human"
+                                    ? "Human (same circle)"
+                                    : "AI fallback"}
+                                </p>
+                                {buddyAssignment.buddy_type === "human" ? (
+                                  <p>
+                                    Handle: {`Handle ${buddyAssignment.buddy_user_id?.slice(0, 4)}`}
+                                  </p>
+                                ) : null}
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {getBuddyNudges().map((nudge) => (
+                                    <Button
+                                      key={nudge.id}
+                                      variant="outline"
+                                      onClick={() => {
+                                        setBuddyNudge(nudge.message);
+                                        trackBuddyNudge(nudge.id);
+                                      }}
+                                    >
+                                      {nudge.label}
+                                    </Button>
+                                  ))}
+                                </div>
+                                {buddyNudge ? (
+                                  <p className="mt-2 text-sm text-slate-700">
+                                    {buddyNudge}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                          {askOfferError ? (
+                            <p className="text-sm text-red-600">{askOfferError}</p>
+                          ) : null}
+                          <div className="space-y-2">
+                            <label className="block text-sm text-slate-700">
+                              Post type
+                            </label>
+                            <select
+                              className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                              value={askOfferType}
+                              onChange={(e) =>
+                                setAskOfferType(
+                                  e.target.value === "offer" ? "offer" : "ask"
+                                )
+                              }
+                            >
+                              <option value="ask">ASK — I need advice on…</option>
+                              <option value="offer">OFFER — I chose X because…</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-sm text-slate-700">
+                              Your message (max 160)
+                            </label>
+                            <textarea
+                              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                              rows={3}
+                              value={askOfferBody}
+                              onChange={(e) => setAskOfferBody(e.target.value)}
+                            />
+                            <Button
+                              variant="secondary"
+                              onClick={handleCreateAskOffer}
+                              disabled={askOfferPosting}
+                            >
+                              {askOfferPosting ? "Posting..." : "Post to circle"}
+                            </Button>
+                          </div>
+                          <div className="space-y-3">
+                            <h3 className="text-lg font-semibold">Recent posts</h3>
+                            {askOfferLoading ? (
+                              <p className="text-sm text-slate-600">Loading…</p>
+                            ) : askOfferPosts.length === 0 ? (
+                              <p className="text-sm text-slate-600">
+                                No posts yet. Be the first to share.
+                              </p>
+                            ) : (
+                              <div className="space-y-3">
+                                {askOfferPosts.map((post) => (
+                                  <div
+                                    key={post.id}
+                                    className="rounded-md border border-slate-200 px-3 py-3"
+                                  >
+                                    <div className="flex items-center justify-between text-xs text-slate-500">
+                                      <span className="uppercase tracking-wide">
+                                        {post.post_type}
+                                      </span>
+                                      <span>{post.author_handle}</span>
+                                    </div>
+                                    <p className="mt-2 text-sm text-slate-800">
+                                      {post.body}
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                      <Button
+                                        variant={post.helpful_given ? "secondary" : "outline"}
+                                        onClick={() => handleHelpful(post.id)}
+                                        disabled={post.helpful_given || helpfulSending[post.id]}
+                                      >
+                                        Helpful · {post.helpful_count}
+                                      </Button>
+                                    </div>
+                                    <div className="mt-3 space-y-2">
+                                      <p className="text-xs text-slate-500">
+                                        Quick reply
+                                      </p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {[
+                                          {
+                                            key: "one_small_step",
+                                            label: "One small step helped me.",
+                                          },
+                                          {
+                                            key: "offer_tip",
+                                            label: "I can offer a quick tip.",
+                                          },
+                                          {
+                                            key: "try_this",
+                                            label: "I tried this.",
+                                          },
+                                        ].map((template) => (
+                                          <Button
+                                            key={template.key}
+                                            variant="outline"
+                                            onClick={() =>
+                                              handleSendReply(post.id, template.key)
+                                            }
+                                            disabled={replySending[post.id]}
+                                          >
+                                            {template.label}
+                                          </Button>
+                                        ))}
+                                      </div>
+                                      <input
+                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                        placeholder="Add a short note (optional)"
+                                        value={replyNotes[post.id] ?? ""}
+                                        onChange={(e) =>
+                                          setReplyNotes((prev) => ({
+                                            ...prev,
+                                            [post.id]: e.target.value,
+                                          }))
+                                        }
+                                      />
+                                    </div>
+                                    {post.replies.length > 0 ? (
+                                      <div className="mt-3 space-y-2">
+                                        <p className="text-xs text-slate-500">
+                                          Replies
+                                        </p>
+                                        <ul className="space-y-2">
+                                          {post.replies.map((reply) => (
+                                            <li
+                                              key={reply.id}
+                                              className="rounded-md border border-slate-100 bg-slate-50 px-2 py-2 text-sm"
+                                            >
+                                              <p className="text-xs text-slate-500">
+                                                {reply.author_handle}
+                                              </p>
+                                              <p className="text-slate-700">
+                                                {reply.body ?? "Shared a quick reply."}
+                                              </p>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
                       <h2 className="text-xl font-semibold">Send a Boost</h2>
                       {boostMessage ? (
                         <p className="text-sm text-slate-700">{boostMessage}</p>
