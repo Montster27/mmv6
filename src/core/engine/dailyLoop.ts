@@ -74,6 +74,7 @@ import {
   listRemnantDefinitions,
 } from "@/lib/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
+import type { RemnantKey } from "@/types/remnants";
 import type {
   DailyPosture,
   DailyTension,
@@ -244,7 +245,9 @@ export async function getOrCreateDailyRun(
 
   let remnantState: DailyRun["remnant"] = null;
   if (featureFlags.remnantSystemEnabled) {
-    const unlockedKeys = await fetchUnlockedRemnants(userId).catch(() => []);
+    const unlockedKeys = await fetchUnlockedRemnants(userId).catch(
+      () => [] as RemnantKey[]
+    );
     const activeSelection = await fetchActiveRemnant(userId).catch(() => null);
     const unlockedDefs = listRemnantDefinitions().filter((remnant) =>
       unlockedKeys.includes(remnant.key)
