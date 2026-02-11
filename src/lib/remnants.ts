@@ -75,7 +75,7 @@ export async function fetchUnlockedRemnants(
     return [];
   }
 
-  return (data ?? []).map((row: RemnantUnlock) => row.remnant_key);
+  return (data ?? []).map((row) => (row as RemnantUnlock).remnant_key);
 }
 
 export async function fetchActiveRemnant(
