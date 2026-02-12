@@ -1511,18 +1511,6 @@ export default function ContentStudioLitePage() {
                       </div>
                     ) : null}
                   </div>
-                ) : activeTab !== "list" ? (
-                  <div className="space-y-2">
-                    <p className="text-sm text-slate-500">
-                      Active tab: {TABS.find((tab) => tab.key === activeTab)?.label}
-                    </p>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-                    </h2>
-                    <p className="text-sm text-slate-600">
-                      Editor surface coming next. This is the stable shell.
-                    </p>
-                  </div>
                 ) : (
                   <div className="space-y-6">
                     <div className="flex flex-wrap items-center justify-between gap-3">
