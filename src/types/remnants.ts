@@ -24,3 +24,12 @@ export type RemnantSelection = {
   active: boolean;
   last_applied_day_index: number | null;
 };
+
+export type RemnantRule = {
+  remnant_key: RemnantKey;
+  discovery: Record<string, unknown>;
+  unlock: Record<string, unknown>;
+  caps: Record<string, unknown>;
+  updated_at?: string;
+  updated_by?: string | null;
+};

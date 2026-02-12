@@ -10,6 +10,12 @@ export type FeatureFlags = {
   buddySystemEnabled: boolean;
   afterActionCompareEnabled: boolean;
   remnantSystemEnabled: boolean;
+  contentStudioLiteEnabled: boolean;
+  contentStudioGraphEnabled: boolean;
+  contentStudioPreviewEnabled: boolean;
+  contentStudioHistoryEnabled: boolean;
+  contentStudioPublishEnabled: boolean;
+  contentStudioRemnantRulesEnabled: boolean;
 };
 
 function parseFlag(value: string | undefined): boolean | null {
@@ -61,6 +67,12 @@ export function getFeatureFlags(): FeatureFlags {
           funPulse: false,
           verticalSlice30Enabled: verticalSliceFlag,
           ...sliceDefaults,
+          contentStudioLiteEnabled: false,
+          contentStudioGraphEnabled: false,
+          contentStudioPreviewEnabled: false,
+          contentStudioHistoryEnabled: false,
+          contentStudioPublishEnabled: false,
+          contentStudioRemnantRulesEnabled: false,
         }
       : {
           arcs: true,
@@ -70,7 +82,33 @@ export function getFeatureFlags(): FeatureFlags {
           funPulse: true,
           verticalSlice30Enabled: verticalSliceFlag,
           ...sliceDefaults,
+          contentStudioLiteEnabled: false,
+          contentStudioGraphEnabled: false,
+          contentStudioPreviewEnabled: false,
+          contentStudioHistoryEnabled: false,
+          contentStudioPublishEnabled: false,
+          contentStudioRemnantRulesEnabled: false,
         };
+
+  const studioFlag =
+    parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_LITE) ?? false;
+  const studioDefaults = studioFlag
+    ? {
+        contentStudioLiteEnabled: true,
+        contentStudioGraphEnabled: true,
+        contentStudioPreviewEnabled: true,
+        contentStudioHistoryEnabled: true,
+        contentStudioPublishEnabled: true,
+        contentStudioRemnantRulesEnabled: true,
+      }
+    : {
+        contentStudioLiteEnabled: false,
+        contentStudioGraphEnabled: false,
+        contentStudioPreviewEnabled: false,
+        contentStudioHistoryEnabled: false,
+        contentStudioPublishEnabled: false,
+        contentStudioRemnantRulesEnabled: false,
+      };
 
   const overrides: Partial<FeatureFlags> = {
     arcs: parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARCS) ?? undefined,
@@ -90,8 +128,21 @@ export function getFeatureFlags(): FeatureFlags {
       parseFlag(process.env.NEXT_PUBLIC_AFTER_ACTION_COMPARE) ?? undefined,
     remnantSystemEnabled:
       parseFlag(process.env.NEXT_PUBLIC_REMNANT_SYSTEM) ?? undefined,
+    contentStudioLiteEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_LITE) ?? undefined,
+    contentStudioGraphEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_GRAPH) ?? undefined,
+    contentStudioPreviewEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_PREVIEW) ?? undefined,
+    contentStudioHistoryEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_HISTORY) ?? undefined,
+    contentStudioPublishEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_PUBLISH) ?? undefined,
+    contentStudioRemnantRulesEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_REMNANT_RULES) ??
+      undefined,
   };
 
   const localOverrides = getOverrideFlags();
-  return { ...base, ...overrides, ...localOverrides };
+  return { ...base, ...studioDefaults, ...overrides, ...localOverrides };
 }

@@ -90,6 +90,7 @@ export type ValidationIssue = {
 };
 
 const KNOWN_REQUIREMENT_KEYS = new Set([
+  "audit",
   "min_day_index",
   "max_day_index",
   "requires_tags_any",

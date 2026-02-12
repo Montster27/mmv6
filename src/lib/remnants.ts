@@ -215,3 +215,7 @@ export async function applyRemnantEffectForDay(params: {
 
   return { applied: true, dayState: updated, activeKey: active.remnant_key };
 }
+
+export function listRemnantKeys(): RemnantKey[] {
+  return REMNANTS.map((remnant) => remnant.key);
+}
