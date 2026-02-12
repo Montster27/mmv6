@@ -110,7 +110,7 @@ export default function DevMenu({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Dev menu</h2>
         <div className="flex items-center gap-2">
-          {isAdmin ? (
+          {isAdmin || devSettings.test_mode ? (
             <Button variant="secondary" asChild>
               <Link href="/studio/content">Content studio</Link>
             </Button>
