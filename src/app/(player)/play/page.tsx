@@ -2251,6 +2251,12 @@ export default function PlayPage() {
 
           {showDevMenu ? (
             <DevMenu
+              isAdmin={Boolean(
+                (session?.user?.email &&
+                  isEmailAllowed(session.user.email)) ||
+                  devIsAdmin ||
+                  bootstrapIsAdmin
+              )}
               devSettings={devSettings}
               devSettingsLoading={devSettingsLoading}
               devSettingsSaving={devSettingsSaving}

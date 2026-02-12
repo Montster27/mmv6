@@ -17,6 +17,7 @@ type DevCharacter = {
 };
 
 type Props = {
+  isAdmin: boolean;
   devSettings: { test_mode: boolean };
   devSettingsLoading: boolean;
   devSettingsSaving: boolean;
@@ -64,6 +65,7 @@ const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
 ];
 
 export default function DevMenu({
+  isAdmin,
   devSettings,
   devSettingsLoading,
   devSettingsSaving,
@@ -108,6 +110,11 @@ export default function DevMenu({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Dev menu</h2>
         <div className="flex items-center gap-2">
+          {isAdmin ? (
+            <Button variant="secondary" asChild>
+              <Link href="/studio/content">Content studio</Link>
+            </Button>
+          ) : null}
           <Button variant="secondary" asChild>
             <Link href="/admin/storylets/validate">Validate storylets</Link>
           </Button>
