@@ -916,13 +916,17 @@ export default function ContentStudioLitePage() {
       }));
       if (allErrors.length > 0) {
         trackEvent({ event_type: "validation_error_detected" });
-        if (!autosave && draft.is_active) {
-          setEditor((prev) => ({
-            ...prev,
-            error: "Fix validation errors before publishing.",
-          }));
+        if (autosave) {
+          setEditor((prev) => ({ ...prev, saveState: "idle" }));
           return;
         }
+        setEditor((prev) => ({
+          ...prev,
+          error: draft.is_active
+            ? "Fix validation errors before publishing."
+            : "Fix validation errors before saving.",
+        }));
+        return;
       }
       setEditor((prev) => ({ ...prev, saveState: "saving", error: null }));
       try {
