@@ -10,6 +10,7 @@ import { isEmailAllowed } from "@/lib/adminAuth";
 import { trackEvent } from "@/lib/events";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { getAppMode } from "@/lib/mode";
+import { fetchDevSettings } from "@/lib/devSettings";
 import { supabase } from "@/lib/supabase/browser";
 import { validateStorylet } from "@/core/validation/storyletValidation";
 import { buildAuditMeta } from "@/lib/contentStudio/audit";
@@ -187,7 +188,8 @@ function formatJson(value: Record<string, unknown> | undefined) {
 export default function ContentStudioLitePage() {
   const [activeTab, setActiveTab] = useState<TabKey>("list");
   const flags = useMemo(() => getFeatureFlags(), []);
-  const testerMode = useMemo(() => getAppMode().testerMode, []);
+  const envTesterMode = useMemo(() => getAppMode().testerMode, []);
+  const [userTestMode, setUserTestMode] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [storylets, setStorylets] = useState<Storylet[]>([]);
   const [validationMap, setValidationMap] = useState<Record<string, ValidationSummary>>(
@@ -237,6 +239,20 @@ export default function ContentStudioLitePage() {
   } | null>(null);
   const [rollbackState, setRollbackState] = useState<SaveState>("idle");
   const autosaveTimerRef = useRef<number | null>(null);
+
+  // Fetch user's test_mode setting for authorization
+  useEffect(() => {
+    async function loadUserTestMode() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const settings = await fetchDevSettings(user.id);
+      setUserTestMode(settings.test_mode);
+    }
+    loadUserTestMode();
+  }, []);
+
+  // Combined tester mode: env-based OR user's test_mode setting
+  const testerMode = envTesterMode || userTestMode;
 
   useEffect(() => {
     if (!flags.contentStudioLiteEnabled) return;
