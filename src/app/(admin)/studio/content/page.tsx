@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import dynamic from "next/dynamic";
+
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
 import { isEmailAllowed } from "@/lib/adminAuth";
@@ -12,12 +14,22 @@ import { supabase } from "@/lib/supabase/browser";
 import { validateStorylet } from "@/core/validation/storyletValidation";
 import { buildAuditMeta } from "@/lib/contentStudio/audit";
 import type { Storylet, StoryletChoice } from "@/types/storylets";
-import { GraphView } from "@/components/contentStudio/GraphView";
 import type { DelayedConsequenceRule } from "@/types/consequences";
-import { PreviewSimulator } from "@/components/contentStudio/PreviewSimulator";
 import type { RemnantRule } from "@/types/remnants";
 import { listRemnantKeys } from "@/lib/remnants";
 import type { ContentVersion, ContentSnapshot } from "@/types/contentVersions";
+
+const GraphView = dynamic(
+  () => import("@/components/contentStudio/GraphView").then((mod) => mod.GraphView),
+  { ssr: false }
+);
+const PreviewSimulator = dynamic(
+  () =>
+    import("@/components/contentStudio/PreviewSimulator").then(
+      (mod) => mod.PreviewSimulator
+    ),
+  { ssr: false }
+);
 
 const TABS = [
   { key: "list", label: "List" },
