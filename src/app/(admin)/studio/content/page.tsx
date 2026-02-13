@@ -17,8 +17,14 @@ import { buildAuditMeta } from "@/lib/contentStudio/audit";
 import type { Storylet, StoryletChoice } from "@/types/storylets";
 import type { DelayedConsequenceRule } from "@/types/consequences";
 import type { RemnantRule } from "@/types/remnants";
-import { listRemnantKeys } from "@/lib/remnants";
 import type { ContentVersion, ContentSnapshot } from "@/types/contentVersions";
+
+const REMNANT_KEYS = [
+  "memory_fragment",
+  "relationship_echo",
+  "composure_scar",
+  "anomaly_thread",
+] as const;
 import { SaveStatusIndicator } from "@/components/contentStudio/SaveStatusIndicator";
 
 const GraphView = dynamic(
@@ -530,7 +536,7 @@ export default function ContentStudioLitePage() {
   };
 
   const createRemnantRule = () => {
-    const key = listRemnantKeys()[0] ?? "";
+    const key = REMNANT_KEYS[0] ?? "";
     setRemnantRuleDraft({
       remnant_key: key,
       discoveryText: "",
@@ -1391,7 +1397,7 @@ export default function ContentStudioLitePage() {
                                     })
                                   }
                                 >
-                                  {listRemnantKeys().map((key) => (
+                                  {REMNANT_KEYS.map((key) => (
                                     <option key={key} value={key}>
                                       {key}
                                     </option>
