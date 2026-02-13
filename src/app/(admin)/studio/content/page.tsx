@@ -1075,11 +1075,14 @@ export default function ContentStudioLitePage() {
                     Internal editor for the 30-minute slice.
                   </p>
                 </div>
-                <div className="flex items-center gap-3 text-sm text-slate-600">
+                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
                   <span>Env: {process.env.NEXT_PUBLIC_VERCEL_ENV ?? "local"}</span>
                   <span>
                     State: {activeStorylet?.is_active ? "Published" : "Draft"}
                   </span>
+                  <Button variant="outline" asChild>
+                    <a href="/play">Exit studio</a>
+                  </Button>
                   <div className="flex items-center gap-2">
                     <input
                       className="w-44 rounded-md border border-slate-300 px-2 py-1 text-xs"
