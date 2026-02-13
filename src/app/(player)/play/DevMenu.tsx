@@ -34,6 +34,7 @@ type Props = {
   onAdvanceDay: (userId: string) => void;
   onResetAccount: (userId: string) => void;
   onToggleAdmin: (userId: string, next: boolean) => void;
+  onFlagsChanged?: () => void;
 };
 
 function readOverrides(): Partial<FeatureFlags> {
@@ -110,6 +111,7 @@ export default function DevMenu({
   onAdvanceDay,
   onResetAccount,
   onToggleAdmin,
+  onFlagsChanged,
 }: Props) {
   const [flagOverrides, setFlagOverrides] = useState<Partial<FeatureFlags>>({});
   const [retainOverrides, setRetainOverrides] = useState(false);
@@ -128,13 +130,13 @@ export default function DevMenu({
     };
     setFlagOverrides(nextOverrides);
     writeOverrides(nextOverrides, currentUserId);
-    window.location.reload();
+    onFlagsChanged?.();
   };
 
   const handleResetFlags = () => {
     setFlagOverrides({});
     writeOverrides({}, currentUserId);
-    window.location.reload();
+    onFlagsChanged?.();
   };
 
   const handleToggleRetain = () => {
@@ -202,7 +204,7 @@ export default function DevMenu({
           </Button>
         </div>
         <p className="text-xs text-slate-500">
-          Overrides are local to this browser. Page reloads when you toggle.
+          Overrides are local to this browser and apply immediately.
         </p>
         <label className="flex items-center gap-2 text-xs text-slate-600">
           <input

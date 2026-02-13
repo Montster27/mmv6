@@ -233,6 +233,7 @@ export default function PlayPage() {
   const servedStoryletsRef = useRef<string | null>(null);
   const [showDevMenu, setShowDevMenu] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [featureFlagsVersion, setFeatureFlagsVersion] = useState(0);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
   const [devIsAdmin, setDevIsAdmin] = useState(false);
@@ -302,7 +303,8 @@ export default function PlayPage() {
     []
   );
   const testerMode = useMemo(() => getAppMode().testerMode, []);
-  const featureFlags = useMemo(() => getFeatureFlags(), []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const featureFlags = useMemo(() => getFeatureFlags(), [featureFlagsVersion]);
   const slicePhaseId = useMemo(() => {
     if (!featureFlags.verticalSlice30Enabled) return null;
     return phaseRef.current;
@@ -2273,6 +2275,7 @@ export default function PlayPage() {
               onAdvanceDay={handleAdvanceDay}
               onResetAccount={handleResetAccount}
               onToggleAdmin={handleToggleAdmin}
+              onFlagsChanged={() => setFeatureFlagsVersion((v) => v + 1)}
             />
           ) : null}
 
