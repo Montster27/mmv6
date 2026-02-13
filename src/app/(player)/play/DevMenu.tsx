@@ -124,10 +124,28 @@ export default function DevMenu({
   }, []);
 
   const handleToggleFlag = (key: keyof FeatureFlags) => {
-    const nextOverrides = {
+    let nextOverrides: Partial<FeatureFlags> = {
       ...flagOverrides,
       [key]: !(flagOverrides[key] ?? flags[key]),
     };
+    if (
+      key === "verticalSlice30Enabled" &&
+      (nextOverrides.verticalSlice30Enabled ?? flags.verticalSlice30Enabled)
+    ) {
+      nextOverrides = {
+        ...nextOverrides,
+        rookieCircleEnabled:
+          flagOverrides.rookieCircleEnabled ?? flags.rookieCircleEnabled,
+        askOfferBoardEnabled:
+          flagOverrides.askOfferBoardEnabled ?? flags.askOfferBoardEnabled,
+        buddySystemEnabled:
+          flagOverrides.buddySystemEnabled ?? flags.buddySystemEnabled,
+        afterActionCompareEnabled:
+          flagOverrides.afterActionCompareEnabled ?? flags.afterActionCompareEnabled,
+        remnantSystemEnabled:
+          flagOverrides.remnantSystemEnabled ?? flags.remnantSystemEnabled,
+      };
+    }
     setFlagOverrides(nextOverrides);
     writeOverrides(nextOverrides, currentUserId);
     onFlagsChanged?.();
