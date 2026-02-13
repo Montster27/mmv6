@@ -94,7 +94,6 @@ import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
 import { getAppMode } from "@/lib/mode";
 import { getFeatureFlags } from "@/lib/featureFlags";
-import { getSlicePhase, SLICE_PHASES } from "@/core/verticalSlice/phases";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -295,6 +294,69 @@ export default function PlayPage() {
     handles: string[];
   } | null>(null);
 
+  const SLICE_PHASES_LOCAL = useMemo(
+    () => [
+      { id: "intro_hook", label: "Intro hook", window: [0, 3] as const },
+      { id: "guided_core_loop", label: "Guided core loop", window: [3, 10] as const },
+      { id: "reflection_arc", label: "Reflection arc", window: [10, 18] as const },
+      { id: "community_purpose", label: "Community purpose", window: [18, 24] as const },
+      { id: "remnant_reveal", label: "Remnant reveal", window: [24, 28] as const },
+      { id: "cliffhanger", label: "Cliffhanger", window: [28, 30] as const },
+    ],
+    []
+  );
+
+  const getSlicePhaseLocal = useCallback(
+    (params: {
+      elapsedMinutes: number;
+      allocationSaved: boolean;
+      storyletRuns: number;
+      socialComplete: boolean;
+      reflectionDone: boolean;
+    }) => {
+      const {
+        elapsedMinutes,
+        allocationSaved,
+        storyletRuns,
+        socialComplete,
+        reflectionDone,
+      } = params;
+
+      const timePhase =
+        elapsedMinutes < 3
+          ? "intro_hook"
+          : elapsedMinutes < 10
+            ? "guided_core_loop"
+            : elapsedMinutes < 18
+              ? "reflection_arc"
+              : elapsedMinutes < 24
+                ? "community_purpose"
+                : elapsedMinutes < 28
+                  ? "remnant_reveal"
+                  : "cliffhanger";
+
+      let criteriaPhase = "intro_hook";
+      if (allocationSaved) criteriaPhase = "guided_core_loop";
+      if (storyletRuns >= 1) criteriaPhase = "reflection_arc";
+      if (storyletRuns >= 2 || reflectionDone) criteriaPhase = "community_purpose";
+      if (socialComplete) criteriaPhase = "remnant_reveal";
+      if (elapsedMinutes >= 28) criteriaPhase = "cliffhanger";
+
+      const order = [
+        "intro_hook",
+        "guided_core_loop",
+        "reflection_arc",
+        "community_purpose",
+        "remnant_reveal",
+        "cliffhanger",
+      ];
+      const timeIndex = order.indexOf(timePhase);
+      const criteriaIndex = order.indexOf(criteriaPhase);
+      return order[Math.max(timeIndex, criteriaIndex)] ?? "cliffhanger";
+    },
+    []
+  );
+
   const gameNote = useMemo(
     () =>
       gameMessage("The day opens like a file you didn't finish yesterday.", {
@@ -319,13 +381,16 @@ export default function PlayPage() {
     if (!featureFlags.verticalSlice30Enabled) return null;
     const phaseId = phaseRef.current;
     if (!phaseId) return null;
-    return SLICE_PHASES.find((phase) => phase.id === phaseId)?.label ?? phaseId;
+    return (
+      SLICE_PHASES_LOCAL.find((phase) => phase.id === phaseId)?.label ?? phaseId
+    );
   }, [
     featureFlags.verticalSlice30Enabled,
     stage,
     allocationSaved,
     runs.length,
     hasSentBoost,
+    SLICE_PHASES_LOCAL,
   ]);
   const remnantDefinitions = useMemo(() => listRemnantDefinitions(), []);
   const testerNote = useMemo(
@@ -1109,7 +1174,7 @@ export default function PlayPage() {
     if (!sessionStartAtRef.current) return;
     if (!userId || loading) return;
     const elapsedMinutes = (Date.now() - sessionStartAtRef.current) / 60000;
-    const phase = getSlicePhase({
+    const phase = getSlicePhaseLocal({
       elapsedMinutes,
       allocationSaved,
       storyletRuns: runs.length,
