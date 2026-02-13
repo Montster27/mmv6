@@ -2,9 +2,11 @@ import { supabase } from "@/lib/supabase/browser";
 import { trackEvent } from "@/lib/events";
 import { getFeatureFlags } from "@/lib/featureFlags";
 
-const DEFAULT_COHORT_CAP = 30;
-const ROOKIE_COHORT_CAP = 5;
-
+/**
+ * Fetch user's cohort membership.
+ * Note: This may fail with RLS errors if user is not yet in a cohort.
+ * Use ensureUserInCohort() which calls the API route for reliable access.
+ */
 export async function fetchUserCohort(
   userId: string
 ): Promise<{ cohortId: string } | null> {
@@ -16,86 +18,55 @@ export async function fetchUserCohort(
     .maybeSingle();
 
   if (error) {
-    console.error("Failed to fetch cohort membership", error);
+    // Don't log RLS errors as they're expected for new users
+    if (error.code !== "42501") {
+      console.error("Failed to fetch cohort membership", error);
+    }
     return null;
   }
 
   return data ? { cohortId: data.cohort_id } : null;
 }
 
+/**
+ * Ensure user is assigned to a cohort.
+ * Uses server-side API route to bypass RLS restrictions.
+ */
 export async function ensureUserInCohort(
   userId: string
 ): Promise<{ cohortId: string }> {
   const featureFlags = getFeatureFlags();
   const useRookieCap =
     featureFlags.rookieCircleEnabled || featureFlags.verticalSlice30Enabled;
-  const cohortCap = useRookieCap ? ROOKIE_COHORT_CAP : DEFAULT_COHORT_CAP;
-  const existing = await fetchUserCohort(userId);
-  if (existing) return existing;
 
-  let createdCohort = false;
-  const { data: candidate, error: candidateError } = await supabase
-    .from("cohorts")
-    .select("id")
-    .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  // Get auth token for API call
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
 
-  if (candidateError) {
-    console.error("Failed to find cohort", candidateError);
+  if (!token) {
+    throw new Error("No session found");
   }
 
-  let cohortId = candidate?.id ?? null;
-  if (cohortId) {
-    const { count, error: countError } = await supabase
-      .from("cohort_members")
-      .select("cohort_id", { count: "exact", head: true })
-      .eq("cohort_id", cohortId);
-    if (countError) {
-      console.error("Failed to count cohort members", countError);
-    }
-    if (count !== null && count >= cohortCap) {
-      cohortId = null;
-    }
-  }
-
-  if (!cohortId) {
-    const { data: created, error: createError } = await supabase
-      .from("cohorts")
-      .insert({})
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-    if (createError) {
-      console.error("Failed to create cohort", createError);
-      throw createError;
-    }
-    cohortId = created?.id ?? null;
-    createdCohort = Boolean(cohortId);
-  }
-
-  if (!cohortId) {
-    throw new Error("Unable to assign cohort.");
-  }
-
-  const { error: insertError } = await supabase.from("cohort_members").insert({
-    cohort_id: cohortId,
-    user_id: userId,
+  // Call server-side API route which uses service role to bypass RLS
+  const res = await fetch("/api/cohort/ensure", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
   });
 
-  if (insertError) {
-    console.error("Failed to join cohort", insertError);
-    throw insertError;
+  const json = await res.json();
+
+  if (!res.ok) {
+    console.error("Failed to ensure cohort membership", json.error);
+    throw new Error(json.error ?? "Failed to ensure cohort membership");
   }
 
-  if (useRookieCap) {
-    if (createdCohort) {
-      trackEvent({
-        event_type: "rookie_circle_created",
-        payload: { cohort_id: cohortId },
-      });
-    }
+  const cohortId = json.cohortId;
+
+  // Track events for rookie circle feature
+  if (useRookieCap && cohortId) {
     trackEvent({
       event_type: "rookie_circle_assigned",
       payload: { cohort_id: cohortId },
