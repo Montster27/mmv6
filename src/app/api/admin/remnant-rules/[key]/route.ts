@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getAdminClient } from "@/lib/supabaseAdmin";
-import { isUserAdmin } from "@/lib/adminAuthServer";
+import { canAccessContentStudio } from "@/lib/adminAuthServer";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { RemnantRule } from "@/types/remnants";
 
@@ -15,7 +15,7 @@ async function getUserFromToken(token?: string) {
   return data.user;
 }
 
-async function ensureAdmin(request: Request) {
+async function ensureContentStudioAccess(request: Request) {
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
     ? authHeader.slice("Bearer ".length)
@@ -24,7 +24,7 @@ async function ensureAdmin(request: Request) {
   if (!user) {
     return null;
   }
-  const ok = await isUserAdmin(user);
+  const ok = await canAccessContentStudio(user);
   if (!ok) {
     return null;
   }
@@ -36,7 +36,7 @@ export async function GET(
   { params }: { params: Promise<{ key: string }> }
 ) {
   const resolvedParams = await params;
-  const user = await ensureAdmin(request);
+  const user = await ensureContentStudioAccess(request);
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const admin = getAdminClient();
@@ -57,7 +57,7 @@ export async function PUT(
   { params }: { params: Promise<{ key: string }> }
 ) {
   const resolvedParams = await params;
-  const user = await ensureAdmin(request);
+  const user = await ensureContentStudioAccess(request);
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const payload = await request.json();
@@ -88,7 +88,7 @@ export async function DELETE(
   { params }: { params: Promise<{ key: string }> }
 ) {
   const resolvedParams = await params;
-  const user = await ensureAdmin(request);
+  const user = await ensureContentStudioAccess(request);
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const admin = getAdminClient();

@@ -19,6 +19,7 @@ import type { DelayedConsequenceRule } from "@/types/consequences";
 import type { RemnantRule } from "@/types/remnants";
 import { listRemnantKeys } from "@/lib/remnants";
 import type { ContentVersion, ContentSnapshot } from "@/types/contentVersions";
+import { SaveStatusIndicator } from "@/components/contentStudio/SaveStatusIndicator";
 
 const GraphView = dynamic(
   () => import("@/components/contentStudio/GraphView").then((mod) => mod.GraphView),
@@ -78,6 +79,7 @@ type EditorState = {
   targetInputs: Record<string, string>;
   error: string | null;
   saveState: SaveState;
+  lastSavedAt: Date | null;
 };
 
 type RuleDraft = {
@@ -205,6 +207,7 @@ export default function ContentStudioLitePage() {
     targetInputs: {},
     error: null,
     saveState: "idle",
+    lastSavedAt: null,
   });
   const [rules, setRules] = useState<DelayedConsequenceRule[]>([]);
   const [rulesLoading, setRulesLoading] = useState(false);
@@ -832,6 +835,7 @@ export default function ContentStudioLitePage() {
         targetInputs: nextTargetInputs,
         error: null,
         saveState: "idle",
+        lastSavedAt: null,
       });
     },
     []
@@ -964,6 +968,7 @@ export default function ContentStudioLitePage() {
           ...prev,
           dirty: false,
           saveState: "saved",
+          lastSavedAt: new Date(),
         }));
         trackEvent({ event_type: "storylet_updated", payload: { id: draft.id } });
       } catch (err) {
@@ -2047,26 +2052,13 @@ export default function ContentStudioLitePage() {
                               })}
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-3">
-                              <Button
-                                onClick={() => saveDraft(false)}
-                                disabled={editor.saveState === "saving"}
-                              >
-                                {editor.saveState === "saving"
-                                  ? "Saving..."
-                                  : "Save draft"}
-                              </Button>
-                              {editor.saveState === "saved" ? (
-                                <span className="text-xs text-slate-500">
-                                  Draft saved
-                                </span>
-                              ) : null}
-                              {editor.error ? (
-                                <span className="text-xs text-red-600">
-                                  {editor.error}
-                                </span>
-                              ) : null}
-                            </div>
+                            <SaveStatusIndicator
+                              saveState={editor.saveState}
+                              lastSavedAt={editor.lastSavedAt}
+                              isDirty={editor.dirty}
+                              error={editor.error}
+                              onSave={() => saveDraft(false)}
+                            />
 
                             <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                               <h4 className="text-sm font-semibold text-slate-700">
