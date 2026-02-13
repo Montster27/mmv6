@@ -285,6 +285,7 @@ export async function getOrCreateDailyRun(
   };
   let directiveRow = null as Awaited<ReturnType<typeof getOrCreateWeeklyDirective>> | null;
   let directiveSummary = null as DailyRun["directive"];
+  const initiativesEnabled = featureFlags.alignment;
 
   await ensureUserAlignmentRows(userId).catch(() => {});
   if (featureFlags.alignment) {
@@ -351,11 +352,11 @@ export async function getOrCreateDailyRun(
 
   let initiatives = null as DailyRun["initiatives"];
 
-  if (cohortId) {
+  if (cohortId && initiativesEnabled) {
     await getOrCreateWeeklyInitiative(cohortId, dayIndex, directiveRow);
   }
 
-  if (cohortId) {
+  if (cohortId && initiativesEnabled) {
     const staleDirective = await fetchStaleDirectiveForCohort(cohortId, dayIndex).catch(
       () => null
     );
@@ -392,7 +393,7 @@ export async function getOrCreateDailyRun(
     }
   }
 
-  if (cohortId) {
+  if (cohortId && initiativesEnabled) {
     const openInitiatives = await fetchOpenInitiativesForCohort(cohortId, dayIndex);
     const enriched = await Promise.all(
       openInitiatives.map(async (initiative) => {

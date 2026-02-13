@@ -162,7 +162,7 @@ function createBlankStorylet(): Omit<Storylet, "id"> {
   return {
     slug: `draft-${Date.now()}`,
     title: "Untitled storylet",
-    body: "",
+    body: "Draft body.",
     choices: [{ id: "continue", label: "Continue" }],
     is_active: false,
     tags: [],
@@ -844,6 +844,8 @@ export default function ContentStudioLitePage() {
       const token = data.session?.access_token;
       if (!token) throw new Error("No session found.");
       const draft = createBlankStorylet();
+      const id = `draft_${Date.now()}`;
+      const body = draft.body?.trim() ? draft.body : "Draft body.";
       const res = await fetch("/api/admin/storylets", {
         method: "POST",
         headers: {
@@ -851,7 +853,9 @@ export default function ContentStudioLitePage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          id,
           ...draft,
+          body,
           requirements: {
             ...draft.requirements,
             audit: buildAuditMeta(data.session?.user?.email ?? null),
@@ -862,10 +866,10 @@ export default function ContentStudioLitePage() {
       if (!res.ok) {
         throw new Error(json.error ?? "Failed to create storylet");
       }
-      const newRow: Storylet = { ...draft, id: json.id };
+      const newRow: Storylet = { ...draft, id, body };
       setStorylets((prev) => [newRow, ...prev]);
       selectStorylet(newRow);
-      trackEvent({ event_type: "storylet_created", payload: { id: json.id } });
+      trackEvent({ event_type: "storylet_created", payload: { id } });
     } catch (err) {
       console.error(err);
       setListError(err instanceof Error ? err.message : "Failed to create storylet");
