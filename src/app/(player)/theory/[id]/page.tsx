@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 
-import { AuthGate } from "@/ui/components/AuthGate";
+import { useSession } from "@/contexts/SessionContext";
 import { Button } from "@/components/ui/button";
 import { fetchUserAnomalies, fetchAnomaliesByIds } from "@/lib/anomalies";
 import {
@@ -13,17 +13,17 @@ import {
   unlinkAnomaly,
   updateHypothesis,
 } from "@/lib/hypotheses";
+import { TheorySkeleton } from "@/components/skeletons/TheorySkeleton";
 import { submitReport } from "@/lib/reports";
 import type { Anomaly, UserAnomaly } from "@/types/anomalies";
 import type { Hypothesis } from "@/types/hypotheses";
 
 function TheoryDetailContent({
   params,
-  session,
 }: {
   params: { id: string };
-  session: Session;
 }) {
+  const session = useSession();
   const [hypothesis, setHypothesis] = useState<Hypothesis | null>(null);
   const [linked, setLinked] = useState<Set<string>>(new Set());
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
@@ -100,7 +100,7 @@ function TheoryDetailContent({
         </div>
       ) : null}
 
-      {loading ? <p className="text-slate-700">Loading…</p> : null}
+      {loading ? <TheorySkeleton /> : null}
 
       {hypothesis ? (
         <div className="space-y-4">
@@ -328,7 +328,5 @@ function TheoryDetailContent({
 }
 
 export default function TheoryDetailPage({ params }: { params: { id: string } }) {
-  return (
-    <AuthGate>{(session) => <TheoryDetailContent params={params} session={session} />}</AuthGate>
-  );
+  return <TheoryDetailContent params={params} />;
 }

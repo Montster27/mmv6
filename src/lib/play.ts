@@ -22,6 +22,9 @@ export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
 export type { StoryletRun };
 
+const clamp = (value: number, min = 0, max = 100) =>
+  Math.min(max, Math.max(min, value));
+
 function parseChoices(raw: unknown): StoryletChoice[] {
   if (Array.isArray(raw)) {
     return raw
@@ -519,6 +522,35 @@ export async function applyOutcomeForChoice(
     resolvedOutcome
   );
   await updateDailyState(userId, nextDailyState);
+
+  if (
+    typeof appliedDeltas.energy === "number" ||
+    typeof appliedDeltas.stress === "number"
+  ) {
+    const dayState = await ensureDayStateUpToDate(userId, dayIndex);
+    const nextEnergy =
+      typeof appliedDeltas.energy === "number"
+        ? clamp(dayState.energy + appliedDeltas.energy)
+        : dayState.energy;
+    const nextStress =
+      typeof appliedDeltas.stress === "number"
+        ? clamp(dayState.stress + appliedDeltas.stress)
+        : dayState.stress;
+    if (nextEnergy !== dayState.energy || nextStress !== dayState.stress) {
+      const { error: updateError } = await supabase
+        .from("player_day_state")
+        .update({
+          energy: nextEnergy,
+          stress: nextStress,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+        .eq("day_index", dayIndex);
+      if (updateError) {
+        console.error("Failed to sync day state from storylet", updateError);
+      }
+    }
+  }
   return {
     nextDailyState,
     appliedMessage: message,

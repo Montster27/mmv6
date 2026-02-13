@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 
-import { AuthGate } from "@/ui/components/AuthGate";
+import { useSession } from "@/contexts/SessionContext";
 import { fetchMyGroupMembership } from "@/lib/groups";
 import { Button } from "@/components/ui/button";
+import { GroupSkeleton } from "@/components/skeletons/GroupSkeleton";
 
-function GroupEntry({ session }: { session: Session }) {
+function GroupEntry() {
+  const session = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [createName, setCreateName] = useState("");
@@ -95,7 +97,7 @@ function GroupEntry({ session }: { session: Session }) {
   };
 
   if (loading) {
-    return <p className="p-6 text-slate-700">Loading…</p>;
+    return <div className="p-6"><GroupSkeleton /></div>;
   }
 
   return (
@@ -164,5 +166,5 @@ function GroupEntry({ session }: { session: Session }) {
 }
 
 export default function GroupPage() {
-  return <AuthGate>{(session) => <GroupEntry session={session} />}</AuthGate>;
+  return <GroupEntry />;
 }

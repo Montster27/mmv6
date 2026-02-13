@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
@@ -13,7 +12,9 @@ import { ArcPanel } from "@/components/play/ArcPanel";
 import { FactionStatusPanel } from "@/components/play/FactionStatusPanel";
 import { InitiativePanel } from "@/components/play/InitiativePanel";
 import { DailySetupPanel } from "@/components/play/DailySetupPanel";
-import { signOut } from "@/lib/auth";
+import { PlaySkeleton } from "@/components/skeletons/PlaySkeleton";
+import { AllocationSection } from "@/components/play/AllocationSection";
+import { ReflectionSection } from "@/components/play/ReflectionSection";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import { supabase } from "@/lib/supabase/browser";
@@ -82,7 +83,7 @@ import type {
   DailyPosture,
 } from "@/types/dailyInteraction";
 import type { ReflectionResponse } from "@/types/reflections";
-import { AuthGate } from "@/ui/components/AuthGate";
+import { useSession } from "@/contexts/SessionContext";
 import { ProgressPanel } from "@/components/ProgressPanel";
 import { OutcomeExplain } from "@/components/play/OutcomeExplain";
 import { SeasonBadge } from "@/components/SeasonBadge";
@@ -94,6 +95,8 @@ import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
 import { getAppMode } from "@/lib/mode";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { useBootstrap } from "@/hooks/queries/useBootstrap";
+import { useDailyRun } from "@/hooks/queries/useDailyRun";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -108,8 +111,10 @@ const defaultAllocation: AllocationPayload = {
 const USE_DAILY_LOOP_ORCHESTRATOR = true;
 
 export default function PlayPage() {
+  const session = useSession();
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
+  const bootstrapQuery = useBootstrap();
   const {
     dailyState,
     dayState,
@@ -223,10 +228,10 @@ export default function PlayPage() {
   const [bootstrapIsAdmin, setBootstrapIsAdmin] = useState(false);
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [bootstrapUserId, setBootstrapUserId] = useState<string | null>(null);
-  const [bootstrapEmail, setBootstrapEmail] = useState<string | null>(null);
-  const { assignments, getVariant, ready: experimentsReady } = useExperiments([
-    "microtask_freq_v1",
-  ], bootstrapAssignments);
+  const { assignments, getVariant, ready: experimentsReady } = useExperiments(
+    ["microtask_freq_v1"],
+    bootstrapAssignments
+  );
   const microtaskVariant = getVariant("microtask_freq_v1", "A");
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
@@ -357,6 +362,35 @@ export default function PlayPage() {
     []
   );
 
+  const isAdmin =
+    Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
+    devIsAdmin ||
+    bootstrapIsAdmin;
+  const dailyRunQuery = useDailyRun(bootstrapUserId, {
+    experiments,
+    microtaskVariant,
+    isAdmin,
+    enabled:
+      USE_DAILY_LOOP_ORCHESTRATOR &&
+      bootstrapReady &&
+      experimentsReady &&
+      !!bootstrapUserId,
+    refreshKey: refreshTick,
+  });
+
+  useEffect(() => {
+    if (bootstrapQuery.isError) {
+      setError("Failed to load play state.");
+      return;
+    }
+    if (!bootstrapQuery.data) return;
+    setBootstrapReady(true);
+    setBootstrapUserId(bootstrapQuery.data.userId);
+    setBootstrapIsAdmin(Boolean(bootstrapQuery.data.isAdmin));
+    setBootstrapAssignments(bootstrapQuery.data.experiments ?? {});
+    setUserId(bootstrapQuery.data.userId);
+  }, [bootstrapQuery.data, bootstrapQuery.isError]);
+
   const gameNote = useMemo(
     () =>
       gameMessage("The day opens like a file you didn't finish yesterday.", {
@@ -400,8 +434,9 @@ export default function PlayPage() {
       }),
     []
   );
-  const [testerIntroMessage, setTesterIntroMessage] =
-    useState<ReturnType<typeof testerMessage> | null>(null);
+  const [testerMessages, setTesterMessages] = useState<
+    Array<ReturnType<typeof testerMessage>>
+  >([]);
   const testerFastForwardNote = useMemo(
     () => testerMessage("Test mode only.", { tone: "warning" }),
     []
@@ -637,50 +672,26 @@ export default function PlayPage() {
   };
 
   useEffect(() => {
-    const loadBootstrap = async () => {
-      setError(null);
-      try {
-        const sessionData = await supabase.auth.getSession();
-        const token = sessionData.data.session?.access_token;
-        if (!token) throw new Error("No session found.");
-        const bootRes = await fetch("/api/bootstrap", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const bootJson = await bootRes.json();
-        if (!bootRes.ok) {
-          throw new Error(bootJson.error ?? "Failed to load bootstrap.");
-        }
-        setUserId(bootJson.userId);
-        setBootstrapUserId(bootJson.userId);
-        setBootstrapEmail(bootJson.email ?? null);
-        setBootstrapAssignments(bootJson.experiments ?? {});
-        setBootstrapIsAdmin(Boolean(bootJson.isAdmin));
-        setBootstrapReady(true);
-      } catch (e) {
-        console.error(e);
-        setError("Failed to load play state.");
-      }
-    };
-
-    loadBootstrap();
-  }, []);
-
-  useEffect(() => {
     const init = async () => {
       if (!bootstrapReady || !bootstrapUserId) return;
-      if (!experimentsReady) return;
+      if (USE_DAILY_LOOP_ORCHESTRATOR) {
+        if (!experimentsReady) return;
+        if (dailyRunQuery.isLoading) {
+          setLoading(true);
+          return;
+        }
+        if (dailyRunQuery.isError) {
+          setError("Failed to load play state.");
+          setLoading(false);
+          return;
+        }
+      }
       setLoading(true);
       setError(null);
       try {
-        const isAdmin =
-          isEmailAllowed(bootstrapEmail) || devIsAdmin || bootstrapIsAdmin;
-
         if (USE_DAILY_LOOP_ORCHESTRATOR) {
-          const run = await getOrCreateDailyRun(bootstrapUserId, new Date(), {
-            microtaskVariant,
-            experiments,
-            isAdmin,
-          });
+          const run = dailyRunQuery.data;
+          if (!run) return;
           if (
             typeof lastRunDayIndexRef.current === "number" &&
             lastRunDayIndexRef.current !== run.dayIndex
@@ -868,11 +879,9 @@ export default function PlayPage() {
     bootstrapReady,
     bootstrapUserId,
     experimentsReady,
-    microtaskVariant,
-    experiments,
-    devIsAdmin,
-    bootstrapEmail,
-    bootstrapIsAdmin,
+    dailyRunQuery.data,
+    dailyRunQuery.isLoading,
+    dailyRunQuery.isError,
     refreshTick,
   ]);
 
@@ -1310,23 +1319,35 @@ export default function PlayPage() {
 
   useEffect(() => {
     if (!testerMode) return;
-    if (testerIntroMessage) return;
-    try {
-      const seen = localStorage.getItem("mmv_tester_intro_seen");
-      if (seen === "1") return;
-      const intro = testerMessage(
-        "You’re testing an early slice of MMV: a daily-life time-loop in a slightly-wrong version of college. Your job is to push on the system and tell us what feels clear, confusing, or pointless.",
-        {
-          title: "Welcome to the MMV Playtest",
-          details:
-            "• Posture + allocation changes Energy/Stress now and carries into tomorrow. • Threads (Arcs) are short narrative investigations. • After Day 2, skill points start and get harder over time. • Start here: begin “Anomaly 001” in the Threads panel.",
-          tone: "warning",
-        }
-      );
-      setTesterIntroMessage(intro);
-      localStorage.setItem("mmv_tester_intro_seen", "1");
-    } catch {}
-  }, [testerMode, testerIntroMessage]);
+    const push = (key: string, message: ReturnType<typeof testerMessage>) => {
+      try {
+        if (localStorage.getItem(key) === "1") return;
+        localStorage.setItem(key, "1");
+        setTesterMessages((prev) => [...prev, message]);
+      } catch {}
+    };
+    push(
+      "mmv_tester_intro_seen",
+      testerMessage("You’re testing an early systems slice of MMV.", {
+        title: "Welcome to the MMV Playtest",
+        details:
+          "This game is about daily pressure and long-term drift, not optimization. Your choices today shape what’s possible tomorrow. • Posture changes allocation impact • Energy and stress carry forward • Resources enable or block story options • Start with the thread “Anomaly 001.”",
+        tone: "warning",
+      })
+    );
+  }, [testerMode]);
+
+  const pushTesterMessage = useCallback(
+    (key: string, message: ReturnType<typeof testerMessage>) => {
+      if (!testerMode) return;
+      try {
+        if (localStorage.getItem(key) === "1") return;
+        localStorage.setItem(key, "1");
+        setTesterMessages((prev) => [...prev, message]);
+      } catch {}
+    },
+    [testerMode]
+  );
 
   const stagePrompt = useMemo(() => {
     if (!testerMode || !lastCompletedStage) return null;
@@ -1412,6 +1433,33 @@ export default function PlayPage() {
   }, [dayState?.energy, dayState?.stress]);
 
   useEffect(() => {
+    if (!testerMode) return;
+    if (!Number.isFinite(dayIndex)) return;
+    if (dayIndex >= 3) {
+      pushTesterMessage(
+        "mmv_tester_day3_skills",
+        testerMessage("Skill points unlock after Day 2.", {
+          title: "Skills Reflect Consistency",
+          details:
+            "They are: • Conditional (energy & stress matter) • Progressive (each level costs more) • Subtle (small multipliers, not power spikes). Skills represent who you are over time, not tactical choices.",
+          tone: "warning",
+        })
+      );
+    }
+    if (dayIndex >= 5) {
+      pushTesterMessage(
+        "mmv_tester_day5_drift",
+        testerMessage("By now, patterns should be forming.", {
+          title: "Look for Drift",
+          details:
+            "Ask yourself: • What kind of person is this character becoming? • Which pressures feel self‑inflicted? • Which tradeoffs surprised you? That sense of drift is the core of the game.",
+          tone: "warning",
+        })
+      );
+    }
+  }, [dayIndex, testerMode, pushTesterMessage]);
+
+  useEffect(() => {
     return () => {
       if (!userId || sessionEndTracked.current) return;
       sessionEndTracked.current = true;
@@ -1451,6 +1499,15 @@ export default function PlayPage() {
     pendingDeltaSourceRef.current = "allocation";
     try {
       await saveTimeAllocation(userId, dayIndex, allocation, posture?.posture ?? null);
+      pushTesterMessage(
+        "mmv_tester_after_allocation",
+        testerMessage("Time allocation sets pressure, not success.", {
+          title: "Allocation ≠ Outcome",
+          details:
+            "Energy and stress are the key signals. Pay attention to how today’s choices affect tomorrow’s baseline. Try repeating the same allocation under a different posture.",
+          tone: "warning",
+        })
+      );
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         const refreshed = await getOrCreateDailyRun(userId, new Date(), {
           microtaskVariant,
@@ -1597,6 +1654,15 @@ export default function PlayPage() {
         setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
         if (resolvedCheck) {
           setLastCheck(resolvedCheck);
+          pushTesterMessage(
+            "mmv_tester_first_check",
+            testerMessage("Some results depend on your current state:", {
+              title: "Outcomes Are State-Driven",
+              details:
+                "• Skills • Energy & stress • Posture. Success isn’t guaranteed — but it isn’t random either. Ask whether the outcome makes sense given how you’ve been playing.",
+              tone: "warning",
+            })
+          );
         }
         if (resolvedOutcomeAnomalies?.length) {
           await awardAnomalies({
@@ -2043,6 +2109,20 @@ export default function PlayPage() {
           : e instanceof Error
             ? e.message
             : "Failed to apply arc choice.";
+      if (e instanceof Error && e.message.startsWith("INSUFFICIENT_RESOURCES")) {
+        pushTesterMessage(
+          "mmv_tester_arc_cost_blocked",
+          testerMessage(
+            "Some story options require resources like money, energy, or social capital.",
+            {
+              title: "Narrative Has a Cost",
+              details:
+                "If an option is unavailable, it’s usually because of how you spent your time earlier. This is intentional. Try changing how you allocate a future day and see what opens up.",
+              tone: "warning",
+            }
+          )
+        );
+      }
       setError(message);
     } finally {
       setArcSubmitting(false);
@@ -2195,8 +2275,6 @@ export default function PlayPage() {
     Boolean(arc?.step);
 
   return (
-    <AuthGate>
-      {(session) => (
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div>
@@ -2254,9 +2332,13 @@ export default function PlayPage() {
                     </div>
                   </TesterOnly>
                 ) : null}
-                {testerIntroMessage ? (
+                {testerMessages.length > 0 ? (
                   <TesterOnly>
-                    <MessageCard message={testerIntroMessage} variant="inline" />
+                    <div className="space-y-2">
+                      {testerMessages.map((message) => (
+                        <MessageCard key={message.id} message={message} variant="inline" />
+                      ))}
+                    </div>
                   </TesterOnly>
                 ) : null}
                 {testerDeltaMessage ? (
@@ -2286,15 +2368,6 @@ export default function PlayPage() {
               ) : null}
             </div>
             <div className="flex items-center gap-2">
-              <Link className="text-sm text-slate-600 hover:underline" href="/journal">
-                Journal
-              </Link>
-              <Link className="text-sm text-slate-600 hover:underline" href="/theory">
-                Theoryboard
-              </Link>
-              <Link className="text-sm text-slate-600 hover:underline" href="/group">
-                Group
-              </Link>
               {isEmailAllowed(session.user.email) || devIsAdmin ? (
                 <Button
                   variant="secondary"
@@ -2312,7 +2385,6 @@ export default function PlayPage() {
                   Dev menu
                 </Button>
               ) : null}
-              <Button onClick={signOut}>Sign out</Button>
             </div>
           </div>
 
@@ -2394,7 +2466,7 @@ export default function PlayPage() {
                 ) : null}
 
                 {loading ? (
-                  <p className="text-slate-700">Loading…</p>
+                  <PlaySkeleton />
                 ) : showDailyComplete ? (
                   <>
                     <section className="space-y-3 rounded-md border border-slate-200 bg-gradient-to-br from-slate-100 via-slate-50 to-blue-100/60 px-4 py-4">
@@ -2537,50 +2609,15 @@ export default function PlayPage() {
 
                   {(stage === "allocation" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && !allocationSaved)) && (
-                    <section className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">Time Allocation</h2>
-                        <span className="text-sm text-slate-600">
-                          Total: {totalAllocation}/100
-                        </span>
-                      </div>
-                      <p className="text-base text-slate-700">
-                        Set your day in percentages. Total must be 100.
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {Object.keys(allocation).map((key) => (
-                          <label
-                            key={key}
-                            className="flex flex-col gap-1 text-base text-slate-700"
-                          >
-                            <span className="capitalize">{key}</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                              value={allocation[key as keyof AllocationPayload]}
-                              onChange={(e) =>
-                                handleAllocationChange(
-                                  key as keyof AllocationPayload,
-                                  Number(e.target.value)
-                                )
-                              }
-                            />
-                          </label>
-                        ))}
-                      </div>
-                      <Button
-                        onClick={handleSaveAllocation}
-                        disabled={!allocationValid || savingAllocation}
-                      >
-                        {savingAllocation ? "Saving..." : "Save time plan"}
-                      </Button>
-                      <p className="text-sm text-slate-600">
-                        Next: choose a storylet.
-                      </p>
-                    </section>
-                    )}
+                    <AllocationSection
+                      allocation={allocation}
+                      totalAllocation={totalAllocation}
+                      allocationValid={allocationValid}
+                      savingAllocation={savingAllocation}
+                      onAllocationChange={handleAllocationChange}
+                      onSave={handleSaveAllocation}
+                    />
+                  )}
 
                   {(stage === "storylet_1" ||
                     stage === "storylet_2" ||
@@ -3142,49 +3179,10 @@ export default function PlayPage() {
                   )}
 
               {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && (
-                <section className="space-y-3 rounded-md border border-purple-200 bg-stone-50 px-4 py-4">
-                  <h2 className="text-xl font-semibold">Reflection</h2>
-                  <p className="text-slate-500 italic">
-                    Did you know what to do today?
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      disabled={reflectionSaving}
-                      onClick={() => handleReflection("yes")}
-                      className="border-slate-300 text-slate-700 hover:bg-slate-100"
-                    >
-                      Yes
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={reflectionSaving}
-                      onClick={() => handleReflection("mostly")}
-                      className="border-slate-300 text-slate-700 hover:bg-slate-100"
-                    >
-                      Mostly
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={reflectionSaving}
-                      onClick={() => handleReflection("no")}
-                      className="border-slate-300 text-slate-700 hover:bg-slate-100"
-                    >
-                      No
-                    </Button>
-                  </div>
-                  <Button
-                    variant="outline"
-                    disabled={reflectionSaving}
-                    onClick={() => handleReflection("skip")}
-                    className="border-slate-300 text-slate-600 hover:bg-slate-100"
-                  >
-                    Skip for today
-                  </Button>
-                  <p className="text-sm text-slate-600">
-                    Thanks — see you tomorrow.
-                  </p>
-                </section>
+                <ReflectionSection
+                  saving={reflectionSaving}
+                  onReflection={handleReflection}
+                />
               )}
               {USE_DAILY_LOOP_ORCHESTRATOR &&
                 featureFlags.funPulse &&
@@ -3220,7 +3218,5 @@ export default function PlayPage() {
             </div>
           )}
         </div>
-      )}
-    </AuthGate>
   );
 }

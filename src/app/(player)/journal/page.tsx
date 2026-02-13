@@ -1,33 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
 
-import { AuthGate } from "@/ui/components/AuthGate";
-import { fetchAnomaliesByIds, fetchUserAnomalies } from "@/lib/anomalies";
+import { useSession } from "@/contexts/SessionContext";
 import { submitReport } from "@/lib/reports";
 import { Button } from "@/components/ui/button";
-import type { Anomaly, UserAnomaly } from "@/types/anomalies";
+import { JournalSkeleton } from "@/components/skeletons/JournalSkeleton";
+import { useJournalData } from "@/hooks/queries/useJournalData";
 
-function JournalContent({ session }: { session: Session }) {
-  const [entries, setEntries] = useState<UserAnomaly[]>([]);
-  const [catalog, setCatalog] = useState<Record<string, Anomaly>>({});
-  const [clues, setClues] = useState<
-    Array<{
-      id: string;
-      from_display_name: string | null;
-      anomaly_title: string | null;
-      anomaly_description: string | null;
-      created_at: string;
-    }>
-  >([]);
+function JournalContent() {
+  const session = useSession();
+  const { data, isLoading, isError } = useJournalData(
+    session.user.id,
+    session.access_token
+  );
+  const entries = data?.entries ?? [];
+  const catalog = data?.catalog ?? {};
+  const clues = data?.clues ?? [];
   const [reportTarget, setReportTarget] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState("spam");
   const [reportDetails, setReportDetails] = useState("");
   const [reportSaving, setReportSaving] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     return entries.map((entry) => ({
@@ -35,38 +29,6 @@ function JournalContent({ session }: { session: Session }) {
       anomaly: catalog[entry.anomaly_id],
     }));
   }, [entries, catalog]);
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const list = await fetchUserAnomalies(session.user.id);
-        setEntries(list);
-        const ids = Array.from(new Set(list.map((row) => row.anomaly_id)));
-        const anomalies = await fetchAnomaliesByIds(ids);
-        const map = anomalies.reduce<Record<string, Anomaly>>((acc, item) => {
-          acc[item.id] = item;
-          return acc;
-        }, {});
-        setCatalog(map);
-
-        const clueRes = await fetch("/api/group/clues/inbox", {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (clueRes.ok) {
-          const json = await clueRes.json();
-          setClues(json.clues ?? []);
-        }
-      } catch (e) {
-        console.error(e);
-        setError("Failed to load journal.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [session.user.id]);
 
   useEffect(() => {
     if (reportMessage !== "Report submitted.") return;
@@ -196,15 +158,15 @@ function JournalContent({ session }: { session: Session }) {
         </div>
       ) : null}
 
-      {error ? (
+      {isError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          Failed to load journal.
         </div>
       ) : null}
 
-      {loading ? <p className="text-slate-700">Loading…</p> : null}
+      {isLoading ? <JournalSkeleton /> : null}
 
-      {!loading && rows.length === 0 ? (
+      {!isLoading && rows.length === 0 ? (
         <p className="text-slate-700">No anomalies yet. Keep playing.</p>
       ) : (
         <div className="space-y-3">
@@ -237,5 +199,5 @@ function JournalContent({ session }: { session: Session }) {
 }
 
 export default function JournalPage() {
-  return <AuthGate>{(session) => <JournalContent session={session} />}</AuthGate>;
+  return <JournalContent />;
 }

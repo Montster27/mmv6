@@ -2,17 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Session } from "@supabase/supabase-js";
 
-import { AuthGate } from "@/ui/components/AuthGate";
+import { useSession } from "@/contexts/SessionContext";
 import { Button } from "@/components/ui/button";
-import { fetchAnomaliesByIds } from "@/lib/anomalies";
-import { supabase } from "@/lib/supabase/browser";
-import { fetchGroup, fetchGroupFeed, fetchMyGroupMembership } from "@/lib/groups";
-import { fetchUserAnomalies } from "@/lib/anomalies";
 import { submitReport } from "@/lib/reports";
-import type { Anomaly } from "@/types/anomalies";
-import type { Group, GroupFeedItem } from "@/types/groups";
+import { GroupSkeleton } from "@/components/skeletons/GroupSkeleton";
+import { useGroupFeedData } from "@/hooks/queries/useGroupData";
 
 type ProfileRow = { id: string; display_name: string | null };
 type ObjectiveRow = {
@@ -33,24 +28,28 @@ function formatWhen(ts: string) {
   return date.toLocaleString();
 }
 
-function GroupFeed({ session }: { session: Session }) {
+function GroupFeed() {
+  const session = useSession();
   const router = useRouter();
-  const [group, setGroup] = useState<Group | null>(null);
-  const [feed, setFeed] = useState<GroupFeedItem[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, ProfileRow>>({});
-  const [anomalies, setAnomalies] = useState<Record<string, Anomaly>>({});
-  const [clues, setClues] = useState<
-    Array<{
-      id: string;
-      from_display_name: string | null;
-      anomaly_title: string | null;
-      anomaly_description: string | null;
-      created_at: string;
-    }>
-  >([]);
-  const [objective, setObjective] = useState<ObjectiveRow | null>(null);
-  const [members, setMembers] = useState<ProfileRow[]>([]);
-  const [myAnomalies, setMyAnomalies] = useState<Anomaly[]>([]);
+  const { data, isLoading, isError } = useGroupFeedData(
+    session.user.id,
+    session.access_token
+  );
+  const group = data?.group ?? null;
+  const feed = data?.feed ?? [];
+  const members = data?.members ?? [];
+  const objective = data?.objective ?? data?.objectives?.[0] ?? null;
+  const clues = data?.clues ?? [];
+  const anomalies = data?.anomalyCatalog ?? {};
+  const myAnomalies = data?.userAnomalyIds?.map((id) => anomalies[id]).filter(Boolean) ?? [];
+  const profiles = useMemo(
+    () =>
+      members.reduce<Record<string, ProfileRow>>((acc, member) => {
+        acc[member.id] = member;
+        return acc;
+      }, {}),
+    [members]
+  );
   const [selectedRecipient, setSelectedRecipient] = useState("");
   const [selectedAnomaly, setSelectedAnomaly] = useState("");
   const [sendMessage, setSendMessage] = useState<string | null>(null);
@@ -62,109 +61,27 @@ function GroupFeed({ session }: { session: Session }) {
   const [reportDetails, setReportDetails] = useState("");
   const [reportSaving, setReportSaving] = useState(false);
   const [reportMessage, setReportMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const membership = await fetchMyGroupMembership(session.user.id);
-        if (!membership) {
-          router.replace("/group");
-          return;
-        }
-        const [groupRow, feedRows] = await Promise.all([
-          fetchGroup(membership.group_id),
-          fetchGroupFeed(membership.group_id),
-        ]);
-        setGroup(groupRow);
-        setFeed(feedRows);
+    if (isLoading) return;
+    if (data === null) {
+      router.replace("/group");
+    }
+  }, [data, isLoading, router]);
 
-        const objectiveRes = await fetch("/api/groups/objective/current", {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (objectiveRes.ok) {
-          const json = await objectiveRes.json();
-          setObjective(json.objective ?? null);
-        }
+  useEffect(() => {
+    if (!selectedRecipient && members.length > 0) {
+      setSelectedRecipient(members[0].id);
+    }
+  }, [members, selectedRecipient]);
 
-        const actorIds = Array.from(
-          new Set(feedRows.map((row) => row.actor_user_id).filter(Boolean))
-        ) as string[];
-        if (actorIds.length) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("id,display_name")
-            .in("id", actorIds);
-          const map = (data ?? []).reduce<Record<string, ProfileRow>>((acc, row) => {
-            acc[row.id] = row;
-            return acc;
-          }, {});
-          setProfiles(map);
-        }
-
-        const anomalyIds = Array.from(
-          new Set(
-            feedRows
-              .map((row) => row.payload?.anomaly_id)
-              .filter((id): id is string => typeof id === "string")
-          )
-        );
-        if (anomalyIds.length) {
-          const list = await fetchAnomaliesByIds(anomalyIds);
-          const map = list.reduce<Record<string, Anomaly>>((acc, item) => {
-            acc[item.id] = item;
-            return acc;
-          }, {});
-          setAnomalies(map);
-        }
-
-        const { data: memberRows } = await supabase
-          .from("group_members")
-          .select("user_id")
-          .eq("group_id", membership.group_id);
-        const memberIds = (memberRows ?? []).map((row) => row.user_id);
-        if (memberIds.length) {
-          const { data: memberProfiles } = await supabase
-            .from("profiles")
-            .select("id,display_name")
-            .in("id", memberIds);
-          const list = (memberProfiles ?? []).filter((row) => row.id !== session.user.id);
-          setMembers(list);
-          if (!selectedRecipient && list[0]) {
-            setSelectedRecipient(list[0].id);
-          }
-        }
-
-        const myAnomalyRows = await fetchUserAnomalies(session.user.id);
-        const myIds = Array.from(new Set(myAnomalyRows.map((row) => row.anomaly_id)));
-        if (myIds.length) {
-          const list = await fetchAnomaliesByIds(myIds);
-          setMyAnomalies(list);
-          if (!selectedAnomaly && list[0]) {
-            setSelectedAnomaly(list[0].id);
-          }
-        }
-
-        const clueRes = await fetch("/api/group/clues/inbox", {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (clueRes.ok) {
-          const json = await clueRes.json();
-          setClues(json.clues ?? []);
-        }
-      } catch (e) {
-        console.error(e);
-        setError("Failed to load group feed.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [session.user.id, router]);
+  useEffect(() => {
+    if (!selectedAnomaly && myAnomalies.length > 0) {
+      setSelectedAnomaly(myAnomalies[0].id);
+    }
+  }, [myAnomalies, selectedAnomaly]);
 
   useEffect(() => {
     if (reportMessage !== "Report submitted.") return;
@@ -257,8 +174,12 @@ function GroupFeed({ session }: { session: Session }) {
     }
   };
 
-  if (loading) {
-    return <p className="p-6 text-slate-700">Loading…</p>;
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <GroupSkeleton />
+      </div>
+    );
   }
 
   return (
@@ -278,9 +199,9 @@ function GroupFeed({ session }: { session: Session }) {
         </Button>
       </div>
 
-      {error ? (
+      {error || isError ? (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          {error ?? "Failed to load group feed."}
         </div>
       ) : null}
 
@@ -522,5 +443,5 @@ function GroupFeed({ session }: { session: Session }) {
 }
 
 export default function GroupFeedPage() {
-  return <AuthGate>{(session) => <GroupFeed session={session} />}</AuthGate>;
+  return <GroupFeed />;
 }
