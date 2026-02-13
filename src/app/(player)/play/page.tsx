@@ -2257,6 +2257,7 @@ export default function PlayPage() {
                   devIsAdmin ||
                   bootstrapIsAdmin
               )}
+              currentUserId={bootstrapUserId}
               devSettings={devSettings}
               devSettingsLoading={devSettingsLoading}
               devSettingsSaving={devSettingsSaving}

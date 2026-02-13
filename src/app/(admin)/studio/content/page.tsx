@@ -1685,7 +1685,7 @@ export default function ContentStudioLitePage() {
                                     ) : null}
                                   </div>
                                   <div className="text-xs text-slate-500">
-                                    {storylet.slug}
+                                    {storylet.slug} · {storylet.id}
                                   </div>
                                 </button>
                               );
@@ -1702,29 +1702,40 @@ export default function ContentStudioLitePage() {
                         ) : (
                           <div className="space-y-4">
                             <div className="grid gap-3 md:grid-cols-2">
-                            <label className="text-sm text-slate-700">
-                              Title
-                              <input
-                                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                value={activeStorylet.title}
+                              <label className="text-sm text-slate-700">
+                                Title
+                                <input
+                                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                  value={activeStorylet.title}
                                 onChange={(e) =>
                                   updateDraft({ title: e.target.value })
                                 }
                                 placeholder="Short descriptive title"
                               />
                             </label>
-                            <label className="text-sm text-slate-700">
-                              Slug
-                              <input
-                                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                value={activeStorylet.slug}
-                                onChange={(e) =>
-                                  updateDraft({ slug: e.target.value })
+                              <label className="text-sm text-slate-700">
+                                Slug
+                                <input
+                                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                  value={activeStorylet.slug}
+                                  onChange={(e) =>
+                                    updateDraft({ slug: e.target.value })
+                                  }
+                                  placeholder="unique_slug"
+                                />
+                              </label>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                              <span>Storylet ID: {activeStorylet.id}</span>
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  navigator.clipboard.writeText(activeStorylet.id)
                                 }
-                                placeholder="unique_slug"
-                              />
-                            </label>
-                          </div>
+                              >
+                                Copy ID
+                              </Button>
+                            </div>
 
                             <label className="text-sm text-slate-700">
                               Body

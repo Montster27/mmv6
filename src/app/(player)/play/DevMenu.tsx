@@ -18,6 +18,7 @@ type DevCharacter = {
 
 type Props = {
   isAdmin: boolean;
+  currentUserId: string | null;
   devSettings: { test_mode: boolean };
   devSettingsLoading: boolean;
   devSettingsSaving: boolean;
@@ -37,6 +38,21 @@ type Props = {
 
 function readOverrides(): Partial<FeatureFlags> {
   try {
+    const retain = window.localStorage.getItem("mmv_feature_overrides_retain");
+    if (retain === "1") {
+      const userKey = window.localStorage.getItem("mmv_feature_overrides_user");
+      if (userKey) {
+        const rawUser = window.localStorage.getItem(userKey);
+        if (rawUser) {
+          const parsedUser = JSON.parse(rawUser) as Partial<FeatureFlags>;
+          return parsedUser && typeof parsedUser === "object" ? parsedUser : {};
+        }
+      }
+    }
+  } catch {
+    return {};
+  }
+  try {
     const raw = window.localStorage.getItem("mmv_feature_overrides");
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Partial<FeatureFlags>;
@@ -46,8 +62,14 @@ function readOverrides(): Partial<FeatureFlags> {
   }
 }
 
-function writeOverrides(overrides: Partial<FeatureFlags>) {
+function writeOverrides(overrides: Partial<FeatureFlags>, userId?: string | null) {
   window.localStorage.setItem("mmv_feature_overrides", JSON.stringify(overrides));
+  const retain = window.localStorage.getItem("mmv_feature_overrides_retain");
+  if (retain === "1" && userId) {
+    const userKey = `mmv_feature_overrides:${userId}`;
+    window.localStorage.setItem("mmv_feature_overrides_user", userKey);
+    window.localStorage.setItem(userKey, JSON.stringify(overrides));
+  }
 }
 
 const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
@@ -72,6 +94,7 @@ const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
 
 export default function DevMenu({
   isAdmin,
+  currentUserId,
   devSettings,
   devSettingsLoading,
   devSettingsSaving,
@@ -89,10 +112,13 @@ export default function DevMenu({
   onToggleAdmin,
 }: Props) {
   const [flagOverrides, setFlagOverrides] = useState<Partial<FeatureFlags>>({});
+  const [retainOverrides, setRetainOverrides] = useState(false);
   const flags = getFeatureFlags();
 
   useEffect(() => {
     setFlagOverrides(readOverrides());
+    const retain = window.localStorage.getItem("mmv_feature_overrides_retain");
+    setRetainOverrides(retain === "1");
   }, []);
 
   const handleToggleFlag = (key: keyof FeatureFlags) => {
@@ -101,14 +127,26 @@ export default function DevMenu({
       [key]: !(flagOverrides[key] ?? flags[key]),
     };
     setFlagOverrides(nextOverrides);
-    writeOverrides(nextOverrides);
+    writeOverrides(nextOverrides, currentUserId);
     window.location.reload();
   };
 
   const handleResetFlags = () => {
     setFlagOverrides({});
-    writeOverrides({});
+    writeOverrides({}, currentUserId);
     window.location.reload();
+  };
+
+  const handleToggleRetain = () => {
+    const next = !retainOverrides;
+    setRetainOverrides(next);
+    window.localStorage.setItem(
+      "mmv_feature_overrides_retain",
+      next ? "1" : "0"
+    );
+    if (next && currentUserId) {
+      writeOverrides(flagOverrides, currentUserId);
+    }
   };
 
   return (
@@ -166,6 +204,14 @@ export default function DevMenu({
         <p className="text-xs text-slate-500">
           Overrides are local to this browser. Page reloads when you toggle.
         </p>
+        <label className="flex items-center gap-2 text-xs text-slate-600">
+          <input
+            type="checkbox"
+            checked={retainOverrides}
+            onChange={handleToggleRetain}
+          />
+          Retain toggles for this account
+        </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {FLAG_LABELS.map(([key, label]) => {
             const active = flagOverrides[key] ?? flags[key];
