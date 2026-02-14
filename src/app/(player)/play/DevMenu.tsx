@@ -134,15 +134,24 @@ export default function DevMenu({
     ) {
       nextOverrides = {
         ...nextOverrides,
-        rookieCircleEnabled: true,
-        askOfferBoardEnabled: true,
-        buddySystemEnabled: true,
-        afterActionCompareEnabled: true,
-        remnantSystemEnabled: true,
+        rookieCircleEnabled:
+          flagOverrides.rookieCircleEnabled ?? flags.rookieCircleEnabled,
+        askOfferBoardEnabled:
+          flagOverrides.askOfferBoardEnabled ?? flags.askOfferBoardEnabled,
+        buddySystemEnabled:
+          flagOverrides.buddySystemEnabled ?? flags.buddySystemEnabled,
+        afterActionCompareEnabled:
+          flagOverrides.afterActionCompareEnabled ?? flags.afterActionCompareEnabled,
+        remnantSystemEnabled:
+          flagOverrides.remnantSystemEnabled ?? flags.remnantSystemEnabled,
       };
     }
     setFlagOverrides(nextOverrides);
     writeOverrides(nextOverrides, currentUserId);
+    if (key === "verticalSlice30Enabled") {
+      window.location.reload();
+      return;
+    }
     onFlagsChanged?.();
   };
 
