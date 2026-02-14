@@ -4,6 +4,7 @@ import { AuthGate } from "@/ui/components/AuthGate";
 import { SessionProvider } from "@/contexts/SessionContext";
 import { PlayerNav } from "@/components/nav/PlayerNav";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { ClientErrorBoundary } from "@/components/ux/ClientErrorBoundary";
 
 export default function PlayerLayout({
   children,
@@ -16,7 +17,9 @@ export default function PlayerLayout({
         <QueryProvider>
           <SessionProvider session={session}>
             <PlayerNav />
-            <main>{children}</main>
+            <main>
+              <ClientErrorBoundary>{children}</ClientErrorBoundary>
+            </main>
           </SessionProvider>
         </QueryProvider>
       )}
