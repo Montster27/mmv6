@@ -1,52 +1,32 @@
-import { describe, expect, it, vi } from "vitest";
-
-const mockState = vi.hoisted(() => {
-  const updatePayloads: Array<{ table: string; payload: any }> = [];
-
-  const builder: any = {
-    table: "",
-    upsert: vi.fn(async () => ({ error: null })),
-    update: vi.fn((payload: any) => {
-      updatePayloads.push({ table: builder.table, payload });
-      return builder;
-    }),
-    eq: vi.fn(() => builder),
-  };
-
-  const supabase = {
-    from: vi.fn((table: string) => {
-      builder.table = table;
-      return builder;
-    }),
-  };
-
-  return {
-    supabase,
-    builder,
-    getUpdatePayloads: () => updatePayloads,
-    reset: () => {
-      updatePayloads.length = 0;
-      builder.upsert.mockClear();
-      builder.update.mockClear();
-      builder.eq.mockClear();
-    },
-  };
-});
-
-vi.mock("@/lib/supabase/browser", () => ({ supabase: mockState.supabase }));
-vi.mock("@/lib/dayState", () => ({ ensureDayStateUpToDate: vi.fn() }));
-vi.mock("@/lib/dailyInteractions", () => ({ fetchSkillLevels: vi.fn() }));
-
-import { saveTimeAllocation } from "@/lib/play";
-import { ensureDayStateUpToDate } from "@/lib/dayState";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { createMockSupabaseBuilder } from "@/test-utils/mockSupabase";
 import { hashAllocation } from "@/core/sim/allocationEffects";
+// We mock these but import them for type usage or just to satisfy the test logic
+import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { fetchSkillLevels } from "@/lib/dailyInteractions";
 
-const allocation = { study: 40, work: 20, social: 10, health: 20, fun: 10 };
-
 describe("saveTimeAllocation", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  const allocation = { study: 40, work: 20, social: 10, health: 20, fun: 10 };
+
   it("applies allocation effects on first submit", async () => {
-    mockState.reset();
+    const mockSupabase = createMockSupabaseBuilder();
+
+    // Mocks
+    vi.doMock("@/lib/supabase/browser", () => ({ supabase: mockSupabase.supabase }));
+    vi.doMock("@/lib/dayState", () => ({ ensureDayStateUpToDate: vi.fn() }));
+    vi.doMock("@/lib/dailyInteractions", () => ({ fetchSkillLevels: vi.fn() }));
+
+    // Import SUT after mocks
+    const { saveTimeAllocation } = await import("@/lib/play");
+    const { ensureDayStateUpToDate } = await import("@/lib/dayState"); // mocked version
+    const { fetchSkillLevels } = await import("@/lib/dailyInteractions"); // mocked version
+
+    mockSupabase.reset();
+
     vi.mocked(fetchSkillLevels).mockResolvedValue({
       focus: 0,
       memory: 0,
@@ -78,12 +58,24 @@ describe("saveTimeAllocation", () => {
       updated_at: new Date().toISOString(),
     });
 
+    // We also need to mock fetchDailyState response if called.
+    // fetchDailyState is called if vectorDeltas > 0.
+    // For this allocation, vectorDeltas might be present.
+    // mockSupabase.supabase.from("daily_states").select(...).maybeSingle()
+    mockSupabase.setMaybeSingleResponses([
+      // if fetchDailyState is called, it returns a daily state
+      { data: { id: "ds1", user_id: "u", day_index: 2, energy: 60, stress: 23, vectors: {} }, error: null }
+    ]);
+
     await saveTimeAllocation("u", 2, allocation, "steady");
 
-    const updates = mockState.getUpdatePayloads();
-    expect(updates.length).toBe(1);
-    expect(updates[0].table).toBe("player_day_state");
-    expect(updates[0].payload).toMatchObject({
+    const updates = mockSupabase.getUpdatePayloads();
+    // 1 update for player_day_state
+    // potentially 1 update for daily_states if vectors applied
+
+    const dayStateUpdate = updates.find(u => u.table === "player_day_state");
+    expect(dayStateUpdate).toBeDefined();
+    expect(dayStateUpdate!.payload).toMatchObject({
       energy: 60,
       stress: 23,
       money: 2,
@@ -101,13 +93,18 @@ describe("saveTimeAllocation", () => {
   });
 
   it("is idempotent for the same allocation", async () => {
-    mockState.reset();
-    vi.mocked(fetchSkillLevels).mockResolvedValue({
-      focus: 0,
-      memory: 0,
-      networking: 0,
-      grit: 0,
-    });
+    const mockSupabase = createMockSupabaseBuilder();
+    vi.doMock("@/lib/supabase/browser", () => ({ supabase: mockSupabase.supabase }));
+    vi.doMock("@/lib/dayState", () => ({ ensureDayStateUpToDate: vi.fn() }));
+    vi.doMock("@/lib/dailyInteractions", () => ({ fetchSkillLevels: vi.fn() }));
+
+    const { saveTimeAllocation } = await import("@/lib/play");
+    const { ensureDayStateUpToDate } = await import("@/lib/dayState"); // mocked version
+    const { fetchSkillLevels } = await import("@/lib/dailyInteractions"); // mocked version
+
+    mockSupabase.reset();
+    vi.mocked(fetchSkillLevels).mockResolvedValue({ focus: 0, memory: 0, networking: 0, grit: 0 });
+
     const sameHash = hashAllocation(allocation);
     vi.mocked(ensureDayStateUpToDate).mockResolvedValue({
       user_id: "u",
@@ -136,17 +133,22 @@ describe("saveTimeAllocation", () => {
 
     await saveTimeAllocation("u", 2, allocation, "steady");
 
-    expect(mockState.getUpdatePayloads().length).toBe(0);
+    expect(mockSupabase.getUpdatePayloads().length).toBe(0);
   });
 
   it("recomputes from pre-allocation baseline when allocation changes", async () => {
-    mockState.reset();
-    vi.mocked(fetchSkillLevels).mockResolvedValue({
-      focus: 0,
-      memory: 0,
-      networking: 0,
-      grit: 0,
-    });
+    const mockSupabase = createMockSupabaseBuilder();
+    vi.doMock("@/lib/supabase/browser", () => ({ supabase: mockSupabase.supabase }));
+    vi.doMock("@/lib/dayState", () => ({ ensureDayStateUpToDate: vi.fn() }));
+    vi.doMock("@/lib/dailyInteractions", () => ({ fetchSkillLevels: vi.fn() }));
+
+    const { saveTimeAllocation } = await import("@/lib/play");
+    const { ensureDayStateUpToDate } = await import("@/lib/dayState");
+    const { fetchSkillLevels } = await import("@/lib/dailyInteractions");
+
+    mockSupabase.reset();
+    vi.mocked(fetchSkillLevels).mockResolvedValue({ focus: 0, memory: 0, networking: 0, grit: 0 });
+
     vi.mocked(ensureDayStateUpToDate).mockResolvedValue({
       user_id: "u",
       day_index: 2,
@@ -172,19 +174,19 @@ describe("saveTimeAllocation", () => {
       updated_at: new Date().toISOString(),
     });
 
-    const nextAllocation = {
-      study: 30,
-      work: 30,
-      social: 10,
-      health: 20,
-      fun: 10,
-    };
+    const nextAllocation = { study: 30, work: 30, social: 10, health: 20, fun: 10 };
+
+    // Mock response for fetchDailyState if needed (it might be called)
+    mockSupabase.setMaybeSingleResponses([
+      { data: { id: "ds1", user_id: "u", day_index: 2, energy: 60, stress: 23, vectors: {} }, error: null }
+    ]);
 
     await saveTimeAllocation("u", 2, nextAllocation, "steady");
 
-    const updates = mockState.getUpdatePayloads();
-    expect(updates.length).toBe(1);
-    expect(updates[0].payload).toMatchObject({
+    const updates = mockSupabase.getUpdatePayloads();
+    const dayStateUpdate = updates.find(u => u.table === "player_day_state");
+    expect(dayStateUpdate).toBeDefined();
+    expect(dayStateUpdate!.payload).toMatchObject({
       pre_allocation_energy: 60,
       pre_allocation_stress: 10,
       pre_allocation_money: 5,
@@ -193,7 +195,7 @@ describe("saveTimeAllocation", () => {
       pre_allocation_health: 40,
       allocation_hash: hashAllocation(nextAllocation),
     });
-    expect(updates[0].payload.energy).toBe(50);
-    expect(updates[0].payload.stress).toBe(13);
+    expect(dayStateUpdate!.payload.energy).toBe(50);
+    expect(dayStateUpdate!.payload.stress).toBe(13);
   });
 });

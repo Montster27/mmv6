@@ -9,15 +9,15 @@ describe("summarizeVectors", () => {
   });
 
   it("summarizes the dominant vector", () => {
-    const res = summarizeVectors({ focus: 5, calm: 7 });
-    expect(res).toBe("You lean toward calm.");
+    const res = summarizeVectors({ focus: 5, curiosity: 7 });
+    expect(res).toBe("You lean toward curiosity.");
   });
 
   it("summarizes change when deltas exist", () => {
     const res = summarizeVectors(
-      { focus: 5, calm: 7 },
-      { vectors: { focus: 3, calm: 1 } }
+      { focus: 5, curiosity: 7 },
+      { vectors: { focus: 3, curiosity: 1 } }
     );
-    expect(res).toBe("You’re becoming more focus.");
+    expect(res).toBe("You’re becoming more focus."); // delta focus=3, curiosity=1. Max delta is focus.
   });
 });

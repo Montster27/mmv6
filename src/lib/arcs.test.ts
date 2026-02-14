@@ -62,6 +62,10 @@ vi.mock("@/lib/dayState", () => ({
   ensureDayStateUpToDate: vi.fn(),
 }));
 
+vi.mock("@/lib/featureFlags", () => ({
+  getFeatureFlags: vi.fn(() => ({ resources: true })),
+}));
+
 import { fetchArcSteps } from "@/lib/content/arcs";
 import { applyAlignmentDelta } from "@/lib/alignment";
 import { progressArcWithChoice, startArc } from "@/lib/arcs";
@@ -149,8 +153,9 @@ describe("arcs", () => {
         },
         error: null,
       },
-      { data: { id: "inst-1" }, error: null },
-      { data: { id: "inst-1" }, error: null },
+      { data: { id: "inst-1" }, error: null }, // update resource (Wait, update doesn't return data unless select used. arcs.ts uses select().maybeSingle() for updates)
+      { data: { id: "inst-1" }, error: null }, // update meta
+      { data: { id: "inst-1" }, error: null }, // update step
     ]);
     vi.mocked(ensureDayStateUpToDate).mockResolvedValue({
       user_id: "u",
@@ -176,11 +181,17 @@ describe("arcs", () => {
     await progressArcWithChoice("u", "anomaly_001", "log_it", 2);
 
     const updatePayloads = mockState.getUpdatePayloads();
-    expect(updatePayloads.length).toBe(2);
+    expect(updatePayloads.length).toBe(3);
+    // 1. Resource update
     expect(updatePayloads[0]).toMatchObject({
+      energy: expect.any(Number),
+    });
+    // 2. Flags update
+    expect(updatePayloads[1]).toMatchObject({
       meta: { flags: { existing: true, arc_anomaly_001_logged: true } },
     });
-    expect(updatePayloads[1]).toMatchObject({
+    // 3. Step update
+    expect(updatePayloads[2]).toMatchObject({
       current_step: 1,
     });
     expect(applyAlignmentDelta).toHaveBeenCalledWith({

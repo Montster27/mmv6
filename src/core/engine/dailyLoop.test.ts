@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { StoryletRun, Storylet } from "@/types/storylets";
-import { _testOnly } from "./dailyLoop";
+import { runsForTodayPair, computeStage } from "@/core/engine/dailyLoop.utils";
 
 const storyletA: Storylet = {
   id: "a",
@@ -19,7 +19,7 @@ describe("dailyLoop helpers", () => {
     const runs: StoryletRun[] = [
       { id: "1", storylet_id: "c", user_id: "u", day_index: 1, choice_id: "x" },
     ];
-    const filtered = _testOnly.runsForTodayPair(runs, [storyletA, storyletB]);
+    const filtered = runsForTodayPair(runs, [storyletA, storyletB]);
     expect(filtered.length).toBe(0);
   });
 
@@ -27,12 +27,12 @@ describe("dailyLoop helpers", () => {
     const runs: StoryletRun[] = [
       { id: "1", storylet_id: "a", user_id: "u", day_index: 1, choice_id: "x" },
     ];
-    const filtered = _testOnly.runsForTodayPair(runs, [storyletA, storyletB]);
+    const filtered = runsForTodayPair(runs, [storyletA, storyletB]);
     expect(filtered.length).toBe(1);
   });
 
   it("computes storylet_2 stage for one completed run", () => {
-    const stage = _testOnly.computeStage(
+    const stage = computeStage(
       true,
       1,
       false,

@@ -1,4 +1,5 @@
 import { ensureCadenceUpToDate } from "@/lib/cadence";
+import { runsForTodayPair, computeStage } from "@/core/engine/dailyLoop.utils";
 import {
   fetchDailyState,
   fetchTimeAllocation,
@@ -90,37 +91,6 @@ const DIRECTIVE_TAGS: Record<string, string[]> = {
   bormann_network: ["security", "secrecy", "force"],
 };
 
-function runsForTodayPair(runs: StoryletRun[], storyletPair: Storylet[]): StoryletRun[] {
-  const ids = new Set(storyletPair.map((s) => s.id));
-  return runs.filter((run) => ids.has(run.storylet_id));
-}
-
-function computeStage(
-  allocationPresent: boolean,
-  runsForPairCount: number,
-  alreadyCompletedToday: boolean,
-  canBoost: boolean,
-  hasStorylets: boolean,
-  reflectionDone: boolean,
-  microTaskEligible: boolean,
-  microTaskDone: boolean,
-  funPulseEligible: boolean,
-  funPulseDone: boolean
-): DailyRunStage {
-  if (!hasStorylets) return "complete";
-  if (alreadyCompletedToday) return "complete";
-  if (!allocationPresent) return "allocation";
-  if (runsForPairCount === 0) return "storylet_1";
-  if (runsForPairCount === 1) return "storylet_2";
-  if (runsForPairCount >= 2 && reflectionDone && funPulseEligible && !funPulseDone) {
-    return "fun_pulse";
-  }
-  if (runsForPairCount >= 2 && reflectionDone) return "complete";
-  if (runsForPairCount >= 2 && microTaskEligible && !microTaskDone) return "microtask";
-  if (runsForPairCount >= 2 && canBoost) return "social";
-  if (runsForPairCount >= 2 && !canBoost) return "reflection";
-  return "complete";
-}
 
 function devLogStage(snapshot: Record<string, unknown>) {
   if (process.env.NODE_ENV !== "production") {
@@ -287,7 +257,7 @@ export async function getOrCreateDailyRun(
   let directiveSummary = null as DailyRun["directive"];
   const initiativesEnabled = featureFlags.alignment;
 
-  await ensureUserAlignmentRows(userId).catch(() => {});
+  await ensureUserAlignmentRows(userId).catch(() => { });
   if (featureFlags.alignment) {
     const [factionsResult, alignmentRows, arcsResult, initiativesResult, events] =
       await Promise.all([
@@ -308,21 +278,21 @@ export async function getOrCreateDailyRun(
     unlocks = computeUnlockedContent(alignment, contentArcs, contentInitiatives);
     directiveRow = cohortId
       ? await getOrCreateWeeklyDirective(
-          cohortId,
-          dayIndex,
-          unlocks.unlockedInitiativeKeys
-        ).catch(() => null)
+        cohortId,
+        dayIndex,
+        unlocks.unlockedInitiativeKeys
+      ).catch(() => null)
       : null;
     directiveSummary = directiveRow
       ? {
-          faction_key: directiveRow.faction_key,
-          title: directiveRow.title,
-          description: directiveRow.description,
-          target_type: directiveRow.target_type,
-          target_key: directiveRow.target_key,
-          week_end_day_index: directiveRow.week_end_day_index,
-          status: directiveRow.status,
-        }
+        faction_key: directiveRow.faction_key,
+        title: directiveRow.title,
+        description: directiveRow.description,
+        target_type: directiveRow.target_type,
+        target_key: directiveRow.target_key,
+        week_end_day_index: directiveRow.week_end_day_index,
+        status: directiveRow.status,
+      }
       : null;
   }
   const directiveTags =
@@ -387,7 +357,7 @@ export async function getOrCreateDailyRun(
             delta: 2,
             source: "directive",
             sourceRef: staleDirective.id,
-          }).catch(() => {});
+          }).catch(() => { });
         }
       }
     }
@@ -476,20 +446,20 @@ export async function getOrCreateDailyRun(
 
   const availableArcs = featureFlags.alignment
     ? await fetchArcInstancesByKeys(userId, unlocks.unlockedArcKeys)
-        .catch(() => [])
-        .then((unlockedInstances) => {
-          const startedArcKeys = new Set(
-            unlockedInstances.map((item) => item.arc_key)
-          );
-          return contentArcs
-            .filter((arc) => unlocks.unlockedArcKeys.includes(arc.key))
-            .filter((arc) => !startedArcKeys.has(arc.key))
-            .map((arc) => ({
-              key: arc.key,
-              title: arc.title,
-              description: arc.description,
-            }));
-        })
+      .catch(() => [])
+      .then((unlockedInstances) => {
+        const startedArcKeys = new Set(
+          unlockedInstances.map((item) => item.arc_key)
+        );
+        return contentArcs
+          .filter((arc) => unlocks.unlockedArcKeys.includes(arc.key))
+          .filter((arc) => !startedArcKeys.has(arc.key))
+          .map((arc) => ({
+            key: arc.key,
+            title: arc.title,
+            description: arc.description,
+          }));
+      })
     : [];
 
   const { weekStart, weekEnd } = computeWeekWindow(dayIndex);
@@ -499,13 +469,13 @@ export async function getOrCreateDailyRun(
   const cohortInfluence =
     featureFlags.alignment && cohortId
       ? await getOrComputeCohortWeeklyInfluence(cohortId, weekStart, weekEnd).catch(
-          () => ({})
-        )
+        () => ({})
+      )
       : null;
   const rivalrySnapshot = featureFlags.alignment
     ? await getOrComputeWeeklySnapshot(weekStart, weekEnd).catch(
-        () => ({ topCohorts: [] })
-      )
+      () => ({ topCohorts: [] })
+    )
     : { topCohorts: [] };
 
   return {
@@ -527,55 +497,55 @@ export async function getOrCreateDailyRun(
     cohortId,
     arc: featureFlags.arcs && arcDefinition
       ? {
-          arc_key: arcDefinition.key,
-          status:
-            arcInstance?.status === "completed"
-              ? "completed"
-              : arcInstance?.status === "active"
-                ? "active"
-                : "not_started",
-          title: arcDefinition.title,
-          description: arcDefinition.description,
-          current_step: arcInstance?.current_step ?? null,
-          step: arcStep
-            ? {
-                step_index: arcStep.step_index,
-                title: arcStep.title,
-                body: arcStep.body,
-                choices: arcStep.choices ?? [],
-              }
-            : null,
-        }
+        arc_key: arcDefinition.key,
+        status:
+          arcInstance?.status === "completed"
+            ? "completed"
+            : arcInstance?.status === "active"
+              ? "active"
+              : "not_started",
+        title: arcDefinition.title,
+        description: arcDefinition.description,
+        current_step: arcInstance?.current_step ?? null,
+        step: arcStep
+          ? {
+            step_index: arcStep.step_index,
+            title: arcStep.title,
+            body: arcStep.body,
+            choices: arcStep.choices ?? [],
+          }
+          : null,
+      }
       : null,
     factions: featureFlags.alignment ? factions : [],
     alignment: featureFlags.alignment ? alignment : undefined,
     unlocks: featureFlags.alignment
       ? {
-          arcKeys: unlocks.unlockedArcKeys,
-          initiativeKeys: unlocks.unlockedInitiativeKeys,
-        }
+        arcKeys: unlocks.unlockedArcKeys,
+        initiativeKeys: unlocks.unlockedInitiativeKeys,
+      }
       : undefined,
     availableArcs: featureFlags.alignment ? availableArcs : [],
     recentAlignmentEvents: featureFlags.alignment ? recentEvents : undefined,
     worldState: featureFlags.alignment
       ? {
-          weekStart,
-          weekEnd,
-          influence: worldInfluence ?? {},
-        }
+        weekStart,
+        weekEnd,
+        influence: worldInfluence ?? {},
+      }
       : undefined,
     cohortState:
       featureFlags.alignment && cohortInfluence
         ? {
-            weekStart,
-            weekEnd,
-            influence: cohortInfluence,
-          }
+          weekStart,
+          weekEnd,
+          influence: cohortInfluence,
+        }
         : null,
     rivalry: featureFlags.alignment
       ? {
-          topCohorts: rivalrySnapshot.topCohorts,
-        }
+        topCohorts: rivalrySnapshot.topCohorts,
+      }
       : undefined,
     directive: featureFlags.alignment ? directiveSummary : null,
     initiatives,
@@ -586,18 +556,18 @@ export async function getOrCreateDailyRun(
     dailyState: daily,
     dayState: dayState
       ? {
-          energy: dayState.energy,
-          stress: dayState.stress,
-          cashOnHand: dayState.cashOnHand,
-          knowledge: dayState.knowledge,
-          socialLeverage: dayState.socialLeverage,
-          physicalResilience: dayState.physicalResilience,
-          total_study: dayState.total_study,
-          total_work: dayState.total_work,
-          total_social: dayState.total_social,
-          total_health: dayState.total_health,
-          total_fun: dayState.total_fun,
-        }
+        energy: dayState.energy,
+        stress: dayState.stress,
+        cashOnHand: dayState.cashOnHand,
+        knowledge: dayState.knowledge,
+        socialLeverage: dayState.socialLeverage,
+        physicalResilience: dayState.physicalResilience,
+        total_study: dayState.total_study,
+        total_work: dayState.total_work,
+        total_social: dayState.total_social,
+        total_health: dayState.total_health,
+        total_fun: dayState.total_fun,
+      }
       : null,
     remnant: featureFlags.remnantSystemEnabled ? remnantState : null,
     seasonResetNeeded,
@@ -607,8 +577,3 @@ export async function getOrCreateDailyRun(
   };
 }
 
-// Export helpers for testing
-export const _testOnly = {
-  runsForTodayPair,
-  computeStage,
-};

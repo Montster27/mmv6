@@ -98,6 +98,11 @@ vi.mock("@/lib/worldState", () => ({
 vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
 }));
+
+vi.mock("@/core/storylets/selectStorylets", () => ({
+  selectStorylets: vi.fn(),
+}));
+
 vi.mock("@/core/validation/storyletValidation", () => ({
   fallbackStorylet: vi.fn(() => ({
     id: "fallback",
@@ -106,6 +111,17 @@ vi.mock("@/core/validation/storyletValidation", () => ({
     body: "",
     choices: [],
     is_active: true,
+  })),
+}));
+
+vi.mock("@/lib/featureFlags", () => ({
+  getFeatureFlags: vi.fn(() => ({
+    skills: true,
+    funPulse: true,
+    alignment: true,
+    arcs: true,
+    resources: true,
+    remnantSystemEnabled: true,
   })),
 }));
 
@@ -203,6 +219,11 @@ const dayState = {
   knowledge: 0,
   socialLeverage: 0,
   physicalResilience: 50,
+  total_study: 0,
+  total_work: 0,
+  total_social: 0,
+  total_health: 0,
+  total_fun: 0,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 };
