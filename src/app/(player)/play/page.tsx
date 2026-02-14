@@ -399,6 +399,7 @@ export default function PlayPage() {
     []
   );
   const testerMode = useMemo(() => getAppMode().testerMode, []);
+  const phaseRef = useRef<string | null>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const featureFlags = useMemo(() => getFeatureFlags(), [featureFlagsVersion]);
   const slicePhaseId = useMemo(() => {
@@ -457,7 +458,6 @@ export default function PlayPage() {
   const stagePauseTimerRef = useRef<number | null>(null);
   const stageInteractionRef = useRef(false);
   const sessionStartAtRef = useRef<number | null>(null);
-  const phaseRef = useRef<string | null>(null);
   const [lastCompletedStage, setLastCompletedStage] =
     useState<DailyRunStage | null>(null);
   const [testerStageResponses, setTesterStageResponses] = useState<
