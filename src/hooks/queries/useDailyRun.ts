@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 
 type DailyRunOptions = {
   experiments: Record<string, string>;
@@ -15,8 +14,9 @@ export function useDailyRun(
 ) {
   return useQuery({
     queryKey: ["daily-run", userId, options.microtaskVariant, options.refreshKey],
-    queryFn: () => {
+    queryFn: async () => {
       if (!userId) throw new Error("No userId");
+      const { getOrCreateDailyRun } = await import("@/core/engine/dailyLoop");
       return getOrCreateDailyRun(userId, new Date(), {
         experiments: options.experiments,
         microtaskVariant: options.microtaskVariant,
