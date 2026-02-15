@@ -148,6 +148,19 @@ export function GraphView({
     dragRef.current = null;
   };
 
+  const canvasSize = useMemo(() => {
+    let maxX = 0;
+    let maxY = 0;
+    Object.values(nodePositions).forEach((pos) => {
+      maxX = Math.max(maxX, pos.x + NODE_WIDTH);
+      maxY = Math.max(maxY, pos.y + NODE_HEIGHT);
+    });
+    return {
+      width: Math.max(640, maxX + COLUMN_GAP),
+      height: Math.max(360, maxY + ROW_GAP),
+    };
+  }, [nodePositions]);
+
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
@@ -167,11 +180,47 @@ export function GraphView({
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
               transformOrigin: "top left",
-              width: "100%",
-              height: "100%",
+              width: canvasSize.width,
+              height: canvasSize.height,
             }}
           >
-            <svg className="absolute left-0 top-0 h-full w-full">
+            <svg
+              className="absolute left-0 top-0"
+              width={canvasSize.width}
+              height={canvasSize.height}
+            >
+              <defs>
+                <marker
+                  id="arrow"
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="6"
+                  refY="3"
+                  orient="auto"
+                >
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8" />
+                </marker>
+                <marker
+                  id="arrow-active"
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="6"
+                  refY="3"
+                  orient="auto"
+                >
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#0f172a" />
+                </marker>
+                <marker
+                  id="arrow-invalid"
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="6"
+                  refY="3"
+                  orient="auto"
+                >
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#dc2626" />
+                </marker>
+              </defs>
               {edges.map((edge, idx) => {
                 const fromPos = nodePositions[edge.from];
                 const toPos = nodePositions[edge.to];
@@ -180,16 +229,29 @@ export function GraphView({
                 const y1 = fromPos.y + NODE_HEIGHT / 2;
                 const x2 = toPos.x;
                 const y2 = toPos.y + NODE_HEIGHT / 2;
+                const midX = x1 + (x2 - x1) * 0.5;
+                const isActive =
+                  selectedStorylet?.id === edge.from ||
+                  selectedStorylet?.id === edge.to;
+                const stroke = edge.invalid
+                  ? "#dc2626"
+                  : isActive
+                  ? "#0f172a"
+                  : "#94a3b8";
+                const marker = edge.invalid
+                  ? "url(#arrow-invalid)"
+                  : isActive
+                  ? "url(#arrow-active)"
+                  : "url(#arrow)";
                 return (
-                  <line
+                  <path
                     key={`${edge.from}-${edge.to}-${idx}`}
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    stroke={edge.invalid ? "#dc2626" : "#94a3b8"}
-                    strokeWidth={2}
+                    d={`M ${x1} ${y1} C ${midX} ${y1} ${midX} ${y2} ${x2} ${y2}`}
+                    stroke={stroke}
+                    strokeWidth={isActive ? 3 : 2}
                     strokeDasharray={edge.invalid ? "4 4" : "0"}
+                    fill="none"
+                    markerEnd={marker}
                   />
                 );
               })}
