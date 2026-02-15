@@ -1641,19 +1641,20 @@ export default function PlayPage() {
             }
           );
         setDailyState(nextDailyState);
-        if (dayState && (typeof appliedDeltas.energy === "number" || typeof appliedDeltas.stress === "number")) {
-          setDayState((prev) => {
-            if (!prev) return prev;
-            const nextEnergy =
-              typeof appliedDeltas.energy === "number"
-                ? Math.max(0, Math.min(100, prev.energy + appliedDeltas.energy))
-                : prev.energy;
-            const nextStress =
-              typeof appliedDeltas.stress === "number"
-                ? Math.max(0, Math.min(100, prev.stress + appliedDeltas.stress))
-                : prev.stress;
-            return { ...prev, energy: nextEnergy, stress: nextStress };
-          });
+        if (
+          dayState &&
+          (typeof appliedDeltas.energy === "number" ||
+            typeof appliedDeltas.stress === "number")
+        ) {
+          const nextEnergy =
+            typeof appliedDeltas.energy === "number"
+              ? Math.max(0, Math.min(100, dayState.energy + appliedDeltas.energy))
+              : dayState.energy;
+          const nextStress =
+            typeof appliedDeltas.stress === "number"
+              ? Math.max(0, Math.min(100, dayState.stress + appliedDeltas.stress))
+              : dayState.stress;
+          setDayState({ ...dayState, energy: nextEnergy, stress: nextStress });
         }
         const hasVectorDeltas =
           appliedDeltas.vectors &&
@@ -1704,18 +1705,12 @@ export default function PlayPage() {
           setDailyState(arcAdvance.nextDailyState);
         }
         if (arcAdvance?.appliedDeltas) {
-          if (
-            dayState &&
-            typeof arcAdvance.appliedDeltas.stress === "number"
-          ) {
-            setDayState((prev) => {
-              if (!prev) return prev;
-              const nextStress = Math.max(
-                0,
-                Math.min(100, prev.stress + arcAdvance.appliedDeltas.stress)
-              );
-              return { ...prev, stress: nextStress };
-            });
+          if (dayState && typeof arcAdvance.appliedDeltas.stress === "number") {
+            const nextStress = Math.max(
+              0,
+              Math.min(100, dayState.stress + arcAdvance.appliedDeltas.stress)
+            );
+            setDayState({ ...dayState, stress: nextStress });
           }
           setOutcomeDeltas((prev) => {
             const merged = {
