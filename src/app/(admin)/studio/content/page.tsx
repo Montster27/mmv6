@@ -1065,6 +1065,95 @@ export default function ContentStudioLitePage() {
     "consequence:"
   ).join(", ");
 
+  const createFollowOnStorylet = async (choiceId: string) => {
+    if (!activeStorylet) return;
+    setListError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+
+      const draft = createBlankStorylet();
+      const id = `draft_${Date.now()}`;
+      const body = draft.body?.trim() ? draft.body : "Draft body.";
+      const tags = [
+        activePhase ? `phase:${activePhase}` : null,
+        activeType ? `type:${activeType}` : null,
+      ].filter(Boolean) as string[];
+
+      const res = await fetch("/api/admin/storylets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          id,
+          ...draft,
+          body,
+          tags,
+          requirements: {
+            ...draft.requirements,
+            audit: buildAuditMeta(data.session?.user?.email ?? null),
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to create storylet");
+      }
+      if (typeof json.id !== "string") {
+        throw new Error("Missing storylet id from server.");
+      }
+
+      const persistedId = json.id;
+      const newRow: Storylet = { ...draft, id: persistedId, body, tags };
+
+      const updatedChoices = activeStorylet.choices.map((choice) =>
+        choice.id === choiceId
+          ? { ...choice, targetStoryletId: persistedId }
+          : choice
+      );
+      const updatedStorylet: Storylet = {
+        ...activeStorylet,
+        choices: updatedChoices,
+        requirements: {
+          ...(activeStorylet.requirements ?? {}),
+          audit: buildAuditMeta(data.session?.user?.email ?? null),
+        },
+      };
+
+      const updateRes = await fetch(`/api/admin/storylets/${activeStorylet.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updatedStorylet),
+      });
+      const updateJson = await updateRes.json();
+      if (!updateRes.ok) {
+        throw new Error(updateJson.error ?? "Failed to link follow-on storylet");
+      }
+
+      setStorylets((prev) => [
+        newRow,
+        ...prev.map((row) => (row.id === updatedStorylet.id ? updatedStorylet : row)),
+      ]);
+      setActiveTab("list");
+      selectStorylet(newRow);
+      trackEvent({
+        event_type: "storylet_created",
+        payload: { id: persistedId, follow_on_for: activeStorylet.id },
+      });
+    } catch (err) {
+      console.error(err);
+      setListError(
+        err instanceof Error ? err.message : "Failed to create follow-on storylet"
+      );
+    }
+  };
+
   return (
     <AuthGate>
       {(session) => {
@@ -1908,6 +1997,10 @@ export default function ContentStudioLitePage() {
                                 const deltas = choice.outcome?.deltas ?? {};
                                 const vectorsInput =
                                   editor.vectorInputs[choice.id] ?? "";
+                                const choiceTarget =
+                                  (choice as StoryletChoice & {
+                                    targetStoryletId?: string;
+                                  }).targetStoryletId ?? "";
                                 return (
                                   <div
                                     key={choice.id}
@@ -2064,6 +2157,18 @@ export default function ContentStudioLitePage() {
                                         placeholder="target storylet id"
                                       />
                                     </label>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs text-slate-500">
+                                        Create a follow-on storylet linked to this choice.
+                                      </p>
+                                      <Button
+                                        variant="outline"
+                                        disabled={Boolean(choiceTarget)}
+                                        onClick={() => createFollowOnStorylet(choice.id)}
+                                      >
+                                        Create follow-on
+                                      </Button>
+                                    </div>
                                   </div>
                                 );
                               })}
