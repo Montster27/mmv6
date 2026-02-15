@@ -846,6 +846,13 @@ export default function ContentStudioLitePage() {
     },
     []
   );
+  const selectStoryletAndEdit = useCallback(
+    (storylet: Storylet) => {
+      setActiveTab("list");
+      selectStorylet(storylet);
+    },
+    [selectStorylet]
+  );
 
   const createStorylet = async () => {
     setListError(null);
@@ -1144,7 +1151,7 @@ export default function ContentStudioLitePage() {
                   <GraphView
                     storylets={storylets}
                     selectedStorylet={activeStorylet}
-                    onSelectStorylet={selectStorylet}
+                    onSelectStorylet={selectStoryletAndEdit}
                     onRetargetChoice={(choiceId, targetId) => {
                       if (!activeStorylet) return;
                       applyChoiceUpdate(choiceId, {
