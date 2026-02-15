@@ -1,6 +1,7 @@
 import "server-only";
 
 import { isEmailAllowed } from "@/lib/adminAuth";
+import { getAppMode } from "@/lib/mode";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export async function isUserAdmin(user: { id: string; email?: string | null }) {
@@ -28,6 +29,9 @@ export async function canAccessContentStudio(user: {
 }): Promise<boolean> {
   // Check admin status first
   if (await isUserAdmin(user)) return true;
+
+  // Allow in tester mode environments
+  if (getAppMode().testerMode) return true;
 
   // Check test_mode from player_experiments
   const { data, error } = await supabaseServer
