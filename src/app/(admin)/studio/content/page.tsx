@@ -883,10 +883,14 @@ export default function ContentStudioLitePage() {
       if (!res.ok) {
         throw new Error(json.error ?? "Failed to create storylet");
       }
-      const newRow: Storylet = { ...draft, id, body };
-      setStorylets((prev) => [newRow, ...prev]);
+      if (typeof json.id !== "string") {
+        throw new Error("Missing storylet id from server.");
+      }
+      const persistedId = json.id;
+      const newRow: Storylet = { ...draft, id: persistedId, body };
+      setStorylets((prev) => [newRow, ...prev.filter((row) => row.id !== id)]);
       selectStorylet(newRow);
-      trackEvent({ event_type: "storylet_created", payload: { id } });
+      trackEvent({ event_type: "storylet_created", payload: { id: persistedId } });
     } catch (err) {
       console.error(err);
       setListError(err instanceof Error ? err.message : "Failed to create storylet");
