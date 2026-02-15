@@ -29,12 +29,16 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     obj.check && typeof obj.check === "object" && !Array.isArray(obj.check)
       ? (obj.check as Check)
       : undefined;
+  const targetStoryletId = isString(obj.targetStoryletId)
+    ? obj.targetStoryletId
+    : undefined;
   return {
     id: obj.id,
     label: obj.label,
     outcome: outcomeObj as StoryletOutcome | undefined,
     outcomes,
     check: checkRaw,
+    targetStoryletId,
   };
 }
 

@@ -23,6 +23,7 @@ export type StoryletChoice = {
   outcome?: StoryletOutcome;
   outcomes?: StoryletOutcomeOption[];
   check?: import("./checks").Check;
+  targetStoryletId?: string;
 };
 
 export type Storylet = {

@@ -41,6 +41,7 @@ function parseChoices(raw: unknown): StoryletChoice[] {
             outcome: (item as any).outcome,
             outcomes: (item as any).outcomes,
             check: (item as any).check,
+            targetStoryletId: (item as any).targetStoryletId,
           } as StoryletChoice;
         }
         return null;
