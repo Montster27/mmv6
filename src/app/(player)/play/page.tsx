@@ -1641,6 +1641,20 @@ export default function PlayPage() {
             }
           );
         setDailyState(nextDailyState);
+        if (dayState && (typeof appliedDeltas.energy === "number" || typeof appliedDeltas.stress === "number")) {
+          setDayState((prev) => {
+            if (!prev) return prev;
+            const nextEnergy =
+              typeof appliedDeltas.energy === "number"
+                ? Math.max(0, Math.min(100, prev.energy + appliedDeltas.energy))
+                : prev.energy;
+            const nextStress =
+              typeof appliedDeltas.stress === "number"
+                ? Math.max(0, Math.min(100, prev.stress + appliedDeltas.stress))
+                : prev.stress;
+            return { ...prev, energy: nextEnergy, stress: nextStress };
+          });
+        }
         const hasVectorDeltas =
           appliedDeltas.vectors &&
           Object.keys(appliedDeltas.vectors).length > 0;
@@ -1690,6 +1704,19 @@ export default function PlayPage() {
           setDailyState(arcAdvance.nextDailyState);
         }
         if (arcAdvance?.appliedDeltas) {
+          if (
+            dayState &&
+            typeof arcAdvance.appliedDeltas.stress === "number"
+          ) {
+            setDayState((prev) => {
+              if (!prev) return prev;
+              const nextStress = Math.max(
+                0,
+                Math.min(100, prev.stress + arcAdvance.appliedDeltas.stress)
+              );
+              return { ...prev, stress: nextStress };
+            });
+          }
           setOutcomeDeltas((prev) => {
             const merged = {
               energy: prev?.energy,
