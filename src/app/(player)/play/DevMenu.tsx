@@ -120,6 +120,11 @@ export default function DevMenu({
   useEffect(() => {
     setFlagOverrides(readOverrides());
     const retain = window.localStorage.getItem("mmv_feature_overrides_retain");
+    if (retain === null) {
+      window.localStorage.setItem("mmv_feature_overrides_retain", "1");
+      setRetainOverrides(true);
+      return;
+    }
     setRetainOverrides(retain === "1");
   }, []);
 

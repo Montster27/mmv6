@@ -40,7 +40,7 @@ function getOverrideFlags(): Partial<FeatureFlags> {
 export function getFeatureFlags(): FeatureFlags {
   const set = process.env.NEXT_PUBLIC_FEATURE_SET;
   const verticalSliceFlag =
-    parseFlag(process.env.NEXT_PUBLIC_VERTICAL_SLICE_30) ?? false;
+    parseFlag(process.env.NEXT_PUBLIC_VERTICAL_SLICE_30) ?? true;
   const sliceDefaults = verticalSliceFlag
     ? {
         rookieCircleEnabled: true,
@@ -62,36 +62,36 @@ export function getFeatureFlags(): FeatureFlags {
       ? {
           arcs: true,
           resources: false,
-          skills: false,
+          skills: true,
           alignment: false,
           funPulse: false,
           verticalSlice30Enabled: verticalSliceFlag,
           ...sliceDefaults,
-          contentStudioLiteEnabled: false,
-          contentStudioGraphEnabled: false,
-          contentStudioPreviewEnabled: false,
-          contentStudioHistoryEnabled: false,
+          contentStudioLiteEnabled: true,
+          contentStudioGraphEnabled: true,
+          contentStudioPreviewEnabled: true,
+          contentStudioHistoryEnabled: true,
           contentStudioPublishEnabled: false,
           contentStudioRemnantRulesEnabled: false,
         }
       : {
           arcs: true,
-          resources: true,
+          resources: false,
           skills: true,
-          alignment: true,
-          funPulse: true,
+          alignment: false,
+          funPulse: false,
           verticalSlice30Enabled: verticalSliceFlag,
           ...sliceDefaults,
-          contentStudioLiteEnabled: false,
-          contentStudioGraphEnabled: false,
-          contentStudioPreviewEnabled: false,
-          contentStudioHistoryEnabled: false,
+          contentStudioLiteEnabled: true,
+          contentStudioGraphEnabled: true,
+          contentStudioPreviewEnabled: true,
+          contentStudioHistoryEnabled: true,
           contentStudioPublishEnabled: false,
           contentStudioRemnantRulesEnabled: false,
         };
 
   const studioFlag =
-    parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_LITE) ?? false;
+    parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_LITE) ?? true;
   const studioDefaults = studioFlag
     ? {
         contentStudioLiteEnabled: true,
