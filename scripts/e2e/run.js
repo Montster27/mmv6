@@ -21,6 +21,18 @@ async function clickByText(page, text, timeout = 10000) {
   await node.click();
 }
 
+async function clickFirstButtonAfterHeading(page, headingText) {
+  const escaped = headingText.replace(/"/g, '\\"');
+  const [button] = await page.$x(
+    `//*[self::h1 or self::h2 or self::h3 or self::h4][contains(normalize-space(), "${escaped}")]/following::button[1]`
+  );
+  if (button) {
+    await button.click();
+    return true;
+  }
+  return false;
+}
+
 async function maybeLogin(page) {
   const emailInput =
     (await page.$('input[type="email"]')) ||
@@ -85,6 +97,10 @@ async function run() {
     await page.waitForTimeout(500);
     await page.goto(`${BASE_URL}/play`, { waitUntil: "networkidle2" });
 
+    await clickFirstButtonAfterHeading(page, "Choose today's posture").catch(
+      () => {}
+    );
+
     await waitForText(page, "Step 1: Time Allocation", 15000);
 
     await setAllocation(page, "Study", 20);
@@ -96,11 +112,34 @@ async function run() {
     await clickByText(page, "Save allocation");
     await page.waitForTimeout(800);
 
+    await clickFirstButtonAfterHeading(page, "Back an Initiative").catch(
+      () => {}
+    );
+    await clickFirstButtonAfterHeading(page, "Push an Initiative Forward").catch(
+      () => {}
+    );
+
+    const [arcButton] = await page.$x(
+      `//section[.//h2[contains(normalize-space(), "Threads")]]//button[not(@disabled)] | //section[.//h2[contains(normalize-space(), "Arc")]]//button[not(@disabled)]`
+    );
+    if (arcButton) {
+      await arcButton.click();
+      await page.waitForTimeout(500);
+    }
+
     const [choiceButton] = await page.$x(
       `//section[.//h2[contains(normalize-space(), "Storylet")]]//button[not(@disabled)]`
     );
     if (choiceButton) {
       await choiceButton.click();
+      await page.waitForTimeout(500);
+    }
+
+    const [secondChoice] = await page.$x(
+      `//section[.//h2[contains(normalize-space(), "Storylet")]]//button[not(@disabled)]`
+    );
+    if (secondChoice) {
+      await secondChoice.click();
     }
 
     await page.waitForTimeout(800);
