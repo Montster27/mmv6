@@ -206,6 +206,12 @@ export default function ContentStudioLitePage() {
   const [contentArcSteps, setContentArcSteps] = useState<ContentArcStep[]>([]);
   const [contentArcsLoading, setContentArcsLoading] = useState(false);
   const [contentArcsError, setContentArcsError] = useState<string | null>(null);
+  const [selectedArcKey, setSelectedArcKey] = useState<string | null>(null);
+  const [arcDraft, setArcDraft] = useState<ContentArc | null>(null);
+  const [arcSaveState, setArcSaveState] = useState<SaveState>("idle");
+  const [stepDraft, setStepDraft] = useState<ContentArcStep | null>(null);
+  const [stepChoicesText, setStepChoicesText] = useState("");
+  const [stepSaveState, setStepSaveState] = useState<SaveState>("idle");
   const [validationMap, setValidationMap] = useState<Record<string, ValidationSummary>>(
     {}
   );
@@ -448,6 +454,117 @@ export default function ContentStudioLitePage() {
     map.forEach((steps) => steps.sort((a, b) => a.step_index - b.step_index));
     return map;
   }, [contentArcSteps]);
+
+  const selectedArc = useMemo(() => {
+    if (!selectedArcKey) return null;
+    return contentArcs.find((arc) => arc.key === selectedArcKey) ?? null;
+  }, [contentArcs, selectedArcKey]);
+
+  const selectArc = (arc: ContentArc) => {
+    setSelectedArcKey(arc.key);
+    setArcDraft({ ...arc });
+    setArcSaveState("idle");
+    setStepDraft(null);
+    setStepChoicesText("");
+    setStepSaveState("idle");
+  };
+
+  const selectStep = (step: ContentArcStep) => {
+    setStepDraft({ ...step });
+    setStepChoicesText(JSON.stringify(step.choices ?? [], null, 2));
+    setStepSaveState("idle");
+  };
+
+  const saveArc = async () => {
+    if (!arcDraft) return;
+    setArcSaveState("saving");
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+      const res = await fetch(`/api/admin/content-arcs/${arcDraft.key}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: arcDraft.title,
+          description: arcDraft.description,
+          tags: arcDraft.tags ?? [],
+          is_active: arcDraft.is_active,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to save arc");
+      }
+      await loadContentArcs();
+      setArcSaveState("saved");
+    } catch (err) {
+      console.error(err);
+      setArcSaveState("error");
+      setContentArcsError(err instanceof Error ? err.message : "Failed to save arc");
+    }
+  };
+
+  const createStep = () => {
+    if (!selectedArc) return;
+    const steps = stepsByArc.get(selectedArc.key) ?? [];
+    const nextIndex = steps.length
+      ? Math.max(...steps.map((s) => s.step_index)) + 1
+      : 0;
+    const draft: ContentArcStep = {
+      arc_key: selectedArc.key,
+      step_index: nextIndex,
+      title: "New step",
+      body: "Draft body.",
+      choices: [],
+      created_at: new Date().toISOString(),
+    };
+    selectStep(draft);
+  };
+
+  const saveStep = async () => {
+    if (!stepDraft) return;
+    let parsedChoices: unknown;
+    try {
+      parsedChoices = stepChoicesText.trim() ? JSON.parse(stepChoicesText) : [];
+    } catch {
+      setContentArcsError("Choices JSON is invalid.");
+      return;
+    }
+    setStepSaveState("saving");
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+      const res = await fetch("/api/admin/content-arc-steps", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          arc_key: stepDraft.arc_key,
+          step_index: stepDraft.step_index,
+          title: stepDraft.title,
+          body: stepDraft.body,
+          choices: parsedChoices,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to save step");
+      }
+      await loadContentArcs();
+      setStepSaveState("saved");
+    } catch (err) {
+      console.error(err);
+      setStepSaveState("error");
+      setContentArcsError(err instanceof Error ? err.message : "Failed to save step");
+    }
+  };
 
   const selectRule = (rule: DelayedConsequenceRule) => {
     setRuleDraft({
@@ -1320,57 +1437,203 @@ export default function ContentStudioLitePage() {
                     ) : contentArcs.length === 0 ? (
                       <p className="text-sm text-slate-600">No arcs found.</p>
                     ) : (
-                      <div className="space-y-4">
-                        {contentArcs.map((arc) => {
-                          const steps = stepsByArc.get(arc.key) ?? [];
-                          return (
-                            <div
+                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+                        <div className="space-y-2">
+                          {contentArcs.map((arc) => (
+                            <button
                               key={arc.key}
-                              className="rounded-md border border-slate-200 bg-white px-4 py-3"
+                              className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
+                                selectedArcKey === arc.key
+                                  ? "border-slate-900 bg-slate-100"
+                                  : "border-slate-200 hover:border-slate-300"
+                              }`}
+                              onClick={() => selectArc(arc)}
                             >
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                  <p className="text-sm font-semibold text-slate-900">
-                                    {arc.title}
-                                  </p>
-                                  <p className="text-xs text-slate-500">{arc.key}</p>
-                                </div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{arc.title}</span>
                                 <span className="text-xs text-slate-500">
-                                  {steps.length} steps
+                                  {(stepsByArc.get(arc.key) ?? []).length} steps
                                 </span>
                               </div>
-                              <p className="mt-2 text-sm text-slate-700">
-                                {arc.description}
-                              </p>
-                              <div className="mt-3 space-y-2">
-                                {steps.length === 0 ? (
-                                  <p className="text-xs text-slate-500">
-                                    No steps yet.
-                                  </p>
-                                ) : (
-                                  steps.map((step) => (
-                                    <div
-                                      key={`${step.arc_key}-${step.step_index}`}
-                                      className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-700"
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span className="font-medium">
-                                          {step.step_index}. {step.title}
-                                        </span>
-                                        <span className="text-slate-500">
-                                          {step.choices?.length ?? 0} choices
-                                        </span>
-                                      </div>
-                                      <p className="mt-1 text-slate-600 line-clamp-2">
-                                        {step.body}
-                                      </p>
+                              <div className="text-xs text-slate-500">{arc.key}</div>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="space-y-4">
+                          {!selectedArc || !arcDraft ? (
+                            <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                              Select an arc to edit.
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="space-y-3">
+                                <h3 className="text-sm font-semibold text-slate-900">
+                                  Arc details
+                                </h3>
+                                <label className="text-sm text-slate-700">
+                                  Title
+                                  <input
+                                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                    value={arcDraft.title}
+                                    onChange={(e) =>
+                                      setArcDraft({ ...arcDraft, title: e.target.value })
+                                    }
+                                  />
+                                </label>
+                                <label className="text-sm text-slate-700">
+                                  Description
+                                  <textarea
+                                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                    rows={3}
+                                    value={arcDraft.description}
+                                    onChange={(e) =>
+                                      setArcDraft({
+                                        ...arcDraft,
+                                        description: e.target.value,
+                                      })
+                                    }
+                                  />
+                                </label>
+                                <label className="text-sm text-slate-700">
+                                  Tags (comma-separated)
+                                  <input
+                                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                    value={(arcDraft.tags ?? []).join(", ")}
+                                    onChange={(e) =>
+                                      setArcDraft({
+                                        ...arcDraft,
+                                        tags: e.target.value
+                                          .split(",")
+                                          .map((tag) => tag.trim())
+                                          .filter(Boolean),
+                                      })
+                                    }
+                                  />
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    checked={arcDraft.is_active}
+                                    onChange={(e) =>
+                                      setArcDraft({
+                                        ...arcDraft,
+                                        is_active: e.target.checked,
+                                      })
+                                    }
+                                  />
+                                  Active
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    onClick={saveArc}
+                                    disabled={arcSaveState === "saving"}
+                                  >
+                                    {arcSaveState === "saving" ? "Saving..." : "Save arc"}
+                                  </Button>
+                                  {arcSaveState === "saved" ? (
+                                    <span className="text-xs text-slate-500">Saved</span>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              <div className="border-t border-slate-200 pt-4">
+                                <div className="flex items-center justify-between">
+                                  <h3 className="text-sm font-semibold text-slate-900">
+                                    Steps
+                                  </h3>
+                                  <Button variant="outline" onClick={createStep}>
+                                    New step
+                                  </Button>
+                                </div>
+                                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[220px_1fr]">
+                                  <div className="space-y-2">
+                                    {(stepsByArc.get(selectedArc.key) ?? []).map((step) => (
+                                      <button
+                                        key={`${step.arc_key}-${step.step_index}`}
+                                        className={`w-full rounded-md border px-3 py-2 text-left text-xs transition ${
+                                          stepDraft?.step_index === step.step_index
+                                            ? "border-slate-900 bg-slate-100"
+                                            : "border-slate-200 hover:border-slate-300"
+                                        }`}
+                                        onClick={() => selectStep(step)}
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <span className="font-medium">
+                                            {step.step_index}. {step.title}
+                                          </span>
+                                          <span className="text-slate-500">
+                                            {step.choices?.length ?? 0}
+                                          </span>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {!stepDraft ? (
+                                    <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                                      Select a step to edit.
                                     </div>
-                                  ))
-                                )}
+                                  ) : (
+                                    <div className="space-y-3">
+                                      <label className="text-sm text-slate-700">
+                                        Title
+                                        <input
+                                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                          value={stepDraft.title}
+                                          onChange={(e) =>
+                                            setStepDraft({
+                                              ...stepDraft,
+                                              title: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </label>
+                                      <label className="text-sm text-slate-700">
+                                        Body
+                                        <textarea
+                                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                          rows={6}
+                                          value={stepDraft.body}
+                                          onChange={(e) =>
+                                            setStepDraft({
+                                              ...stepDraft,
+                                              body: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      </label>
+                                      <label className="text-sm text-slate-700">
+                                        Choices (JSON)
+                                        <textarea
+                                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
+                                          rows={8}
+                                          value={stepChoicesText}
+                                          onChange={(e) => setStepChoicesText(e.target.value)}
+                                        />
+                                      </label>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          onClick={saveStep}
+                                          disabled={stepSaveState === "saving"}
+                                        >
+                                          {stepSaveState === "saving"
+                                            ? "Saving..."
+                                            : "Save step"}
+                                        </Button>
+                                        {stepSaveState === "saved" ? (
+                                          <span className="text-xs text-slate-500">
+                                            Saved
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          );
-                        })}
+                          )}
+                        </div>
                       </div>
                     )}
                     {contentArcsError ? (
