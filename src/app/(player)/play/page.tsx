@@ -1331,7 +1331,7 @@ export default function PlayPage() {
       testerMessage("You’re testing an early systems slice of MMV.", {
         title: "Welcome to the MMV Playtest",
         details:
-          "This game is about daily pressure and long-term drift, not optimization. Your choices today shape what’s possible tomorrow. • Posture changes allocation impact • Energy and stress carry forward • Resources enable or block story options • Start with the thread “Anomaly 001.”",
+          "This game is about daily pressure and long-term drift, not optimization. Your choices today shape what’s possible tomorrow. • Posture changes allocation impact • Energy and stress carry forward • Resources enable or block story options • Start with the thread “The Phone on the Hall.”",
         tone: "warning",
       })
     );
@@ -2292,7 +2292,7 @@ export default function PlayPage() {
   const showOpeningArcFirst =
     featureFlags.arcs &&
     Boolean(arc) &&
-    arc?.arc_key === "anomaly_001" &&
+    arc?.arc_key === "intro_phone_on_hall" &&
     arc?.current_step === 0 &&
     Boolean(arc?.step);
 

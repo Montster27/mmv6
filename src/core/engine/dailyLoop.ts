@@ -26,6 +26,7 @@ import {
   fetchArcCurrentStepContent,
   fetchArcInstance,
   fetchArcInstancesByKeys,
+  startArc,
 } from "@/lib/arcs";
 import { listFactions } from "@/lib/factions";
 import {
@@ -83,7 +84,7 @@ import type {
 } from "@/types/dailyInteraction";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
-const ARC_KEY = "anomaly_001";
+const ARC_KEY = "intro_phone_on_hall";
 const DIRECTIVE_TAGS: Record<string, string[]> = {
   neo_assyrian: ["work", "cash", "leverage"],
   dynastic_consortium: ["study", "research", "tech"],
@@ -380,8 +381,11 @@ export async function getOrCreateDailyRun(
   const arcDefinition = featureFlags.arcs
     ? await fetchContentArcByKey(ARC_KEY)
     : null;
-  const arcInstance =
+  let arcInstance =
     featureFlags.arcs && arcDefinition ? await fetchArcInstance(userId, ARC_KEY) : null;
+  if (featureFlags.arcs && arcDefinition && !arcInstance && dayIndex >= 1) {
+    arcInstance = await startArc(userId, ARC_KEY, dayIndex);
+  }
   const arcStep =
     featureFlags.arcs && arcDefinition && arcInstance?.status === "active"
       ? await fetchArcCurrentStepContent(ARC_KEY, arcInstance.current_step)
@@ -576,4 +580,3 @@ export async function getOrCreateDailyRun(
     seasonContext,
   };
 }
-

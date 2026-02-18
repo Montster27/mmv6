@@ -11,6 +11,9 @@ export type ContentArcStepChoice = {
   key: string;
   label: string;
   flags?: Record<string, boolean>;
+  counters?: Record<string, number>;
+  next_step_index?: number;
+  skill_points?: number;
   vector_deltas?: Partial<{
     reflection: number;
     focus: number;

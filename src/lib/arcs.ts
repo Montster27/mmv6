@@ -7,6 +7,7 @@ import { fetchDailyState, updateDailyState } from "@/lib/play";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { ensureSkillBankUpToDate, fetchSkillBank } from "@/lib/dailyInteractions";
 import type { ArcInstance } from "@/types/arcs";
 import type { ContentArcStep } from "@/types/content";
 
@@ -203,6 +204,70 @@ export async function applyArcChoiceFlags(
   }
 }
 
+async function applyArcChoiceCounters(
+  userId: string,
+  arcKey: string,
+  counters?: Record<string, number>
+): Promise<void> {
+  if (!counters || Object.keys(counters).length === 0) return;
+
+  const instance = await fetchArcInstance(userId, arcKey);
+  if (!instance) {
+    throw new Error("Arc not started.");
+  }
+
+  const metaBase =
+    instance.meta && typeof instance.meta === "object" ? instance.meta : {};
+  const baseCounters =
+    metaBase && typeof (metaBase as any).counters === "object"
+      ? (metaBase as any).counters
+      : {};
+  const nextCounters: Record<string, number> = { ...baseCounters };
+  for (const [key, delta] of Object.entries(counters)) {
+    if (typeof delta !== "number") continue;
+    nextCounters[key] = (nextCounters[key] ?? 0) + delta;
+  }
+  const nextMeta = {
+    ...metaBase,
+    counters: nextCounters,
+  };
+
+  const { data, error } = await supabase
+    .from("arc_instances")
+    .update({ meta: nextMeta, updated_at: new Date().toISOString() })
+    .eq("id", instance.id)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to update arc counters", error);
+    throw new Error("Failed to update arc.");
+  }
+  if (!data) {
+    throw new Error("Failed to update arc.");
+  }
+}
+
+async function awardSkillPoints(userId: string, dayIndex: number, points: number) {
+  if (!points || points <= 0) return;
+  await ensureSkillBankUpToDate(userId, dayIndex);
+  const bank = await fetchSkillBank(userId);
+  if (!bank) return;
+  const nextAvailable = bank.available_points + points;
+  const cap = typeof bank.cap === "number" ? bank.cap : 10;
+  const { error } = await supabase
+    .from("skill_bank")
+    .update({
+      available_points: Math.min(cap, nextAvailable),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+  if (error) {
+    console.error("Failed to award skill points", error);
+  }
+}
+
 export async function progressArcWithChoice(
   userId: string,
   arcKey: string,
@@ -341,6 +406,10 @@ export async function progressArcWithChoice(
   }
 
   await applyArcChoiceFlags(userId, arcKey, choice.flags);
+  await applyArcChoiceCounters(userId, arcKey, choice.counters);
+  if (typeof dayIndex === "number") {
+    await awardSkillPoints(userId, dayIndex, choice.skill_points ?? 0);
+  }
 
   const alignmentDelta = ARC_CHOICE_ALIGNMENT_DELTAS[choiceKey];
   if (alignmentDelta && typeof dayIndex === "number") {
@@ -375,7 +444,10 @@ export async function progressArcWithChoice(
     }
   }
 
-  const nextStep = instance.current_step + 1;
+  const nextStep =
+    typeof choice.next_step_index === "number"
+      ? choice.next_step_index
+      : instance.current_step + 1;
   if (nextStep >= steps.length) {
     const { data, error } = await supabase
       .from("arc_instances")
