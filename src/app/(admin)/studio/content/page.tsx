@@ -218,6 +218,10 @@ export default function ContentStudioLitePage() {
   const [arcViewMode, setArcViewMode] = useState<"editor" | "graph">("editor");
   const arcAutosaveTimerRef = useRef<number | null>(null);
   const stepAutosaveTimerRef = useRef<number | null>(null);
+  const [arcLastSavedAt, setArcLastSavedAt] = useState<Date | null>(null);
+  const [stepLastSavedAt, setStepLastSavedAt] = useState<Date | null>(null);
+  const [arcSaveError, setArcSaveError] = useState<string | null>(null);
+  const [stepSaveError, setStepSaveError] = useState<string | null>(null);
   const [validationMap, setValidationMap] = useState<Record<string, ValidationSummary>>(
     {}
   );
@@ -471,10 +475,14 @@ export default function ContentStudioLitePage() {
     setArcDraft({ ...arc });
     setArcSaveState("idle");
     setArcDirty(false);
+    setArcLastSavedAt(null);
+    setArcSaveError(null);
     setStepDraft(null);
     setStepChoicesText("");
     setStepSaveState("idle");
     setStepDirty(false);
+    setStepLastSavedAt(null);
+    setStepSaveError(null);
   };
 
   const selectStep = (step: ContentArcStep) => {
@@ -482,11 +490,14 @@ export default function ContentStudioLitePage() {
     setStepChoicesText(JSON.stringify(step.choices ?? [], null, 2));
     setStepSaveState("idle");
     setStepDirty(false);
+    setStepLastSavedAt(null);
+    setStepSaveError(null);
   };
 
   const saveArc = async () => {
     if (!arcDraft) return;
     setArcSaveState("saving");
+    setArcSaveError(null);
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
@@ -511,10 +522,13 @@ export default function ContentStudioLitePage() {
       await loadContentArcs();
       setArcSaveState("saved");
       setArcDirty(false);
+      setArcLastSavedAt(new Date());
     } catch (err) {
       console.error(err);
       setArcSaveState("error");
-      setContentArcsError(err instanceof Error ? err.message : "Failed to save arc");
+      const message = err instanceof Error ? err.message : "Failed to save arc";
+      setArcSaveError(message);
+      setContentArcsError(message);
     }
   };
 
@@ -545,6 +559,7 @@ export default function ContentStudioLitePage() {
       return;
     }
     setStepSaveState("saving");
+    setStepSaveError(null);
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
@@ -570,10 +585,13 @@ export default function ContentStudioLitePage() {
       await loadContentArcs();
       setStepSaveState("saved");
       setStepDirty(false);
+      setStepLastSavedAt(new Date());
     } catch (err) {
       console.error(err);
       setStepSaveState("error");
-      setContentArcsError(err instanceof Error ? err.message : "Failed to save step");
+      const message = err instanceof Error ? err.message : "Failed to save step";
+      setStepSaveError(message);
+      setContentArcsError(message);
     }
   };
 
@@ -1540,7 +1558,14 @@ export default function ContentStudioLitePage() {
                                   <h3 className="text-sm font-semibold text-slate-900">
                                     Arc details
                                   </h3>
-                                  <SaveStatusIndicator saveState={arcSaveState} />
+                                  <SaveStatusIndicator
+                                    saveState={arcSaveState}
+                                    lastSavedAt={arcLastSavedAt}
+                                    isDirty={arcDirty}
+                                    error={arcSaveError}
+                                    onSave={saveArc}
+                                    disabled={arcSaveState === "saving"}
+                                  />
                                 </div>
                                 <label className="text-sm text-slate-700">
                                   Title
@@ -1655,7 +1680,14 @@ export default function ContentStudioLitePage() {
                                         <h4 className="text-sm font-semibold text-slate-900">
                                           Step editor
                                         </h4>
-                                        <SaveStatusIndicator saveState={stepSaveState} />
+                                        <SaveStatusIndicator
+                                          saveState={stepSaveState}
+                                          lastSavedAt={stepLastSavedAt}
+                                          isDirty={stepDirty}
+                                          error={stepSaveError}
+                                          onSave={saveStep}
+                                          disabled={stepSaveState === "saving"}
+                                        />
                                       </div>
                                       <label className="text-sm text-slate-700">
                                         Title
