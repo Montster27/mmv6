@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
-import { isUserAdmin } from "@/lib/adminAuthServer";
+import { canAccessContentStudio } from "@/lib/adminAuthServer";
 import {
   coerceStoryletRow,
   validateStoryletIssues,
@@ -26,7 +26,7 @@ async function ensureAdmin(request: Request) {
     : undefined;
   const user = await getUserFromToken(token);
   if (!user) return null;
-  const ok = await isUserAdmin(user);
+  const ok = await canAccessContentStudio(user);
   return ok ? user : null;
 }
 

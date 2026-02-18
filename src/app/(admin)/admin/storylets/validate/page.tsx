@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
-import { isEmailAllowed } from "@/lib/adminAuth";
 
 type Issue = {
   storyletId: string;
@@ -76,16 +75,6 @@ export default function StoryletValidatePage() {
   return (
     <AuthGate>
       {(session) => {
-        const email = session.user.email;
-        if (!isEmailAllowed(email)) {
-          return (
-            <div className="p-6 space-y-3">
-              <h1 className="text-2xl font-semibold">Validate Storylets</h1>
-              <p className="text-slate-700">Not authorized.</p>
-            </div>
-          );
-        }
-
         return (
           <div className="p-6 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
