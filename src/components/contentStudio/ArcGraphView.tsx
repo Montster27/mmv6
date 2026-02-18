@@ -28,17 +28,59 @@ export function ArcGraphView({
     return map;
   }, [steps]);
 
+  const orderedSteps = useMemo(() => {
+    return [...steps].sort((a, b) => a.step_index - b.step_index);
+  }, [steps]);
+
+  const getNextIndices = (step: ContentArcStep) => {
+    const explicit = (step.choices ?? [])
+      .map((choice) => choice.next_step_index)
+      .filter((value): value is number => typeof value === "number");
+    const uniqueExplicit = Array.from(new Set(explicit));
+    if (uniqueExplicit.length > 0) {
+      return uniqueExplicit;
+    }
+    const fallback = step.step_index + 1;
+    return stepMap.has(fallback) ? [fallback] : [];
+  };
+
+  const laneByStep = useMemo(() => {
+    const laneMap = new Map<number, number>();
+    let nextLaneId = 1;
+
+    const assignLane = (stepIndex: number, lane: number) => {
+      if (!stepMap.has(stepIndex)) return;
+      if (!laneMap.has(stepIndex)) {
+        laneMap.set(stepIndex, lane);
+      }
+      const step = stepMap.get(stepIndex);
+      if (!step) return;
+      const nextIndices = getNextIndices(step);
+      if (nextIndices.length === 0) return;
+      nextIndices.forEach((nextIndex, idx) => {
+        const targetLane = idx === 0 ? lane : nextLaneId++;
+        assignLane(nextIndex, targetLane);
+      });
+    };
+
+    if (orderedSteps.length > 0) {
+      assignLane(orderedSteps[0].step_index, 0);
+    }
+
+    return laneMap;
+  }, [orderedSteps, stepMap]);
+
   const nodePositions = useMemo(() => {
     const positions: Record<number, { x: number; y: number }> = {};
-    const ordered = [...steps].sort((a, b) => a.step_index - b.step_index);
-    ordered.forEach((step, idx) => {
+    orderedSteps.forEach((step, idx) => {
+      const lane = laneByStep.get(step.step_index) ?? 0;
       positions[step.step_index] = {
-        x: 0,
+        x: lane * (NODE_WIDTH + COLUMN_GAP),
         y: idx * (NODE_HEIGHT + ROW_GAP),
       };
     });
     return positions;
-  }, [steps]);
+  }, [orderedSteps, laneByStep]);
 
   const edges = useMemo(() => {
     const list: Array<{ from: number; to: number }> = [];
@@ -53,6 +95,12 @@ export function ArcGraphView({
           list.push({ from: step.step_index, to: next });
         }
       });
+      if (!step.choices?.length) {
+        const fallback = step.step_index + 1;
+        if (indices.has(fallback)) {
+          list.push({ from: step.step_index, to: fallback });
+        }
+      }
     });
     return list;
   }, [steps]);
