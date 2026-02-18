@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { canAccessContentStudio } from "@/lib/adminAuthServer";
@@ -24,11 +24,14 @@ async function ensureAccess(request: Request) {
   return ok ? user : null;
 }
 
-export async function PUT(request: Request, context: { params: { key: string } }) {
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ key: string }> }
+) {
   const user = await ensureAccess(request);
   if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
-  const key = context.params.key;
+  const { key } = await context.params;
   const payload = await request.json().catch(() => null);
   if (!payload || typeof payload !== "object") {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
