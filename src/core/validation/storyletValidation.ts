@@ -97,6 +97,7 @@ const KNOWN_REQUIREMENT_KEYS = new Set([
   "audit",
   "min_day_index",
   "max_day_index",
+  "trigger_phase",
   "requires_tags_any",
   "vectors_min",
   "min_season_index",
@@ -438,6 +439,22 @@ export function validateStoryletIssues(
           storylet,
           "requirements.seasons_any",
           "requirements.seasons_any must be an array of integers"
+        );
+      }
+    }
+    if (req.trigger_phase !== undefined) {
+      if (
+        !isString(req.trigger_phase) &&
+        !(
+          Array.isArray(req.trigger_phase) &&
+          req.trigger_phase.every((value) => isString(value))
+        )
+      ) {
+        addIssue(
+          errors,
+          storylet,
+          "requirements.trigger_phase",
+          "requirements.trigger_phase must be a string or array of strings"
         );
       }
     }
