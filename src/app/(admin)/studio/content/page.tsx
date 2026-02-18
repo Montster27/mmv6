@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase/browser";
 import { validateStorylet } from "@/core/validation/storyletValidation";
 import { buildAuditMeta } from "@/lib/contentStudio/audit";
 import type { Storylet, StoryletChoice } from "@/types/storylets";
+import type { ContentArc, ContentArcStep } from "@/types/content";
 import type { DelayedConsequenceRule } from "@/types/consequences";
 import type { RemnantRule } from "@/types/remnants";
 import type { ContentVersion, ContentSnapshot } from "@/types/contentVersions";
@@ -41,6 +42,7 @@ const PreviewSimulator = dynamic(
 
 const TABS = [
   { key: "list", label: "List" },
+  { key: "arcs", label: "Arcs" },
   { key: "graph", label: "Graph" },
   { key: "preview", label: "Preview" },
   { key: "rules", label: "Rules" },
@@ -200,6 +202,10 @@ export default function ContentStudioLitePage() {
   const [userTestMode, setUserTestMode] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [storylets, setStorylets] = useState<Storylet[]>([]);
+  const [contentArcs, setContentArcs] = useState<ContentArc[]>([]);
+  const [contentArcSteps, setContentArcSteps] = useState<ContentArcStep[]>([]);
+  const [contentArcsLoading, setContentArcsLoading] = useState(false);
+  const [contentArcsError, setContentArcsError] = useState<string | null>(null);
   const [validationMap, setValidationMap] = useState<Record<string, ValidationSummary>>(
     {}
   );
@@ -281,6 +287,32 @@ export default function ContentStudioLitePage() {
     if (tab === "rules") return flags.contentStudioRemnantRulesEnabled;
     return true;
   };
+
+  const loadContentArcs = useCallback(async () => {
+    setContentArcsLoading(true);
+    setContentArcsError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("No session found.");
+      }
+      const res = await fetch("/api/admin/content-arcs", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to load arcs");
+      }
+      setContentArcs(json.arcs ?? []);
+      setContentArcSteps(json.steps ?? []);
+    } catch (err) {
+      console.error(err);
+      setContentArcsError(err instanceof Error ? err.message : "Failed to load arcs");
+    } finally {
+      setContentArcsLoading(false);
+    }
+  }, []);
 
   const validateForList = useCallback((items: Storylet[]) => {
     const next: Record<string, ValidationSummary> = {};
@@ -400,6 +432,22 @@ export default function ContentStudioLitePage() {
     if (activeTab !== "rules") return;
     loadRemnantRules();
   }, [flags.contentStudioLiteEnabled, activeTab, loadRemnantRules]);
+
+  useEffect(() => {
+    if (!flags.contentStudioLiteEnabled) return;
+    if (activeTab !== "arcs") return;
+    loadContentArcs();
+  }, [flags.contentStudioLiteEnabled, activeTab, loadContentArcs]);
+
+  const stepsByArc = useMemo(() => {
+    const map = new Map<string, ContentArcStep[]>();
+    contentArcSteps.forEach((step) => {
+      if (!map.has(step.arc_key)) map.set(step.arc_key, []);
+      map.get(step.arc_key)?.push(step);
+    });
+    map.forEach((steps) => steps.sort((a, b) => a.step_index - b.step_index));
+    return map;
+  }, [contentArcSteps]);
 
   const selectRule = (rule: DelayedConsequenceRule) => {
     setRuleDraft({
@@ -1253,6 +1301,82 @@ export default function ContentStudioLitePage() {
                       } as StoryletChoice);
                     }}
                   />
+                ) : activeTab === "arcs" ? (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-xl font-semibold text-slate-900">Content arcs</h2>
+                        <p className="text-sm text-slate-600">
+                          Read-only view of content_arcs and steps.
+                        </p>
+                      </div>
+                      <Button variant="outline" onClick={loadContentArcs}>
+                        Refresh
+                      </Button>
+                    </div>
+
+                    {contentArcsLoading ? (
+                      <p className="text-sm text-slate-600">Loading…</p>
+                    ) : contentArcs.length === 0 ? (
+                      <p className="text-sm text-slate-600">No arcs found.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {contentArcs.map((arc) => {
+                          const steps = stepsByArc.get(arc.key) ?? [];
+                          return (
+                            <div
+                              key={arc.key}
+                              className="rounded-md border border-slate-200 bg-white px-4 py-3"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-900">
+                                    {arc.title}
+                                  </p>
+                                  <p className="text-xs text-slate-500">{arc.key}</p>
+                                </div>
+                                <span className="text-xs text-slate-500">
+                                  {steps.length} steps
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm text-slate-700">
+                                {arc.description}
+                              </p>
+                              <div className="mt-3 space-y-2">
+                                {steps.length === 0 ? (
+                                  <p className="text-xs text-slate-500">
+                                    No steps yet.
+                                  </p>
+                                ) : (
+                                  steps.map((step) => (
+                                    <div
+                                      key={`${step.arc_key}-${step.step_index}`}
+                                      className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-700"
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-medium">
+                                          {step.step_index}. {step.title}
+                                        </span>
+                                        <span className="text-slate-500">
+                                          {step.choices?.length ?? 0} choices
+                                        </span>
+                                      </div>
+                                      <p className="mt-1 text-slate-600 line-clamp-2">
+                                        {step.body}
+                                      </p>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {contentArcsError ? (
+                      <p className="text-sm text-red-600">{contentArcsError}</p>
+                    ) : null}
+                  </div>
                 ) : activeTab === "rules" ? (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
