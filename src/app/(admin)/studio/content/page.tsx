@@ -27,6 +27,7 @@ const REMNANT_KEYS = [
   "anomaly_thread",
 ] as const;
 import { SaveStatusIndicator } from "@/components/contentStudio/SaveStatusIndicator";
+import { ArcGraphView } from "@/components/contentStudio/ArcGraphView";
 
 const GraphView = dynamic(
   () => import("@/components/contentStudio/GraphView").then((mod) => mod.GraphView),
@@ -212,6 +213,11 @@ export default function ContentStudioLitePage() {
   const [stepDraft, setStepDraft] = useState<ContentArcStep | null>(null);
   const [stepChoicesText, setStepChoicesText] = useState("");
   const [stepSaveState, setStepSaveState] = useState<SaveState>("idle");
+  const [arcDirty, setArcDirty] = useState(false);
+  const [stepDirty, setStepDirty] = useState(false);
+  const [arcViewMode, setArcViewMode] = useState<"editor" | "graph">("editor");
+  const arcAutosaveTimerRef = useRef<number | null>(null);
+  const stepAutosaveTimerRef = useRef<number | null>(null);
   const [validationMap, setValidationMap] = useState<Record<string, ValidationSummary>>(
     {}
   );
@@ -464,15 +470,18 @@ export default function ContentStudioLitePage() {
     setSelectedArcKey(arc.key);
     setArcDraft({ ...arc });
     setArcSaveState("idle");
+    setArcDirty(false);
     setStepDraft(null);
     setStepChoicesText("");
     setStepSaveState("idle");
+    setStepDirty(false);
   };
 
   const selectStep = (step: ContentArcStep) => {
     setStepDraft({ ...step });
     setStepChoicesText(JSON.stringify(step.choices ?? [], null, 2));
     setStepSaveState("idle");
+    setStepDirty(false);
   };
 
   const saveArc = async () => {
@@ -501,6 +510,7 @@ export default function ContentStudioLitePage() {
       }
       await loadContentArcs();
       setArcSaveState("saved");
+      setArcDirty(false);
     } catch (err) {
       console.error(err);
       setArcSaveState("error");
@@ -559,12 +569,43 @@ export default function ContentStudioLitePage() {
       }
       await loadContentArcs();
       setStepSaveState("saved");
+      setStepDirty(false);
     } catch (err) {
       console.error(err);
       setStepSaveState("error");
       setContentArcsError(err instanceof Error ? err.message : "Failed to save step");
     }
   };
+
+  useEffect(() => {
+    if (!arcDraft || !arcDirty) return;
+    if (arcAutosaveTimerRef.current) {
+      window.clearTimeout(arcAutosaveTimerRef.current);
+    }
+    arcAutosaveTimerRef.current = window.setTimeout(() => {
+      saveArc();
+    }, 900);
+    return () => {
+      if (arcAutosaveTimerRef.current) {
+        window.clearTimeout(arcAutosaveTimerRef.current);
+      }
+    };
+  }, [arcDraft, arcDirty]);
+
+  useEffect(() => {
+    if (!stepDraft || !stepDirty) return;
+    if (stepAutosaveTimerRef.current) {
+      window.clearTimeout(stepAutosaveTimerRef.current);
+    }
+    stepAutosaveTimerRef.current = window.setTimeout(() => {
+      saveStep();
+    }, 900);
+    return () => {
+      if (stepAutosaveTimerRef.current) {
+        window.clearTimeout(stepAutosaveTimerRef.current);
+      }
+    };
+  }, [stepDraft, stepDirty]);
 
   const selectRule = (rule: DelayedConsequenceRule) => {
     setRuleDraft({
@@ -1420,17 +1461,31 @@ export default function ContentStudioLitePage() {
                   />
                 ) : activeTab === "arcs" ? (
                   <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h2 className="text-xl font-semibold text-slate-900">Content arcs</h2>
-                        <p className="text-sm text-slate-600">
-                          Read-only view of content_arcs and steps.
-                        </p>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-xl font-semibold text-slate-900">Content arcs</h2>
+                          <p className="text-sm text-slate-600">
+                            Read-only view of content_arcs and steps.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant={arcViewMode === "editor" ? "default" : "outline"}
+                            onClick={() => setArcViewMode("editor")}
+                          >
+                            Editor
+                          </Button>
+                          <Button
+                            variant={arcViewMode === "graph" ? "default" : "outline"}
+                            onClick={() => setArcViewMode("graph")}
+                          >
+                            Graph
+                          </Button>
+                          <Button variant="outline" onClick={loadContentArcs}>
+                            Refresh
+                          </Button>
+                        </div>
                       </div>
-                      <Button variant="outline" onClick={loadContentArcs}>
-                        Refresh
-                      </Button>
-                    </div>
 
                     {contentArcsLoading ? (
                       <p className="text-sm text-slate-600">Loading…</p>
@@ -1464,20 +1519,42 @@ export default function ContentStudioLitePage() {
                             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
                               Select an arc to edit.
                             </div>
+                          ) : arcViewMode === "graph" ? (
+                            <ArcGraphView
+                              steps={stepsByArc.get(selectedArc.key) ?? []}
+                              selectedStepIndex={stepDraft?.step_index ?? null}
+                              onSelectStep={(index) => {
+                                const step = (stepsByArc.get(selectedArc.key) ?? []).find(
+                                  (candidate) => candidate.step_index === index
+                                );
+                                if (step) {
+                                  selectStep(step);
+                                  setArcViewMode("editor");
+                                }
+                              }}
+                            />
                           ) : (
                             <div className="space-y-4">
                               <div className="space-y-3">
-                                <h3 className="text-sm font-semibold text-slate-900">
-                                  Arc details
-                                </h3>
+                                <div className="flex items-center justify-between">
+                                  <h3 className="text-sm font-semibold text-slate-900">
+                                    Arc details
+                                  </h3>
+                                  <SaveStatusIndicator saveState={arcSaveState} />
+                                </div>
                                 <label className="text-sm text-slate-700">
                                   Title
                                   <input
                                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                     value={arcDraft.title}
-                                    onChange={(e) =>
-                                      setArcDraft({ ...arcDraft, title: e.target.value })
-                                    }
+                                    onChange={(e) => {
+                                      setArcDraft({
+                                        ...arcDraft,
+                                        title: e.target.value,
+                                      });
+                                      setArcDirty(true);
+                                      setArcSaveState("idle");
+                                    }}
                                   />
                                 </label>
                                 <label className="text-sm text-slate-700">
@@ -1486,12 +1563,14 @@ export default function ContentStudioLitePage() {
                                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                     rows={3}
                                     value={arcDraft.description}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
                                       setArcDraft({
                                         ...arcDraft,
                                         description: e.target.value,
-                                      })
-                                    }
+                                      });
+                                      setArcDirty(true);
+                                      setArcSaveState("idle");
+                                    }}
                                   />
                                 </label>
                                 <label className="text-sm text-slate-700">
@@ -1499,49 +1578,46 @@ export default function ContentStudioLitePage() {
                                   <input
                                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                     value={(arcDraft.tags ?? []).join(", ")}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
                                       setArcDraft({
                                         ...arcDraft,
                                         tags: e.target.value
                                           .split(",")
                                           .map((tag) => tag.trim())
                                           .filter(Boolean),
-                                      })
-                                    }
+                                      });
+                                      setArcDirty(true);
+                                      setArcSaveState("idle");
+                                    }}
                                   />
                                 </label>
                                 <label className="flex items-center gap-2 text-sm text-slate-700">
                                   <input
                                     type="checkbox"
                                     checked={arcDraft.is_active}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
                                       setArcDraft({
                                         ...arcDraft,
                                         is_active: e.target.checked,
-                                      })
-                                    }
+                                      });
+                                      setArcDirty(true);
+                                      setArcSaveState("idle");
+                                    }}
                                   />
                                   Active
                                 </label>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="outline"
-                                    onClick={saveArc}
-                                    disabled={arcSaveState === "saving"}
-                                  >
-                                    {arcSaveState === "saving" ? "Saving..." : "Save arc"}
-                                  </Button>
-                                  {arcSaveState === "saved" ? (
-                                    <span className="text-xs text-slate-500">Saved</span>
-                                  ) : null}
-                                </div>
                               </div>
 
                               <div className="border-t border-slate-200 pt-4">
                                 <div className="flex items-center justify-between">
-                                  <h3 className="text-sm font-semibold text-slate-900">
-                                    Steps
-                                  </h3>
+                                  <div>
+                                    <h3 className="text-sm font-semibold text-slate-900">
+                                      Steps
+                                    </h3>
+                                    <p className="text-xs text-slate-500">
+                                      Autosave enabled.
+                                    </p>
+                                  </div>
                                   <Button variant="outline" onClick={createStep}>
                                     New step
                                   </Button>
@@ -1575,17 +1651,25 @@ export default function ContentStudioLitePage() {
                                     </div>
                                   ) : (
                                     <div className="space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-semibold text-slate-900">
+                                          Step editor
+                                        </h4>
+                                        <SaveStatusIndicator saveState={stepSaveState} />
+                                      </div>
                                       <label className="text-sm text-slate-700">
                                         Title
                                         <input
                                           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                           value={stepDraft.title}
-                                          onChange={(e) =>
+                                          onChange={(e) => {
                                             setStepDraft({
                                               ...stepDraft,
                                               title: e.target.value,
-                                            })
-                                          }
+                                            });
+                                            setStepDirty(true);
+                                            setStepSaveState("idle");
+                                          }}
                                         />
                                       </label>
                                       <label className="text-sm text-slate-700">
@@ -1594,12 +1678,14 @@ export default function ContentStudioLitePage() {
                                           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                           rows={6}
                                           value={stepDraft.body}
-                                          onChange={(e) =>
+                                          onChange={(e) => {
                                             setStepDraft({
                                               ...stepDraft,
                                               body: e.target.value,
-                                            })
-                                          }
+                                            });
+                                            setStepDirty(true);
+                                            setStepSaveState("idle");
+                                          }}
                                         />
                                       </label>
                                       <label className="text-sm text-slate-700">
@@ -1608,25 +1694,13 @@ export default function ContentStudioLitePage() {
                                           className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
                                           rows={8}
                                           value={stepChoicesText}
-                                          onChange={(e) => setStepChoicesText(e.target.value)}
+                                          onChange={(e) => {
+                                            setStepChoicesText(e.target.value);
+                                            setStepDirty(true);
+                                            setStepSaveState("idle");
+                                          }}
                                         />
                                       </label>
-                                      <div className="flex items-center gap-2">
-                                        <Button
-                                          variant="outline"
-                                          onClick={saveStep}
-                                          disabled={stepSaveState === "saving"}
-                                        >
-                                          {stepSaveState === "saving"
-                                            ? "Saving..."
-                                            : "Save step"}
-                                        </Button>
-                                        {stepSaveState === "saved" ? (
-                                          <span className="text-xs text-slate-500">
-                                            Saved
-                                          </span>
-                                        ) : null}
-                                      </div>
                                     </div>
                                   )}
                                 </div>
