@@ -2818,10 +2818,15 @@ export default function PlayPage() {
                               (arcToday.progressionSlotsTotal ?? 0) -
                               (arcToday.progressionSlotsUsed ?? 0);
                             const daysLeft = due.expires_on_day - dayIndex;
+                            const expiresSoon = daysLeft <= 0;
                             return (
                               <div
                                 key={due.instance.id}
-                                className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2"
+                                className={`rounded-md border px-4 py-3 space-y-2 ${
+                                  expiresSoon
+                                    ? "border-amber-300 bg-amber-50"
+                                    : "border-slate-200 bg-white"
+                                }`}
                               >
                                 <div>
                                   <p className="text-xs text-slate-500">
@@ -2833,7 +2838,13 @@ export default function PlayPage() {
                                   <p className="text-sm text-slate-700">
                                     {due.step.body}
                                   </p>
-                                  <p className="text-xs text-slate-500">
+                                  <p
+                                    className={`text-xs ${
+                                      expiresSoon
+                                        ? "text-amber-700"
+                                        : "text-slate-500"
+                                    }`}
+                                  >
                                     {daysLeft <= 0
                                       ? "Expires today"
                                       : `Expires in ${daysLeft} day${
