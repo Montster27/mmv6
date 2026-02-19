@@ -29,7 +29,7 @@ insert into public.arc_steps (
   due_offset_days,
   expires_after_days
 )
-select arc.id, *
+select arc.id, steps.*
 from arc
 cross join (
   values
