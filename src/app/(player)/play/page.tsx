@@ -2860,6 +2860,11 @@ export default function PlayPage() {
                                           daysLeft === 1 ? "" : "s"
                                         }`}
                                   </p>
+                                  {expiresSoon ? (
+                                    <p className="text-xs font-semibold text-amber-700">
+                                      Action needed today.
+                                    </p>
+                                  ) : null}
                                 </div>
                                 <div className="space-y-2">
                                   {due.step.options.map((option) => (
