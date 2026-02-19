@@ -116,12 +116,24 @@ vi.mock("@/core/validation/storyletValidation", () => ({
 
 vi.mock("@/lib/featureFlags", () => ({
   getFeatureFlags: vi.fn(() => ({
+    arcFirstEnabled: false,
     skills: true,
     funPulse: true,
     alignment: true,
     arcs: true,
     resources: true,
     remnantSystemEnabled: true,
+    verticalSlice30Enabled: false,
+    rookieCircleEnabled: false,
+    askOfferBoardEnabled: false,
+    buddySystemEnabled: false,
+    afterActionCompareEnabled: false,
+    contentStudioLiteEnabled: false,
+    contentStudioGraphEnabled: false,
+    contentStudioPreviewEnabled: false,
+    contentStudioHistoryEnabled: false,
+    contentStudioPublishEnabled: false,
+    contentStudioRemnantRulesEnabled: false,
   })),
 }));
 

@@ -78,6 +78,7 @@ import {
 } from "@/lib/remnants";
 import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
+import type { TodayArcState } from "@/domain/arcs/types";
 import type { TelemetryEvent } from "@/types/telemetry";
 import type {
   DailyPosture,
@@ -109,6 +110,13 @@ const defaultAllocation: AllocationPayload = {
 };
 
 const USE_DAILY_LOOP_ORCHESTRATOR = true;
+
+const ARC_TONE_COPY = [
+  "You notice…",
+  "You see it again…",
+  "It is hard to ignore…",
+  "This might be your last chance…",
+];
 
 export default function PlayPage() {
   const session = useSession();
@@ -221,6 +229,9 @@ export default function PlayPage() {
   } = useGameContent();
   const [arcSubmitting, setArcSubmitting] = useState(false);
   const [initiativeSubmitting, setInitiativeSubmitting] = useState(false);
+  const [arcToday, setArcToday] = useState<TodayArcState | null>(null);
+  const [arcTodayLoading, setArcTodayLoading] = useState(false);
+  const [arcTodayError, setArcTodayError] = useState<string | null>(null);
   const [funPulseSaving, setFunPulseSaving] = useState(false);
   const [bootstrapAssignments, setBootstrapAssignments] = useState<
     Record<string, string>
@@ -502,6 +513,35 @@ export default function PlayPage() {
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
+
+  const fetchArcToday = useCallback(async () => {
+    if (!featureFlags.arcFirstEnabled || !userId) return;
+    if (typeof dayIndex !== "number") return;
+    setArcTodayLoading(true);
+    setArcTodayError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+      const res = await fetch(`/api/arcs/today?day=${dayIndex}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to load arc state.");
+      }
+      setArcToday(json as TodayArcState);
+    } catch (err) {
+      console.error(err);
+      setArcTodayError(err instanceof Error ? err.message : "Failed to load arcs.");
+    } finally {
+      setArcTodayLoading(false);
+    }
+  }, [featureFlags.arcFirstEnabled, userId, dayIndex]);
+
+  useEffect(() => {
+    fetchArcToday();
+  }, [fetchArcToday, refreshTick]);
 
   const loadDevCharacters = async () => {
     setDevLoading(true);
@@ -1551,7 +1591,7 @@ export default function PlayPage() {
       setAllocationSaved(true);
       setAllocationSummary(allocation);
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
-        setStage("storylet_1");
+        setStage(featureFlags.arcFirstEnabled ? "social" : "storylet_1");
       }
     } catch (e) {
       console.error(e);
@@ -1560,6 +1600,117 @@ export default function PlayPage() {
       setSavingAllocation(false);
     }
   };
+
+  const callArcApi = useCallback(
+    async (path: string, body: Record<string, unknown>) => {
+      if (!userId) throw new Error("Missing user.");
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+      const res = await fetch(path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Arc action failed.");
+      }
+    },
+    [userId]
+  );
+
+  const handleAcceptOffer = useCallback(
+    async (offerId: string) => {
+      if (typeof dayIndex !== "number") return;
+      setArcSubmitting(true);
+      setArcTodayError(null);
+      try {
+        await callArcApi("/api/arcs/offers/accept", { offerId, day: dayIndex });
+        await fetchArcToday();
+      } catch (err) {
+        console.error(err);
+        setArcTodayError(
+          err instanceof Error ? err.message : "Failed to accept offer."
+        );
+      } finally {
+        setArcSubmitting(false);
+      }
+    },
+    [callArcApi, dayIndex, fetchArcToday]
+  );
+
+  const handleResolveArcStep = useCallback(
+    async (instanceId: string, optionKey: string) => {
+      if (typeof dayIndex !== "number") return;
+      setArcSubmitting(true);
+      setArcTodayError(null);
+      try {
+        await callArcApi("/api/arcs/instances/resolve", {
+          arcInstanceId: instanceId,
+          optionKey,
+          day: dayIndex,
+        });
+        await fetchArcToday();
+      } catch (err) {
+        console.error(err);
+        setArcTodayError(
+          err instanceof Error ? err.message : "Failed to resolve step."
+        );
+      } finally {
+        setArcSubmitting(false);
+      }
+    },
+    [callArcApi, dayIndex, fetchArcToday]
+  );
+
+  const handleDeferArcStep = useCallback(
+    async (instanceId: string) => {
+      if (typeof dayIndex !== "number") return;
+      setArcSubmitting(true);
+      setArcTodayError(null);
+      try {
+        await callArcApi("/api/arcs/instances/defer", {
+          arcInstanceId: instanceId,
+          day: dayIndex,
+        });
+        await fetchArcToday();
+      } catch (err) {
+        console.error(err);
+        setArcTodayError(
+          err instanceof Error ? err.message : "Failed to defer step."
+        );
+      } finally {
+        setArcSubmitting(false);
+      }
+    },
+    [callArcApi, dayIndex, fetchArcToday]
+  );
+
+  const renderDeltaLines = useCallback(
+    (label: string, delta?: Record<string, number>) => {
+      if (!delta) return null;
+      const entries = Object.entries(delta).filter(
+        ([, value]) => typeof value === "number" && value !== 0
+      );
+      if (entries.length === 0) return null;
+      return (
+        <div className="text-xs text-slate-600">
+          {label}{" "}
+          {entries.map(([key, value]) => (
+            <span key={key} className="mr-2">
+              {key} {value >= 0 ? "+" : ""}
+              {value}
+            </span>
+          ))}
+        </div>
+      );
+    },
+    []
+  );
 
   const currentStorylet =
     stage === "storylet_1"
@@ -2641,181 +2792,363 @@ export default function PlayPage() {
                     />
                   )}
 
-                  {(stage === "storylet_1" ||
-                    stage === "storylet_2" ||
-                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
-                    <section className="space-y-3">
+                  {featureFlags.arcFirstEnabled ? (
+                    <section className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">Storylets</h2>
+                        <h2 className="text-xl font-semibold">Today</h2>
                         <span className="text-sm text-slate-600">
-                          Progress: {Math.min(runs.length, 2)}/2
+                          Progress: {arcToday?.progressionSlotsUsed ?? 0}/
+                          {arcToday?.progressionSlotsTotal ?? 0}
                         </span>
                       </div>
-                      <p className="text-base text-slate-700">
-                        Pick one choice. You can do two today.
-                      </p>
+                      {arcTodayLoading ? (
+                        <p className="text-sm text-slate-600">Loading arcs…</p>
+                      ) : null}
+                      {arcTodayError ? (
+                        <p className="text-sm text-red-600">{arcTodayError}</p>
+                      ) : null}
 
-                      {!currentStorylet ? (
-                        <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
-                          {storylets.length === 0 ? (
-                            <p className="text-slate-700">No more storylets today.</p>
-                          ) : (
-                            <p className="text-slate-700">Daily complete ✅</p>
-                          )}
-                          <Button className="mt-3" variant="secondary">
-                            Back tomorrow
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                          <div>
-                            <p className="text-sm text-slate-600">
-                              Storylet {stage === "storylet_2" ? 2 : 1} of 2
-                            </p>
-                            <h3 className="text-lg font-semibold text-slate-900">
-                              {currentStorylet.title}
-                            </h3>
-                            <p className="text-slate-700">{currentStorylet.body}</p>
-                          </div>
-                          <div className="space-y-2">
-                            {(() => {
-                              const choices = toChoices(currentStorylet);
-
-                              return choices.length > 0 ? (
-                                choices.map((choice) => (
-                                  <Button
-                                    key={choice.id}
-                                    variant="secondary"
-                                    disabled={choicesDisabled}
-                                    onClick={() => handleChoice(choice.id)}
-                                    className="w-full justify-start"
-                                  >
-                                    {choice.label}
-                                  </Button>
-                                ))
-                              ) : (
-                                <p className="text-slate-600 text-sm">
-                                  No choices available.
-                                </p>
-                              );
-                            })()}
-                            {(outcomeMessage || outcomeDeltas) && !consequenceActive && (
-                              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                                {outcomeMessage ? <p>{outcomeMessage}</p> : null}
-                                {outcomeDeltas ? (
-                                  <ul className="mt-1 space-y-0.5 text-slate-700">
-                                    {typeof outcomeDeltas.energy === "number" ? (
-                                      <li>
-                                        Energy {outcomeDeltas.energy >= 0 ? "+" : ""}
-                                        {outcomeDeltas.energy}
-                                      </li>
-                                    ) : null}
-                                    {typeof outcomeDeltas.stress === "number" ? (
-                                      <li>
-                                        Stress {outcomeDeltas.stress >= 0 ? "+" : ""}
-                                        {outcomeDeltas.stress}
-                                      </li>
-                                    ) : null}
-                                    {featureFlags.resources && outcomeDeltas.vectors
-                                      ? Object.entries(outcomeDeltas.vectors).map(
-                                          ([key, delta]) => (
-                                            <li key={key}>
-                                              {key}: {delta >= 0 ? "+" : ""}
-                                              {delta}
-                                            </li>
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Due today
+                        </h3>
+                        {arcToday?.dueSteps?.length ? (
+                          arcToday.dueSteps.map((due) => {
+                            const slotsRemaining =
+                              (arcToday.progressionSlotsTotal ?? 0) -
+                              (arcToday.progressionSlotsUsed ?? 0);
+                            const daysLeft = due.expires_on_day - dayIndex;
+                            return (
+                              <div
+                                key={due.instance.id}
+                                className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2"
+                              >
+                                <div>
+                                  <p className="text-xs text-slate-500">
+                                    {due.arc.title}
+                                  </p>
+                                  <h4 className="text-base font-semibold text-slate-900">
+                                    {due.step.title}
+                                  </h4>
+                                  <p className="text-sm text-slate-700">
+                                    {due.step.body}
+                                  </p>
+                                  <p className="text-xs text-slate-500">
+                                    {daysLeft <= 0
+                                      ? "Expires today"
+                                      : `Expires in ${daysLeft} day${
+                                          daysLeft === 1 ? "" : "s"
+                                        }`}
+                                  </p>
+                                </div>
+                                <div className="space-y-2">
+                                  {due.step.options.map((option) => (
+                                    <div key={option.option_key} className="space-y-1">
+                                      <Button
+                                        variant="secondary"
+                                        disabled={arcSubmitting || slotsRemaining <= 0}
+                                        onClick={() =>
+                                          handleResolveArcStep(
+                                            due.instance.id,
+                                            option.option_key
                                           )
-                                        )
-                                      : null}
-                                  </ul>
-                                ) : null}
-                                {lastCheck ? (
-                                  <TesterOnly>
-                                    <OutcomeExplain check={lastCheck} />
-                                  </TesterOnly>
-                                ) : null}
-                                {featureFlags.afterActionCompareEnabled &&
-                                compareVisible ? (
-                                  <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
-                                    <div className="flex items-center justify-between">
-                                      <p className="font-semibold">
-                                        Cohort comparison
-                                      </p>
-                                      <Button
-                                        variant="ghost"
-                                        onClick={handleCompareDismiss}
-                                      >
-                                        Dismiss
-                                      </Button>
-                                    </div>
-                                    {compareLoading ? (
-                                      <p className="text-sm text-slate-600">
-                                        Loading…
-                                      </p>
-                                    ) : compareSnapshot ? (
-                                      <div className="space-y-2">
-                                        <ul className="space-y-1">
-                                          {compareSnapshot.options.map((opt) => (
-                                            <li key={opt.choice_id}>
-                                              {choiceLabelMap.get(opt.choice_id) ??
-                                                opt.choice_id}
-                                              : {opt.percent}%
-                                            </li>
-                                          ))}
-                                        </ul>
-                                        {compareSnapshot.rationale ? (
-                                          <p className="text-xs text-slate-600">
-                                            {compareSnapshot.rationale.handle}:{" "}
-                                            {compareSnapshot.rationale.text}
-                                          </p>
-                                        ) : (
-                                          <p className="text-xs text-slate-500">
-                                            Not enough data yet.
-                                          </p>
-                                        )}
-                                      </div>
-                                    ) : compareError ? (
-                                      <p className="text-xs text-slate-500">
-                                        {compareError}
-                                      </p>
-                                    ) : null}
-                                    <div className="mt-3 space-y-2">
-                                      <label className="block text-xs text-slate-500">
-                                        Share a short note (optional)
-                                      </label>
-                                      <input
-                                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                                        value={compareNote}
-                                        onChange={(e) =>
-                                          setCompareNote(e.target.value)
                                         }
-                                      />
-                                      <Button
-                                        variant="outline"
-                                        onClick={handleCompareSubmit}
-                                        disabled={compareSending}
+                                        className="w-full justify-start"
                                       >
-                                        {compareSending ? "Saving..." : "Share note"}
+                                        {option.label}
                                       </Button>
+                                      {renderDeltaLines(
+                                        "Costs:",
+                                        option.costs?.resources
+                                      )}
+                                      {renderDeltaLines(
+                                        "Rewards:",
+                                        option.rewards?.resources
+                                      )}
+                                      {typeof option.rewards?.skill_points ===
+                                      "number" ? (
+                                        <div className="text-xs text-slate-600">
+                                          Skill points +{option.rewards.skill_points}
+                                        </div>
+                                      ) : null}
                                     </div>
+                                  ))}
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      onClick={() =>
+                                        handleDeferArcStep(due.instance.id)
+                                      }
+                                      disabled={arcSubmitting}
+                                    >
+                                      Defer
+                                    </Button>
+                                    {slotsRemaining <= 0 ? (
+                                      <span className="text-xs text-amber-700">
+                                        No progression slots left today.
+                                      </span>
+                                    ) : null}
                                   </div>
-                                ) : null}
+                                </div>
                               </div>
-                            )}
-                            {consequenceActive && (
-                              <ConsequenceMoment
-                                message={outcomeMessage}
-                                deltas={outcomeDeltas}
-                                onDone={finishConsequence}
-                              />
-                            )}
+                            );
+                          })
+                        ) : (
+                          <p className="text-sm text-slate-600">
+                            No arc steps are due today.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Invitations
+                        </h3>
+                        {arcToday?.offers?.length ? (
+                          arcToday.offers.map((offer) => (
+                            <div
+                              key={offer.id}
+                              className="rounded-md border border-slate-200 bg-white px-4 py-3"
+                            >
+                              <p className="text-xs text-slate-500">
+                                {ARC_TONE_COPY[offer.tone_level] ??
+                                  ARC_TONE_COPY[0]}
+                              </p>
+                              <h4 className="text-base font-semibold text-slate-900">
+                                {offer.arc.title}
+                              </h4>
+                              <p className="text-sm text-slate-700">
+                                {offer.arc.description}
+                              </p>
+                              <Button
+                                className="mt-2"
+                                onClick={() => handleAcceptOffer(offer.id)}
+                                disabled={arcSubmitting}
+                              >
+                                Accept
+                              </Button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-slate-600">
+                            No invitations today.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Active arcs
+                        </h3>
+                        {arcToday?.activeArcs?.length ? (
+                          <div className="space-y-2">
+                            {arcToday.activeArcs.map((instance) => (
+                              <div
+                                key={instance.id}
+                                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium">
+                                    {instance.arc.title}
+                                  </span>
+                                  <span className="text-xs text-slate-500">
+                                    Due day {instance.step_due_day}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  Defers: {instance.step_defer_count}
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      )}
+                        ) : (
+                          <p className="text-sm text-slate-600">
+                            No active arcs yet.
+                          </p>
+                        )}
+                      </div>
                     </section>
-                    )}
+                  ) : (
+                    (stage === "storylet_1" ||
+                      stage === "storylet_2" ||
+                      (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
+                      <section className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-xl font-semibold">Storylets</h2>
+                          <span className="text-sm text-slate-600">
+                            Progress: {Math.min(runs.length, 2)}/2
+                          </span>
+                        </div>
+                        <p className="text-base text-slate-700">
+                          Pick one choice. You can do two today.
+                        </p>
+
+                        {!currentStorylet ? (
+                          <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
+                            {storylets.length === 0 ? (
+                              <p className="text-slate-700">No more storylets today.</p>
+                            ) : (
+                              <p className="text-slate-700">Daily complete ✅</p>
+                            )}
+                            <Button className="mt-3" variant="secondary">
+                              Back tomorrow
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                            <div>
+                              <p className="text-sm text-slate-600">
+                                Storylet {stage === "storylet_2" ? 2 : 1} of 2
+                              </p>
+                              <h3 className="text-lg font-semibold text-slate-900">
+                                {currentStorylet.title}
+                              </h3>
+                              <p className="text-slate-700">{currentStorylet.body}</p>
+                            </div>
+                            <div className="space-y-2">
+                              {(() => {
+                                const choices = toChoices(currentStorylet);
+
+                                return choices.length > 0 ? (
+                                  choices.map((choice) => (
+                                    <Button
+                                      key={choice.id}
+                                      variant="secondary"
+                                      disabled={choicesDisabled}
+                                      onClick={() => handleChoice(choice.id)}
+                                      className="w-full justify-start"
+                                    >
+                                      {choice.label}
+                                    </Button>
+                                  ))
+                                ) : (
+                                  <p className="text-slate-600 text-sm">
+                                    No choices available.
+                                  </p>
+                                );
+                              })()}
+                              {(outcomeMessage || outcomeDeltas) &&
+                                !consequenceActive && (
+                                  <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                                    {outcomeMessage ? <p>{outcomeMessage}</p> : null}
+                                    {outcomeDeltas ? (
+                                      <ul className="mt-1 space-y-0.5 text-slate-700">
+                                        {typeof outcomeDeltas.energy === "number" ? (
+                                          <li>
+                                            Energy{" "}
+                                            {outcomeDeltas.energy >= 0 ? "+" : ""}
+                                            {outcomeDeltas.energy}
+                                          </li>
+                                        ) : null}
+                                        {typeof outcomeDeltas.stress === "number" ? (
+                                          <li>
+                                            Stress{" "}
+                                            {outcomeDeltas.stress >= 0 ? "+" : ""}
+                                            {outcomeDeltas.stress}
+                                          </li>
+                                        ) : null}
+                                        {featureFlags.resources && outcomeDeltas.vectors
+                                          ? Object.entries(outcomeDeltas.vectors).map(
+                                              ([key, delta]) => (
+                                                <li key={key}>
+                                                  {key}: {delta >= 0 ? "+" : ""}
+                                                  {delta}
+                                                </li>
+                                              )
+                                            )
+                                          : null}
+                                      </ul>
+                                    ) : null}
+                                    {lastCheck ? (
+                                      <TesterOnly>
+                                        <OutcomeExplain check={lastCheck} />
+                                      </TesterOnly>
+                                    ) : null}
+                                    {featureFlags.afterActionCompareEnabled &&
+                                    compareVisible ? (
+                                      <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+                                        <div className="flex items-center justify-between">
+                                          <p className="font-semibold">
+                                            Cohort comparison
+                                          </p>
+                                          <Button
+                                            variant="ghost"
+                                            onClick={handleCompareDismiss}
+                                          >
+                                            Dismiss
+                                          </Button>
+                                        </div>
+                                        {compareLoading ? (
+                                          <p className="text-sm text-slate-600">
+                                            Loading…
+                                          </p>
+                                        ) : compareSnapshot ? (
+                                          <div className="space-y-2">
+                                            <ul className="space-y-1">
+                                              {compareSnapshot.options.map((opt) => (
+                                                <li key={opt.choice_id}>
+                                                  {choiceLabelMap.get(opt.choice_id) ??
+                                                    opt.choice_id}
+                                                  : {opt.percent}%
+                                                </li>
+                                              ))}
+                                            </ul>
+                                            {compareSnapshot.rationale ? (
+                                              <p className="text-xs text-slate-600">
+                                                {compareSnapshot.rationale.handle}:{" "}
+                                                {compareSnapshot.rationale.text}
+                                              </p>
+                                            ) : (
+                                              <p className="text-xs text-slate-500">
+                                                Not enough data yet.
+                                              </p>
+                                            )}
+                                          </div>
+                                        ) : compareError ? (
+                                          <p className="text-xs text-slate-500">
+                                            {compareError}
+                                          </p>
+                                        ) : null}
+                                        <div className="mt-3 space-y-2">
+                                          <label className="block text-xs text-slate-500">
+                                            Share a short note (optional)
+                                          </label>
+                                          <input
+                                            className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                            value={compareNote}
+                                            onChange={(e) =>
+                                              setCompareNote(e.target.value)
+                                            }
+                                          />
+                                          <Button
+                                            variant="outline"
+                                            onClick={handleCompareSubmit}
+                                            disabled={compareSending}
+                                          >
+                                            {compareSending ? "Saving..." : "Share note"}
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                )}
+                              {consequenceActive && (
+                                <ConsequenceMoment
+                                  message={outcomeMessage}
+                                  deltas={outcomeDeltas}
+                                  onDone={finishConsequence}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </section>
+                    )
+                  )}
 
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     featureFlags.arcs &&
+                    !featureFlags.arcFirstEnabled &&
                     arc &&
                     stage !== "setup" &&
                     stage !== "allocation" &&

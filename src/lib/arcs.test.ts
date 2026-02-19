@@ -63,7 +63,26 @@ vi.mock("@/lib/dayState", () => ({
 }));
 
 vi.mock("@/lib/featureFlags", () => ({
-  getFeatureFlags: vi.fn(() => ({ resources: true })),
+  getFeatureFlags: vi.fn(() => ({
+    arcFirstEnabled: false,
+    arcs: true,
+    resources: true,
+    skills: false,
+    alignment: false,
+    funPulse: false,
+    verticalSlice30Enabled: false,
+    rookieCircleEnabled: false,
+    askOfferBoardEnabled: false,
+    buddySystemEnabled: false,
+    afterActionCompareEnabled: false,
+    remnantSystemEnabled: false,
+    contentStudioLiteEnabled: false,
+    contentStudioGraphEnabled: false,
+    contentStudioPreviewEnabled: false,
+    contentStudioHistoryEnabled: false,
+    contentStudioPublishEnabled: false,
+    contentStudioRemnantRulesEnabled: false,
+  })),
 }));
 
 import { fetchArcSteps } from "@/lib/content/arcs";

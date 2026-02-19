@@ -42,8 +42,26 @@ describe("dailyLoop helpers", () => {
       false,
       false,
       false,
+      false,
       false
     );
     expect(stage).toBe("storylet_2");
+  });
+
+  it("uses allocation stage when arc-first is enabled", () => {
+    const stage = computeStage(
+      false,
+      0,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    );
+    expect(stage).toBe("allocation");
   });
 });

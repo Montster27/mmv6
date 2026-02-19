@@ -12,12 +12,22 @@ export function computeStage(
     alreadyCompletedToday: boolean,
     canBoost: boolean,
     hasStorylets: boolean,
+    arcFirstEnabled: boolean,
     reflectionDone: boolean,
     microTaskEligible: boolean,
     microTaskDone: boolean,
     funPulseEligible: boolean,
     funPulseDone: boolean
 ): DailyRunStage {
+    if (arcFirstEnabled) {
+        if (alreadyCompletedToday) return "complete";
+        if (!allocationPresent) return "allocation";
+        if (microTaskEligible && !microTaskDone) return "microtask";
+        if (canBoost) return "social";
+        if (!reflectionDone) return "reflection";
+        if (funPulseEligible && !funPulseDone) return "fun_pulse";
+        return "complete";
+    }
     if (!hasStorylets) return "complete";
     if (alreadyCompletedToday) return "complete";
     if (!allocationPresent) return "allocation";
