@@ -15,7 +15,7 @@ import type {
   DueStep,
   TodayArcState,
 } from "@/domain/arcs/types";
-import { applyResourceDeltaToDayState } from "@/services/arcs/arcResources";
+import { applyResourceDelta } from "@/services/resources/resourceService";
 
 const DEFAULT_PROGRESS_SLOTS = 2;
 const MAX_OFFERS_PER_DAY = 3;
@@ -127,9 +127,17 @@ export async function getTodayArcState(params: {
         .eq("id", instance.id)
         .eq("user_id", userId);
 
-      await applyResourceDeltaToDayState(userId, currentDay, {
-        resources: { stress: 1 },
-      });
+      await applyResourceDelta(
+        userId,
+        currentDay,
+        { resources: { stress: 1 } },
+        {
+          source: "arc_expired_penalty",
+          arcId: instance.arc_id,
+          arcInstanceId: instance.id,
+          stepKey: instance.current_step_key,
+        }
+      );
 
       await logChoice({
         user_id: userId,

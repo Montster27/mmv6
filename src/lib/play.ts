@@ -15,6 +15,7 @@ import { allocationToVectorDeltas } from "@/core/vectors/allocationToVectorDelta
 import { ensureDayStateUpToDate, finalizeDay } from "@/lib/dayState";
 import { resolveCheck } from "@/core/sim/checkResolver";
 import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
+import { applyResourceDelta } from "@/lib/resources";
 import type { CheckResult, CheckSkillLevels } from "@/types/checks";
 import { getFeatureFlags } from "@/lib/featureFlags";
 
@@ -205,36 +206,38 @@ export async function saveTimeAllocation(
     Math.max(0, basePhysicalResilience + resilienceGain)
   );
 
-  const { error: updateError } = await supabase
-    .from("player_day_state")
-    .update({
-      energy: next.energy,
-      stress: next.stress,
-      money: nextCashOnHand,
-      study_progress: nextKnowledge,
-      social_capital: nextSocialLeverage,
-      health: nextPhysicalResilience,
-      total_study: previousTotals.total_study + normalizedAllocation.study,
-      total_work: previousTotals.total_work + normalizedAllocation.work,
-      total_social: previousTotals.total_social + normalizedAllocation.social,
-      total_health: previousTotals.total_health + normalizedAllocation.health,
-      total_fun: previousTotals.total_fun + normalizedAllocation.fun,
-      pre_allocation_energy: baseEnergy,
-      pre_allocation_stress: baseStress,
-      pre_allocation_money: baseCashOnHand,
-      pre_allocation_study_progress: baseKnowledge,
-      pre_allocation_social_capital: baseSocialLeverage,
-      pre_allocation_health: basePhysicalResilience,
-      allocation_hash: allocationHash,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId)
-    .eq("day_index", dayIndex);
+  const resourceDelta = {
+    energy: next.energy - dayState.energy,
+    stress: next.stress - dayState.stress,
+    cashOnHand: nextCashOnHand - dayState.cashOnHand,
+    knowledge: nextKnowledge - dayState.knowledge,
+    socialLeverage: nextSocialLeverage - dayState.socialLeverage,
+    physicalResilience: nextPhysicalResilience - dayState.physicalResilience,
+  };
 
-  if (updateError) {
-    console.error("Failed to update day state from allocation", updateError);
-    throw updateError;
-  }
+  await applyResourceDelta(
+    userId,
+    dayIndex,
+    { resources: resourceDelta },
+    {
+      source: "daily_allocation",
+      meta: { allocation: normalizedAllocation },
+      extraUpdates: {
+        total_study: previousTotals.total_study + normalizedAllocation.study,
+        total_work: previousTotals.total_work + normalizedAllocation.work,
+        total_social: previousTotals.total_social + normalizedAllocation.social,
+        total_health: previousTotals.total_health + normalizedAllocation.health,
+        total_fun: previousTotals.total_fun + normalizedAllocation.fun,
+        pre_allocation_energy: baseEnergy,
+        pre_allocation_stress: baseStress,
+        pre_allocation_money: baseCashOnHand,
+        pre_allocation_study_progress: baseKnowledge,
+        pre_allocation_social_capital: baseSocialLeverage,
+        pre_allocation_health: basePhysicalResilience,
+        allocation_hash: allocationHash,
+      },
+    }
+  );
 
   const vectorDeltas = allocationToVectorDeltas(normalizedAllocation);
   if (Object.keys(vectorDeltas).length > 0) {

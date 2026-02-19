@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { acceptOffer } from "@/services/arcs/arcActions";
+import { getCurrentDayIndex } from "@/app/api/arcs/arcDay";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -26,14 +27,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const { offerId, day } = payload as { offerId?: string; day?: number };
+  const { offerId } = payload as { offerId?: string; day?: number };
   if (!offerId || typeof offerId !== "string") {
     return NextResponse.json({ error: "offerId required" }, { status: 400 });
   }
-  if (typeof day !== "number") {
-    return NextResponse.json({ error: "day required" }, { status: 400 });
-  }
-
-  await acceptOffer({ userId: user.id, currentDay: day, offerId });
+  const currentDay = await getCurrentDayIndex(user.id);
+  await acceptOffer({ userId: user.id, currentDay, offerId });
   return NextResponse.json({ ok: true });
 }

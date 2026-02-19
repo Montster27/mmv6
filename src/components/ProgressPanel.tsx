@@ -6,6 +6,7 @@ import type { DailyState } from "@/types/daily";
 import type { DailyRun } from "@/types/dailyRun";
 import type { SevenVectors } from "@/types/vectors";
 import { summarizeVectors } from "@/core/ui/vectorSummary";
+import { resourceLabel } from "@/core/resources/resourceMap";
 
 type DeltaInfo = {
   energy?: number;
@@ -135,7 +136,7 @@ function ProgressPanelComponent({
               : "text-slate-700"
           }`}
         >
-          <span>Energy</span>
+          <span>{resourceLabel("energy")}</span>
           <span>
             {typeof energy === "number" ? energy : "—"}
             {deltaBadge(lastAppliedDeltas?.energy, highlightEnergy)}
@@ -149,7 +150,7 @@ function ProgressPanelComponent({
               : "text-slate-700"
           }`}
         >
-          <span>Stress</span>
+          <span>{resourceLabel("stress")}</span>
           <span>
             {typeof stress === "number" ? stress : "—"}
             {deltaBadge(lastAppliedDeltas?.stress, highlightStress)}
@@ -162,23 +163,23 @@ function ProgressPanelComponent({
         {resourcesEnabled ? (
           <>
             <div className="flex items-center justify-between">
-              <span>Knowledge</span>
+              <span>{resourceLabel("knowledge")}</span>
               <span>{dayState?.knowledge ?? 0}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Cash on Hand</span>
+              <span>{resourceLabel("cashOnHand")}</span>
               <span>{dayState?.cashOnHand ?? 0}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Social Leverage</span>
+              <span>{resourceLabel("socialLeverage")}</span>
               <span>{dayState?.socialLeverage ?? 0}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Physical Resilience</span>
+              <span>{resourceLabel("physicalResilience")}</span>
               <span>{dayState?.physicalResilience ?? 0}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Morale</span>
+              <span>{resourceLabel("morale")}</span>
               <span>{typeof morale === "number" ? morale : "—"}</span>
             </div>
           </>
@@ -190,7 +191,7 @@ function ProgressPanelComponent({
         {skillsEnabled ? (
           <>
             <div className="flex items-center justify-between text-slate-600">
-              <span>Skill points</span>
+              <span>{resourceLabel("skillPoints")}</span>
               <span>
                 {typeof skillBank?.available_points === "number"
                   ? `${skillBank.available_points} / ${skillBank.cap}`
@@ -199,19 +200,19 @@ function ProgressPanelComponent({
             </div>
             <div className="mt-2 space-y-1 text-slate-600">
               <div className="flex items-center justify-between">
-                <span>Focus</span>
+                <span>{resourceLabel("focus")}</span>
                 <span>{skillLevels.focus}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Memory</span>
+                <span>{resourceLabel("memory")}</span>
                 <span>{skillLevels.memory}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Networking</span>
+                <span>{resourceLabel("networking")}</span>
                 <span>{skillLevels.networking}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Grit</span>
+                <span>{resourceLabel("grit")}</span>
                 <span>{skillLevels.grit}</span>
               </div>
             </div>

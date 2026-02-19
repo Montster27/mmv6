@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { deferStep } from "@/services/arcs/arcActions";
+import { getCurrentDayIndex } from "@/app/api/arcs/arcDay";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -26,17 +27,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const { arcInstanceId, day } = payload as {
+  const { arcInstanceId } = payload as {
     arcInstanceId?: string;
-    day?: number;
   };
   if (!arcInstanceId || typeof arcInstanceId !== "string") {
     return NextResponse.json({ error: "arcInstanceId required" }, { status: 400 });
   }
-  if (typeof day !== "number") {
-    return NextResponse.json({ error: "day required" }, { status: 400 });
-  }
-
-  await deferStep({ userId: user.id, currentDay: day, arcInstanceId });
+  const currentDay = await getCurrentDayIndex(user.id);
+  await deferStep({ userId: user.id, currentDay, arcInstanceId });
   return NextResponse.json({ ok: true });
 }

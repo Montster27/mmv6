@@ -63,8 +63,18 @@ describe("saveTimeAllocation", () => {
     // For this allocation, vectorDeltas might be present.
     // mockSupabase.supabase.from("daily_states").select(...).maybeSingle()
     mockSupabase.setMaybeSingleResponses([
-      // if fetchDailyState is called, it returns a daily state
-      { data: { id: "ds1", user_id: "u", day_index: 2, energy: 60, stress: 23, vectors: {} }, error: null }
+      {
+        data: {
+          energy: 70,
+          stress: 20,
+          money: 0,
+          study_progress: 0,
+          social_capital: 0,
+          health: 50,
+        },
+        error: null,
+      },
+      { data: { id: "ds1", user_id: "u", day_index: 2, energy: 60, stress: 23, vectors: {} }, error: null },
     ]);
 
     await saveTimeAllocation("u", 2, allocation, "steady");
@@ -178,7 +188,18 @@ describe("saveTimeAllocation", () => {
 
     // Mock response for fetchDailyState if needed (it might be called)
     mockSupabase.setMaybeSingleResponses([
-      { data: { id: "ds1", user_id: "u", day_index: 2, energy: 60, stress: 23, vectors: {} }, error: null }
+      {
+        data: {
+          energy: 62,
+          stress: 20,
+          money: 0,
+          study_progress: 0,
+          social_capital: 0,
+          health: 50,
+        },
+        error: null,
+      },
+      { data: { id: "ds1", user_id: "u", day_index: 2, energy: 60, stress: 23, vectors: {} }, error: null },
     ]);
 
     await saveTimeAllocation("u", 2, nextAllocation, "steady");

@@ -76,6 +76,7 @@ import {
   selectRemnant,
   unlockRemnant,
 } from "@/lib/remnants";
+import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
 import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { TodayArcState } from "@/domain/arcs/types";
@@ -1702,12 +1703,15 @@ export default function PlayPage() {
       return (
         <div className="text-xs text-slate-600">
           {label}{" "}
-          {entries.map(([key, value]) => (
-            <span key={key} className="mr-2">
-              {key} {value >= 0 ? "+" : ""}
-              {value}
-            </span>
-          ))}
+          {entries.map(([key, value]) => {
+            const mapped = mapLegacyResourceKey(key) ?? key;
+            return (
+              <span key={key} className="mr-2">
+                {resourceLabel(mapped as any)} {value >= 0 ? "+" : ""}
+                {value}
+              </span>
+            );
+          })}
         </div>
       );
     },

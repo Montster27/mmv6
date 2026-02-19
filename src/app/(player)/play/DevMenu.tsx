@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { FeatureFlags } from "@/lib/featureFlags";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { getResourceTrace, isResourceTraceEnabled } from "@/core/resources/resourceTrace";
+import { supabase } from "@/lib/supabase/browser";
 
 type DevCharacter = {
   user_id: string;
@@ -117,6 +119,10 @@ export default function DevMenu({
   const [flagOverrides, setFlagOverrides] = useState<Partial<FeatureFlags>>({});
   const [retainOverrides, setRetainOverrides] = useState(false);
   const flags = getFeatureFlags();
+  const [serverTrace, setServerTrace] = useState<
+    ReturnType<typeof getResourceTrace>
+  >([]);
+  const [traceLoading, setTraceLoading] = useState(false);
 
   useEffect(() => {
     setFlagOverrides(readOverrides());
@@ -127,6 +133,32 @@ export default function DevMenu({
       return;
     }
     setRetainOverrides(retain === "1");
+  }, []);
+
+  const loadServerTrace = async () => {
+    if (!isResourceTraceEnabled()) return;
+    setTraceLoading(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+      const res = await fetch("/api/admin/dev/resource-trace", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to load trace");
+      }
+      setServerTrace(json.trace ?? []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTraceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadServerTrace();
   }, []);
 
   const handleToggleFlag = (key: keyof FeatureFlags) => {
@@ -224,6 +256,53 @@ export default function DevMenu({
           </div>
         ) : null}
       </div>
+
+      {isResourceTraceEnabled() ? (
+        <div className="rounded-md border border-slate-200 bg-white px-3 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">Resource trace</h3>
+              <p className="text-xs text-slate-500">
+                Recent resource deltas (client + server).
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={loadServerTrace}>
+              {traceLoading ? "Loading…" : "Refresh"}
+            </Button>
+          </div>
+          <div className="space-y-2 text-xs text-slate-600">
+            {getResourceTrace().length === 0 && serverTrace.length === 0 ? (
+              <p>No resource events yet.</p>
+            ) : null}
+            {getResourceTrace().map((event, index) => (
+              <div key={`local-${index}`} className="rounded border border-slate-200 px-2 py-1">
+                <div className="font-medium">
+                  Local · Day {event.dayIndex} · {event.source}
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  {event.timestamp}
+                </div>
+                <pre className="text-[11px] whitespace-pre-wrap">
+                  {JSON.stringify(event.delta, null, 2)}
+                </pre>
+              </div>
+            ))}
+            {serverTrace.map((event, index) => (
+              <div key={`server-${index}`} className="rounded border border-slate-200 px-2 py-1">
+                <div className="font-medium">
+                  Server · Day {event.dayIndex} · {event.source}
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  {event.timestamp}
+                </div>
+                <pre className="text-[11px] whitespace-pre-wrap">
+                  {JSON.stringify(event.delta, null, 2)}
+                </pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
         <div className="flex items-center justify-between gap-2">
           <span className="font-medium">Feature toggles</span>

@@ -1,4 +1,4 @@
-import type { ResourceKey } from "@/core/resources/resourceKeys";
+import { RESOURCE_KEYS, type ResourceKey } from "@/core/resources/resourceKeys";
 
 export type ResourceStock = Record<ResourceKey, number>;
 
@@ -10,11 +10,18 @@ const LEGACY_TO_RESOURCE: Record<string, ResourceKey> = {
 };
 
 const RESOURCE_LABELS: Record<ResourceKey, string> = {
+  energy: "Energy",
+  stress: "Stress",
   knowledge: "Knowledge",
   cashOnHand: "Cash on Hand",
   socialLeverage: "Social Leverage",
   physicalResilience: "Physical Resilience",
   morale: "Morale",
+  skillPoints: "Skill Points",
+  focus: "Focus",
+  memory: "Memory",
+  networking: "Networking",
+  grit: "Grit",
 };
 
 export function resourceLabel(key: ResourceKey): string {
@@ -35,7 +42,11 @@ export function mapLegacyResourceKey(key: string): ResourceKey | null {
 export function mapLegacyResourceRecord(
   record: Record<string, unknown> | null | undefined
 ): ResourceStock {
+  const energy = normalizeResourceValue(record?.energy);
+  const stress = normalizeResourceValue(record?.stress);
   return {
+    energy,
+    stress,
     knowledge: normalizeResourceValue(
       record?.study_progress ?? record?.knowledge
     ),
@@ -47,6 +58,11 @@ export function mapLegacyResourceRecord(
       record?.health ?? record?.physicalResilience
     ),
     morale: 0,
+    skillPoints: normalizeResourceValue(record?.skillPoints),
+    focus: normalizeResourceValue(record?.focus),
+    memory: normalizeResourceValue(record?.memory),
+    networking: normalizeResourceValue(record?.networking),
+    grit: normalizeResourceValue(record?.grit),
   };
 }
 
@@ -72,9 +88,11 @@ export function normalizeResourceDelta(
 ): Partial<ResourceStock> {
   if (!input) return {};
   const output: Partial<ResourceStock> = {};
+  const allowed = new Set<string>(RESOURCE_KEYS);
   for (const [key, value] of Object.entries(input)) {
     if (typeof value !== "number") continue;
     const mapped = mapLegacyResourceKey(key) ?? (key as ResourceKey);
+    if (!allowed.has(mapped)) continue;
     output[mapped] = (output[mapped] ?? 0) + value;
   }
   return output;

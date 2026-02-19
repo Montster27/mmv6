@@ -16,7 +16,7 @@ import type {
   ChoiceLogEntry,
   ResourceDelta,
 } from "@/domain/arcs/types";
-import { applyResourceDeltaToDayState } from "@/services/arcs/arcResources";
+import { applyResourceDelta } from "@/services/resources/resourceService";
 
 const DEFAULT_PROGRESS_SLOTS = 2;
 const BRANCH_REGEX = /^branch_(a|b|c)/i;
@@ -96,41 +96,17 @@ async function applyDispositionDeltas(userId: string, deltas: Record<string, num
   }
 }
 
-async function applySkillPoints(userId: string, delta: number) {
-  if (!delta) return;
-  const { data } = await supabaseServer
-    .from("skill_bank")
-    .select("user_id,available_points,cap,last_awarded_day_index")
-    .eq("user_id", userId)
-    .limit(1)
-    .maybeSingle();
-
-  if (!data) {
-    await supabaseServer.from("skill_bank").insert({
-      user_id: userId,
-      available_points: Math.max(0, delta),
-      cap: 10,
-      last_awarded_day_index: null,
-    });
-    return;
-  }
-
-  await supabaseServer
-    .from("skill_bank")
-    .update({ available_points: (data.available_points ?? 0) + delta })
-    .eq("user_id", userId);
-}
-
 function mergeDeltas(costs?: ResourceDelta, rewards?: ResourceDelta): ResourceDelta {
   const merged: ResourceDelta = {};
   const resources: Record<string, number> = {};
 
-  const apply = (source?: ResourceDelta, sign: number = 1) => {
+  const apply = (source?: ResourceDelta, sign: number = 1, absolute = false) => {
     if (!source) return;
     if (source.resources) {
       for (const [key, value] of Object.entries(source.resources)) {
         if (typeof value !== "number") continue;
-        resources[key] = (resources[key] ?? 0) + value * sign;
+        const nextValue = absolute ? Math.abs(value) : value;
+        resources[key] = (resources[key] ?? 0) + nextValue * sign;
       }
     }
     if (typeof source.skill_points === "number") {
@@ -145,7 +121,7 @@ function mergeDeltas(costs?: ResourceDelta, rewards?: ResourceDelta): ResourceDe
     }
   };
 
-  apply(costs, -1);
+  apply(costs, -1, true);
   apply(rewards, 1);
   merged.resources = resources;
   return merged;
@@ -282,11 +258,21 @@ export async function resolveStep(params: {
     combined = applyDispositionCost(tag, combined, hesitation);
   }
 
-  if (combined.resources && Object.keys(combined.resources).length > 0) {
-    await applyResourceDeltaToDayState(userId, currentDay, combined);
-  }
-  if (combined.skill_points) {
-    await applySkillPoints(userId, combined.skill_points);
+  if (
+    (combined.resources && Object.keys(combined.resources).length > 0) ||
+    typeof combined.skill_points === "number"
+  ) {
+    await applyResourceDelta(userId, currentDay, combined, {
+      source: "arc_step_resolved",
+      arcId: arc?.id ?? null,
+      arcInstanceId: instance.id,
+      stepKey: step.step_key,
+      optionKey: option.option_key,
+      meta: {
+        hesitation_snapshot: hesitationSnapshot,
+        branch_key: nextBranchKey,
+      },
+    });
   }
   if (combined.dispositions) {
     await applyDispositionDeltas(userId, combined.dispositions);
@@ -405,9 +391,18 @@ export async function deferStep(params: {
         failure_reason: "deferred",
       })
       .eq("id", instance.id);
-    await applyResourceDeltaToDayState(userId, currentDay, {
-      resources: { stress: 1 },
-    });
+    await applyResourceDelta(
+      userId,
+      currentDay,
+      { resources: { stress: 1 } },
+      {
+        source: "arc_abandoned_penalty",
+        arcId: instance.arc_id,
+        arcInstanceId: instance.id,
+        stepKey: instance.current_step_key,
+        meta: { reason: "deferred_expired" },
+      }
+    );
     await logChoice({
       user_id: userId,
       day: currentDay,
