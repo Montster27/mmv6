@@ -804,24 +804,26 @@ export default function PlayPage() {
             }
           }
 
-          const servedKey = `${run.dayIndex}:${run.storylets
-            .map((s) => s.id)
-            .join(",")}`;
-          if (servedStoryletsRef.current !== servedKey) {
-            servedStoryletsRef.current = servedKey;
-            run.storylets.forEach((storylet) => {
-              const audience = (storylet.requirements as any)?.audience;
-              trackWithSeason({
-                event_type: "storylet_served",
-                day_index: run.dayIndex,
-                stage: run.stage,
-                payload: {
-                  storylet_id: storylet.id,
-                  storylet_slug: storylet.slug,
-                  audience: audience ?? null,
-                },
+          if (!featureFlags.arcFirstEnabled) {
+            const servedKey = `${run.dayIndex}:${run.storylets
+              .map((s) => s.id)
+              .join(",")}`;
+            if (servedStoryletsRef.current !== servedKey) {
+              servedStoryletsRef.current = servedKey;
+              run.storylets.forEach((storylet) => {
+                const audience = (storylet.requirements as any)?.audience;
+                trackWithSeason({
+                  event_type: "storylet_served",
+                  day_index: run.dayIndex,
+                  stage: run.stage,
+                  payload: {
+                    storylet_id: storylet.id,
+                    storylet_slug: storylet.slug,
+                    audience: audience ?? null,
+                  },
+                });
               });
-            });
+            }
           }
 
           const [profiles, received] = await Promise.all([

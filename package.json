@@ -8,7 +8,8 @@
     "predeploy": "npm run build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "arcflow": "node scripts/arcFlow/run.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

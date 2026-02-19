@@ -493,8 +493,12 @@ export async function getOrCreateDailyRun(
     stage,
     allocation: allocation ?? null,
     allocationSeed,
-    storylets: hasStorylets ? storylets : [fallbackStorylet(), fallbackStorylet()],
-    storyletRunsToday: runs,
+    storylets: featureFlags.arcFirstEnabled
+      ? []
+      : hasStorylets
+      ? storylets
+      : [fallbackStorylet(), fallbackStorylet()],
+    storyletRunsToday: featureFlags.arcFirstEnabled ? [] : runs,
     canBoost,
     tensions,
     skillBank: featureFlags.skills ? skillBank : null,
