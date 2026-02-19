@@ -258,6 +258,16 @@ export async function resolveStep(params: {
     combined = applyDispositionCost(tag, combined, hesitation);
   }
 
+  if (combined.dispositions) {
+    await applyDispositionDeltas(userId, combined.dispositions);
+  }
+
+  const nextKey =
+    option.next_step_key ?? step.default_next_step_key ?? null;
+  const derivedBranchKey = deriveBranchKey(nextKey);
+  const nextBranchKey =
+    instance.branch_key ?? derivedBranchKey ?? null;
+
   if (
     (combined.resources && Object.keys(combined.resources).length > 0) ||
     typeof combined.skill_points === "number"
@@ -274,15 +284,6 @@ export async function resolveStep(params: {
       },
     });
   }
-  if (combined.dispositions) {
-    await applyDispositionDeltas(userId, combined.dispositions);
-  }
-
-  const nextKey =
-    option.next_step_key ?? step.default_next_step_key ?? null;
-  const derivedBranchKey = deriveBranchKey(nextKey);
-  const nextBranchKey =
-    instance.branch_key ?? derivedBranchKey ?? null;
 
   await logChoice({
     user_id: userId,
