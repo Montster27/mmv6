@@ -517,14 +517,13 @@ export default function PlayPage() {
 
   const fetchArcToday = useCallback(async () => {
     if (!featureFlags.arcFirstEnabled || !userId) return;
-    if (typeof dayIndex !== "number") return;
     setArcTodayLoading(true);
     setArcTodayError(null);
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new Error("No session found.");
-      const res = await fetch(`/api/arcs/today?day=${dayIndex}`, {
+      const res = await fetch("/api/arcs/today", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const json = await res.json();
@@ -1628,11 +1627,10 @@ export default function PlayPage() {
 
   const handleAcceptOffer = useCallback(
     async (offerId: string) => {
-      if (typeof dayIndex !== "number") return;
       setArcSubmitting(true);
       setArcTodayError(null);
       try {
-        await callArcApi("/api/arcs/offers/accept", { offerId, day: dayIndex });
+        await callArcApi("/api/arcs/offers/accept", { offerId });
         await fetchArcToday();
       } catch (err) {
         console.error(err);
@@ -1648,14 +1646,12 @@ export default function PlayPage() {
 
   const handleResolveArcStep = useCallback(
     async (instanceId: string, optionKey: string) => {
-      if (typeof dayIndex !== "number") return;
       setArcSubmitting(true);
       setArcTodayError(null);
       try {
         await callArcApi("/api/arcs/instances/resolve", {
           arcInstanceId: instanceId,
           optionKey,
-          day: dayIndex,
         });
         await fetchArcToday();
       } catch (err) {
@@ -1672,13 +1668,11 @@ export default function PlayPage() {
 
   const handleDeferArcStep = useCallback(
     async (instanceId: string) => {
-      if (typeof dayIndex !== "number") return;
       setArcSubmitting(true);
       setArcTodayError(null);
       try {
         await callArcApi("/api/arcs/instances/defer", {
           arcInstanceId: instanceId,
-          day: dayIndex,
         });
         await fetchArcToday();
       } catch (err) {
