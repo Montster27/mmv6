@@ -96,15 +96,20 @@ async function applyDeltaToDayState(
   delta: ResourceDelta
 ): Promise<void> {
   const dayState = await fetchDayState(userId, dayIndex);
-  const resourceDelta = normalizeResourceDelta(delta.resources);
+  const rawResources = delta.resources ?? {};
+  const energyDelta =
+    typeof rawResources.energy === "number" ? rawResources.energy : 0;
+  const stressDelta =
+    typeof rawResources.stress === "number" ? rawResources.stress : 0;
+  const resourceDelta = normalizeResourceDelta(rawResources);
 
   const nextEnergy =
-    typeof resourceDelta.energy === "number"
-      ? clamp(dayState.energy + resourceDelta.energy, 0, 100)
+    energyDelta !== 0
+      ? clamp(dayState.energy + energyDelta, 0, 100)
       : dayState.energy;
   const nextStress =
-    typeof resourceDelta.stress === "number"
-      ? clamp(dayState.stress + resourceDelta.stress, 0, 100)
+    stressDelta !== 0
+      ? clamp(dayState.stress + stressDelta, 0, 100)
       : dayState.stress;
 
   const nextResources = {
