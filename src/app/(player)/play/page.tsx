@@ -2801,6 +2801,13 @@ export default function PlayPage() {
                           {arcToday?.progressionSlotsTotal ?? 0}
                         </span>
                       </div>
+                      {(arcToday?.progressionSlotsTotal ?? 0) -
+                        (arcToday?.progressionSlotsUsed ?? 0) <=
+                      0 ? (
+                        <p className="text-xs text-amber-700">
+                          No progression slots left today.
+                        </p>
+                      ) : null}
                       {arcTodayLoading ? (
                         <p className="text-sm text-slate-600">Loading arcs…</p>
                       ) : null}
