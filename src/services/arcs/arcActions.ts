@@ -16,22 +16,10 @@ import type {
   ChoiceLogEntry,
   ResourceDelta,
 } from "@/domain/arcs/types";
-import { normalizeResourceDelta, toLegacyResourceUpdates } from "@/core/resources/resourceMap";
+import { applyResourceDeltaToDayState } from "@/services/arcs/arcResources";
 
 const DEFAULT_PROGRESS_SLOTS = 2;
-
-type DayState = {
-  energy: number;
-  stress: number;
-  cashOnHand: number;
-  knowledge: number;
-  socialLeverage: number;
-  physicalResilience: number;
-};
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
+const BRANCH_REGEX = /^branch_(a|b|c)/i;
 
 async function logChoice(entry: Omit<ChoiceLogEntry, "id">) {
   const { error } = await supabaseServer.from("choice_log").insert(entry);
@@ -69,83 +57,19 @@ async function fetchArcSteps(arcId: string): Promise<ArcStep[]> {
   return (data ?? []) as ArcStep[];
 }
 
-async function fetchDayState(userId: string, dayIndex: number): Promise<DayState> {
-  const { data, error } = await supabaseServer
-    .from("player_day_state")
-    .select("energy,stress,money,study_progress,social_capital,health")
-    .eq("user_id", userId)
-    .eq("day_index", dayIndex)
-    .limit(1)
-    .maybeSingle();
-  if (error || !data) {
-    throw new Error("Failed to load day state.");
-  }
-  return {
-    energy: data.energy ?? 0,
-    stress: data.stress ?? 0,
-    cashOnHand: data.money ?? 0,
-    knowledge: data.study_progress ?? 0,
-    socialLeverage: data.social_capital ?? 0,
-    physicalResilience: data.health ?? 0,
-  };
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
-async function applyDeltaToDayState(
-  userId: string,
-  dayIndex: number,
-  delta: ResourceDelta
-): Promise<void> {
-  const dayState = await fetchDayState(userId, dayIndex);
-  const rawResources = delta.resources ?? {};
-  const energyDelta =
-    typeof rawResources.energy === "number" ? rawResources.energy : 0;
-  const stressDelta =
-    typeof rawResources.stress === "number" ? rawResources.stress : 0;
-  const resourceDelta = normalizeResourceDelta(rawResources);
-
-  const nextEnergy =
-    energyDelta !== 0
-      ? clamp(dayState.energy + energyDelta, 0, 100)
-      : dayState.energy;
-  const nextStress =
-    stressDelta !== 0
-      ? clamp(dayState.stress + stressDelta, 0, 100)
-      : dayState.stress;
-
-  const nextResources = {
-    knowledge:
-      typeof resourceDelta.knowledge === "number"
-        ? dayState.knowledge + resourceDelta.knowledge
-        : dayState.knowledge,
-    cashOnHand:
-      typeof resourceDelta.cashOnHand === "number"
-        ? dayState.cashOnHand + resourceDelta.cashOnHand
-        : dayState.cashOnHand,
-    socialLeverage:
-      typeof resourceDelta.socialLeverage === "number"
-        ? dayState.socialLeverage + resourceDelta.socialLeverage
-        : dayState.socialLeverage,
-    physicalResilience:
-      typeof resourceDelta.physicalResilience === "number"
-        ? clamp(dayState.physicalResilience + resourceDelta.physicalResilience, 0, 100)
-        : dayState.physicalResilience,
-  };
-
-  const { error } = await supabaseServer
-    .from("player_day_state")
-    .update({
-      energy: nextEnergy,
-      stress: nextStress,
-      ...toLegacyResourceUpdates(nextResources),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId)
-    .eq("day_index", dayIndex);
-
-  if (error) {
-    console.error("Failed to update day state", error);
-    throw new Error("Failed to update day state.");
-  }
+function deriveBranchKey(nextKey: string | null): string | null {
+  if (!nextKey) return null;
+  const match = nextKey.match(BRANCH_REGEX);
+  if (!match) return null;
+  const token = match[1]?.toLowerCase();
+  if (token === "a") return "A";
+  if (token === "b") return "B";
+  if (token === "c") return "C";
+  return null;
 }
 
 async function applyDispositionDeltas(userId: string, deltas: Record<string, number>) {
@@ -273,7 +197,7 @@ export async function acceptOffer(params: {
       updated_day: currentDay,
     })
     .select(
-      "id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason"
+      "id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key"
     )
     .maybeSingle();
   if (instanceError || !instance) {
@@ -309,7 +233,7 @@ export async function resolveStep(params: {
   const { data: instance, error } = await supabaseServer
     .from("arc_instances")
     .select(
-      "id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason"
+      "id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key"
     )
     .eq("id", arcInstanceId)
     .eq("user_id", userId)
@@ -342,6 +266,7 @@ export async function resolveStep(params: {
 
   const arc = await fetchArcDefinition(instance.arc_id);
   const tags = arc?.tags ?? [];
+  const hesitationSnapshot: Record<string, number> = {};
 
   let combined = mergeDeltas(option.costs, option.rewards);
   for (const tag of tags) {
@@ -353,11 +278,12 @@ export async function resolveStep(params: {
       .limit(1)
       .maybeSingle();
     const hesitation = data?.hesitation ?? 0;
+    hesitationSnapshot[tag] = hesitation;
     combined = applyDispositionCost(tag, combined, hesitation);
   }
 
   if (combined.resources && Object.keys(combined.resources).length > 0) {
-    await applyDeltaToDayState(userId, currentDay, combined);
+    await applyResourceDeltaToDayState(userId, currentDay, combined);
   }
   if (combined.skill_points) {
     await applySkillPoints(userId, combined.skill_points);
@@ -365,6 +291,12 @@ export async function resolveStep(params: {
   if (combined.dispositions) {
     await applyDispositionDeltas(userId, combined.dispositions);
   }
+
+  const nextKey =
+    option.next_step_key ?? step.default_next_step_key ?? null;
+  const derivedBranchKey = deriveBranchKey(nextKey);
+  const nextBranchKey =
+    instance.branch_key ?? derivedBranchKey ?? null;
 
   await logChoice({
     user_id: userId,
@@ -375,15 +307,18 @@ export async function resolveStep(params: {
     step_key: step.step_key,
     option_key: option.option_key,
     delta: combined,
+    meta: {
+      branch_key: nextBranchKey,
+      hesitation_snapshot: hesitationSnapshot,
+      tone_level_if_offer: null,
+    },
   });
-
-  const nextKey =
-    option.next_step_key ?? step.default_next_step_key ?? null;
   if (!nextKey) {
     await supabaseServer
       .from("arc_instances")
       .update({
         state: "COMPLETED",
+        branch_key: nextBranchKey,
         updated_day: currentDay,
         completed_day: currentDay,
       })
@@ -394,6 +329,7 @@ export async function resolveStep(params: {
       event_type: "ARC_COMPLETED",
       arc_id: instance.arc_id,
       arc_instance_id: instance.id,
+      meta: { branch_key: nextBranchKey },
     });
     return;
   }
@@ -404,6 +340,7 @@ export async function resolveStep(params: {
       .from("arc_instances")
       .update({
         state: "COMPLETED",
+        branch_key: nextBranchKey,
         updated_day: currentDay,
         completed_day: currentDay,
       })
@@ -414,6 +351,7 @@ export async function resolveStep(params: {
       event_type: "ARC_COMPLETED",
       arc_id: instance.arc_id,
       arc_instance_id: instance.id,
+      meta: { branch_key: nextBranchKey },
     });
     return;
   }
@@ -425,6 +363,7 @@ export async function resolveStep(params: {
       current_step_key: nextKey,
       step_due_day: nextDue,
       step_defer_count: 0,
+      branch_key: nextBranchKey,
       updated_day: currentDay,
     })
     .eq("id", instance.id);
@@ -439,7 +378,7 @@ export async function deferStep(params: {
   const { data: instance, error } = await supabaseServer
     .from("arc_instances")
     .select(
-      "id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason"
+      "id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key"
     )
     .eq("id", arcInstanceId)
     .eq("user_id", userId)
@@ -466,6 +405,9 @@ export async function deferStep(params: {
         failure_reason: "deferred",
       })
       .eq("id", instance.id);
+    await applyResourceDeltaToDayState(userId, currentDay, {
+      resources: { stress: 1 },
+    });
     await logChoice({
       user_id: userId,
       day: currentDay,
@@ -473,7 +415,11 @@ export async function deferStep(params: {
       arc_id: instance.arc_id,
       arc_instance_id: instance.id,
       step_key: instance.current_step_key,
-      meta: { reason: "deferred" },
+      meta: {
+        reason: "deferred",
+        branch_key: instance.branch_key ?? null,
+        defer_count: nextDefer,
+      },
     });
     const arc = await fetchArcDefinition(instance.arc_id);
     const tags = arc?.tags ?? [];

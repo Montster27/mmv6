@@ -73,6 +73,7 @@ export type ArcInstance = {
   updated_day: number;
   completed_day?: number | null;
   failure_reason?: string | null;
+  branch_key?: string | null;
 };
 
 export type DueStep = {

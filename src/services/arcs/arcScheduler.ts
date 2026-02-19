@@ -15,6 +15,7 @@ import type {
   DueStep,
   TodayArcState,
 } from "@/domain/arcs/types";
+import { applyResourceDeltaToDayState } from "@/services/arcs/arcResources";
 
 const DEFAULT_PROGRESS_SLOTS = 2;
 const MAX_OFFERS_PER_DAY = 3;
@@ -81,7 +82,7 @@ export async function getTodayArcState(params: {
   const { data: instances, error: instError } = await supabaseServer
     .from("arc_instances")
     .select(
-      "id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason"
+      "id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key"
     )
     .eq("user_id", userId)
     .eq("state", "ACTIVE");
@@ -126,6 +127,10 @@ export async function getTodayArcState(params: {
         .eq("id", instance.id)
         .eq("user_id", userId);
 
+      await applyResourceDeltaToDayState(userId, currentDay, {
+        resources: { stress: 1 },
+      });
+
       await logChoice({
         user_id: userId,
         day: currentDay,
@@ -143,7 +148,11 @@ export async function getTodayArcState(params: {
         arc_id: instance.arc_id,
         arc_instance_id: instance.id,
         step_key: instance.current_step_key,
-        meta: { reason: "expired" },
+        meta: {
+          reason: "expired",
+          branch_key: instance.branch_key ?? null,
+          defer_count: instance.step_defer_count,
+        },
       });
 
       const tags = defById.get(instance.arc_id)?.tags ?? [];
