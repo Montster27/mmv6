@@ -80,6 +80,28 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 
 type ChoiceVectorInput = Record<string, string>;
 
+type ArcDefinitionRow = {
+  id: string;
+  key: string;
+  title: string;
+  description: string;
+  tags: string[];
+  is_enabled: boolean;
+  created_at?: string;
+};
+
+type ArcStepRow = {
+  id: string;
+  arc_id: string;
+  step_key: string;
+  order_index: number;
+  title: string;
+  body: string;
+  options: unknown[];
+  due_offset_days: number;
+  expires_after_days: number;
+};
+
 type EditorState = {
   draft: Storylet | null;
   dirty: boolean;
@@ -209,6 +231,23 @@ export default function ContentStudioLitePage() {
   const [contentArcsError, setContentArcsError] = useState<string | null>(null);
   const [selectedArcKey, setSelectedArcKey] = useState<string | null>(null);
   const [arcDraft, setArcDraft] = useState<ContentArc | null>(null);
+  const [arcDefinitions, setArcDefinitions] = useState<ArcDefinitionRow[]>([]);
+  const [arcDefinitionSteps, setArcDefinitionSteps] = useState<ArcStepRow[]>([]);
+  const [arcDefinitionsLoading, setArcDefinitionsLoading] = useState(false);
+  const [arcDefinitionsError, setArcDefinitionsError] = useState<string | null>(null);
+  const [selectedArcDefinitionId, setSelectedArcDefinitionId] = useState<string | null>(
+    null
+  );
+  const [arcDefinitionDraft, setArcDefinitionDraft] = useState<ArcDefinitionRow | null>(
+    null
+  );
+  const [arcDefinitionDirty, setArcDefinitionDirty] = useState(false);
+  const [arcDefinitionSaveState, setArcDefinitionSaveState] = useState<SaveState>("idle");
+  const [arcDefinitionLastSavedAt, setArcDefinitionLastSavedAt] =
+    useState<Date | null>(null);
+  const [arcDefinitionSaveError, setArcDefinitionSaveError] = useState<string | null>(
+    null
+  );
   const [arcSaveState, setArcSaveState] = useState<SaveState>("idle");
   const [stepDraft, setStepDraft] = useState<ContentArcStep | null>(null);
   const [stepChoicesText, setStepChoicesText] = useState("");
@@ -327,6 +366,43 @@ export default function ContentStudioLitePage() {
       setContentArcsError(err instanceof Error ? err.message : "Failed to load arcs");
     } finally {
       setContentArcsLoading(false);
+    }
+  }, []);
+
+  const loadArcDefinitions = useCallback(async () => {
+    setArcDefinitionsLoading(true);
+    setArcDefinitionsError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        throw new Error("No session found.");
+      }
+      const [defsRes, stepsRes] = await Promise.all([
+        fetch("/api/admin/arc-definitions", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch("/api/admin/arc-steps", {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      const defsJson = await defsRes.json();
+      if (!defsRes.ok) {
+        throw new Error(defsJson.error ?? "Failed to load arc definitions");
+      }
+      const stepsJson = await stepsRes.json();
+      if (!stepsRes.ok) {
+        throw new Error(stepsJson.error ?? "Failed to load arc steps");
+      }
+      setArcDefinitions(defsJson.arcs ?? []);
+      setArcDefinitionSteps(stepsJson.steps ?? []);
+    } catch (err) {
+      console.error(err);
+      setArcDefinitionsError(
+        err instanceof Error ? err.message : "Failed to load arc definitions"
+      );
+    } finally {
+      setArcDefinitionsLoading(false);
     }
   }, []);
 
@@ -453,7 +529,8 @@ export default function ContentStudioLitePage() {
     if (!flags.contentStudioLiteEnabled) return;
     if (activeTab !== "arcs") return;
     loadContentArcs();
-  }, [flags.contentStudioLiteEnabled, activeTab, loadContentArcs]);
+    loadArcDefinitions();
+  }, [flags.contentStudioLiteEnabled, activeTab, loadContentArcs, loadArcDefinitions]);
 
   const stepsByArc = useMemo(() => {
     const map = new Map<string, ContentArcStep[]>();
@@ -470,6 +547,21 @@ export default function ContentStudioLitePage() {
     return contentArcs.find((arc) => arc.key === selectedArcKey) ?? null;
   }, [contentArcs, selectedArcKey]);
 
+  const arcDefinitionStepsByArcId = useMemo(() => {
+    const map = new Map<string, ArcStepRow[]>();
+    arcDefinitionSteps.forEach((step) => {
+      if (!map.has(step.arc_id)) map.set(step.arc_id, []);
+      map.get(step.arc_id)?.push(step);
+    });
+    map.forEach((steps) => steps.sort((a, b) => a.order_index - b.order_index));
+    return map;
+  }, [arcDefinitionSteps]);
+
+  const selectedArcDefinition = useMemo(() => {
+    if (!selectedArcDefinitionId) return null;
+    return arcDefinitions.find((arc) => arc.id === selectedArcDefinitionId) ?? null;
+  }, [arcDefinitions, selectedArcDefinitionId]);
+
   const selectArc = (arc: ContentArc) => {
     setSelectedArcKey(arc.key);
     setArcDraft({ ...arc });
@@ -483,6 +575,77 @@ export default function ContentStudioLitePage() {
     setStepDirty(false);
     setStepLastSavedAt(null);
     setStepSaveError(null);
+  };
+
+  const selectArcDefinition = (arc: ArcDefinitionRow) => {
+    setSelectedArcDefinitionId(arc.id);
+    setArcDefinitionDraft({ ...arc });
+    setArcDefinitionDirty(false);
+    setArcDefinitionSaveState("idle");
+    setArcDefinitionLastSavedAt(null);
+    setArcDefinitionSaveError(null);
+  };
+
+  const saveArcDefinition = async () => {
+    if (!arcDefinitionDraft) return;
+    setArcDefinitionSaveState("saving");
+    setArcDefinitionSaveError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+      const res = await fetch(`/api/admin/arc-definitions/${arcDefinitionDraft.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: arcDefinitionDraft.title,
+          description: arcDefinitionDraft.description,
+          tags: arcDefinitionDraft.tags ?? [],
+          is_enabled: arcDefinitionDraft.is_enabled,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to save arc definition");
+      }
+      setArcDefinitionSaveState("saved");
+      setArcDefinitionDirty(false);
+      setArcDefinitionLastSavedAt(new Date());
+      await loadArcDefinitions();
+    } catch (err) {
+      console.error(err);
+      setArcDefinitionSaveState("error");
+      setArcDefinitionSaveError(
+        err instanceof Error ? err.message : "Failed to save arc definition"
+      );
+    }
+  };
+
+  const deleteArcStep = async (stepId: string) => {
+    const confirmed = window.confirm("Delete this step? This cannot be undone.");
+    if (!confirmed) return;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("No session found.");
+      const res = await fetch(`/api/admin/arc-steps/${stepId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to delete step");
+      }
+      await loadArcDefinitions();
+    } catch (err) {
+      console.error(err);
+      setArcDefinitionsError(
+        err instanceof Error ? err.message : "Failed to delete step"
+      );
+    }
   };
 
   const selectStep = (step: ContentArcStep) => {
@@ -1745,6 +1908,173 @@ export default function ContentStudioLitePage() {
                     {contentArcsError ? (
                       <p className="text-sm text-red-600">{contentArcsError}</p>
                     ) : null}
+
+                    <div className="border-t border-slate-200 pt-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h2 className="text-xl font-semibold text-slate-900">
+                            Arc scheduler
+                          </h2>
+                          <p className="text-sm text-slate-600">
+                            Edit arc_definitions and manage arc_steps.
+                          </p>
+                        </div>
+                        <Button variant="outline" onClick={loadArcDefinitions}>
+                          Refresh
+                        </Button>
+                      </div>
+
+                      {arcDefinitionsLoading ? (
+                        <p className="mt-3 text-sm text-slate-600">Loading…</p>
+                      ) : arcDefinitions.length === 0 ? (
+                        <p className="mt-3 text-sm text-slate-600">No arcs found.</p>
+                      ) : (
+                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+                          <div className="space-y-2">
+                            {arcDefinitions.map((arc) => (
+                              <button
+                                key={arc.id}
+                                className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
+                                  selectedArcDefinitionId === arc.id
+                                    ? "border-slate-900 bg-slate-100"
+                                    : "border-slate-200 hover:border-slate-300"
+                                }`}
+                                onClick={() => selectArcDefinition(arc)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium">{arc.title}</span>
+                                  <span className="text-xs text-slate-500">
+                                    {(arcDefinitionStepsByArcId.get(arc.id) ?? []).length} steps
+                                  </span>
+                                </div>
+                                <div className="text-xs text-slate-500">{arc.key}</div>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="space-y-4">
+                            {!selectedArcDefinition || !arcDefinitionDraft ? (
+                              <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                                Select an arc to view details.
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-semibold text-slate-900">
+                                      Arc details
+                                    </h3>
+                                    <SaveStatusIndicator
+                                      saveState={arcDefinitionSaveState}
+                                      lastSavedAt={arcDefinitionLastSavedAt}
+                                      isDirty={arcDefinitionDirty}
+                                      error={arcDefinitionSaveError}
+                                      onSave={saveArcDefinition}
+                                      disabled={arcDefinitionSaveState === "saving"}
+                                    />
+                                  </div>
+                                  <label className="text-sm text-slate-700">
+                                    Title
+                                    <input
+                                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                      value={arcDefinitionDraft.title}
+                                      onChange={(e) => {
+                                        setArcDefinitionDraft({
+                                          ...arcDefinitionDraft,
+                                          title: e.target.value,
+                                        });
+                                        setArcDefinitionDirty(true);
+                                        setArcDefinitionSaveState("idle");
+                                      }}
+                                    />
+                                  </label>
+                                  <label className="text-sm text-slate-700">
+                                    Description
+                                    <textarea
+                                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                      rows={3}
+                                      value={arcDefinitionDraft.description}
+                                      onChange={(e) => {
+                                        setArcDefinitionDraft({
+                                          ...arcDefinitionDraft,
+                                          description: e.target.value,
+                                        });
+                                        setArcDefinitionDirty(true);
+                                        setArcDefinitionSaveState("idle");
+                                      }}
+                                    />
+                                  </label>
+                                  <label className="text-sm text-slate-700">
+                                    Tags (comma-separated)
+                                    <input
+                                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                                      value={(arcDefinitionDraft.tags ?? []).join(", ")}
+                                      onChange={(e) => {
+                                        setArcDefinitionDraft({
+                                          ...arcDefinitionDraft,
+                                          tags: e.target.value
+                                            .split(",")
+                                            .map((tag) => tag.trim())
+                                            .filter(Boolean),
+                                        });
+                                        setArcDefinitionDirty(true);
+                                        setArcDefinitionSaveState("idle");
+                                      }}
+                                    />
+                                  </label>
+                                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={arcDefinitionDraft.is_enabled}
+                                      onChange={(e) => {
+                                        setArcDefinitionDraft({
+                                          ...arcDefinitionDraft,
+                                          is_enabled: e.target.checked,
+                                        });
+                                        setArcDefinitionDirty(true);
+                                        setArcDefinitionSaveState("idle");
+                                      }}
+                                    />
+                                    Enabled
+                                  </label>
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-semibold text-slate-900">Steps</h4>
+                                  <div className="mt-2 space-y-2">
+                                    {(arcDefinitionStepsByArcId.get(selectedArcDefinition.id) ??
+                                      []).map((step) => (
+                                      <div
+                                        key={step.id}
+                                        className="rounded-md border border-slate-200 px-3 py-2 text-xs"
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div>
+                                            <div className="font-medium">
+                                              {step.order_index}. {step.title}
+                                            </div>
+                                            <div className="text-slate-500">{step.step_key}</div>
+                                          </div>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => deleteArcStep(step.id)}
+                                          >
+                                            Delete
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {arcDefinitionsError ? (
+                        <p className="mt-3 text-sm text-red-600">{arcDefinitionsError}</p>
+                      ) : null}
+                    </div>
                   </div>
                 ) : activeTab === "rules" ? (
                   <div className="space-y-4">
