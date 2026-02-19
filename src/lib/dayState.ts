@@ -48,12 +48,13 @@ export async function fetchDayState(
 
   if (!data) return null;
   const resources = mapLegacyResourceRecord(data as Record<string, unknown>);
+  const { energy: _energy, stress: _stress, ...resourceRest } = resources;
   return {
     user_id: data.user_id,
     day_index: data.day_index,
     energy: data.energy,
     stress: data.stress,
-    ...resources,
+    ...resourceRest,
     total_study: data.total_study ?? 0,
     total_work: data.total_work ?? 0,
     total_social: data.total_social ?? 0,
