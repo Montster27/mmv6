@@ -24,5 +24,5 @@ export async function GET(request: Request) {
 
   const currentDay = await getCurrentDayIndex(user.id);
   const state = await getTodayArcState({ userId: user.id, currentDay });
-  return NextResponse.json(state);
+  return NextResponse.json({ ...state, currentDay });
 }
