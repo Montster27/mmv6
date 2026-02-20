@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { OutcomeExplain } from "@/components/play/OutcomeExplain";
@@ -45,7 +46,7 @@ type StoryletSectionProps = {
   toChoices: (storylet: Storylet) => Choice[];
 };
 
-export function StoryletSection({
+function StoryletSectionComponent({
   stage,
   currentStorylet,
   storylets,
@@ -161,3 +162,5 @@ export function StoryletSection({
     </section>
   );
 }
+
+export const StoryletSection = memo(StoryletSectionComponent);

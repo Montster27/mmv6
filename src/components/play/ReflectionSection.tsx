@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import type { ReflectionResponse } from "@/types/reflections";
 
@@ -8,7 +9,7 @@ type ReflectionSectionProps = {
   onReflection: (response: ReflectionResponse | "skip") => void;
 };
 
-export function ReflectionSection({
+function ReflectionSectionComponent({
   saving,
   onReflection,
 }: ReflectionSectionProps) {
@@ -58,3 +59,5 @@ export function ReflectionSection({
     </section>
   );
 }
+
+export const ReflectionSection = memo(ReflectionSectionComponent);

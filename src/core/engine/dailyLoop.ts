@@ -469,20 +469,21 @@ export async function getOrCreateDailyRun(
     : [];
 
   const { weekStart, weekEnd } = computeWeekWindow(dayIndex);
-  const worldInfluence = featureFlags.alignment
-    ? await getOrComputeWorldWeeklyInfluence(weekStart, weekEnd).catch(() => ({}))
-    : null;
-  const cohortInfluence =
+  const [worldInfluence, cohortInfluence, rivalrySnapshot] = await Promise.all([
+    featureFlags.alignment
+      ? getOrComputeWorldWeeklyInfluence(weekStart, weekEnd).catch(() => ({}))
+      : Promise.resolve(null),
     featureFlags.alignment && cohortId
-      ? await getOrComputeCohortWeeklyInfluence(cohortId, weekStart, weekEnd).catch(
+      ? getOrComputeCohortWeeklyInfluence(cohortId, weekStart, weekEnd).catch(
         () => ({})
       )
-      : null;
-  const rivalrySnapshot = featureFlags.alignment
-    ? await getOrComputeWeeklySnapshot(weekStart, weekEnd).catch(
-      () => ({ topCohorts: [] })
-    )
-    : { topCohorts: [] };
+      : Promise.resolve(null),
+    featureFlags.alignment
+      ? getOrComputeWeeklySnapshot(weekStart, weekEnd).catch(
+        () => ({ topCohorts: [] })
+      )
+      : Promise.resolve({ topCohorts: [] }),
+  ]);
 
   return {
     userId,

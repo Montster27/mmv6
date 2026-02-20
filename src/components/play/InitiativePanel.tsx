@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import type { Initiative } from "@/types/initiatives";
 import type { Faction } from "@/types/factions";
@@ -22,7 +23,7 @@ type Props = {
   onContribute: () => void;
 };
 
-export function InitiativePanel({
+function InitiativePanelComponent({
   initiative,
   dayIndex,
   directive,
@@ -78,3 +79,5 @@ export function InitiativePanel({
     </div>
   );
 }
+
+export const InitiativePanel = memo(InitiativePanelComponent);

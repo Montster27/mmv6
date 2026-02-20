@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { InitiativePanel } from "@/components/play/InitiativePanel";
 import type { Faction } from "@/types/factions";
@@ -45,7 +46,7 @@ type SocialSectionProps = {
   onContributeInitiative: (id: string) => void;
 };
 
-export function SocialSection({
+function SocialSectionComponent({
   boostMessage,
   hasSentBoost,
   publicProfiles,
@@ -139,3 +140,5 @@ export function SocialSection({
     </section>
   );
 }
+
+export const SocialSection = memo(SocialSectionComponent);

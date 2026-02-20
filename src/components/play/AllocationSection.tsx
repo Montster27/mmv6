@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import type { AllocationPayload } from "@/lib/play";
 
@@ -12,7 +13,7 @@ type AllocationSectionProps = {
   onSave: () => void;
 };
 
-export function AllocationSection({
+function AllocationSectionComponent({
   allocation,
   totalAllocation,
   allocationValid,
@@ -60,3 +61,5 @@ export function AllocationSection({
     </section>
   );
 }
+
+export const AllocationSection = memo(AllocationSectionComponent);
