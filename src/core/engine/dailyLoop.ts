@@ -254,12 +254,14 @@ export async function getOrCreateDailyRun(
   let directiveSummary = null as DailyRun["directive"];
   const initiativesEnabled = featureFlags.alignment;
 
-  await ensureUserAlignmentRows(userId).catch(() => { });
   if (featureFlags.alignment) {
-    const [factionsResult, alignmentRows, arcsResult, initiativesResult, events] =
+    const [alignmentRows, factionsResult, arcsResult, initiativesResult, events] =
       await Promise.all([
+        (async () => {
+          await ensureUserAlignmentRows(userId).catch(() => { });
+          return fetchUserAlignment(userId);
+        })(),
         listFactions(),
-        fetchUserAlignment(userId),
         listActiveArcs(),
         listActiveInitiativesCatalog(),
         fetchRecentAlignmentEvents(userId, dayIndex).catch(() => []),
