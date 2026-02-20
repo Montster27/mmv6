@@ -24,6 +24,7 @@ type Props = {
   devSettings: { test_mode: boolean };
   devSettingsLoading: boolean;
   devSettingsSaving: boolean;
+  runResetting?: boolean;
   devLoading: boolean;
   devError: string | null;
   devCharacters: DevCharacter[];
@@ -32,6 +33,7 @@ type Props = {
   togglingAdminId: string | null;
   onToggleTestMode: () => void;
   onFastForward: () => void;
+  onResetRun?: () => void;
   onClose: () => void;
   onAdvanceDay: (userId: string) => void;
   onResetAccount: (userId: string) => void;
@@ -102,6 +104,7 @@ export default function DevMenu({
   devSettings,
   devSettingsLoading,
   devSettingsSaving,
+  runResetting = false,
   devLoading,
   devError,
   devCharacters,
@@ -110,6 +113,7 @@ export default function DevMenu({
   togglingAdminId,
   onToggleTestMode,
   onFastForward,
+  onResetRun,
   onClose,
   onAdvanceDay,
   onResetAccount,
@@ -283,6 +287,18 @@ export default function DevMenu({
               className="border-amber-400 text-amber-900 hover:bg-amber-200/70"
             >
               ⏩ Fast Forward: Next Day (TEST MODE)
+            </Button>
+          </div>
+        ) : null}
+        {onResetRun ? (
+          <div className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-slate-700">
+            <span>Reset run (current user).</span>
+            <Button
+              variant="secondary"
+              onClick={onResetRun}
+              disabled={runResetting}
+            >
+              {runResetting ? "Resetting..." : "Reset run"}
             </Button>
           </div>
         ) : null}

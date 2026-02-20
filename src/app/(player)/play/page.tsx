@@ -2573,6 +2573,7 @@ export default function PlayPage() {
               devSettings={devSettings}
               devSettingsLoading={devSettingsLoading}
               devSettingsSaving={devSettingsSaving}
+              runResetting={runResetting}
               devLoading={devLoading}
               devError={devError}
               devCharacters={devCharacters}
@@ -2581,6 +2582,7 @@ export default function PlayPage() {
               togglingAdminId={togglingAdminId}
               onToggleTestMode={handleToggleTestMode}
               onFastForward={handleFastForward}
+              onResetRun={handleRunReset}
               onClose={() => setShowDevMenu(false)}
               onAdvanceDay={handleAdvanceDay}
               onResetAccount={handleResetAccount}
