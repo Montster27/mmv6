@@ -201,25 +201,21 @@ export async function getOrCreateDailyRun(
   const allocations = featureFlags.skills ? allocationsRaw : [];
   const skills = featureFlags.skills ? skillsRaw : null;
 
-  let allocationSeed = null as DailyRun["allocationSeed"];
-  if (!allocation && dayIndex > 0) {
-    allocationSeed = await fetchTimeAllocation(userId, dayIndex - 1).catch(
-      () => null
-    );
-  }
-
-  const recentRuns =
-    (await fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => [])) ?? [];
-
-  const cohort = await ensureUserInCohort(userId).catch(() => null);
+  const [allocationSeed, recentRuns, cohort] = await Promise.all([
+    !allocation && dayIndex > 0
+      ? fetchTimeAllocation(userId, dayIndex - 1).catch(() => null)
+      : Promise.resolve(null),
+    fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => []),
+    ensureUserInCohort(userId).catch(() => null),
+  ]);
   const cohortId = cohort?.cohortId ?? null;
 
   let remnantState: DailyRun["remnant"] = null;
   if (featureFlags.remnantSystemEnabled) {
-    const unlockedKeys = await fetchUnlockedRemnants(userId).catch(
-      () => [] as RemnantKey[]
-    );
-    const activeSelection = await fetchActiveRemnant(userId).catch(() => null);
+    const [unlockedKeys, activeSelection] = await Promise.all([
+      fetchUnlockedRemnants(userId).catch(() => [] as RemnantKey[]),
+      fetchActiveRemnant(userId).catch(() => null),
+    ]);
     const unlockedDefs = listRemnantDefinitions().filter((remnant) =>
       unlockedKeys.includes(remnant.key)
     );
