@@ -7,6 +7,19 @@ const LEGACY_TO_RESOURCE: Record<string, ResourceKey> = {
   money: "cashOnHand",
   social_capital: "socialLeverage",
   health: "physicalResilience",
+  Energy: "energy",
+  Stress: "stress",
+  Knowledge: "knowledge",
+  Cash: "cashOnHand",
+  CashOnHand: "cashOnHand",
+  SocialLeverage: "socialLeverage",
+  PhysicalResilience: "physicalResilience",
+  Morale: "morale",
+  SkillPoints: "skillPoints",
+  Focus: "focus",
+  Memory: "memory",
+  Networking: "networking",
+  Grit: "grit",
 };
 
 const RESOURCE_LABELS: Record<ResourceKey, string> = {

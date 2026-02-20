@@ -1,8 +1,8 @@
 import "server-only";
 
 import { supabaseServer } from "@/lib/supabase/server";
-import { ensureDayStateUpToDate } from "@/lib/dayState";
-import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
+import { mapLegacyResourceRecord, toLegacyResourceUpdates } from "@/core/resources/resourceMap";
+import type { PlayerDayState } from "@/types/dayState";
 import {
   applyResourceDeltaToSnapshot,
   computeMorale,
@@ -25,7 +25,7 @@ export async function getResources(
   userId: string,
   dayIndex: number
 ): Promise<ResourceSnapshot> {
-  const dayState = await ensureDayStateUpToDate(userId, dayIndex);
+  const dayState = await ensureDayStateUpToDateServer(userId, dayIndex);
   return {
     energy: dayState.energy,
     stress: dayState.stress,
@@ -74,13 +74,161 @@ async function applySkillPoints(userId: string, delta: number) {
   }
 }
 
+const DEFAULT_STATE = {
+  energy: 70,
+  stress: 20,
+  cashOnHand: 0,
+  knowledge: 0,
+  socialLeverage: 0,
+  physicalResilience: 50,
+  total_study: 0,
+  total_work: 0,
+  total_social: 0,
+  total_health: 0,
+  total_fun: 0,
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+async function fetchDayStateServer(
+  userId: string,
+  dayIndex: number
+): Promise<PlayerDayState | null> {
+  const { data, error } = await supabaseServer
+    .from("player_day_state")
+    .select(
+      "user_id,day_index,energy,stress,money,study_progress,social_capital,health,total_study,total_work,total_social,total_health,total_fun,allocation_hash,pre_allocation_energy,pre_allocation_stress,pre_allocation_money,pre_allocation_study_progress,pre_allocation_social_capital,pre_allocation_health,resolved_at,end_energy,end_stress,next_energy,next_stress,created_at,updated_at"
+    )
+    .eq("user_id", userId)
+    .eq("day_index", dayIndex)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to fetch day state", error);
+    throw new Error("Failed to load day state.");
+  }
+
+  if (!data) return null;
+  const resources = mapLegacyResourceRecord(data as Record<string, unknown>);
+  const { energy: _energy, stress: _stress, ...resourceRest } = resources;
+  return {
+    user_id: data.user_id,
+    day_index: data.day_index,
+    energy: data.energy,
+    stress: data.stress,
+    ...resourceRest,
+    total_study: data.total_study ?? 0,
+    total_work: data.total_work ?? 0,
+    total_social: data.total_social ?? 0,
+    total_health: data.total_health ?? 0,
+    total_fun: data.total_fun ?? 0,
+    allocation_hash: data.allocation_hash ?? null,
+    pre_allocation_energy: data.pre_allocation_energy ?? null,
+    pre_allocation_stress: data.pre_allocation_stress ?? null,
+    pre_allocation_cashOnHand: data.pre_allocation_money ?? null,
+    pre_allocation_knowledge: data.pre_allocation_study_progress ?? null,
+    pre_allocation_socialLeverage: data.pre_allocation_social_capital ?? null,
+    pre_allocation_physicalResilience: data.pre_allocation_health ?? null,
+    resolved_at: data.resolved_at ?? null,
+    end_energy: data.end_energy ?? null,
+    end_stress: data.end_stress ?? null,
+    next_energy: data.next_energy ?? null,
+    next_stress: data.next_stress ?? null,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+  };
+}
+
+async function createDayStateFromPreviousServer(
+  userId: string,
+  dayIndex: number
+): Promise<PlayerDayState> {
+  let source: PlayerDayState | null = null;
+  if (dayIndex > 0) {
+    source = await fetchDayStateServer(userId, dayIndex - 1).catch(() => null);
+  }
+
+  const baseEnergy =
+    source?.next_energy ?? source?.energy ?? DEFAULT_STATE.energy;
+  const baseStress =
+    source?.next_stress ?? source?.stress ?? DEFAULT_STATE.stress;
+
+  const nextState = {
+    energy: clamp(baseEnergy, 0, 100),
+    stress: clamp(baseStress, 0, 100),
+    cashOnHand: source?.cashOnHand ?? DEFAULT_STATE.cashOnHand,
+    knowledge: source?.knowledge ?? DEFAULT_STATE.knowledge,
+    socialLeverage: source?.socialLeverage ?? DEFAULT_STATE.socialLeverage,
+    physicalResilience:
+      source?.physicalResilience ?? DEFAULT_STATE.physicalResilience,
+    total_study: source?.total_study ?? DEFAULT_STATE.total_study,
+    total_work: source?.total_work ?? DEFAULT_STATE.total_work,
+    total_social: source?.total_social ?? DEFAULT_STATE.total_social,
+    total_health: source?.total_health ?? DEFAULT_STATE.total_health,
+    total_fun: source?.total_fun ?? DEFAULT_STATE.total_fun,
+  };
+
+  const insertPayload = {
+    user_id: userId,
+    day_index: dayIndex,
+    ...toLegacyResourceUpdates(nextState),
+    energy: nextState.energy,
+    stress: nextState.stress,
+    total_study: nextState.total_study,
+    total_work: nextState.total_work,
+    total_social: nextState.total_social,
+    total_health: nextState.total_health,
+    total_fun: nextState.total_fun,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error: insertError } = await supabaseServer
+    .from("player_day_state")
+    .insert(insertPayload);
+
+  if (insertError) {
+    if (insertError.code !== "23505") {
+      console.error("Failed to create day state", insertError);
+      throw new Error("Failed to create day state.");
+    }
+  }
+
+  const created = await fetchDayStateServer(userId, dayIndex);
+  if (!created) {
+    throw new Error("Failed to create day state.");
+  }
+
+  return created;
+}
+
+async function ensureDayStateUpToDateServer(
+  userId: string,
+  dayIndex: number
+): Promise<PlayerDayState> {
+  const existing = await fetchDayStateServer(userId, dayIndex);
+  if (existing) return existing;
+
+  try {
+    return await createDayStateFromPreviousServer(userId, dayIndex);
+  } catch (error) {
+    if ((error as { code?: string })?.code === "23505") {
+      const retry = await fetchDayStateServer(userId, dayIndex);
+      if (retry) return retry;
+    }
+    throw error;
+  }
+}
+
 export async function applyResourceDelta(
   userId: string,
   dayIndex: number,
   delta: ResourceDelta,
   options: ResourceApplyOptions = {}
 ): Promise<ResourceSnapshot> {
-  const dayState = await ensureDayStateUpToDate(userId, dayIndex);
+  const dayState = await ensureDayStateUpToDateServer(userId, dayIndex);
   const before: ResourceSnapshot = {
     energy: dayState.energy,
     stress: dayState.stress,

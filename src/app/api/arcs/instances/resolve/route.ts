@@ -38,11 +38,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "optionKey required" }, { status: 400 });
   }
   const currentDay = await getCurrentDayIndex(user.id);
-  await resolveStep({
-    userId: user.id,
-    currentDay,
-    arcInstanceId,
-    optionKey,
-  });
-  return NextResponse.json({ ok: true });
+  try {
+    await resolveStep({
+      userId: user.id,
+      currentDay,
+      arcInstanceId,
+      optionKey,
+    });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Failed to resolve arc step", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to resolve step." },
+      { status: 500 }
+    );
+  }
 }
