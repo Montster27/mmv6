@@ -5,7 +5,6 @@ import type {
   SkillBank,
   SkillPointAllocation,
 } from "@/types/dailyInteraction";
-import { skillCostForLevel } from "@/core/sim/skillProgression";
 
 export type {
   DailyPosture,
@@ -331,7 +330,6 @@ export async function fetchSkillLevels(
 
 export async function allocateSkillPoint(params: {
   userId: string;
-  dayIndex: number;
   skillKey: string;
 }): Promise<void> {
   const skillKey = params.skillKey.trim();
@@ -339,83 +337,23 @@ export async function allocateSkillPoint(params: {
     throw new Error("Invalid skill key.");
   }
 
-  const { data: bank, error: bankError } = await supabase
-    .from("skill_bank")
-    .select("user_id,available_points,cap,last_awarded_day_index")
-    .eq("user_id", params.userId)
-    .limit(1)
-    .maybeSingle();
-
-  if (bankError) {
-    console.error("Failed to load skill bank", bankError);
-    throw bankError;
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) {
+    throw new Error("No session found.");
   }
 
-  if (!bank || bank.available_points <= 0) {
-    throw new Error("No skill points available.");
-  }
-
-  const { data: priorAllocations, error: priorError } = await supabase
-    .from("skill_point_allocations")
-    .select("skill_key")
-    .eq("user_id", params.userId)
-    .eq("skill_key", skillKey);
-
-  if (priorError) {
-    console.error("Failed to load skill level", priorError);
-    throw priorError;
-  }
-
-  const currentLevel = (priorAllocations ?? []).length;
-  const nextLevel = currentLevel + 1;
-  const cost = skillCostForLevel(nextLevel);
-  if (bank.available_points < cost) {
-    throw new Error("Not enough skill points for this level.");
-  }
-
-  const allocationPayload = {
-    user_id: params.userId,
-    day_index: params.dayIndex,
-    skill_key: skillKey,
-    points: cost,
-  };
-
-  const { error: insertError } = await supabase
-    .from("skill_point_allocations")
-    .insert(allocationPayload);
-
-  if (insertError) {
-    if (insertError.code === "23505") {
-      throw new Error("Skill already allocated today.");
-    }
-    console.error("Failed to insert skill allocation", insertError);
-    throw insertError;
-  }
-
-  const { data: updated, error: updateError } = await supabase
-    .from("skill_bank")
-    .update({ available_points: bank.available_points - cost })
-    .eq("user_id", params.userId)
-    .gte("available_points", cost)
-    .select("available_points");
-
-  if (updateError || !updated || updated.length === 0) {
-    const { error: rollbackError } = await supabase
-      .from("skill_point_allocations")
-      .delete()
-      .match({
-        user_id: params.userId,
-        day_index: params.dayIndex,
-        skill_key: skillKey,
-      });
-    if (rollbackError) {
-      console.error("Failed to rollback skill allocation", rollbackError);
-    }
-    if (updateError) {
-      console.error("Failed to decrement skill bank", updateError);
-      throw updateError;
-    }
-    throw new Error("Failed to decrement skill bank.");
+  const res = await fetch("/api/skills/allocate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ skillKey }),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error ?? "Failed to allocate skill point.");
   }
 }
 

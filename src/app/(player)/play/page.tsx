@@ -2204,7 +2204,7 @@ export default function PlayPage() {
     setSetupActionError(null);
     setAllocatingSkill(true);
     try {
-      await allocateSkillPoint({ userId, dayIndex, skillKey });
+      await allocateSkillPoint({ userId, skillKey });
       setRefreshTick((tick) => tick + 1);
     } catch (e) {
       console.error(e);
