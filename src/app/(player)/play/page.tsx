@@ -247,7 +247,7 @@ export default function PlayPage() {
   const microtaskVariant = getVariant("microtask_freq_v1", "A");
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
-  const [showDevMenu, setShowDevMenu] = useState(false);
+  const [showDevMenu, setShowDevMenu] = useState(() => getAppMode().testerMode);
   const [refreshTick, setRefreshTick] = useState(0);
   const [featureFlagsVersion, setFeatureFlagsVersion] = useState(0);
   const [devLoading, setDevLoading] = useState(false);
