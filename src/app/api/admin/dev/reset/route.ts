@@ -81,6 +81,10 @@ export async function POST(request: Request) {
   await supabaseServer.from("user_alignment").delete().eq("user_id", userId);
   await supabaseServer.from("alignment_events").delete().eq("user_id", userId);
   await supabaseServer.from("arc_instances").delete().eq("user_id", userId);
+  await supabaseServer.from("arc_offers").delete().eq("user_id", userId);
+  await supabaseServer.from("player_dispositions").delete().eq("user_id", userId);
+  await supabaseServer.from("choice_log").delete().eq("user_id", userId);
+  await supabaseServer.from("chapter_summaries").delete().eq("user_id", userId);
   await supabaseServer.from("player_day_state").delete().eq("user_id", userId);
   await supabaseServer.from("events").delete().eq("user_id", userId);
   await supabaseServer.from("user_anomalies").delete().eq("user_id", userId);
