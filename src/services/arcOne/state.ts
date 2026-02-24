@@ -2,7 +2,8 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { getArcOneState, deriveEnergyLevel, normalizeMoneyBand } from "@/core/arcOne/state";
-import type { ArcOneState, ExpiredOpportunity, MoneyBand, SkillFlags } from "@/core/arcOne/types";
+import type { ArcOneState, ExpiredOpportunity, MoneyBand } from "@/core/arcOne/types";
+import { parseSkillRequirement } from "@/core/arcOne/skill";
 
 export async function fetchArcOneState(userId: string): Promise<ArcOneState | null> {
   const { data, error } = await supabaseServer
@@ -68,19 +69,7 @@ export function applyMoneyEffect(band: MoneyBand, effect?: "improve" | "worsen")
   return "tight";
 }
 
-export function parseSkillRequirement(requirement?: string | null):
-  | { key: keyof SkillFlags; min: number }
-  | null {
-  if (!requirement) return null;
-  const [rawKey, rawMin] = requirement.split(":");
-  const key = rawKey.trim() as keyof SkillFlags;
-  if (!key) return null;
-  const min = rawMin ? Number(rawMin) : 1;
-  return {
-    key,
-    min: Number.isFinite(min) ? min : 1,
-  };
-}
+export { parseSkillRequirement };
 
 export function appendExpired(
   current: ExpiredOpportunity[],

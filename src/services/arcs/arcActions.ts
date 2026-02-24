@@ -26,9 +26,9 @@ import {
   bumpEnergyLevelFromEnergy,
   canSpendMoney,
   fetchArcOneState,
-  parseSkillRequirement,
   updateArcOneState,
 } from "@/services/arcOne/state";
+import { parseSkillRequirement } from "@/core/arcOne/skill";
 import { bumpLifePressure, updateNpcMemory, updateSkillFlag } from "@/core/arcOne/state";
 import type { ExpiredOpportunity } from "@/core/arcOne/types";
 
