@@ -12,7 +12,6 @@ import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
-import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
@@ -20,14 +19,7 @@ import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { buildStoryletContext } from "@/core/engine/storyletContext";
 import { ensureUserInCohort } from "@/lib/cohorts";
-import { fetchArcByKey as fetchContentArcByKey, listActiveArcs } from "@/lib/content/arcs";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
-import {
-  fetchArcCurrentStepContent,
-  fetchArcInstance,
-  fetchArcInstancesByKeys,
-  startArc,
-} from "@/lib/arcs";
 import { listFactions } from "@/lib/factions";
 import {
   ensureUserAlignmentRows,
@@ -86,7 +78,6 @@ import type {
 } from "@/types/dailyInteraction";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
-const ARC_KEY = "intro_phone_on_hall";
 const DIRECTIVE_TAGS: Record<string, string[]> = {
   neo_assyrian: ["work", "cash", "leverage"],
   dynastic_consortium: ["study", "research", "tech"],
@@ -249,7 +240,6 @@ export async function getOrCreateDailyRun(
 
   let factions: DailyRun["factions"] = [];
   let alignment = {} as Record<string, number>;
-  let contentArcs = [] as Awaited<ReturnType<typeof listActiveArcs>>;
   let contentInitiatives = [] as Awaited<ReturnType<typeof listActiveInitiativesCatalog>>;
   let recentEvents = [] as DailyRun["recentAlignmentEvents"];
   let unlocks: ReturnType<typeof computeUnlockedContent> = {
@@ -261,26 +251,24 @@ export async function getOrCreateDailyRun(
   const initiativesEnabled = featureFlags.alignment;
 
   if (featureFlags.alignment) {
-    const [alignmentRows, factionsResult, arcsResult, initiativesResult, events] =
+    const [alignmentRows, factionsResult, initiativesResult, events] =
       await Promise.all([
         (async () => {
           await ensureUserAlignmentRows(userId).catch(() => { });
           return fetchUserAlignment(userId);
         })(),
         listFactions(),
-        listActiveArcs(),
         listActiveInitiativesCatalog(),
         fetchRecentAlignmentEvents(userId, dayIndex).catch(() => []),
       ]);
     factions = factionsResult;
-    contentArcs = arcsResult;
     contentInitiatives = initiativesResult;
     recentEvents = events;
     alignment = alignmentRows.reduce<Record<string, number>>((acc, row) => {
       acc[row.faction_key] = row.score;
       return acc;
     }, {});
-    unlocks = computeUnlockedContent(alignment, contentArcs, contentInitiatives);
+    unlocks = computeUnlockedContent(alignment, [], contentInitiatives);
     directiveRow = cohortId
       ? await getOrCreateWeeklyDirective(
         cohortId,
@@ -305,31 +293,22 @@ export async function getOrCreateDailyRun(
       ? DIRECTIVE_TAGS[directiveRow.faction_key]
       : [];
 
-  const userArc = featureFlags.arcs ? await getOrStartArc(userId, dayIndex) : null;
-  const arcStorylet =
-    featureFlags.arcs && userArc
-      ? getArcNextStepStorylet(userArc, dayIndex, storyletsRaw, runs)
-      : null;
-
-  const storyletsSelected = featureFlags.arcFirstEnabled
-    ? []
-    : selectStorylets({
-        seed: `${userId}-${dayIndex}`,
-        userId,
-        dayIndex,
-        seasonIndex: seasonContext.currentSeason.season_index,
-        dailyState: daily ?? null,
-        allStorylets: storyletsRaw,
-        recentRuns,
-        forcedStorylet: arcStorylet ?? undefined,
-        experiments: options?.experiments,
-        isAdmin: options?.isAdmin,
-        context: buildStoryletContext({
-          posture: postureResolved,
-          tensions,
-          directiveTags,
-        }),
-      });
+  const storyletsSelected = selectStorylets({
+    seed: `${userId}-${dayIndex}`,
+    userId,
+    dayIndex,
+    seasonIndex: seasonContext.currentSeason.season_index,
+    dailyState: daily ?? null,
+    allStorylets: storyletsRaw,
+    recentRuns,
+    experiments: options?.experiments,
+    isAdmin: options?.isAdmin,
+    context: buildStoryletContext({
+      posture: postureResolved,
+      tensions,
+      directiveTags,
+    }),
+  });
 
   let initiatives = null as DailyRun["initiatives"];
 
@@ -388,19 +367,6 @@ export async function getOrCreateDailyRun(
     initiatives = enriched;
   }
 
-  const arcDefinition = featureFlags.arcs
-    ? await fetchContentArcByKey(ARC_KEY)
-    : null;
-  let arcInstance =
-    featureFlags.arcs && arcDefinition ? await fetchArcInstance(userId, ARC_KEY) : null;
-  if (featureFlags.arcs && arcDefinition && !arcInstance && dayIndex >= 1) {
-    arcInstance = await startArc(userId, ARC_KEY, dayIndex);
-  }
-  const arcStep =
-    featureFlags.arcs && arcDefinition && arcInstance?.status === "active"
-      ? await fetchArcCurrentStepContent(ARC_KEY, arcInstance.current_step)
-      : null;
-
   const reflection = await getReflection(userId, dayIndex);
   const reflectionDone = isReflectionDone(reflection);
   const funPulseEligible = featureFlags.funPulse
@@ -423,18 +389,15 @@ export async function getOrCreateDailyRun(
     : "pending";
   const microTaskDone = Boolean(microTaskRun);
 
-  const storylets = featureFlags.arcFirstEnabled
-    ? []
-    : storyletsSelected.length > 0
-    ? storyletsSelected
-    : [fallbackStorylet(), fallbackStorylet()];
+  const storylets =
+    storyletsSelected.length > 0
+      ? storyletsSelected
+      : [fallbackStorylet(), fallbackStorylet()];
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
   const canBoost = !boosted;
   const arcOneMode =
-    featureFlags.arcOneScarcityEnabled &&
-    featureFlags.arcFirstEnabled &&
-    dayIndex <= ARC_ONE_LAST_DAY;
+    featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY;
   const setupNeeded = needsSetup({
     skillBank: arcOneMode ? null : skillBank,
     posture: postureResolved,
@@ -446,7 +409,7 @@ export async function getOrCreateDailyRun(
     cadence.alreadyCompletedToday,
     canBoost,
     hasStorylets,
-    featureFlags.arcFirstEnabled,
+    false,
     reflectionDone,
     microTaskEligible,
     microTaskDone,
@@ -470,23 +433,7 @@ export async function getOrCreateDailyRun(
     stage,
   });
 
-  const availableArcs = featureFlags.alignment
-    ? await fetchArcInstancesByKeys(userId, unlocks.unlockedArcKeys)
-      .catch(() => [])
-      .then((unlockedInstances) => {
-        const startedArcKeys = new Set(
-          unlockedInstances.map((item) => item.arc_key)
-        );
-        return contentArcs
-          .filter((arc) => unlocks.unlockedArcKeys.includes(arc.key))
-          .filter((arc) => !startedArcKeys.has(arc.key))
-          .map((arc) => ({
-            key: arc.key,
-            title: arc.title,
-            description: arc.description,
-          }));
-      })
-    : [];
+  const availableArcs: DailyRun["availableArcs"] = [];
 
   const { weekStart, weekEnd } = computeWeekWindow(dayIndex);
   const [worldInfluence, cohortInfluence, rivalrySnapshot] = await Promise.all([
@@ -512,12 +459,8 @@ export async function getOrCreateDailyRun(
     stage,
     allocation: allocation ?? null,
     allocationSeed,
-    storylets: featureFlags.arcFirstEnabled
-      ? []
-      : hasStorylets
-      ? storylets
-      : [fallbackStorylet(), fallbackStorylet()],
-    storyletRunsToday: featureFlags.arcFirstEnabled ? [] : runs,
+    storylets: hasStorylets ? storylets : [fallbackStorylet(), fallbackStorylet()],
+    storyletRunsToday: runs,
     canBoost,
     tensions,
     skillBank: featureFlags.skills ? skillBank : null,
@@ -526,33 +469,12 @@ export async function getOrCreateDailyRun(
     skills: featureFlags.skills ? skills ?? undefined : undefined,
     nextSkillUnlockDay: featureFlags.skills ? 2 : undefined,
     cohortId,
-    arc: featureFlags.arcs && arcDefinition
-      ? {
-        arc_key: arcDefinition.key,
-        status:
-          arcInstance?.status === "completed"
-            ? "completed"
-            : arcInstance?.status === "active"
-              ? "active"
-              : "not_started",
-        title: arcDefinition.title,
-        description: arcDefinition.description,
-        current_step: arcInstance?.current_step ?? null,
-        step: arcStep
-          ? {
-            step_index: arcStep.step_index,
-            title: arcStep.title,
-            body: arcStep.body,
-            choices: arcStep.choices ?? [],
-          }
-          : null,
-      }
-      : null,
+    arc: null,
     factions: featureFlags.alignment ? factions : [],
     alignment: featureFlags.alignment ? alignment : undefined,
     unlocks: featureFlags.alignment
       ? {
-        arcKeys: unlocks.unlockedArcKeys,
+        arcKeys: [],
         initiativeKeys: unlocks.unlockedInitiativeKeys,
       }
       : undefined,

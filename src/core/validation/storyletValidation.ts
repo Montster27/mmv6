@@ -6,7 +6,6 @@ import type {
 } from "@/types/storylets";
 import type { Check } from "@/types/checks";
 import type { JsonObject } from "@/types/vectors";
-import { ARC_DEFINITIONS } from "@/content/arcs/arcDefinitions";
 
 function isString(value: unknown): value is string {
   return typeof value === "string";
@@ -552,29 +551,6 @@ export function fallbackStorylet(): Storylet {
 }
 
 export function validateArcDefinitions(storylets: Storylet[]) {
-  const warnings: ValidationIssue[] = [];
-  const bySlug = new Map(storylets.map((s) => [s.slug, s]));
-  ARC_DEFINITIONS.forEach((arc) => {
-    arc.steps.forEach((step) => {
-      const storylet = bySlug.get(step.storylet_slug);
-      if (!storylet) {
-        warnings.push({
-          storyletId: "",
-          slug: step.storylet_slug,
-          path: `arc.${arc.arc_id}.${step.step_id}`,
-          message: "Arc step storylet slug not found",
-        });
-        return;
-      }
-      if (!storylet.is_active) {
-        warnings.push({
-          storyletId: storylet.id,
-          slug: storylet.slug,
-          path: `arc.${arc.arc_id}.${step.step_id}`,
-          message: "Arc step storylet is inactive",
-        });
-      }
-    });
-  });
-  return warnings;
+  void storylets;
+  return [];
 }

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
-import { ArcPanel } from "@/components/play/ArcPanel";
 import { FactionStatusPanel } from "@/components/play/FactionStatusPanel";
 import { InitiativePanel } from "@/components/play/InitiativePanel";
 import { DailySetupPanel } from "@/components/play/DailySetupPanel";
@@ -21,8 +20,6 @@ import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import { supabase } from "@/lib/supabase/browser";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
-import { advanceArcIfStepCompleted } from "@/core/arcs/arcEngine";
-import { PRIMARY_ARC_ID } from "@/content/arcs/arcDefinitions";
 import { awardAnomalies } from "@/lib/anomalies";
 import { appendGroupFeedEvent } from "@/lib/groups/feed";
 import { incrementGroupObjective } from "@/lib/groups/objective";
@@ -56,7 +53,6 @@ import {
   resolveTension,
   submitPosture,
 } from "@/lib/dailyInteractions";
-import { advanceArc, completeArc, progressArcWithChoice, startArc } from "@/lib/arcs";
 import { fetchCohortRoster } from "@/lib/cohorts";
 import { contributeToInitiative } from "@/lib/initiatives";
 import {
@@ -81,13 +77,10 @@ import {
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
 import { getArcOneState } from "@/core/arcOne/state";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
-import { parseSkillRequirement } from "@/core/arcOne/skill";
-import { canSpendMoney } from "@/core/arcOne/money";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
 import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
-import type { TodayArcState } from "@/domain/arcs/types";
 import type { TelemetryEvent } from "@/types/telemetry";
 import type {
   DailyPosture,
@@ -119,13 +112,6 @@ const defaultAllocation: AllocationPayload = {
 };
 
 const USE_DAILY_LOOP_ORCHESTRATOR = true;
-
-const ARC_TONE_COPY = [
-  "You notice…",
-  "You see it again…",
-  "It is hard to ignore…",
-  "This might be your last chance…",
-];
 
 export default function PlayPage() {
   const session = useSession();
@@ -219,9 +205,7 @@ export default function PlayPage() {
     worldState,
     cohortState,
     rivalry,
-    availableArcs,
     cohortId,
-    arc,
     initiatives,
     setFactions,
     setAlignment,
@@ -230,17 +214,11 @@ export default function PlayPage() {
     setWorldState,
     setCohortState,
     setRivalry,
-    setAvailableArcs,
     setCohortId,
-    setArc,
     setInitiatives,
     setGameContent,
   } = useGameContent();
-  const [arcSubmitting, setArcSubmitting] = useState(false);
   const [initiativeSubmitting, setInitiativeSubmitting] = useState(false);
-  const [arcToday, setArcToday] = useState<TodayArcState | null>(null);
-  const [arcTodayLoading, setArcTodayLoading] = useState(false);
-  const [arcTodayError, setArcTodayError] = useState<string | null>(null);
   const [funPulseSaving, setFunPulseSaving] = useState(false);
   const [bootstrapAssignments, setBootstrapAssignments] = useState<
     Record<string, string>
@@ -523,10 +501,8 @@ export default function PlayPage() {
 
   const arcOneMode = useMemo(
     () =>
-      featureFlags.arcOneScarcityEnabled &&
-      featureFlags.arcFirstEnabled &&
-      dayIndex <= ARC_ONE_LAST_DAY,
-    [featureFlags.arcOneScarcityEnabled, featureFlags.arcFirstEnabled, dayIndex]
+      featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY,
+    [featureFlags.arcOneScarcityEnabled, dayIndex]
   );
   const arcOneState = useMemo(
     () => (arcOneMode ? getArcOneState(dailyState) : null),
@@ -573,34 +549,6 @@ export default function PlayPage() {
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
-
-  const fetchArcToday = useCallback(async () => {
-    if (!featureFlags.arcFirstEnabled || !userId) return;
-    setArcTodayLoading(true);
-    setArcTodayError(null);
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("No session found.");
-      const res = await fetch("/api/arcs/today", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error ?? "Failed to load arc state.");
-      }
-      setArcToday(json as TodayArcState);
-    } catch (err) {
-      console.error(err);
-      setArcTodayError(err instanceof Error ? err.message : "Failed to load arcs.");
-    } finally {
-      setArcTodayLoading(false);
-    }
-  }, [featureFlags.arcFirstEnabled, userId, dayIndex]);
-
-  useEffect(() => {
-    fetchArcToday();
-  }, [fetchArcToday, refreshTick]);
 
   const loadDevCharacters = async () => {
     setDevLoading(true);
@@ -828,7 +776,6 @@ export default function PlayPage() {
             seasonRecap: run.seasonResetNeeded ? run.seasonRecap ?? null : null,
           });
           setGameContent({
-            arc: run.arc ?? null,
             initiatives: run.initiatives ?? [],
             factions: run.factions ?? [],
             alignment: run.alignment ?? {},
@@ -837,7 +784,6 @@ export default function PlayPage() {
             worldState: run.worldState ?? null,
             cohortState: run.cohortState ?? null,
             rivalry: run.rivalry ?? null,
-            availableArcs: run.availableArcs ?? [],
             cohortId: run.cohortId ?? null,
           });
           setRemnantState(run.remnant ?? null);
@@ -863,26 +809,24 @@ export default function PlayPage() {
             }
           }
 
-          if (!featureFlags.arcFirstEnabled) {
-            const servedKey = `${run.dayIndex}:${run.storylets
-              .map((s) => s.id)
-              .join(",")}`;
-            if (servedStoryletsRef.current !== servedKey) {
-              servedStoryletsRef.current = servedKey;
-              run.storylets.forEach((storylet) => {
-                const audience = (storylet.requirements as any)?.audience;
-                trackWithSeason({
-                  event_type: "storylet_served",
-                  day_index: run.dayIndex,
-                  stage: run.stage,
-                  payload: {
-                    storylet_id: storylet.id,
-                    storylet_slug: storylet.slug,
-                    audience: audience ?? null,
-                  },
-                });
+          const servedKey = `${run.dayIndex}:${run.storylets
+            .map((s) => s.id)
+            .join(",")}`;
+          if (servedStoryletsRef.current !== servedKey) {
+            servedStoryletsRef.current = servedKey;
+            run.storylets.forEach((storylet) => {
+              const audience = (storylet.requirements as any)?.audience;
+              trackWithSeason({
+                event_type: "storylet_served",
+                day_index: run.dayIndex,
+                stage: run.stage,
+                payload: {
+                  storylet_id: storylet.id,
+                  storylet_slug: storylet.slug,
+                  audience: audience ?? null,
+                },
               });
-            }
+            });
           }
 
           const [profiles, received] = await Promise.all([
@@ -1652,7 +1596,7 @@ export default function PlayPage() {
       setAllocationSaved(true);
       setAllocationSummary(allocation);
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
-        setStage(featureFlags.arcFirstEnabled ? "social" : "storylet_1");
+        setStage("storylet_1");
       }
     } catch (e) {
       console.error(e);
@@ -1661,90 +1605,6 @@ export default function PlayPage() {
       setSavingAllocation(false);
     }
   };
-
-  const callArcApi = useCallback(
-    async (path: string, body: Record<string, unknown>) => {
-      if (!userId) throw new Error("Missing user.");
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("No session found.");
-      const res = await fetch(path, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error ?? "Arc action failed.");
-      }
-    },
-    [userId]
-  );
-
-  const handleAcceptOffer = useCallback(
-    async (offerId: string) => {
-      setArcSubmitting(true);
-      setArcTodayError(null);
-      try {
-        await callArcApi("/api/arcs/offers/accept", { offerId });
-        await fetchArcToday();
-      } catch (err) {
-        console.error(err);
-        setArcTodayError(
-          err instanceof Error ? err.message : "Failed to accept offer."
-        );
-      } finally {
-        setArcSubmitting(false);
-      }
-    },
-    [callArcApi, dayIndex, fetchArcToday]
-  );
-
-  const handleResolveArcStep = useCallback(
-    async (instanceId: string, optionKey: string) => {
-      setArcSubmitting(true);
-      setArcTodayError(null);
-      try {
-        await callArcApi("/api/arcs/instances/resolve", {
-          arcInstanceId: instanceId,
-          optionKey,
-        });
-        await fetchArcToday();
-      } catch (err) {
-        console.error(err);
-        setArcTodayError(
-          err instanceof Error ? err.message : "Failed to resolve step."
-        );
-      } finally {
-        setArcSubmitting(false);
-      }
-    },
-    [callArcApi, dayIndex, fetchArcToday]
-  );
-
-  const handleDeferArcStep = useCallback(
-    async (instanceId: string) => {
-      setArcSubmitting(true);
-      setArcTodayError(null);
-      try {
-        await callArcApi("/api/arcs/instances/defer", {
-          arcInstanceId: instanceId,
-        });
-        await fetchArcToday();
-      } catch (err) {
-        console.error(err);
-        setArcTodayError(
-          err instanceof Error ? err.message : "Failed to defer step."
-        );
-      } finally {
-        setArcSubmitting(false);
-      }
-    },
-    [callArcApi, dayIndex, fetchArcToday]
-  );
 
   const renderDeltaLines = useCallback(
     (label: string, delta?: Record<string, number>) => {
@@ -1851,24 +1711,6 @@ export default function PlayPage() {
     }
   );
 
-  const moneyOrder = ["tight", "okay", "comfortable"] as const;
-  const canAffordBand = (
-    band: typeof moneyOrder[number],
-    required?: typeof moneyOrder[number] | null
-  ) => {
-    if (!required) return true;
-    return moneyOrder.indexOf(band) >= moneyOrder.indexOf(required);
-  };
-
-  const parseSkillRequirement = (requirement?: string | null) => {
-    if (!requirement) return null;
-    const [rawKey, rawMin] = requirement.split(":");
-    const min = rawMin ? Number(rawMin) : 1;
-    return {
-      key: rawKey.trim(),
-      min: Number.isFinite(min) ? min : 1,
-    };
-  };
         setDailyState(nextDailyState);
         if (
           dayState &&
@@ -1922,46 +1764,6 @@ export default function PlayPage() {
               stage,
               payload: { anomaly_id: anomalyId, source: currentStorylet.slug },
             });
-          });
-        }
-        const arcAdvance = await advanceArcIfStepCompleted(
-          userId,
-          PRIMARY_ARC_ID,
-          dayIndex,
-          currentStorylet.slug
-        );
-        if (arcAdvance?.nextDailyState) {
-          setDailyState(arcAdvance.nextDailyState);
-        }
-        if (arcAdvance?.appliedDeltas) {
-          if (dayState && typeof arcAdvance.appliedDeltas.stress === "number") {
-            const nextStress = Math.max(
-              0,
-              Math.min(100, dayState.stress + arcAdvance.appliedDeltas.stress)
-            );
-            setDayState({ ...dayState, stress: nextStress });
-          }
-          setOutcomeDeltas((prev) => {
-            const merged = {
-              energy: prev?.energy,
-              stress: prev?.stress,
-            } as {
-              energy?: number;
-              stress?: number;
-              vectors?: Record<string, number>;
-            };
-            merged.vectors = { ...(prev?.vectors ?? {}) };
-            if (typeof arcAdvance.appliedDeltas?.stress === "number") {
-              merged.stress = (merged.stress ?? 0) + arcAdvance.appliedDeltas.stress;
-            }
-            if (arcAdvance.appliedDeltas?.vectors) {
-              for (const [key, delta] of Object.entries(
-                arcAdvance.appliedDeltas.vectors
-              )) {
-                merged.vectors[key] = (merged.vectors[key] ?? 0) + delta;
-              }
-            }
-            return merged;
           });
         }
         if (resolvedOutcomeId) {
@@ -2341,91 +2143,6 @@ export default function PlayPage() {
     }
   };
 
-  const handleStartArc = async () => {
-    if (!userId || !arc) return;
-    setArcSubmitting(true);
-    setError(null);
-    try {
-      await startArc(userId, arc.arc_key, dayIndex);
-      setRefreshTick((tick) => tick + 1);
-    } catch (e) {
-      console.error(e);
-      setError(e instanceof Error ? e.message : "Failed to start arc.");
-    } finally {
-      setArcSubmitting(false);
-    }
-  };
-
-  const handleAdvanceArc = async (nextStep: number, complete: boolean) => {
-    if (!userId || !arc) return;
-    setArcSubmitting(true);
-    setError(null);
-    try {
-      if (complete) {
-        await completeArc(userId, arc.arc_key);
-      } else {
-        await advanceArc(userId, arc.arc_key, nextStep);
-      }
-      setRefreshTick((tick) => tick + 1);
-    } catch (e) {
-      console.error(e);
-      setError(e instanceof Error ? e.message : "Failed to advance arc.");
-    } finally {
-      setArcSubmitting(false);
-    }
-  };
-
-  const handleArcChoice = async (choiceKey: string) => {
-    if (!userId || !arc) return;
-    recordInteraction();
-    setArcSubmitting(true);
-    setError(null);
-    try {
-      await progressArcWithChoice(userId, arc.arc_key, choiceKey, dayIndex);
-      setRefreshTick((tick) => tick + 1);
-    } catch (e) {
-      console.error(e);
-      const message =
-        e instanceof Error && e.message.startsWith("INSUFFICIENT_RESOURCES")
-          ? "Not enough resources to choose that."
-          : e instanceof Error
-            ? e.message
-            : "Failed to apply arc choice.";
-      if (e instanceof Error && e.message.startsWith("INSUFFICIENT_RESOURCES")) {
-        pushTesterMessage(
-          "mmv_tester_arc_cost_blocked",
-          testerMessage(
-            "Some story options require resources like money, energy, or social capital.",
-            {
-              title: "Narrative Has a Cost",
-              details:
-                "If an option is unavailable, it’s usually because of how you spent your time earlier. This is intentional. Try changing how you allocate a future day and see what opens up.",
-              tone: "warning",
-            }
-          )
-        );
-      }
-      setError(message);
-    } finally {
-      setArcSubmitting(false);
-    }
-  };
-
-  const handleBeginUnlockedArc = async (arcKey: string) => {
-    if (!userId) return;
-    setArcSubmitting(true);
-    setError(null);
-    try {
-      await startArc(userId, arcKey, dayIndex);
-      setRefreshTick((tick) => tick + 1);
-    } catch (e) {
-      console.error(e);
-      setError(e instanceof Error ? e.message : "Failed to start arc.");
-    } finally {
-      setArcSubmitting(false);
-    }
-  };
-
   const handleContributeInitiative = async (initiativeId: string) => {
     if (!userId) return;
     recordInteraction();
@@ -2548,13 +2265,6 @@ export default function PlayPage() {
       markCompleteIfNeeded();
     }
   }, [stage, alreadyCompletedToday, userId, dayIndex]);
-
-  const showOpeningArcFirst =
-    featureFlags.arcs &&
-    Boolean(arc) &&
-    arc?.arc_key === "intro_phone_on_hall" &&
-    arc?.current_step === 0 &&
-    Boolean(arc?.step);
 
   return (
         <div className="p-6 space-y-6">
@@ -2807,29 +2517,6 @@ export default function PlayPage() {
                   </>
                 ) : (
                   <>
-                  {showOpeningArcFirst ? (
-                    <section
-                      className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4"
-                      onMouseEnter={() => startHover("arc_panel")}
-                      onMouseLeave={() => endHover("arc_panel")}
-                    >
-                      <ArcPanel
-                        arc={arc}
-                        availableArcs={availableArcs}
-                        dayState={dayState}
-                        resourcesEnabled={featureFlags.resources}
-                        submitting={arcSubmitting}
-                        onStart={handleStartArc}
-                        onAdvance={handleAdvanceArc}
-                        onChoose={handleArcChoice}
-                        onBeginUnlocked={handleBeginUnlockedArc}
-                      />
-                      <p className="text-sm text-slate-600">
-                        You still have a day to get through.
-                      </p>
-                    </section>
-                  ) : null}
-
                   <section className="rounded-md border border-slate-200 bg-white px-4 py-4 text-slate-700">
                     Today you’re balancing pressure, opportunity, and what you’re willing
                     to push.
@@ -2904,274 +2591,10 @@ export default function PlayPage() {
                     />
                   )}
 
-                  {featureFlags.arcFirstEnabled ? (
-                    <section className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">Today</h2>
-                        <span className="text-sm text-slate-600">
-                          {arcOneMode ? "Time slots" : "Progress"}:{" "}
-                          {arcToday?.progressionSlotsUsed ?? 0}/
-                          {arcToday?.progressionSlotsTotal ?? 0}
-                        </span>
-                      </div>
-                      {(arcToday?.progressionSlotsTotal ?? 0) -
-                        (arcToday?.progressionSlotsUsed ?? 0) <=
-                      0 ? (
-                        <p className="text-xs text-amber-700">
-                          No progression slots left today.
-                        </p>
-                      ) : null}
-                      {arcTodayLoading ? (
-                        <p className="text-sm text-slate-600">Loading arcs…</p>
-                      ) : null}
-                      {arcTodayError ? (
-                        <p className="text-sm text-red-600">{arcTodayError}</p>
-                      ) : null}
-
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-slate-900">
-                          Due today
-                        </h3>
-                        {arcToday?.dueSteps?.length ? (
-                          arcToday.dueSteps.map((due) => {
-                            const slotsRemaining =
-                              (arcToday.progressionSlotsTotal ?? 0) -
-                              (arcToday.progressionSlotsUsed ?? 0);
-                            const daysLeft = due.expires_on_day - dayIndex;
-                            const expiresSoon = daysLeft <= 0;
-                            return (
-                              <div
-                                key={due.instance.id}
-                                className={`rounded-md border px-4 py-3 space-y-2 ${
-                                  expiresSoon
-                                    ? "border-amber-300 bg-amber-50"
-                                    : "border-slate-200 bg-white"
-                                }`}
-                              >
-                                <div>
-                                  <p className="text-xs text-slate-500">
-                                    {due.arc.title}
-                                  </p>
-                                  <h4 className="text-base font-semibold text-slate-900">
-                                    {due.step.title}
-                                  </h4>
-                                  <p className="text-sm text-slate-700">
-                                    {due.step.body}
-                                  </p>
-                                  <p
-                                    className={`text-xs ${
-                                      expiresSoon
-                                        ? "text-amber-700"
-                                        : "text-slate-500"
-                                    }`}
-                                  >
-                                    {daysLeft <= 0
-                                      ? "Expires today"
-                                      : `Expires in ${daysLeft} day${
-                                          daysLeft === 1 ? "" : "s"
-                                        }`}
-                                  </p>
-                                  {expiresSoon ? (
-                                    <p className="text-xs font-semibold text-amber-700">
-                                      Action needed today.
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <div className="space-y-2">
-                                  {due.step.options.map((option) => {
-                                    const timeCost = Math.max(1, option.time_cost ?? 1);
-                                    const energyCost = option.energy_cost ?? 0;
-                                    const moneyReq = option.money_requirement ?? null;
-                                    const skillReq = parseSkillRequirement(
-                                      option.skill_requirement ?? null
-                                    );
-                                    const skillKey = skillReq?.key ?? null;
-                                    const skillMin = skillReq?.min ?? 0;
-                                    const skillLevel =
-                                      skillKey && arcOneState
-                                        ? (arcOneState.skillFlags as any)?.[skillKey] ?? 0
-                                        : 0;
-                                    const lacksSkill =
-                                      Boolean(skillKey) && skillLevel < skillMin;
-                                    const lacksMoney =
-                                      arcOneMode && arcOneState
-                                        ? !canSpendMoney(
-                                            arcOneState.moneyBand,
-                                            moneyReq
-                                          )
-                                        : false;
-                                    const disabled =
-                                      arcSubmitting ||
-                                      slotsRemaining < timeCost ||
-                                      lacksSkill ||
-                                      lacksMoney;
-                                    return (
-                                      <div
-                                        key={option.option_key}
-                                        className="space-y-1"
-                                      >
-                                        <Button
-                                          variant="secondary"
-                                          disabled={disabled}
-                                          onClick={() =>
-                                            handleResolveArcStep(
-                                              due.instance.id,
-                                              option.option_key
-                                            )
-                                          }
-                                          className="w-full justify-start"
-                                        >
-                                          {option.label}
-                                        </Button>
-                                        {arcOneMode ? (
-                                          <div className="text-xs text-slate-600">
-                                            Time {timeCost} · Energy{" "}
-                                            {energyCost > 0 ? `-${energyCost}` : "0"}
-                                            {moneyReq ? ` · Money: ${moneyReq}` : ""}
-                                          </div>
-                                        ) : null}
-                                        {lacksMoney ? (
-                                          <div className="text-xs text-amber-700">
-                                            Money is too tight.
-                                          </div>
-                                        ) : null}
-                                        {lacksSkill ? (
-                                          <div className="text-xs text-amber-700">
-                                            Requires {skillKey} {skillMin}.
-                                          </div>
-                                        ) : null}
-                                        {renderDeltaLines(
-                                          "Costs:",
-                                          option.costs?.resources
-                                        )}
-                                        {renderDeltaLines(
-                                          "Rewards:",
-                                          option.rewards?.resources
-                                        )}
-                                        {typeof option.rewards?.skill_points ===
-                                        "number" ? (
-                                          <div className="text-xs text-slate-600">
-                                            Skill points +{option.rewards.skill_points}
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    );
-                                  })}
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      onClick={() =>
-                                        handleDeferArcStep(due.instance.id)
-                                      }
-                                      disabled={arcSubmitting}
-                                    >
-                                      Defer
-                                    </Button>
-                                    {slotsRemaining <= 0 ? (
-                                      <span className="text-xs text-amber-700">
-                                        No progression slots left today.
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                  <TesterOnly>
-                                    <TesterFeedback
-                                      dayIndex={dayIndex}
-                                      context={{
-                                        arc_key: due.arc.key,
-                                        step_key: due.step.step_key,
-                                        lifePressureState: arcOneState?.lifePressureState,
-                                        energyLevel: arcOneState?.energyLevel,
-                                        moneyBand: arcOneState?.moneyBand,
-                                        skillFlags: arcOneState?.skillFlags,
-                                        npcMemory: arcOneState?.npcMemory,
-                                      }}
-                                      label="Leave feedback"
-                                    />
-                                  </TesterOnly>
-                                </div>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <p className="text-sm text-slate-600">
-                            No arc steps are due today.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-slate-900">
-                          Invitations
-                        </h3>
-                        {arcToday?.offers?.length ? (
-                          arcToday.offers.map((offer) => (
-                            <div
-                              key={offer.id}
-                              className="rounded-md border border-slate-200 bg-white px-4 py-3"
-                            >
-                              <p className="text-xs text-slate-500">
-                                {ARC_TONE_COPY[offer.tone_level] ??
-                                  ARC_TONE_COPY[0]}
-                              </p>
-                              <h4 className="text-base font-semibold text-slate-900">
-                                {offer.arc.title}
-                              </h4>
-                              <p className="text-sm text-slate-700">
-                                {offer.arc.description}
-                              </p>
-                              <Button
-                                className="mt-2"
-                                onClick={() => handleAcceptOffer(offer.id)}
-                                disabled={arcSubmitting}
-                              >
-                                Accept
-                              </Button>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-slate-600">
-                            No invitations today.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-slate-900">
-                          Active arcs
-                        </h3>
-                        {arcToday?.activeArcs?.length ? (
-                          <div className="space-y-2">
-                            {arcToday.activeArcs.map((instance) => (
-                              <div
-                                key={instance.id}
-                                className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium">
-                                    {instance.arc.title}
-                                  </span>
-                                  <span className="text-xs text-slate-500">
-                                    Due day {instance.step_due_day}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  Defers: {instance.step_defer_count}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-slate-600">
-                            No active arcs yet.
-                          </p>
-                        )}
-                      </div>
-                    </section>
-                  ) : (
-                    (stage === "storylet_1" ||
-                      stage === "storylet_2" ||
-                      (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
-                      <section className="space-y-3">
+                  {(stage === "storylet_1" ||
+                    stage === "storylet_2" ||
+                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
+                    <section className="space-y-3">
                         <div className="flex items-center justify-between">
                           <h2 className="text-xl font-semibold">Storylets</h2>
                           <span className="text-sm text-slate-600">
@@ -3340,36 +2763,6 @@ export default function PlayPage() {
                               )}
                             </div>
                           </div>
-                        )}
-                      </section>
-                    )
-                  )}
-
-                  {USE_DAILY_LOOP_ORCHESTRATOR &&
-                    featureFlags.arcs &&
-                    !featureFlags.arcFirstEnabled &&
-                    arc &&
-                    stage !== "setup" &&
-                    stage !== "allocation" &&
-                    stage !== "storylet_1" &&
-                    stage !== "storylet_2" && (
-                      <section
-                        className="space-y-3"
-                        onMouseEnter={() => startHover("arc_panel")}
-                        onMouseLeave={() => endHover("arc_panel")}
-                      >
-                        {showOpeningArcFirst && arc?.current_step === 0 ? null : (
-                        <ArcPanel
-                          arc={arc}
-                          availableArcs={availableArcs}
-                          dayState={dayState}
-                          resourcesEnabled={featureFlags.resources}
-                          submitting={arcSubmitting}
-                          onStart={handleStartArc}
-                          onAdvance={handleAdvanceArc}
-                          onChoose={handleArcChoice}
-                          onBeginUnlocked={handleBeginUnlockedArc}
-                        />
                         )}
                       </section>
                     )}

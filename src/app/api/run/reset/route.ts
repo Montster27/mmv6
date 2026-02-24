@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 import { supabaseServer } from "@/lib/supabase/server";
-import { computeChapterSummary } from "@/services/arcs/chapterSummary";
 
 function utcToday(): string {
   const now = new Date();
@@ -43,12 +42,6 @@ export async function POST(request: Request) {
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
-  const dayEnd = dailyState?.day_index ?? null;
-  if (dayEnd) {
-    computeChapterSummary(userId, "arc_first", dayEnd).catch((error) => {
-      console.error("Failed to compute chapter summary", error);
-    });
-  }
 
   await supabaseServer.from("storylet_runs").delete().eq("user_id", userId);
   await supabaseServer.from("reflections").delete().eq("user_id", userId);

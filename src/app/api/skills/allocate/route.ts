@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
-import { getCurrentDayIndex } from "@/app/api/arcs/arcDay";
+import { getCurrentDayIndex } from "@/app/api/dayIndex";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;

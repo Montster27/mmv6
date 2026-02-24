@@ -23,10 +23,6 @@ vi.mock("@/lib/reflections", () => ({
 vi.mock("@/lib/microtasks", () => ({
   fetchMicroTaskRun: vi.fn(),
 }));
-vi.mock("@/core/arcs/arcEngine", () => ({
-  getOrStartArc: vi.fn(),
-  getArcNextStepStorylet: vi.fn(),
-}));
 vi.mock("@/core/season/getSeasonContext", () => ({
   getSeasonContext: vi.fn(),
 }));
@@ -91,17 +87,8 @@ vi.mock("@/lib/dayState", () => ({
 vi.mock("@/lib/cohorts", () => ({
   ensureUserInCohort: vi.fn(),
 }));
-vi.mock("@/lib/content/arcs", () => ({
-  fetchArcByKey: vi.fn(),
-  listActiveArcs: vi.fn(),
-}));
 vi.mock("@/lib/content/initiatives", () => ({
   listActiveInitiativesCatalog: vi.fn(),
-}));
-vi.mock("@/lib/arcs", () => ({
-  fetchArcCurrentStepContent: vi.fn(),
-  fetchArcInstance: vi.fn(),
-  fetchArcInstancesByKeys: vi.fn(),
 }));
 vi.mock("@/lib/factions", () => ({
   listFactions: vi.fn(),
@@ -144,7 +131,6 @@ import {
 import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
-import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
@@ -161,14 +147,7 @@ import {
 } from "@/lib/dailyInteractions";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { ensureUserInCohort } from "@/lib/cohorts";
-import { fetchArcByKey } from "@/lib/content/arcs";
-import { listActiveArcs } from "@/lib/content/arcs";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
-import {
-  fetchArcCurrentStepContent,
-  fetchArcInstance,
-  fetchArcInstancesByKeys,
-} from "@/lib/arcs";
 import { listFactions } from "@/lib/factions";
 import {
   ensureUserAlignmentRows,
@@ -281,8 +260,6 @@ beforeEach(() => {
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
   vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
-  vi.mocked(getOrStartArc).mockResolvedValue(null);
-  vi.mocked(getArcNextStepStorylet).mockReturnValue(null);
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
@@ -309,11 +286,6 @@ beforeEach(() => {
     grit: 0,
   });
   vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
-  vi.mocked(fetchArcByKey).mockResolvedValue(null);
-  vi.mocked(listActiveArcs).mockResolvedValue([]);
-  vi.mocked(fetchArcInstance).mockResolvedValue(null);
-  vi.mocked(fetchArcCurrentStepContent).mockResolvedValue(null);
-  vi.mocked(fetchArcInstancesByKeys).mockResolvedValue([]);
   vi.mocked(ensureUserAlignmentRows).mockResolvedValue();
   vi.mocked(listFactions).mockResolvedValue([
     {
@@ -416,33 +388,7 @@ describe("daily loop validation", () => {
     expect(run.stage).toBe("microtask");
   });
 
-  it("attaches cohort, arc, and initiatives", async () => {
-    vi.mocked(fetchArcByKey).mockResolvedValue({
-      key: "anomaly_001",
-      title: "Anomaly 001",
-      description: "Test arc",
-      tags: [],
-      is_active: true,
-      created_at: new Date().toISOString(),
-    });
-    vi.mocked(fetchArcInstance).mockResolvedValue({
-      id: "inst-1",
-      user_id: "u",
-      arc_key: "anomaly_001",
-      status: "active",
-      started_day_index: 2,
-      current_step: 1,
-      updated_at: new Date().toISOString(),
-      meta: null,
-    });
-    vi.mocked(fetchArcCurrentStepContent).mockResolvedValue({
-      arc_key: "anomaly_001",
-      step_index: 1,
-      title: "Step 1",
-      body: "Body",
-      choices: [],
-      created_at: new Date().toISOString(),
-    });
+  it("attaches cohort and initiatives", async () => {
     vi.mocked(fetchOpenInitiativesForCohort).mockResolvedValue([
       {
         id: "init-1",
@@ -463,7 +409,6 @@ describe("daily loop validation", () => {
 
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.cohortId).toBe("c1");
-    expect(run.arc?.arc_key).toBe("anomaly_001");
     expect(run.initiatives?.length).toBe(1);
     expect(run.initiatives?.[0]?.contributedToday).toBe(true);
     expect(run.factions?.length).toBeGreaterThan(0);
@@ -474,31 +419,6 @@ describe("daily loop validation", () => {
     expect(run.worldState?.weekStart).toBe(1);
     expect(run.cohortState?.weekStart).toBe(1);
     expect(run.rivalry?.topCohorts).toEqual([]);
-  });
-
-  it("attaches available arcs from unlocks", async () => {
-    vi.mocked(listActiveArcs).mockResolvedValue([
-      {
-        key: "anomaly_002",
-        title: "Anomaly 002",
-        description: "Test arc",
-        tags: [],
-        is_active: true,
-        created_at: new Date().toISOString(),
-      },
-    ]);
-    vi.mocked(fetchUserAlignment).mockResolvedValue([
-      {
-        user_id: "u",
-        faction_key: "neo_assyrian",
-        score: 6,
-        updated_at: new Date().toISOString(),
-      },
-    ]);
-    vi.mocked(fetchArcInstancesByKeys).mockResolvedValue([]);
-
-    const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.availableArcs?.[0]?.key).toBe("anomaly_002");
   });
 
   it("applies directive payoff once after completion", async () => {

@@ -130,11 +130,6 @@ export default function DevMenu({
     ReturnType<typeof getResourceTrace>
   >([]);
   const [traceLoading, setTraceLoading] = useState(false);
-  const [arcDayInfo, setArcDayInfo] = useState<{
-    dayIndex: number;
-    slotsUsed: number;
-  } | null>(null);
-  const [arcDayLoading, setArcDayLoading] = useState(false);
 
   useEffect(() => {
     setFlagOverrides(readOverrides());
@@ -169,34 +164,8 @@ export default function DevMenu({
     }
   };
 
-  const loadArcDayInfo = async () => {
-    if (!isAdmin && !devSettings.test_mode) return;
-    setArcDayLoading(true);
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("No session found.");
-      const res = await fetch("/api/arcs/today", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error ?? "Failed to load arc day info");
-      }
-      setArcDayInfo({
-        dayIndex: Number(json.currentDay ?? json.dayIndex ?? 0),
-        slotsUsed: Number(json.progressionSlotsUsed ?? 0),
-      });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setArcDayLoading(false);
-    }
-  };
-
   useEffect(() => {
     loadServerTrace();
-    loadArcDayInfo();
   }, []);
 
   const handleToggleFlag = (key: keyof FeatureFlags) => {
@@ -356,31 +325,6 @@ export default function DevMenu({
         </div>
       ) : null}
 
-      {(isAdmin || devSettings.test_mode) ? (
-        <div className="rounded-md border border-slate-200 bg-white px-3 py-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800">
-                Arc day source
-              </h3>
-              <p className="text-xs text-slate-500">
-                Uses daily_states.day_index on the server.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={loadArcDayInfo}>
-              {arcDayLoading ? "Loading…" : "Refresh"}
-            </Button>
-          </div>
-          {arcDayInfo ? (
-            <div className="text-xs text-slate-600 space-y-1">
-              <div>Day index: {arcDayInfo.dayIndex}</div>
-              <div>Slots used: {arcDayInfo.slotsUsed}</div>
-            </div>
-          ) : (
-            <p className="text-xs text-slate-600">No data yet.</p>
-          )}
-        </div>
-      ) : null}
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
         <div className="flex items-center justify-between gap-2">
           <span className="font-medium">Feature toggles</span>

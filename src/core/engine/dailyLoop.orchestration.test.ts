@@ -23,10 +23,6 @@ vi.mock("@/lib/reflections", () => ({
 vi.mock("@/lib/microtasks", () => ({
   fetchMicroTaskRun: vi.fn(),
 }));
-vi.mock("@/core/arcs/arcEngine", () => ({
-  getOrStartArc: vi.fn(),
-  getArcNextStepStorylet: vi.fn(),
-}));
 vi.mock("@/core/season/getSeasonContext", () => ({
   getSeasonContext: vi.fn(),
 }));
@@ -55,17 +51,8 @@ vi.mock("@/lib/dayState", () => ({
 vi.mock("@/lib/cohorts", () => ({
   ensureUserInCohort: vi.fn(),
 }));
-vi.mock("@/lib/content/arcs", () => ({
-  fetchArcByKey: vi.fn(),
-  listActiveArcs: vi.fn(),
-}));
 vi.mock("@/lib/content/initiatives", () => ({
   listActiveInitiativesCatalog: vi.fn(),
-}));
-vi.mock("@/lib/arcs", () => ({
-  fetchArcCurrentStepContent: vi.fn(),
-  fetchArcInstance: vi.fn(),
-  fetchArcInstancesByKeys: vi.fn(),
 }));
 vi.mock("@/lib/factions", () => ({
   listFactions: vi.fn(),
@@ -96,10 +83,6 @@ vi.mock("@/lib/worldState", () => ({
   getOrComputeWorldWeeklyInfluence: vi.fn(),
   getOrComputeWeeklySnapshot: vi.fn(),
 }));
-vi.mock("@/core/storylets/selectStorylets", () => ({
-  selectStorylets: vi.fn(),
-}));
-
 vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
 }));
@@ -149,7 +132,6 @@ import {
 import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
-import { getArcNextStepStorylet, getOrStartArc } from "@/core/arcs/arcEngine";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
@@ -166,14 +148,7 @@ import {
 } from "@/lib/dailyInteractions";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { ensureUserInCohort } from "@/lib/cohorts";
-import { fetchArcByKey } from "@/lib/content/arcs";
-import { listActiveArcs } from "@/lib/content/arcs";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
-import {
-  fetchArcCurrentStepContent,
-  fetchArcInstance,
-  fetchArcInstancesByKeys,
-} from "@/lib/arcs";
 import { listFactions } from "@/lib/factions";
 import {
   ensureUserAlignmentRows,
@@ -309,8 +284,6 @@ beforeEach(() => {
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
   vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
-  vi.mocked(getOrStartArc).mockResolvedValue(null);
-  vi.mocked(getArcNextStepStorylet).mockReturnValue(null);
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
@@ -337,11 +310,6 @@ beforeEach(() => {
     grit: 0,
   });
   vi.mocked(ensureUserInCohort).mockResolvedValue({ cohortId: "c1" });
-  vi.mocked(fetchArcByKey).mockResolvedValue(null);
-  vi.mocked(listActiveArcs).mockResolvedValue([]);
-  vi.mocked(fetchArcInstance).mockResolvedValue(null);
-  vi.mocked(fetchArcCurrentStepContent).mockResolvedValue(null);
-  vi.mocked(fetchArcInstancesByKeys).mockResolvedValue([]);
   vi.mocked(ensureUserAlignmentRows).mockResolvedValue();
   vi.mocked(listFactions).mockResolvedValue([
     {
