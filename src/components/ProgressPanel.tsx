@@ -17,7 +17,10 @@ type DeltaInfo = {
 };
 
 type Props = {
-  dailyState?: Pick<DailyState, "energy" | "stress" | "vectors"> | null;
+  dailyState?: Pick<
+    DailyState,
+    "energy" | "stress" | "vectors" | "money_band"
+  > | null;
   dayState?: DailyRun["dayState"] | null;
   skillBank?: { available_points: number; cap: number } | null;
   skills?: DailyRun["skills"] | null;
