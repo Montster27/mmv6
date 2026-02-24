@@ -8,6 +8,7 @@ import type { SevenVectors } from "@/types/vectors";
 import { summarizeVectors } from "@/core/ui/vectorSummary";
 import { resourceLabel } from "@/core/resources/resourceMap";
 import { deriveEnergyLevel } from "@/core/arcOne/state";
+import { TesterOnly } from "@/components/ux/TesterOnly";
 
 type DeltaInfo = {
   energy?: number;
@@ -172,7 +173,14 @@ function ProgressPanelComponent({
             <span>Energy level</span>
             <span className="capitalize">{energyLevel ?? deriveEnergyLevel(energy ?? 100)}</span>
           </div>
-          {/* TODO(arc-one): decide whether to surface money band in UI. */}
+          <TesterOnly>
+            <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+              <span>Money band</span>
+              <span className="capitalize">
+                {dailyState?.money_band ?? "okay"}
+              </span>
+            </div>
+          </TesterOnly>
         </div>
       ) : null}
 
