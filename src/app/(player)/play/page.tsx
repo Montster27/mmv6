@@ -82,6 +82,7 @@ import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMa
 import { getArcOneState } from "@/core/arcOne/state";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import { parseSkillRequirement } from "@/core/arcOne/skill";
+import { canSpendMoney } from "@/services/arcOne/state";
 import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
 import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
@@ -2968,7 +2969,7 @@ export default function PlayPage() {
                                       Boolean(skillKey) && skillLevel < skillMin;
                                     const lacksMoney =
                                       arcOneMode && arcOneState
-                                        ? !canAffordBand(
+                                        ? !canSpendMoney(
                                             arcOneState.moneyBand,
                                             moneyReq
                                           )
