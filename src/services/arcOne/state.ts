@@ -10,7 +10,7 @@ export async function fetchArcOneState(userId: string): Promise<ArcOneState | nu
   const { data, error } = await supabaseServer
     .from("daily_states")
     .select(
-      "energy,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,expired_opportunities,replay_intention,arc_one_reflection_done"
+      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,expired_opportunities,replay_intention,arc_one_reflection_done"
     )
     .eq("user_id", userId)
     .limit(1)
