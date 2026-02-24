@@ -547,7 +547,7 @@ export default function PlayPage() {
   );
   const skillUiEnabled = useMemo(() => {
     if (!featureFlags.skills || arcOneMode) return false;
-    const unlockDay = nextSkillUnlockDay ?? 2;
+    const unlockDay = dailyRunQuery.data?.nextSkillUnlockDay ?? 2;
     if (dayIndex < unlockDay) return false;
     const levels = {
       focus: skills?.focus ?? 0,
@@ -566,7 +566,7 @@ export default function PlayPage() {
     featureFlags.skills,
     arcOneMode,
     dayIndex,
-    nextSkillUnlockDay,
+    dailyRunQuery.data?.nextSkillUnlockDay,
     skills,
     skillBank,
   ]);
