@@ -82,7 +82,7 @@ import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMa
 import { getArcOneState } from "@/core/arcOne/state";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import { parseSkillRequirement } from "@/core/arcOne/skill";
-import { canSpendMoney } from "@/services/arcOne/state";
+import { canSpendMoney } from "@/core/arcOne/money";
 import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
 import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";

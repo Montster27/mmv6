@@ -19,12 +19,11 @@ import type {
 import { applyResourceDelta } from "@/services/resources/resourceService";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { ARC_ONE_ARC_KEYS, ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
+import { applyMoneyEffect, canSpendMoney } from "@/core/arcOne/money";
 import { mapArcTagsToOpportunity, mapTagsToIdentity, shouldFlagIdentity } from "@/core/arcOne/mapping";
 import {
   appendExpired,
-  applyMoneyEffect,
   bumpEnergyLevelFromEnergy,
-  canSpendMoney,
   fetchArcOneState,
   updateArcOneState,
 } from "@/services/arcOne/state";

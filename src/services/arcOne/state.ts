@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getArcOneState, deriveEnergyLevel, normalizeMoneyBand } from "@/core/arcOne/state";
 import type { ArcOneState, ExpiredOpportunity, MoneyBand } from "@/core/arcOne/types";
+import { applyMoneyEffect, canSpendMoney } from "@/core/arcOne/money";
 import { parseSkillRequirement } from "@/core/arcOne/skill";
 
 export async function fetchArcOneState(userId: string): Promise<ArcOneState | null> {
@@ -51,23 +52,7 @@ export function bumpEnergyLevelFromEnergy(energy: number) {
   return deriveEnergyLevel(energy);
 }
 
-export function canSpendMoney(band: MoneyBand, required?: MoneyBand | null): boolean {
-  if (!required) return true;
-  const order: MoneyBand[] = ["tight", "okay", "comfortable"];
-  return order.indexOf(band) >= order.indexOf(required);
-}
-
-export function applyMoneyEffect(band: MoneyBand, effect?: "improve" | "worsen"): MoneyBand {
-  if (!effect) return band;
-  if (effect === "improve") {
-    if (band === "tight") return "okay";
-    if (band === "okay") return "comfortable";
-    return "comfortable";
-  }
-  if (band === "comfortable") return "okay";
-  if (band === "okay") return "tight";
-  return "tight";
-}
+export { canSpendMoney, applyMoneyEffect };
 
 export { parseSkillRequirement };
 
