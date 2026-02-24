@@ -68,6 +68,8 @@ import {
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { getArcOneState } from "@/core/arcOne/state";
+import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import {
   applyRemnantEffectForDay,
   fetchActiveRemnant,
@@ -421,9 +423,17 @@ export async function getOrCreateDailyRun(
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
   const canBoost = !boosted;
-  const setupNeeded = needsSetup({ skillBank, posture, skillLevels: skills ?? null });
+  const arcOneMode =
+    featureFlags.arcOneScarcityEnabled &&
+    featureFlags.arcFirstEnabled &&
+    dayIndex <= ARC_ONE_LAST_DAY;
+  const setupNeeded = needsSetup({
+    skillBank: arcOneMode ? null : skillBank,
+    posture,
+    skillLevels: skills ?? null,
+  });
   const baseStage = computeStage(
-    Boolean(allocation),
+    arcOneMode ? true : Boolean(allocation),
     runsForPair.length,
     cadence.alreadyCompletedToday,
     canBoost,
@@ -437,6 +447,8 @@ export async function getOrCreateDailyRun(
   );
   const stage =
     !cadence.alreadyCompletedToday && setupNeeded ? "setup" : baseStage;
+
+  const arcOneState = arcOneMode ? getArcOneState(daily ?? null) : null;
 
   devLogStage({
     dayIndex,
@@ -580,6 +592,7 @@ export async function getOrCreateDailyRun(
         total_fun: dayState.total_fun,
       }
       : null,
+    arcOneState: arcOneState ?? undefined,
     remnant: featureFlags.remnantSystemEnabled ? remnantState : null,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,

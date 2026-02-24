@@ -12,6 +12,7 @@ import type { Initiative } from "./initiatives";
 import type { AlignmentEvent, Faction } from "./factions";
 import type { PlayerDayState } from "./dayState";
 import type { RemnantDefinition } from "./remnants";
+import type { ArcOneState } from "@/core/arcOne/types";
 
 export type DailyRunStage =
   | "setup"
@@ -144,6 +145,7 @@ export type DailyRun = {
     active: RemnantDefinition | null;
     applied: boolean;
   } | null;
+  arcOneState?: ArcOneState;
   lastCheck?: import("./checks").CheckResult | null;
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
   const { data: dailyState } = await supabaseServer
     .from("daily_states")
-    .select("day_index")
+    .select("day_index,replay_intention")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
@@ -78,6 +78,15 @@ export async function POST(request: Request) {
       energy: 100,
       stress: 0,
       vectors: {},
+      life_pressure_state: {},
+      energy_level: "high",
+      money_band: "okay",
+      skill_flags: {},
+      npc_memory: {},
+      expired_opportunities: [],
+      replay_intention: dailyState?.replay_intention ?? {},
+      // TODO(arc-one): decide whether replay intention persists beyond Arc One.
+      arc_one_reflection_done: false,
       start_date: today,
       last_day_completed: null,
       last_day_index_completed: null,

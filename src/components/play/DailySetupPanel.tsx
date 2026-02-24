@@ -16,6 +16,7 @@ type Props = {
   allocations: SkillPointAllocation[];
   skills?: CheckSkillLevels | null;
   skillsEnabled?: boolean;
+  scarcityMode?: boolean;
   onAllocateSkillPoint: (skillKey: string) => void;
   submitting?: boolean;
   onSubmitPosture: (posture: DailyPosture["posture"]) => void;
@@ -38,6 +39,7 @@ export function DailySetupPanel({
   allocations,
   skills,
   skillsEnabled = true,
+  scarcityMode = false,
   onAllocateSkillPoint,
   submitting,
   onSubmitPosture,
@@ -70,7 +72,9 @@ export function DailySetupPanel({
       <div>
         <h2 className="text-xl font-semibold">Start your day</h2>
         <p className="text-base text-slate-700">
-          Set your posture, then plan your time.
+          {scarcityMode
+            ? "Set your posture, then step into the day."
+            : "Set your posture, then plan your time."}
         </p>
       </div>
 
@@ -140,7 +144,9 @@ export function DailySetupPanel({
           <p className="text-sm text-slate-600">Not set yet.</p>
         )}
         <p className="text-xs text-slate-500">
-          Next step: set your time allocation.
+          {scarcityMode
+            ? "Next step: move into the day."
+            : "Next step: set your time allocation."}
         </p>
         <div className="flex flex-wrap gap-2">
           {POSTURES.map((option) => (

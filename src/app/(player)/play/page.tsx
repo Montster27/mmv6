@@ -15,6 +15,8 @@ import { DailySetupPanel } from "@/components/play/DailySetupPanel";
 import { PlaySkeleton } from "@/components/skeletons/PlaySkeleton";
 import { AllocationSection } from "@/components/play/AllocationSection";
 import { ReflectionSection } from "@/components/play/ReflectionSection";
+import { ArcOneReflection } from "@/components/play/ArcOneReflection";
+import { TesterFeedback } from "@/components/play/TesterFeedback";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import { supabase } from "@/lib/supabase/browser";
@@ -77,6 +79,9 @@ import {
   unlockRemnant,
 } from "@/lib/remnants";
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
+import { getArcOneState } from "@/core/arcOne/state";
+import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
+import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
 import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { TodayArcState } from "@/domain/arcs/types";
@@ -270,6 +275,7 @@ export default function PlayPage() {
   const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
+  const [arcOneReflectionSaving, setArcOneReflectionSaving] = useState(false);
   const [askOfferPosts, setAskOfferPosts] = useState<AskOfferPostView[]>([]);
   const [askOfferLoading, setAskOfferLoading] = useState(false);
   const [askOfferError, setAskOfferError] = useState<string | null>(null);
@@ -510,6 +516,28 @@ export default function PlayPage() {
   const microTaskEligible = useMemo(
     () => isMicrotaskEligible(dayIndex, microtaskVariant),
     [dayIndex, microtaskVariant]
+  );
+
+  const arcOneMode = useMemo(
+    () =>
+      featureFlags.arcOneScarcityEnabled &&
+      featureFlags.arcFirstEnabled &&
+      dayIndex <= ARC_ONE_LAST_DAY,
+    [featureFlags.arcOneScarcityEnabled, featureFlags.arcFirstEnabled, dayIndex]
+  );
+  const arcOneState = useMemo(
+    () => (arcOneMode ? getArcOneState(dailyState) : null),
+    [arcOneMode, dailyState]
+  );
+  const arcOneReflectionReady = Boolean(
+    arcOneMode && arcOneState && dayIndex >= 5 && !arcOneState.reflectionDone
+  );
+  const arcOneReflectionLines = useMemo(
+    () =>
+      arcOneReflectionReady && arcOneState
+        ? buildReflectionSummary({ arcOneState, moneyBandHistory: [] })
+        : [],
+    [arcOneReflectionReady, arcOneState]
   );
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
@@ -1789,8 +1817,27 @@ export default function PlayPage() {
               dayState,
               posture: posture?.posture ?? null,
               skills: featureFlags.skills ? skills ?? undefined : undefined,
-            }
-          );
+    }
+  );
+
+  const moneyOrder = ["tight", "okay", "comfortable"] as const;
+  const canAffordBand = (
+    band: typeof moneyOrder[number],
+    required?: typeof moneyOrder[number] | null
+  ) => {
+    if (!required) return true;
+    return moneyOrder.indexOf(band) >= moneyOrder.indexOf(required);
+  };
+
+  const parseSkillRequirement = (requirement?: string | null) => {
+    if (!requirement) return null;
+    const [rawKey, rawMin] = requirement.split(":");
+    const min = rawMin ? Number(rawMin) : 1;
+    return {
+      key: rawKey.trim(),
+      min: Number.isFinite(min) ? min : 1,
+    };
+  };
         setDailyState(nextDailyState);
         if (
           dayState &&
@@ -2085,6 +2132,37 @@ export default function PlayPage() {
       setError(e instanceof Error ? e.message : "Failed to reset run.");
     } finally {
       setRunResetting(false);
+    }
+  };
+
+  const handleArcOneReplayIntention = async (intention: string) => {
+    setArcOneReflectionSaving(true);
+    setError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setError("No session found.");
+        return;
+      }
+      const res = await fetch("/api/arc-one/replay-intention", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ intention }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to save intention.");
+      }
+      await handleRunReset();
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Failed to save intention.");
+    } finally {
+      setArcOneReflectionSaving(false);
     }
   };
 
@@ -2772,7 +2850,8 @@ export default function PlayPage() {
                         dayIndex={dayIndex}
                         allocations={skillAllocations}
                         skills={skills ?? undefined}
-                        skillsEnabled={featureFlags.skills}
+                        skillsEnabled={featureFlags.skills && !arcOneMode}
+                        scarcityMode={arcOneMode}
                         onAllocateSkillPoint={handleAllocateSkillPoint}
                         submitting={allocatingSkill}
                         onSubmitPosture={handleSubmitPosture}
@@ -2799,7 +2878,8 @@ export default function PlayPage() {
                       <div className="flex items-center justify-between">
                         <h2 className="text-xl font-semibold">Today</h2>
                         <span className="text-sm text-slate-600">
-                          Progress: {arcToday?.progressionSlotsUsed ?? 0}/
+                          {arcOneMode ? "Time slots" : "Progress"}:{" "}
+                          {arcToday?.progressionSlotsUsed ?? 0}/
                           {arcToday?.progressionSlotsTotal ?? 0}
                         </span>
                       </div>
@@ -2867,37 +2947,85 @@ export default function PlayPage() {
                                   ) : null}
                                 </div>
                                 <div className="space-y-2">
-                                  {due.step.options.map((option) => (
-                                    <div key={option.option_key} className="space-y-1">
-                                      <Button
-                                        variant="secondary"
-                                        disabled={arcSubmitting || slotsRemaining <= 0}
-                                        onClick={() =>
-                                          handleResolveArcStep(
-                                            due.instance.id,
-                                            option.option_key
+                                  {due.step.options.map((option) => {
+                                    const timeCost = Math.max(1, option.time_cost ?? 1);
+                                    const energyCost = option.energy_cost ?? 0;
+                                    const moneyReq = option.money_requirement ?? null;
+                                    const skillReq = parseSkillRequirement(
+                                      option.skill_requirement ?? null
+                                    );
+                                    const skillKey = skillReq?.key ?? null;
+                                    const skillMin = skillReq?.min ?? 0;
+                                    const skillLevel =
+                                      skillKey && arcOneState
+                                        ? (arcOneState.skillFlags as any)?.[skillKey] ?? 0
+                                        : 0;
+                                    const lacksSkill =
+                                      Boolean(skillKey) && skillLevel < skillMin;
+                                    const lacksMoney =
+                                      arcOneMode && arcOneState
+                                        ? !canAffordBand(
+                                            arcOneState.moneyBand,
+                                            moneyReq
                                           )
-                                        }
-                                        className="w-full justify-start"
+                                        : false;
+                                    const disabled =
+                                      arcSubmitting ||
+                                      slotsRemaining < timeCost ||
+                                      lacksSkill ||
+                                      lacksMoney;
+                                    return (
+                                      <div
+                                        key={option.option_key}
+                                        className="space-y-1"
                                       >
-                                        {option.label}
-                                      </Button>
-                                      {renderDeltaLines(
-                                        "Costs:",
-                                        option.costs?.resources
-                                      )}
-                                      {renderDeltaLines(
-                                        "Rewards:",
-                                        option.rewards?.resources
-                                      )}
-                                      {typeof option.rewards?.skill_points ===
-                                      "number" ? (
-                                        <div className="text-xs text-slate-600">
-                                          Skill points +{option.rewards.skill_points}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  ))}
+                                        <Button
+                                          variant="secondary"
+                                          disabled={disabled}
+                                          onClick={() =>
+                                            handleResolveArcStep(
+                                              due.instance.id,
+                                              option.option_key
+                                            )
+                                          }
+                                          className="w-full justify-start"
+                                        >
+                                          {option.label}
+                                        </Button>
+                                        {arcOneMode ? (
+                                          <div className="text-xs text-slate-600">
+                                            Time {timeCost} · Energy{" "}
+                                            {energyCost > 0 ? `-${energyCost}` : "0"}
+                                            {moneyReq ? ` · Money: ${moneyReq}` : ""}
+                                          </div>
+                                        ) : null}
+                                        {lacksMoney ? (
+                                          <div className="text-xs text-amber-700">
+                                            Money is too tight.
+                                          </div>
+                                        ) : null}
+                                        {lacksSkill ? (
+                                          <div className="text-xs text-amber-700">
+                                            Requires {skillKey} {skillMin}.
+                                          </div>
+                                        ) : null}
+                                        {renderDeltaLines(
+                                          "Costs:",
+                                          option.costs?.resources
+                                        )}
+                                        {renderDeltaLines(
+                                          "Rewards:",
+                                          option.rewards?.resources
+                                        )}
+                                        {typeof option.rewards?.skill_points ===
+                                        "number" ? (
+                                          <div className="text-xs text-slate-600">
+                                            Skill points +{option.rewards.skill_points}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })}
                                   <div className="flex items-center gap-2">
                                     <Button
                                       variant="outline"
@@ -2914,6 +3042,21 @@ export default function PlayPage() {
                                       </span>
                                     ) : null}
                                   </div>
+                                  <TesterOnly>
+                                    <TesterFeedback
+                                      dayIndex={dayIndex}
+                                      context={{
+                                        arc_key: due.arc.key,
+                                        step_key: due.step.step_key,
+                                        lifePressureState: arcOneState?.lifePressureState,
+                                        energyLevel: arcOneState?.energyLevel,
+                                        moneyBand: arcOneState?.moneyBand,
+                                        skillFlags: arcOneState?.skillFlags,
+                                        npcMemory: arcOneState?.npcMemory,
+                                      }}
+                                      label="Leave feedback"
+                                    />
+                                  </TesterOnly>
                                 </div>
                               </div>
                             );
@@ -3202,6 +3345,7 @@ export default function PlayPage() {
 
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     featureFlags.alignment &&
+                    !arcOneMode &&
                     factions.length > 0 && (
                     <section className="space-y-3">
                       <FactionStatusPanel
@@ -3558,12 +3702,36 @@ export default function PlayPage() {
                     </section>
                   )}
 
-              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && (
+              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && arcOneReflectionReady ? (
+                <section className="space-y-3">
+                  <ArcOneReflection
+                    summaryLines={arcOneReflectionLines}
+                    prompt={buildReplayPrompt()}
+                    submitting={arcOneReflectionSaving}
+                    onSelect={handleArcOneReplayIntention}
+                  />
+                  <TesterOnly>
+                    <TesterFeedback
+                      dayIndex={dayIndex}
+                      context={{
+                        lifePressureState: arcOneState?.lifePressureState,
+                        energyLevel: arcOneState?.energyLevel,
+                        moneyBand: arcOneState?.moneyBand,
+                        skillFlags: arcOneState?.skillFlags,
+                        npcMemory: arcOneState?.npcMemory,
+                        replayIntention: arcOneState?.replayIntention,
+                        expiredOpportunities: arcOneState?.expiredOpportunities,
+                      }}
+                      label="Leave feedback"
+                    />
+                  </TesterOnly>
+                </section>
+              ) : USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" ? (
                 <ReflectionSection
                   saving={reflectionSaving}
                   onReflection={handleReflection}
                 />
-              )}
+              ) : null}
               {USE_DAILY_LOOP_ORCHESTRATOR &&
                 featureFlags.funPulse &&
                 stage === "fun_pulse" && (
@@ -3587,8 +3755,10 @@ export default function PlayPage() {
                   lastAppliedDeltas={outcomeDeltas}
                   boostsReceivedCount={boostsReceived.length}
                   skills={skills}
-                  resourcesEnabled={featureFlags.resources}
-                  skillsEnabled={featureFlags.skills}
+                  resourcesEnabled={featureFlags.resources && !arcOneMode}
+                  skillsEnabled={featureFlags.skills && !arcOneMode}
+                  scarcityMode={arcOneMode}
+                  energyLevel={arcOneState?.energyLevel}
                   onResourcesHoverStart={() => startHover("resources_panel")}
                   onResourcesHoverEnd={() => endHover("resources_panel")}
                   onVectorsHoverStart={() => startHover("vectors_panel")}

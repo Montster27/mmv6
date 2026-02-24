@@ -17,6 +17,20 @@ import type {
   ResourceDelta,
 } from "@/domain/arcs/types";
 import { applyResourceDelta } from "@/services/resources/resourceService";
+import { getFeatureFlags } from "@/lib/featureFlags";
+import { ARC_ONE_ARC_KEYS, ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
+import { mapArcTagsToOpportunity, mapTagsToIdentity, shouldFlagIdentity } from "@/core/arcOne/mapping";
+import {
+  appendExpired,
+  applyMoneyEffect,
+  bumpEnergyLevelFromEnergy,
+  canSpendMoney,
+  fetchArcOneState,
+  parseSkillRequirement,
+  updateArcOneState,
+} from "@/services/arcOne/state";
+import { bumpLifePressure, updateNpcMemory, updateSkillFlag } from "@/core/arcOne/state";
+import type { ExpiredOpportunity } from "@/core/arcOne/types";
 
 const DEFAULT_PROGRESS_SLOTS = 2;
 const BRANCH_REGEX = /^branch_(a|b|c)/i;
@@ -204,7 +218,14 @@ export async function resolveStep(params: {
   progressionSlotsTotal?: number;
 }): Promise<void> {
   const { userId, currentDay, arcInstanceId, optionKey } = params;
-  const progressionSlotsTotal = params.progressionSlotsTotal ?? DEFAULT_PROGRESS_SLOTS;
+  const featureFlags = getFeatureFlags();
+  const arcOneMode =
+    featureFlags.arcOneScarcityEnabled &&
+    featureFlags.arcFirstEnabled &&
+    currentDay <= ARC_ONE_LAST_DAY;
+  const progressionSlotsTotal =
+    params.progressionSlotsTotal ??
+    (arcOneMode ? 3 : DEFAULT_PROGRESS_SLOTS);
 
   const { data: instance, error } = await supabaseServer
     .from("arc_instances")
@@ -226,25 +247,61 @@ export async function resolveStep(params: {
     throw new Error("Step expired.");
   }
 
-  const { data: logCount } = await supabaseServer
+  const option = findOption(step, optionKey);
+  if (!option) throw new Error("Option not found.");
+  const timeCost = Math.max(1, option.time_cost ?? 1);
+
+  const arc = await fetchArcDefinition(instance.arc_id);
+  const arcKey = arc?.key ?? "";
+  const arcOneEnabled = arcOneMode && ARC_ONE_ARC_KEYS.has(arcKey);
+  const arcOneState = arcOneEnabled ? await fetchArcOneState(userId) : null;
+  if (arcOneEnabled && arcOneState) {
+    if (!canSpendMoney(arcOneState.moneyBand, option.money_requirement)) {
+      throw new Error("Money is too tight for that.");
+    }
+    const requirement = parseSkillRequirement(option.skill_requirement);
+    if (
+      requirement &&
+      (arcOneState.skillFlags[requirement.key] ?? 0) < requirement.min
+    ) {
+      throw new Error("Skill requirement not met.");
+    }
+  }
+
+  const { data: logRows, error: logError } = await supabaseServer
     .from("choice_log")
-    .select("id", { count: "exact", head: true })
+    .select("meta")
     .eq("user_id", userId)
     .eq("day", currentDay)
     .eq("event_type", "STEP_RESOLVED");
-  const slotsUsed = logCount?.length ?? 0;
-  if (!canProgressToday(slotsUsed, progressionSlotsTotal)) {
+  if (logError) {
+    console.error("Failed to load progression count", logError);
+  }
+  const slotsUsed = (logRows ?? []).reduce((sum, row) => {
+    const meta = row?.meta as Record<string, unknown> | null;
+    const cost = typeof meta?.time_cost === "number" ? meta?.time_cost : 1;
+    return sum + cost;
+  }, 0);
+  if (!canProgressToday(slotsUsed, progressionSlotsTotal, timeCost)) {
     throw new Error("No progression slots left today.");
   }
 
-  const option = findOption(step, optionKey);
-  if (!option) throw new Error("Option not found.");
-
-  const arc = await fetchArcDefinition(instance.arc_id);
   const tags = arc?.tags ?? [];
   const hesitationSnapshot: Record<string, number> = {};
 
   let combined = mergeDeltas(option.costs, option.rewards);
+  let energyCost = typeof option.energy_cost === "number" ? option.energy_cost : 0;
+  if (arcOneEnabled && arcOneState && option.skill_modifier) {
+    const key = option.skill_modifier as keyof typeof arcOneState.skillFlags;
+    if (key in arcOneState.skillFlags && arcOneState.skillFlags[key] >= 2) {
+      // TODO(arc-one): tune skill-based energy efficiency.
+      energyCost = Math.max(0, energyCost - 1);
+    }
+  }
+  if (energyCost !== 0) {
+    combined.resources = combined.resources ?? {};
+    combined.resources.energy = (combined.resources.energy ?? 0) - energyCost;
+  }
   for (const tag of tags) {
     const { data } = await supabaseServer
       .from("player_dispositions")
@@ -268,11 +325,12 @@ export async function resolveStep(params: {
   const nextBranchKey =
     instance.branch_key ?? derivedBranchKey ?? null;
 
+  let resourceSnapshot = null as Awaited<ReturnType<typeof applyResourceDelta>> | null;
   if (
     (combined.resources && Object.keys(combined.resources).length > 0) ||
     typeof combined.skill_points === "number"
   ) {
-    await applyResourceDelta(userId, currentDay, combined, {
+    resourceSnapshot = await applyResourceDelta(userId, currentDay, combined, {
       source: "arc_step_resolved",
       arcId: arc?.id ?? null,
       arcInstanceId: instance.id,
@@ -281,7 +339,53 @@ export async function resolveStep(params: {
       meta: {
         hesitation_snapshot: hesitationSnapshot,
         branch_key: nextBranchKey,
+        time_cost: timeCost,
       },
+    });
+  }
+
+  if (arcOneEnabled && arcOneState) {
+    const identityTags =
+      option.identity_tags && option.identity_tags.length > 0
+        ? option.identity_tags
+        : mapTagsToIdentity(tags);
+    const normalizedTags = identityTags.filter((tag) => shouldFlagIdentity(tag));
+    const nextLifePressure = bumpLifePressure(
+      arcOneState.lifePressureState,
+      normalizedTags
+    );
+    const nextMoneyBand = applyMoneyEffect(
+      arcOneState.moneyBand,
+      option.money_effect
+    );
+    let nextSkillFlags = arcOneState.skillFlags;
+    if (option.skill_modifier) {
+      const key = option.skill_modifier as keyof typeof arcOneState.skillFlags;
+      if (key in arcOneState.skillFlags) {
+        nextSkillFlags = updateSkillFlag(arcOneState.skillFlags, key);
+      }
+    }
+    let nextNpcMemory = arcOneState.npcMemory;
+    if (option.relational_effects?.npc_key) {
+      nextNpcMemory = updateNpcMemory(
+        arcOneState.npcMemory,
+        option.relational_effects.npc_key,
+        {
+          trust: option.relational_effects.trust_delta,
+          reliability: option.relational_effects.reliability_delta,
+          emotionalLoad: option.relational_effects.emotionalLoad_delta,
+        }
+      );
+    }
+    const nextEnergyLevel = resourceSnapshot
+      ? bumpEnergyLevelFromEnergy(resourceSnapshot.energy)
+      : arcOneState.energyLevel;
+    await updateArcOneState(userId, {
+      lifePressureState: nextLifePressure,
+      moneyBand: nextMoneyBand,
+      skillFlags: nextSkillFlags,
+      npcMemory: nextNpcMemory,
+      energyLevel: nextEnergyLevel,
     });
   }
 
@@ -298,8 +402,42 @@ export async function resolveStep(params: {
       branch_key: nextBranchKey,
       hesitation_snapshot: hesitationSnapshot,
       tone_level_if_offer: null,
+      time_cost: timeCost,
     },
   });
+
+  const nextSlotsUsed = slotsUsed + timeCost;
+  if (arcOneEnabled && arcOneState && nextSlotsUsed >= progressionSlotsTotal) {
+    const { data: dueInstances } = await supabaseServer
+      .from("arc_instances")
+      .select("id,arc_id,current_step_key,step_due_day")
+      .eq("user_id", userId)
+      .eq("state", "ACTIVE")
+      .lte("step_due_day", currentDay);
+    const remaining = (dueInstances ?? []).filter(
+      (row) => row.id !== instance.id
+    );
+    if (remaining.length > 0) {
+      const arcIds = Array.from(new Set(remaining.map((row) => row.arc_id)));
+      const { data: arcRows } = await supabaseServer
+        .from("arc_definitions")
+        .select("id,tags")
+        .in("id", arcIds);
+      const tagMap = new Map(
+        (arcRows ?? []).map((row) => [row.id, row.tags as string[]])
+      );
+      const expired = remaining.map<ExpiredOpportunity>((row) => ({
+        type: mapArcTagsToOpportunity(tagMap.get(row.arc_id) ?? []),
+        day_index: currentDay,
+      }));
+      await updateArcOneState(userId, {
+        expiredOpportunities: appendExpired(
+          arcOneState.expiredOpportunities,
+          expired
+        ),
+      });
+    }
+  }
   if (!nextKey) {
     await supabaseServer
       .from("arc_instances")

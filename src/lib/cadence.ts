@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/browser";
 import type { DailyState } from "@/types/daily";
+import { deriveEnergyLevel } from "@/core/arcOne/state";
 
 export function utcToday(): string {
   const now = new Date();
@@ -80,6 +81,7 @@ export async function ensureCadenceUpToDate(userId: string): Promise<{
         day_index: expectedDayIndex,
         energy: carryEnergy,
         stress: carryStress,
+        energy_level: deriveEnergyLevel(carryEnergy),
         updated_at: new Date().toISOString(),
       })
       .eq("id", daily.id);

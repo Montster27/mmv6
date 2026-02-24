@@ -7,6 +7,7 @@ import type { DailyRun } from "@/types/dailyRun";
 import type { SevenVectors } from "@/types/vectors";
 import { summarizeVectors } from "@/core/ui/vectorSummary";
 import { resourceLabel } from "@/core/resources/resourceMap";
+import { deriveEnergyLevel } from "@/core/arcOne/state";
 
 type DeltaInfo = {
   energy?: number;
@@ -23,6 +24,8 @@ type Props = {
   boostsReceivedCount?: number;
   resourcesEnabled?: boolean;
   skillsEnabled?: boolean;
+  scarcityMode?: boolean;
+  energyLevel?: "high" | "moderate" | "low";
   onResourcesHoverStart?: () => void;
   onResourcesHoverEnd?: () => void;
   onVectorsHoverStart?: () => void;
@@ -83,6 +86,8 @@ function ProgressPanelComponent({
   boostsReceivedCount,
   resourcesEnabled = true,
   skillsEnabled = true,
+  scarcityMode = false,
+  energyLevel,
   onResourcesHoverStart,
   onResourcesHoverEnd,
   onVectorsHoverStart,
@@ -123,7 +128,9 @@ function ProgressPanelComponent({
 
   return (
     <aside className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-4">
-      <h2 className="text-sm font-semibold text-slate-800">Resources</h2>
+      <h2 className="text-sm font-semibold text-slate-800">
+        {scarcityMode ? "Energy & Stress" : "Resources"}
+      </h2>
       <div
         className="space-y-2"
         onMouseEnter={onResourcesHoverStart}
@@ -159,37 +166,48 @@ function ProgressPanelComponent({
         {bar(stress, highlightStress)}
       </div>
 
-      <div className="space-y-1 text-sm text-slate-700">
-        {resourcesEnabled ? (
-          <>
-            <div className="flex items-center justify-between">
-              <span>{resourceLabel("knowledge")}</span>
-              <span>{dayState?.knowledge ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{resourceLabel("cashOnHand")}</span>
-              <span>{dayState?.cashOnHand ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{resourceLabel("socialLeverage")}</span>
-              <span>{dayState?.socialLeverage ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{resourceLabel("physicalResilience")}</span>
-              <span>{dayState?.physicalResilience ?? 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>{resourceLabel("morale")}</span>
-              <span>{typeof morale === "number" ? morale : "—"}</span>
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-slate-600">
-            Your reserves shift quietly beneath the day.
-          </p>
-        )}
-        {skillsEnabled ? (
-          <>
+      {scarcityMode ? (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <div className="flex items-center justify-between">
+            <span>Energy level</span>
+            <span className="capitalize">{energyLevel ?? deriveEnergyLevel(energy ?? 100)}</span>
+          </div>
+          {/* TODO(arc-one): decide whether to surface money band in UI. */}
+        </div>
+      ) : null}
+
+      {!scarcityMode ? (
+        <div className="space-y-1 text-sm text-slate-700">
+          {resourcesEnabled ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span>{resourceLabel("knowledge")}</span>
+                <span>{dayState?.knowledge ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>{resourceLabel("cashOnHand")}</span>
+                <span>{dayState?.cashOnHand ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>{resourceLabel("socialLeverage")}</span>
+                <span>{dayState?.socialLeverage ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>{resourceLabel("physicalResilience")}</span>
+                <span>{dayState?.physicalResilience ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>{resourceLabel("morale")}</span>
+                <span>{typeof morale === "number" ? morale : "—"}</span>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-600">
+              Your reserves shift quietly beneath the day.
+            </p>
+          )}
+          {skillsEnabled ? (
+            <>
             <div className="flex items-center justify-between text-slate-600">
               <span>{resourceLabel("skillPoints")}</span>
               <span>
@@ -217,54 +235,59 @@ function ProgressPanelComponent({
               </div>
             </div>
           </>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      ) : null}
 
-      <div
-        className="space-y-2"
-        onMouseEnter={onVectorsHoverStart}
-        onMouseLeave={onVectorsHoverEnd}
-      >
-        <p className="text-sm font-semibold text-slate-800">Vectors</p>
-        {vectorKeys.length === 0 ? (
-          <p className="text-sm text-slate-700">No vectors yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {vectorKeys.map((key) => {
-              const value = vectors[key] ?? 0;
-              const delta = lastAppliedDeltas?.vectors?.[key];
-              const highlightVector =
-                typeof highlight?.vectors?.[key] === "number" &&
-                highlight.vectors[key] !== 0;
-              return (
-                <div key={key} className="space-y-1">
-                  <div
-                    className={`flex items-center justify-between text-sm ${
-                      highlightVector
-                        ? "text-slate-900 font-medium underline decoration-cyan-400/70 stat-highlight"
-                        : "text-slate-700"
-                    }`}
-                  >
-                    <span className="capitalize">{key}</span>
-                    <span>
-                      {value}
-                      {deltaBadge(delta, highlightVector)}
-                    </span>
+      {!scarcityMode ? (
+        <div
+          className="space-y-2"
+          onMouseEnter={onVectorsHoverStart}
+          onMouseLeave={onVectorsHoverEnd}
+        >
+          <p className="text-sm font-semibold text-slate-800">Vectors</p>
+          {vectorKeys.length === 0 ? (
+            <p className="text-sm text-slate-700">No vectors yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {vectorKeys.map((key) => {
+                const value = vectors[key] ?? 0;
+                const delta = lastAppliedDeltas?.vectors?.[key];
+                const highlightVector =
+                  typeof highlight?.vectors?.[key] === "number" &&
+                  highlight.vectors[key] !== 0;
+                return (
+                  <div key={key} className="space-y-1">
+                    <div
+                      className={`flex items-center justify-between text-sm ${
+                        highlightVector
+                          ? "text-slate-900 font-medium underline decoration-cyan-400/70 stat-highlight"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      <span className="capitalize">{key}</span>
+                      <span>
+                        {value}
+                        {deltaBadge(delta, highlightVector)}
+                      </span>
+                    </div>
+                    {bar(value, highlightVector)}
                   </div>
-                  {bar(value, highlightVector)}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
 
-      <div className="text-sm text-slate-700 space-y-1">
-        <p>{summary}</p>
-        <p className="text-xs text-slate-600">
-          Boosts received today: {boostsReceivedCount ?? 0}
-        </p>
-      </div>
+      {!scarcityMode ? (
+        <div className="text-sm text-slate-700 space-y-1">
+          <p>{summary}</p>
+          <p className="text-xs text-slate-600">
+            Boosts received today: {boostsReceivedCount ?? 0}
+          </p>
+        </div>
+      ) : null}
     </aside>
   );
 }

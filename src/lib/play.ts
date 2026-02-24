@@ -69,7 +69,7 @@ export async function fetchDailyState(
   const { data, error } = await supabase
     .from("daily_states")
     .select(
-      "id,user_id,day_index,energy,stress,vectors,start_date,last_day_completed,last_day_index_completed"
+      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,expired_opportunities,replay_intention,arc_one_reflection_done,start_date,last_day_completed,last_day_index_completed"
     )
     .eq("user_id", userId)
     .limit(1)

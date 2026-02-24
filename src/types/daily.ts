@@ -7,6 +7,14 @@ export type DailyState = {
   energy: number;
   stress: number;
   vectors: SevenVectors | JsonObject;
+  life_pressure_state?: JsonObject;
+  energy_level?: "high" | "moderate" | "low";
+  money_band?: "tight" | "okay" | "comfortable";
+  skill_flags?: JsonObject;
+  npc_memory?: JsonObject;
+  expired_opportunities?: JsonObject;
+  replay_intention?: JsonObject;
+  arc_one_reflection_done?: boolean;
   start_date?: string;
   last_day_completed?: string | null;
   last_day_index_completed?: number | null;

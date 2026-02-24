@@ -29,6 +29,19 @@ export type ArcDefinition = {
 export type ArcStepOption = {
   option_key: string;
   label: string;
+  time_cost?: number;
+  energy_cost?: number;
+  money_requirement?: "tight" | "okay" | "comfortable";
+  money_effect?: "improve" | "worsen";
+  skill_requirement?: string;
+  skill_modifier?: string;
+  identity_tags?: string[];
+  relational_effects?: {
+    npc_key?: string;
+    trust_delta?: number;
+    reliability_delta?: number;
+    emotionalLoad_delta?: number;
+  };
   costs?: ResourceDelta;
   rewards?: ResourceDelta;
   next_step_key?: string | null;

@@ -16,6 +16,8 @@ import type {
   TodayArcState,
 } from "@/domain/arcs/types";
 import { applyResourceDelta } from "@/services/resources/resourceService";
+import { getFeatureFlags } from "@/lib/featureFlags";
+import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 
 const DEFAULT_PROGRESS_SLOTS = 2;
 const MAX_OFFERS_PER_DAY = 3;
@@ -65,7 +67,14 @@ export async function getTodayArcState(params: {
   progressionSlotsTotal?: number;
 }): Promise<TodayArcState> {
   const { userId, currentDay } = params;
-  const progressionSlotsTotal = params.progressionSlotsTotal ?? DEFAULT_PROGRESS_SLOTS;
+  const featureFlags = getFeatureFlags();
+  const arcOneMode =
+    featureFlags.arcOneScarcityEnabled &&
+    featureFlags.arcFirstEnabled &&
+    currentDay <= ARC_ONE_LAST_DAY;
+  const progressionSlotsTotal =
+    params.progressionSlotsTotal ??
+    (arcOneMode ? 3 : DEFAULT_PROGRESS_SLOTS);
 
   const { data: definitions, error: defError } = await supabaseServer
     .from("arc_definitions")
@@ -232,9 +241,53 @@ export async function getTodayArcState(params: {
   }
 
   const activeOffers = offerRows.filter((offer) => offer.state === "ACTIVE");
+  let replay: Record<string, boolean> = {};
+  if (arcOneMode) {
+    const { data: replayRow } = await supabaseServer
+      .from("daily_states")
+      .select("replay_intention")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+    replay = (replayRow?.replay_intention ?? {}) as Record<string, boolean>;
+  }
+
   const toShow = activeOffers
-    .sort((a, b) => a.last_seen_day - b.last_seen_day)
-    .slice(0, MAX_OFFERS_PER_DAY);
+    .map((offer) => {
+      const arc = defById.get(offer.arc_id);
+      const tags = arc?.tags ?? [];
+      const lower = tags.map((tag) => tag.toLowerCase());
+      let biasScore = 0;
+      // TODO(arc-one): tune bias weights for replay intention.
+      if (replay.risk_bias && lower.some((tag) => tag.includes("courage"))) {
+        biasScore += 1;
+      }
+      if (
+        replay.people_bias &&
+        lower.some((tag) => tag.includes("belonging") || tag.includes("love"))
+      ) {
+        biasScore += 1;
+      }
+      if (
+        replay.confront_bias &&
+        lower.some((tag) => tag.includes("agency") || tag.includes("assert"))
+      ) {
+        biasScore += 1;
+      }
+      if (
+        replay.achievement_bias &&
+        lower.some((tag) => tag.includes("craft") || tag.includes("achievement"))
+      ) {
+        biasScore += 1;
+      }
+      return { offer, biasScore };
+    })
+    .sort((a, b) => {
+      if (b.biasScore !== a.biasScore) return b.biasScore - a.biasScore;
+      return a.offer.last_seen_day - b.offer.last_seen_day;
+    })
+    .slice(0, MAX_OFFERS_PER_DAY)
+    .map((entry) => entry.offer);
 
   for (const offer of activeOffers) {
     if (shouldOfferExpire(currentDay, offer)) {
@@ -280,16 +333,20 @@ export async function getTodayArcState(params: {
     offer.last_seen_day = currentDay;
   }
 
-  const { count, error: logError } = await supabaseServer
+  const { data: logRows, error: logError } = await supabaseServer
     .from("choice_log")
-    .select("id", { count: "exact", head: true })
+    .select("meta")
     .eq("user_id", userId)
     .eq("day", currentDay)
     .eq("event_type", "STEP_RESOLVED");
   if (logError) {
     console.error("Failed to load progression count", logError);
   }
-  const progressionSlotsUsed = count ?? 0;
+  const progressionSlotsUsed = (logRows ?? []).reduce((sum, row) => {
+    const meta = row?.meta as Record<string, unknown> | null;
+    const cost = typeof meta?.time_cost === "number" ? meta.time_cost : 1;
+    return sum + cost;
+  }, 0);
 
   const offersWithArc = toShow
     .map((offer) => {

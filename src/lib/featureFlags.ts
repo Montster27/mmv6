@@ -1,5 +1,6 @@
 export type FeatureFlags = {
   arcFirstEnabled: boolean;
+  arcOneScarcityEnabled: boolean;
   arcs: boolean;
   resources: boolean;
   skills: boolean;
@@ -62,6 +63,7 @@ export function getFeatureFlags(): FeatureFlags {
     set === "muted"
       ? {
           arcFirstEnabled: true,
+          arcOneScarcityEnabled: true,
           arcs: true,
           resources: false,
           skills: true,
@@ -78,6 +80,7 @@ export function getFeatureFlags(): FeatureFlags {
         }
       : {
           arcFirstEnabled: true,
+          arcOneScarcityEnabled: true,
           arcs: true,
           resources: false,
           skills: true,
@@ -116,6 +119,8 @@ export function getFeatureFlags(): FeatureFlags {
   const overrides: Partial<FeatureFlags> = {
     arcFirstEnabled:
       parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARC_FIRST) ?? undefined,
+    arcOneScarcityEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARC_ONE_SCARCITY) ?? undefined,
     arcs: parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARCS) ?? undefined,
     resources: parseFlag(process.env.NEXT_PUBLIC_FEATURE_RESOURCES) ?? undefined,
     skills: parseFlag(process.env.NEXT_PUBLIC_FEATURE_SKILLS) ?? undefined,
