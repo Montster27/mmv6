@@ -18,9 +18,26 @@ import type {
 import { applyResourceDelta } from "@/services/resources/resourceService";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
+import { mapArcTagsToOpportunity } from "@/core/arcOne/mapping";
+import { appendExpired, fetchArcOneState, updateArcOneState } from "@/services/arcOne/state";
+import type { ExpiredOpportunity } from "@/core/arcOne/types";
 
 const DEFAULT_PROGRESS_SLOTS = 2;
 const MAX_OFFERS_PER_DAY = 3;
+
+function mergeExpired(
+  current: ExpiredOpportunity[],
+  additions: ExpiredOpportunity[]
+) {
+  const seen = new Set(current.map((item) => `${item.type}:${item.day_index}`));
+  const filtered = additions.filter((item) => {
+    const key = `${item.type}:${item.day_index}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return appendExpired(current, filtered);
+}
 
 async function logChoice(entry: Omit<ChoiceLogEntry, "id">) {
   const { error } = await supabaseServer.from("choice_log").insert(entry);
@@ -347,6 +364,25 @@ export async function getTodayArcState(params: {
     const cost = typeof meta?.time_cost === "number" ? meta.time_cost : 1;
     return sum + cost;
   }, 0);
+
+  if (arcOneMode && progressionSlotsUsed >= progressionSlotsTotal) {
+    const arcOneState = await fetchArcOneState(userId);
+    if (arcOneState) {
+      const expiredFromDue = dueSteps.map<ExpiredOpportunity>((due) => ({
+        type: mapArcTagsToOpportunity(due.arc.tags ?? []),
+        day_index: currentDay,
+      }));
+      const expiredFromOffers = activeOffers.map<ExpiredOpportunity>((offer) => ({
+        type: mapArcTagsToOpportunity(defById.get(offer.arc_id)?.tags ?? []),
+        day_index: currentDay,
+      }));
+      const merged = mergeExpired(
+        arcOneState.expiredOpportunities,
+        [...expiredFromDue, ...expiredFromOffers]
+      );
+      await updateArcOneState(userId, { expiredOpportunities: merged });
+    }
+  }
 
   const offersWithArc = toShow
     .map((offer) => {
