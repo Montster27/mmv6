@@ -124,6 +124,8 @@ export default function DevMenu({
   const [flagOverrides, setFlagOverrides] = useState<Partial<FeatureFlags>>({});
   const [retainOverrides, setRetainOverrides] = useState(false);
   const flags = getFeatureFlags();
+  const contentStudioEnabled =
+    flagOverrides.contentStudioLiteEnabled ?? flags.contentStudioLiteEnabled;
   const [serverTrace, setServerTrace] = useState<
     ReturnType<typeof getResourceTrace>
   >([]);
@@ -252,9 +254,11 @@ export default function DevMenu({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Dev menu</h2>
         <div className="flex items-center gap-2">
-          {isAdmin || devSettings.test_mode ? (
+          {contentStudioEnabled && (isAdmin || devSettings.test_mode) ? (
             <Button variant="secondary" asChild>
-              <Link href="/studio/content">Content studio</Link>
+              <a href="/studio/content" target="_blank" rel="noreferrer">
+                Open Content Studio
+              </a>
             </Button>
           ) : null}
           <Button variant="secondary" asChild>

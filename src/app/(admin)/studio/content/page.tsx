@@ -14,11 +14,16 @@ import { fetchDevSettings } from "@/lib/devSettings";
 import { supabase } from "@/lib/supabase/browser";
 import { validateStorylet } from "@/core/validation/storyletValidation";
 import { buildAuditMeta } from "@/lib/contentStudio/audit";
+import { RESOURCE_KEYS } from "@/core/resources/resourceKeys";
+import { StudioDatalist } from "@/components/contentStudio/StudioDatalist";
 import type { Storylet, StoryletChoice } from "@/types/storylets";
 import type { ContentArc, ContentArcStep } from "@/types/content";
 import type { DelayedConsequenceRule } from "@/types/consequences";
 import type { RemnantRule } from "@/types/remnants";
 import type { ContentVersion, ContentSnapshot } from "@/types/contentVersions";
+
+import { SaveStatusIndicator } from "@/components/contentStudio/SaveStatusIndicator";
+import { ArcGraphView } from "@/components/contentStudio/ArcGraphView";
 
 const REMNANT_KEYS = [
   "memory_fragment",
@@ -26,8 +31,6 @@ const REMNANT_KEYS = [
   "composure_scar",
   "anomaly_thread",
 ] as const;
-import { SaveStatusIndicator } from "@/components/contentStudio/SaveStatusIndicator";
-import { ArcGraphView } from "@/components/contentStudio/ArcGraphView";
 
 const GraphView = dynamic(
   () => import("@/components/contentStudio/GraphView").then((mod) => mod.GraphView),
@@ -220,6 +223,7 @@ function formatJson(value: Record<string, unknown> | undefined) {
 
 export default function ContentStudioLitePage() {
   const [activeTab, setActiveTab] = useState<TabKey>("list");
+  const defaultTabApplied = useRef(false);
   const flags = useMemo(() => getFeatureFlags(), []);
   const envTesterMode = useMemo(() => getAppMode().testerMode, []);
   const [userTestMode, setUserTestMode] = useState(false);
@@ -254,6 +258,18 @@ export default function ContentStudioLitePage() {
   const [stepSaveState, setStepSaveState] = useState<SaveState>("idle");
   const [arcDirty, setArcDirty] = useState(false);
   const [stepDirty, setStepDirty] = useState(false);
+  const [storyletJump, setStoryletJump] = useState("");
+  const [arcJump, setArcJump] = useState("");
+  const [arcDefinitionJump, setArcDefinitionJump] = useState("");
+  const [resourceHelperValue, setResourceHelperValue] = useState("");
+
+  useEffect(() => {
+    if (defaultTabApplied.current) return;
+    defaultTabApplied.current = true;
+    if (flags.contentStudioGraphEnabled) {
+      setActiveTab("graph");
+    }
+  }, [flags.contentStudioGraphEnabled]);
   const [arcViewMode, setArcViewMode] = useState<"editor" | "graph">("editor");
   const arcAutosaveTimerRef = useRef<number | null>(null);
   const stepAutosaveTimerRef = useRef<number | null>(null);
@@ -1204,6 +1220,63 @@ export default function ContentStudioLitePage() {
     });
   }, [storylets, filters.phase, filters.type, filters.hasErrors, validationMap]);
 
+  const storyletOptions = useMemo(
+    () =>
+      storylets.map((storylet) => ({
+        value: storylet.id,
+        label: storylet.title || storylet.slug || storylet.id,
+      })),
+    [storylets]
+  );
+
+  const storyletLookup = useMemo(() => {
+    const map = new Map<string, Storylet>();
+    storylets.forEach((storylet) => map.set(storylet.id, storylet));
+    return map;
+  }, [storylets]);
+
+  const arcOptions = useMemo(
+    () =>
+      contentArcs.map((arc) => ({
+        value: arc.key,
+        label: arc.title,
+      })),
+    [contentArcs]
+  );
+
+  const arcDefinitionOptions = useMemo(
+    () =>
+      arcDefinitions.map((arc) => ({
+        value: arc.key,
+        label: arc.title,
+      })),
+    [arcDefinitions]
+  );
+
+  const tagOptions = useMemo(() => {
+    const set = new Set<string>();
+    storylets.forEach((storylet) => {
+      (storylet.tags ?? []).forEach((tag) => set.add(tag));
+    });
+    contentArcs.forEach((arc) => {
+      (arc.tags ?? []).forEach((tag) => set.add(tag));
+    });
+    arcDefinitions.forEach((arc) => {
+      (arc.tags ?? []).forEach((tag) => set.add(tag));
+    });
+    PHASE_OPTIONS.forEach((tag) => set.add(`phase:${tag}`));
+    TYPE_OPTIONS.forEach((tag) => set.add(`type:${tag}`));
+    return Array.from(set)
+      .filter(Boolean)
+      .sort()
+      .map((value) => ({ value }));
+  }, [storylets, contentArcs, arcDefinitions]);
+
+  const resourceKeyOptions = useMemo(
+    () => RESOURCE_KEYS.map((value) => ({ value })),
+    []
+  );
+
   const selectStorylet = useCallback(
     (storylet: Storylet) => {
       const nextVectorInputs: ChoiceVectorInput = {};
@@ -1452,6 +1525,58 @@ export default function ContentStudioLitePage() {
     "consequence:"
   ).join(", ");
 
+  const storyletWarnings = useMemo(() => {
+    if (!activeStorylet) return [];
+    const warnings: string[] = [];
+    activeStorylet.choices.forEach((choice) => {
+      const target = (choice as StoryletChoice & { targetStoryletId?: string })
+        .targetStoryletId;
+      if (!target) return;
+      if (target === activeStorylet.id) {
+        warnings.push(`Choice "${choice.id}" targets itself.`);
+        return;
+      }
+      if (!storyletLookup.has(target)) {
+        warnings.push(`Choice "${choice.id}" targets missing storylet "${target}".`);
+      }
+    });
+    return warnings;
+  }, [activeStorylet, storyletLookup]);
+
+  const stepWarnings = useMemo(() => {
+    if (!stepDraft) return [];
+    const warnings: string[] = [];
+    let parsed: unknown;
+    try {
+      parsed = stepChoicesText ? JSON.parse(stepChoicesText) : null;
+    } catch {
+      return warnings;
+    }
+    if (!Array.isArray(parsed)) return warnings;
+    const stepIndices = new Set(
+      (stepsByArc.get(stepDraft.arc_key) ?? []).map((step) => step.step_index)
+    );
+    const validResources = new Set(RESOURCE_KEYS);
+    parsed.forEach((choice) => {
+      if (!choice || typeof choice !== "object") return;
+      const nextIndex = (choice as { next_step_index?: number }).next_step_index;
+      if (typeof nextIndex === "number" && !stepIndices.has(nextIndex)) {
+        warnings.push(`Choice points to missing step index ${nextIndex}.`);
+      }
+      const costs = (choice as { costs?: Record<string, unknown> }).costs;
+      const rewards = (choice as { rewards?: Record<string, unknown> }).rewards;
+      [costs, rewards].forEach((delta) => {
+        if (!delta || typeof delta !== "object") return;
+        Object.keys(delta).forEach((key) => {
+          if (!validResources.has(key as (typeof RESOURCE_KEYS)[number])) {
+            warnings.push(`Unknown resource key "${key}" in choices JSON.`);
+          }
+        });
+      });
+    });
+    return warnings;
+  }, [stepDraft, stepChoicesText, stepsByArc]);
+
   const createFollowOnStorylet = async (choiceId: string) => {
     if (!activeStorylet) return;
     setListError(null);
@@ -1622,6 +1747,38 @@ export default function ContentStudioLitePage() {
               </aside>
 
               <main className="rounded-md border border-slate-200 bg-white px-6 py-6">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  {flags.contentStudioGraphEnabled ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-slate-600">View</span>
+                      <Button
+                        size="sm"
+                        variant={activeTab === "list" ? "default" : "outline"}
+                        onClick={() => setActiveTab("list")}
+                      >
+                        Editor
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={activeTab === "graph" ? "default" : "outline"}
+                        onClick={() => setActiveTab("graph")}
+                      >
+                        Graph
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-slate-600">Editor</span>
+                  )}
+                  {activeTab === "list" && activeStorylet ? (
+                    <SaveStatusIndicator
+                      saveState={editor.saveState}
+                      lastSavedAt={editor.lastSavedAt}
+                      isDirty={editor.dirty}
+                      error={editor.error}
+                      onSave={() => saveDraft(false)}
+                    />
+                  ) : null}
+                </div>
                 {activeTab === "preview" ? (
                   <PreviewSimulator
                     storylets={storylets}
@@ -1673,8 +1830,23 @@ export default function ContentStudioLitePage() {
                     ) : contentArcs.length === 0 ? (
                       <p className="text-sm text-slate-600">No arcs found.</p>
                     ) : (
-                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
                         <div className="space-y-2">
+                          <label className="text-xs text-slate-600">
+                            Jump to arc
+                            <StudioDatalist
+                              id="arc-jump"
+                              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                              value={arcJump}
+                              onChange={(next) => {
+                                setArcJump(next);
+                                const match = contentArcs.find((arc) => arc.key === next);
+                                if (match) selectArc(match);
+                              }}
+                              options={arcOptions}
+                              placeholder="arc key"
+                            />
+                          </label>
                           {contentArcs.map((arc) => (
                             <button
                               key={arc.key}
@@ -1763,13 +1935,14 @@ export default function ContentStudioLitePage() {
                                 </label>
                                 <label className="text-sm text-slate-700">
                                   Tags (comma-separated)
-                                  <input
+                                  <StudioDatalist
+                                    id="arc-tags"
                                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                     value={(arcDraft.tags ?? []).join(", ")}
-                                    onChange={(e) => {
+                                    onChange={(next) => {
                                       setArcDraft({
                                         ...arcDraft,
-                                        tags: e.target.value
+                                        tags: next
                                           .split(",")
                                           .map((tag) => tag.trim())
                                           .filter(Boolean),
@@ -1777,6 +1950,7 @@ export default function ContentStudioLitePage() {
                                       setArcDirty(true);
                                       setArcSaveState("idle");
                                     }}
+                                    options={tagOptions}
                                   />
                                 </label>
                                 <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -1896,6 +2070,29 @@ export default function ContentStudioLitePage() {
                                           }}
                                         />
                                       </label>
+                                      <label className="text-sm text-slate-700">
+                                        Resource key helper
+                                        <StudioDatalist
+                                          id="resource-keys"
+                                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
+                                          value={resourceHelperValue}
+                                          onChange={setResourceHelperValue}
+                                          options={resourceKeyOptions}
+                                          placeholder="Knowledge, CashOnHand, SocialLeverage…"
+                                        />
+                                      </label>
+                                      {stepWarnings.length ? (
+                                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                          <div className="font-semibold">
+                                            Warnings
+                                          </div>
+                                          <ul className="mt-1 space-y-1">
+                                            {stepWarnings.map((warning) => (
+                                              <li key={warning}>{warning}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      ) : null}
                                     </div>
                                   )}
                                 </div>
@@ -1931,6 +2128,23 @@ export default function ContentStudioLitePage() {
                       ) : (
                         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
                           <div className="space-y-2">
+                            <label className="text-xs text-slate-600">
+                              Jump to arc
+                              <StudioDatalist
+                                id="arc-definition-jump"
+                                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                value={arcDefinitionJump}
+                                onChange={(next) => {
+                                  setArcDefinitionJump(next);
+                                  const match = arcDefinitions.find(
+                                    (arc) => arc.key === next
+                                  );
+                                  if (match) selectArcDefinition(match);
+                                }}
+                                options={arcDefinitionOptions}
+                                placeholder="arc key"
+                              />
+                            </label>
                             {arcDefinitions.map((arc) => (
                               <button
                                 key={arc.id}
@@ -2005,13 +2219,14 @@ export default function ContentStudioLitePage() {
                                   </label>
                                   <label className="text-sm text-slate-700">
                                     Tags (comma-separated)
-                                    <input
+                                    <StudioDatalist
+                                      id="arc-definition-tags"
                                       className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                       value={(arcDefinitionDraft.tags ?? []).join(", ")}
-                                      onChange={(e) => {
+                                      onChange={(next) => {
                                         setArcDefinitionDraft({
                                           ...arcDefinitionDraft,
-                                          tags: e.target.value
+                                          tags: next
                                             .split(",")
                                             .map((tag) => tag.trim())
                                             .filter(Boolean),
@@ -2019,6 +2234,7 @@ export default function ContentStudioLitePage() {
                                         setArcDefinitionDirty(true);
                                         setArcDefinitionSaveState("idle");
                                       }}
+                                      options={tagOptions}
                                     />
                                   </label>
                                   <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -2517,6 +2733,21 @@ export default function ContentStudioLitePage() {
                             />
                           </label>
                           <label className="text-sm text-slate-700">
+                            Jump to storylet
+                            <StudioDatalist
+                              id="storylet-jump"
+                              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                              value={storyletJump}
+                              onChange={(next) => {
+                                setStoryletJump(next);
+                                const match = storyletLookup.get(next);
+                                if (match) selectStorylet(match);
+                              }}
+                              options={storyletOptions}
+                              placeholder="storylet id"
+                            />
+                          </label>
+                          <label className="text-sm text-slate-700">
                             Phase
                             <select
                               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
@@ -2758,11 +2989,12 @@ export default function ContentStudioLitePage() {
                               <span className="ml-2 text-xs text-slate-500">
                                 (optional)
                               </span>
-                              <input
+                              <StudioDatalist
+                                id="storylet-tags"
                                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                 value={extraTags}
-                                onChange={(e) => {
-                                  const updated = e.target.value
+                                onChange={(next) => {
+                                  const updated = next
                                     .split(",")
                                     .map((tag) => tag.trim())
                                     .filter(Boolean);
@@ -2784,6 +3016,7 @@ export default function ContentStudioLitePage() {
                                     ],
                                   });
                                 }}
+                                options={tagOptions}
                               />
                             </label>
 
@@ -2956,11 +3189,11 @@ export default function ContentStudioLitePage() {
                                     </div>
                                     <label className="text-xs text-slate-600">
                                       Target storylet id (optional)
-                                      <input
+                                      <StudioDatalist
+                                        id={`target-storylet-${choice.id}`}
                                         className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
                                         value={editor.targetInputs[choice.id] ?? ""}
-                                        onChange={(e) => {
-                                          const next = e.target.value;
+                                        onChange={(next) => {
                                           setEditor((prev) => ({
                                             ...prev,
                                             targetInputs: {
@@ -2976,7 +3209,7 @@ export default function ContentStudioLitePage() {
                                             targetStoryletId: next,
                                           } as StoryletChoice);
                                         }}
-                                        onBlur={() => saveDraft(true)}
+                                        options={storyletOptions}
                                         placeholder="target storylet id"
                                       />
                                     </label>
@@ -2997,14 +3230,6 @@ export default function ContentStudioLitePage() {
                               })}
                             </div>
 
-                            <SaveStatusIndicator
-                              saveState={editor.saveState}
-                              lastSavedAt={editor.lastSavedAt}
-                              isDirty={editor.dirty}
-                              error={editor.error}
-                              onSave={() => saveDraft(false)}
-                            />
-
                             <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                               <h4 className="text-sm font-semibold text-slate-700">
                                 Validation
@@ -3020,6 +3245,13 @@ export default function ContentStudioLitePage() {
                                   No blocking errors.
                                 </p>
                               )}
+                              {storyletWarnings.length ? (
+                                <ul className="mt-2 text-xs text-amber-700 space-y-1">
+                                  {storyletWarnings.map((warning) => (
+                                    <li key={warning}>{warning}</li>
+                                  ))}
+                                </ul>
+                              ) : null}
                             </div>
                           </div>
                         )}
