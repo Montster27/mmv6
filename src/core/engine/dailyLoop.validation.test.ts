@@ -83,6 +83,7 @@ vi.mock("@/lib/dailyInteractions", () => ({
   fetchTensions: vi.fn(),
   fetchSkillBank: vi.fn(),
   fetchPosture: vi.fn(),
+  upsertPosture: vi.fn(),
 }));
 vi.mock("@/lib/dayState", () => ({
   ensureDayStateUpToDate: vi.fn(),
@@ -385,23 +386,6 @@ beforeEach(() => {
 
 describe("daily loop validation", () => {
   it("moves from setup to allocation once blockers clear", async () => {
-    vi.mocked(fetchPosture).mockResolvedValue(null);
-    vi.mocked(fetchSkillBank).mockResolvedValue({
-      user_id: "u",
-      available_points: 0,
-      cap: 2,
-      last_awarded_day_index: 2,
-    });
-
-    const setupRun = await getOrCreateDailyRun("u", new Date());
-    expect(setupRun.stage).toBe("setup");
-
-    vi.mocked(fetchPosture).mockResolvedValue({
-      user_id: "u",
-      day_index: 2,
-      posture: "steady",
-      created_at: new Date().toISOString(),
-    });
     vi.mocked(fetchTimeAllocation).mockResolvedValue(null);
 
     const allocationRun = await getOrCreateDailyRun("u", new Date());

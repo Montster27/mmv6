@@ -64,9 +64,9 @@ import {
   fetchPosture,
   fetchSkillBank,
   fetchTensions,
+  upsertPosture,
 } from "@/lib/dailyInteractions";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
-import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { getArcOneState } from "@/core/arcOne/state";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
@@ -110,24 +110,7 @@ function needsSetup({
   posture: DailyPosture | null;
   skillLevels: { focus: number; memory: number; networking: number; grit: number } | null;
 }) {
-  if (skillBank && skillBank.available_points > 0) {
-    const levels = skillLevels ?? {
-      focus: 0,
-      memory: 0,
-      networking: 0,
-      grit: 0,
-    };
-    const minCost = Math.min(
-      skillCostForLevel(levels.focus + 1),
-      skillCostForLevel(levels.memory + 1),
-      skillCostForLevel(levels.networking + 1),
-      skillCostForLevel(levels.grit + 1)
-    );
-    if (skillBank.available_points >= minCost) {
-      return true;
-    }
-  }
-  if (!posture) return true;
+  // auto-default posture for user test build (can be reverted)
   return false;
 }
 
@@ -181,7 +164,7 @@ export async function getOrCreateDailyRun(
     boosted,
     tensions,
     skillBankRaw,
-    posture,
+    postureRaw,
     allocationsRaw,
     skillsRaw,
   ] = await Promise.all([
@@ -202,6 +185,27 @@ export async function getOrCreateDailyRun(
   const skillBank = featureFlags.skills ? skillBankRaw : null;
   const allocations = featureFlags.skills ? allocationsRaw : [];
   const skills = featureFlags.skills ? skillsRaw : null;
+  let postureResolved = postureRaw;
+  if (!postureResolved) {
+    // auto-default posture for user test build (can be reverted)
+    const createdAt = new Date().toISOString();
+    try {
+      await upsertPosture({
+        user_id: userId,
+        day_index: dayIndex,
+        posture: "steady",
+        created_at: createdAt,
+      });
+    } catch (error) {
+      console.error("Failed to auto-default posture", error);
+    }
+    postureResolved = {
+      user_id: userId,
+      day_index: dayIndex,
+      posture: "steady",
+      created_at: createdAt,
+    };
+  }
 
   const [allocationSeed, recentRuns, cohort] = await Promise.all([
     !allocation && dayIndex > 0
@@ -320,7 +324,11 @@ export async function getOrCreateDailyRun(
         forcedStorylet: arcStorylet ?? undefined,
         experiments: options?.experiments,
         isAdmin: options?.isAdmin,
-        context: buildStoryletContext({ posture, tensions, directiveTags }),
+        context: buildStoryletContext({
+          posture: postureResolved,
+          tensions,
+          directiveTags,
+        }),
       });
 
   let initiatives = null as DailyRun["initiatives"];
@@ -429,7 +437,7 @@ export async function getOrCreateDailyRun(
     dayIndex <= ARC_ONE_LAST_DAY;
   const setupNeeded = needsSetup({
     skillBank: arcOneMode ? null : skillBank,
-    posture,
+    posture: postureResolved,
     skillLevels: skills ?? null,
   });
   const baseStage = computeStage(
@@ -513,7 +521,7 @@ export async function getOrCreateDailyRun(
     canBoost,
     tensions,
     skillBank: featureFlags.skills ? skillBank : null,
-    posture,
+    posture: postureResolved,
     allocations: featureFlags.skills ? allocations : [],
     skills: featureFlags.skills ? skills ?? undefined : undefined,
     nextSkillUnlockDay: featureFlags.skills ? 2 : undefined,

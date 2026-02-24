@@ -47,6 +47,7 @@ vi.mock("@/lib/dailyInteractions", () => ({
   fetchTensions: vi.fn(),
   fetchSkillBank: vi.fn(),
   fetchPosture: vi.fn(),
+  upsertPosture: vi.fn(),
 }));
 vi.mock("@/lib/dayState", () => ({
   ensureDayStateUpToDate: vi.fn(),
@@ -426,7 +427,7 @@ describe("getOrCreateDailyRun", () => {
     ]);
     vi.mocked(fetchPosture).mockResolvedValue(null);
     const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.stage).toBe("setup");
+    expect(run.stage).toBe("storylet_1");
     expect(run.tensions?.length).toBe(1);
     expect(run.dayState?.energy).toBe(dayState.energy);
   });
@@ -484,7 +485,7 @@ describe("getOrCreateDailyRun", () => {
       last_awarded_day_index: 1,
     });
     const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.stage).toBe("setup");
+    expect(run.stage).toBe("storylet_1");
   });
 
   it("returns allocation when skill points are drained", async () => {
@@ -508,7 +509,7 @@ describe("getOrCreateDailyRun", () => {
     });
     vi.mocked(fetchPosture).mockResolvedValue(null);
     const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.stage).toBe("setup");
+    expect(run.stage).toBe("storylet_1");
   });
 
   it("returns allocation stage when no allocation saved", async () => {

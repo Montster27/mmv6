@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { TesterOnly } from "@/components/ux/TesterOnly";
 import type {
   DailyPosture,
   DailyTension,
@@ -78,17 +79,19 @@ export function DailySetupPanel({
         </p>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800">Quick check</h3>
-        <ul className="text-sm text-slate-700 space-y-1">
-          <li>Posture set: {posture ? "yes" : "no"}</li>
-          {skillsEnabled ? <li>Skill points remaining: {points}</li> : null}
-          <li>Unresolved tensions: {unresolvedCount}</li>
-        </ul>
-        {actionError ? (
-          <p className="text-xs text-red-600">{actionError}</p>
-        ) : null}
-      </div>
+      <TesterOnly>
+        <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
+          <h3 className="text-sm font-semibold text-slate-800">Quick check</h3>
+          <ul className="text-sm text-slate-700 space-y-1">
+            <li>Posture set: {posture ? "yes" : "no"}</li>
+            {skillsEnabled ? <li>Skill points remaining: {points}</li> : null}
+            <li>Unresolved tensions: {unresolvedCount}</li>
+          </ul>
+          {actionError ? (
+            <p className="text-xs text-red-600">{actionError}</p>
+          ) : null}
+        </div>
+      </TesterOnly>
 
       {skillsEnabled ? (
         <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
@@ -135,64 +138,56 @@ export function DailySetupPanel({
       ) : null}
 
       <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800">
-          Choose a posture for today
-        </h3>
-        {posture ? (
-          <p className="text-sm text-slate-700 capitalize">{posture.posture}</p>
-        ) : (
-          <p className="text-sm text-slate-600">Not set yet.</p>
-        )}
-        <p className="text-xs text-slate-500">
+        <h3 className="text-sm font-semibold text-slate-800">Ready to begin</h3>
+        <p className="text-sm text-slate-700">
           {scarcityMode
-            ? "Next step: move into the day."
-            : "Next step: set your time allocation."}
+            ? "Step into the day and make your next choice."
+            : "Continue to plan your time and choices for today."}
         </p>
-        <div className="flex flex-wrap gap-2">
-          {POSTURES.map((option) => (
-            <Button
-              key={option}
-              variant={posture?.posture === option ? "default" : "outline"}
-              disabled={Boolean(posture) || submittingPosture}
-              onClick={() => onSubmitPosture(option)}
-              className="capitalize"
-            >
-              {option}
-            </Button>
-          ))}
-        </div>
+        {!posture ? (
+          <Button
+            onClick={() => onSubmitPosture("steady")}
+            disabled={submittingPosture}
+          >
+            Continue
+          </Button>
+        ) : null}
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
-        <h3 className="text-sm font-semibold text-slate-800">Open pressures</h3>
-        <p className="text-xs text-slate-500">
-          Leaving these open will affect tomorrow.
-        </p>
-        {activeTensions.length === 0 ? (
-          <p className="text-sm text-slate-600">No active tensions.</p>
-        ) : (
-          <ul className="space-y-2 text-sm text-slate-700">
-            {activeTensions.map((tension) => (
-              <li key={`${tension.user_id}-${tension.day_index}-${tension.key}`}>
-                <div className="font-medium capitalize">
-                  {formatKey(tension.key)}
-                </div>
-                <div className="text-xs text-slate-600">
-                  Severity {tension.severity}
-                </div>
-                {getHint(tension) ? (
-                  <div className="text-xs text-slate-500">{getHint(tension)}</div>
-                ) : null}
-                {formatExpires(tension) ? (
-                  <div className="text-xs text-slate-500">
-                    {formatExpires(tension)}
+      <TesterOnly>
+        <div className="rounded-md border border-slate-200 bg-white px-4 py-3 space-y-2">
+          <h3 className="text-sm font-semibold text-slate-800">Open pressures</h3>
+          <p className="text-xs text-slate-500">
+            Leaving these open will affect tomorrow.
+          </p>
+          {activeTensions.length === 0 ? (
+            <p className="text-sm text-slate-600">No active tensions.</p>
+          ) : (
+            <ul className="space-y-2 text-sm text-slate-700">
+              {activeTensions.map((tension) => (
+                <li key={`${tension.user_id}-${tension.day_index}-${tension.key}`}>
+                  <div className="font-medium capitalize">
+                    {formatKey(tension.key)}
                   </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                  <div className="text-xs text-slate-600">
+                    Severity {tension.severity}
+                  </div>
+                  {getHint(tension) ? (
+                    <div className="text-xs text-slate-500">
+                      {getHint(tension)}
+                    </div>
+                  ) : null}
+                  {formatExpires(tension) ? (
+                    <div className="text-xs text-slate-500">
+                      {formatExpires(tension)}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </TesterOnly>
     </div>
   );
 }

@@ -8,7 +8,7 @@ type StageCopy = {
 const COPY: Record<DailyRunStage, StageCopy> = {
   setup: {
     title: "Before you plan your day",
-    body: "Allocate skill points, choose posture, address pressures.",
+    body: "Take a breath, then continue.",
   },
   allocation: {
     title: "Set your focus for today",

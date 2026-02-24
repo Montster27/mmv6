@@ -83,6 +83,7 @@ import { getArcOneState } from "@/core/arcOne/state";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import { parseSkillRequirement } from "@/core/arcOne/skill";
 import { canSpendMoney } from "@/core/arcOne/money";
+import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
 import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
@@ -544,6 +545,31 @@ export default function PlayPage() {
         : [],
     [arcOneReflectionReady, arcOneState]
   );
+  const skillUiEnabled = useMemo(() => {
+    if (!featureFlags.skills || arcOneMode) return false;
+    const unlockDay = nextSkillUnlockDay ?? 2;
+    if (dayIndex < unlockDay) return false;
+    const levels = {
+      focus: skills?.focus ?? 0,
+      memory: skills?.memory ?? 0,
+      networking: skills?.networking ?? 0,
+      grit: skills?.grit ?? 0,
+    };
+    const minCost = Math.min(
+      skillCostForLevel(levels.focus + 1),
+      skillCostForLevel(levels.memory + 1),
+      skillCostForLevel(levels.networking + 1),
+      skillCostForLevel(levels.grit + 1)
+    );
+    return (skillBank?.available_points ?? 0) >= minCost;
+  }, [
+    featureFlags.skills,
+    arcOneMode,
+    dayIndex,
+    nextSkillUnlockDay,
+    skills,
+    skillBank,
+  ]);
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
@@ -2855,7 +2881,7 @@ export default function PlayPage() {
                         dayIndex={dayIndex}
                         allocations={skillAllocations}
                         skills={skills ?? undefined}
-                        skillsEnabled={featureFlags.skills && !arcOneMode}
+                        skillsEnabled={skillUiEnabled}
                         scarcityMode={arcOneMode}
                         onAllocateSkillPoint={handleAllocateSkillPoint}
                         submitting={allocatingSkill}
@@ -3761,7 +3787,7 @@ export default function PlayPage() {
                   boostsReceivedCount={boostsReceived.length}
                   skills={skills}
                   resourcesEnabled={featureFlags.resources && !arcOneMode}
-                  skillsEnabled={featureFlags.skills && !arcOneMode}
+                  skillsEnabled={skillUiEnabled}
                   scarcityMode={arcOneMode}
                   energyLevel={arcOneState?.energyLevel}
                   onResourcesHoverStart={() => startHover("resources_panel")}
