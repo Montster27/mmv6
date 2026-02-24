@@ -297,7 +297,10 @@ export async function resolveStep(params: {
       energyCost = Math.max(0, energyCost - 1);
     }
   }
-  if (energyCost !== 0) {
+  if (
+    energyCost !== 0 &&
+    !(combined.resources && typeof combined.resources.energy === "number")
+  ) {
     combined.resources = combined.resources ?? {};
     combined.resources.energy = (combined.resources.energy ?? 0) - energyCost;
   }
