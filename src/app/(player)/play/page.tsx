@@ -530,7 +530,10 @@ export default function PlayPage() {
     [arcOneMode, dailyState]
   );
   const arcOneReflectionReady = Boolean(
-    arcOneMode && arcOneState && dayIndex >= 5 && !arcOneState.reflectionDone
+    arcOneMode &&
+      arcOneState &&
+      dayIndex >= ARC_ONE_LAST_DAY &&
+      !arcOneState.reflectionDone
   );
   const arcOneReflectionLines = useMemo(
     () =>
