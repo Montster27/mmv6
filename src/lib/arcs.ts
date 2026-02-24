@@ -16,7 +16,7 @@ export async function fetchArcInstance(
   arcKey: string
 ): Promise<ArcInstance | null> {
   const { data, error } = await supabase
-    .from("arc_instances")
+    .from("content_arc_instances")
     .select("id,user_id,arc_key,status,started_day_index,current_step,updated_at,meta")
     .eq("user_id", userId)
     .eq("arc_key", arcKey)
@@ -37,7 +37,7 @@ export async function fetchArcInstancesByKeys(
 ): Promise<ArcInstance[]> {
   if (arcKeys.length === 0) return [];
   const { data, error } = await supabase
-    .from("arc_instances")
+    .from("content_arc_instances")
     .select("id,user_id,arc_key,status,started_day_index,current_step,updated_at,meta")
     .eq("user_id", userId)
     .in("arc_key", arcKeys);
@@ -56,7 +56,7 @@ export async function startArc(
   dayIndex: number
 ): Promise<ArcInstance> {
   const { data: existing, error: existingError } = await supabase
-    .from("arc_instances")
+    .from("content_arc_instances")
     .select("id,user_id,arc_key,status,started_day_index,current_step,updated_at,meta")
     .eq("user_id", userId)
     .eq("arc_key", arcKey)
@@ -71,7 +71,7 @@ export async function startArc(
   if (existing) return existing as ArcInstance;
 
   const { data: created, error: insertError } = await supabase
-    .from("arc_instances")
+    .from("content_arc_instances")
     .insert({
       user_id: userId,
       arc_key: arcKey,
@@ -86,7 +86,7 @@ export async function startArc(
 
   if (insertError) {
     const { data: retry } = await supabase
-      .from("arc_instances")
+      .from("content_arc_instances")
       .select("id,user_id,arc_key,status,started_day_index,current_step,updated_at,meta")
       .eq("user_id", userId)
       .eq("arc_key", arcKey)
@@ -110,7 +110,7 @@ export async function advanceArc(
   nextStep: number
 ): Promise<void> {
   const { data, error } = await supabase
-    .from("arc_instances")
+    .from("content_arc_instances")
     .update({
       current_step: nextStep,
       updated_at: new Date().toISOString(),
@@ -134,7 +134,7 @@ export async function advanceArc(
 
 export async function completeArc(userId: string, arcKey: string): Promise<void> {
   const { data, error } = await supabase
-    .from("arc_instances")
+    .from("content_arc_instances")
     .update({
       status: "completed",
       updated_at: new Date().toISOString(),
@@ -188,7 +188,7 @@ export async function applyArcChoiceFlags(
   };
 
   const { data, error } = await supabase
-    .from("arc_instances")
+    .from("content_arc_instances")
     .update({ meta: nextMeta, updated_at: new Date().toISOString() })
     .eq("id", instance.id)
     .select("id")
@@ -233,7 +233,7 @@ async function applyArcChoiceCounters(
   };
 
   const { data, error } = await supabase
-    .from("arc_instances")
+    .from("content_arc_instances")
     .update({ meta: nextMeta, updated_at: new Date().toISOString() })
     .eq("id", instance.id)
     .select("id")
