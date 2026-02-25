@@ -889,7 +889,21 @@ export default function PlayPage() {
 
           const used = new Set(existingRuns.map((r) => r.storylet_id));
           const next = candidates.filter((c) => !used.has(c.id)).slice(0, 2);
-          setStorylets(next);
+          const entrySlug = "s1_dorm_wake_dislocation";
+          const shouldForceEntry =
+            featureFlags.arcOneScarcityEnabled &&
+            day <= ARC_ONE_LAST_DAY &&
+            existingRuns.length === 0;
+          const entryStorylet = shouldForceEntry
+            ? candidates.find((c) => c.slug === entrySlug)
+            : null;
+          const nextStorylets = entryStorylet
+            ? [entryStorylet, ...next.filter((c) => c.id !== entryStorylet.id)].slice(
+                0,
+                2
+              )
+            : next;
+          setStorylets(nextStorylets);
 
           const allocationExists = Boolean(existingAllocation);
           const [profiles, received, sent] = await Promise.all([
