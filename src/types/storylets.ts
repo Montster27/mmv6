@@ -24,6 +24,11 @@ export type StoryletChoice = {
   outcomes?: StoryletOutcomeOption[];
   check?: import("./checks").Check;
   targetStoryletId?: string;
+  time_cost?: number;
+  energy_cost?: number;
+  identity_tags?: string[];
+  relational_effects?: Record<string, Record<string, number>>;
+  condition?: Record<string, unknown>;
 };
 
 export type Storylet = {

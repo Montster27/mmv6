@@ -205,7 +205,9 @@ describe("saveTimeAllocation", () => {
     await saveTimeAllocation("u", 2, nextAllocation, "steady");
 
     const updates = mockSupabase.getUpdatePayloads();
-    const dayStateUpdate = updates.find(u => u.table === "player_day_state");
+    const dayStateUpdate = updates.find(
+      (u) => u.table === "player_day_state"
+    ) as { payload: Record<string, unknown> } | undefined;
     expect(dayStateUpdate).toBeDefined();
     expect(dayStateUpdate!.payload).toMatchObject({
       pre_allocation_energy: 60,

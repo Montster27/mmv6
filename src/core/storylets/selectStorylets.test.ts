@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { selectStorylets, _testOnly } from "@/core/storylets/selectStorylets";
+import type { StoryletContext } from "@/core/engine/storyletContext";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 import type { DailyState } from "@/types/daily";
 
@@ -249,7 +250,7 @@ describe("selectStorylets", () => {
   it("scores social tags higher for connect posture", () => {
     const social = makeStorylet("social", { tags: ["social"] });
     const other = makeStorylet("other", { tags: ["study"] });
-    const ctx = { posture: "connect", unresolvedTensionKeys: [] };
+    const ctx: StoryletContext = { posture: "connect", unresolvedTensionKeys: [] };
     const scoreSocial = _testOnly.scoreStorylet(social, "seed", ctx);
     const scoreOther = _testOnly.scoreStorylet(other, "seed", ctx);
     expect(scoreSocial).toBeLessThan(scoreOther);
@@ -258,7 +259,10 @@ describe("selectStorylets", () => {
   it("scores study tags higher for unfinished assignment tension", () => {
     const study = makeStorylet("study", { tags: ["study"] });
     const other = makeStorylet("other", { tags: ["social"] });
-    const ctx = { posture: null, unresolvedTensionKeys: ["unfinished_assignment"] };
+    const ctx: StoryletContext = {
+      posture: null,
+      unresolvedTensionKeys: ["unfinished_assignment"],
+    };
     const scoreStudy = _testOnly.scoreStorylet(study, "seed", ctx);
     const scoreOther = _testOnly.scoreStorylet(other, "seed", ctx);
     expect(scoreStudy).toBeLessThan(scoreOther);

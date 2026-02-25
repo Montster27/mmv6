@@ -3162,7 +3162,7 @@ export default function ContentStudioLitePage() {
                                         <input
                                           type="number"
                                           className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-                                          value={choice.time_cost ?? 0}
+                                          value={extendedChoice.time_cost ?? 0}
                                           onChange={(e) => {
                                             const next = Number(e.target.value);
                                             applyChoiceUpdate(choice.id, {
@@ -3179,7 +3179,7 @@ export default function ContentStudioLitePage() {
                                         <input
                                           type="number"
                                           className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-                                          value={choice.energy_cost ?? 0}
+                                          value={extendedChoice.energy_cost ?? 0}
                                           onChange={(e) => {
                                             const next = Number(e.target.value);
                                             applyChoiceUpdate(choice.id, {
