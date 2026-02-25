@@ -1770,9 +1770,11 @@ export default function ContentStudioLitePage() {
       if (identityTags?.some((tag) => !validIdentityTags.has(tag))) {
         warnings.push(`Choice "${choice.id}" has unknown identity tag.`);
       }
+      const relationalEffects = (choice as { relational_effects?: Record<string, unknown> })
+        .relational_effects;
       if (
-        choice.relational_effects &&
-        Object.keys(choice.relational_effects).some((key) => !validNpcIds.has(key))
+        relationalEffects &&
+        Object.keys(relationalEffects).some((key) => !validNpcIds.has(key))
       ) {
         warnings.push(`Choice "${choice.id}" references unknown NPC id.`);
       }
