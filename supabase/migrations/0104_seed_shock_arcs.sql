@@ -13,14 +13,14 @@ seed AS (
       source.description,
       'Academic pressure lands early. Decide how you respond.'
     ) AS description,
-    COALESCE(source.tags, ARRAY['Craft', 'Agency']::text[]) AS tags,
+    COALESCE(source.tags, '["Craft","Agency"]'::jsonb) AS tags,
     COALESCE(source.is_enabled, true) AS is_enabled
   FROM source
   UNION ALL
   SELECT
     'Shock: Academic',
     'Academic pressure lands early. Decide how you respond.',
-    ARRAY['Craft', 'Agency']::text[],
+    '["Craft","Agency"]'::jsonb,
     true
   WHERE NOT EXISTS (SELECT 1 FROM source)
   LIMIT 1
@@ -84,14 +84,14 @@ seed AS (
       source.description,
       'You choose how to approach a new social circle.'
     ) AS description,
-    COALESCE(source.tags, ARRAY['Belonging', 'Courage']::text[]) AS tags,
+    COALESCE(source.tags, '["Belonging","Courage"]'::jsonb) AS tags,
     COALESCE(source.is_enabled, true) AS is_enabled
   FROM source
   UNION ALL
   SELECT
     'Shock: Social',
     'You choose how to approach a new social circle.',
-    ARRAY['Belonging', 'Courage']::text[],
+    '["Belonging","Courage"]'::jsonb,
     true
   WHERE NOT EXISTS (SELECT 1 FROM source)
   LIMIT 1
@@ -155,14 +155,14 @@ seed AS (
       source.description,
       'A small connection tests whether you risk closeness.'
     ) AS description,
-    COALESCE(source.tags, ARRAY['Love', 'Courage', 'Belonging']::text[]) AS tags,
+    COALESCE(source.tags, '["Love","Courage","Belonging"]'::jsonb) AS tags,
     COALESCE(source.is_enabled, true) AS is_enabled
   FROM source
   UNION ALL
   SELECT
     'Shock: Romantic',
     'A small connection tests whether you risk closeness.',
-    ARRAY['Love', 'Courage', 'Belonging']::text[],
+    '["Love","Courage","Belonging"]'::jsonb,
     true
   WHERE NOT EXISTS (SELECT 1 FROM source)
   LIMIT 1
