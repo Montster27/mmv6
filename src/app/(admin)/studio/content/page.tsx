@@ -1766,9 +1766,8 @@ export default function ContentStudioLitePage() {
       if (!storyletLookup.has(target) && !storyletLookup.has(`slug:${target}`)) {
         warnings.push(`Choice "${choice.id}" targets missing storylet "${target}".`);
       }
-      if (
-        choice.identity_tags?.some((tag) => !validIdentityTags.has(tag))
-      ) {
+      const identityTags = (choice as { identity_tags?: string[] }).identity_tags;
+      if (identityTags?.some((tag) => !validIdentityTags.has(tag))) {
         warnings.push(`Choice "${choice.id}" has unknown identity tag.`);
       }
       if (
