@@ -20,7 +20,7 @@ const mockState = vi.hoisted(() => {
       if (builder.table === "content_arcs") {
         return {
           data: {
-            key: "anomaly_001",
+            key: "arc_academic_shock",
             title: "Arc",
             description: "desc",
             tags: [],
@@ -40,7 +40,7 @@ const mockState = vi.hoisted(() => {
       if (table === "content_arc_steps") {
         builder.rows = [
           {
-            arc_key: "anomaly_001",
+            arc_key: "arc_academic_shock",
             step_index: 1,
             title: "Two",
             body: "b",
@@ -48,7 +48,7 @@ const mockState = vi.hoisted(() => {
             created_at: new Date().toISOString(),
           },
           {
-            arc_key: "anomaly_001",
+            arc_key: "arc_academic_shock",
             step_index: 0,
             title: "One",
             body: "a",
@@ -70,8 +70,8 @@ import { fetchArcWithSteps } from "@/lib/content/arcs";
 
 describe("content loaders", () => {
   it("fetches arc with ordered steps", async () => {
-    const result = await fetchArcWithSteps("anomaly_001");
-    expect(result?.arc.key).toBe("anomaly_001");
+    const result = await fetchArcWithSteps("arc_academic_shock");
+    expect(result?.arc.key).toBe("arc_academic_shock");
     expect(result?.steps[0]?.step_index).toBe(0);
     expect(result?.steps[1]?.step_index).toBe(1);
   });

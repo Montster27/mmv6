@@ -98,7 +98,7 @@ describe("alignment", () => {
       factionKey: "templar_remnant",
       delta: 2,
       source: "arc_choice",
-      sourceRef: "anomaly_001:0:go",
+      sourceRef: "arc_academic_shock:0:start",
     });
 
     const updates = mockState.getUpdatePayloads();
