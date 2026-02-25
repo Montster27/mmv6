@@ -23,7 +23,6 @@ import type { RemnantRule } from "@/types/remnants";
 import type { ContentVersion, ContentSnapshot } from "@/types/contentVersions";
 
 import { SaveStatusIndicator } from "@/components/contentStudio/SaveStatusIndicator";
-import { ArcGraphView } from "@/components/contentStudio/ArcGraphView";
 
 const REMNANT_KEYS = [
   "memory_fragment",
@@ -45,7 +44,7 @@ const PreviewSimulator = dynamic(
 );
 
 const TABS = [
-  { key: "list", label: "List" },
+  { key: "list", label: "Storylets" },
   { key: "arcs", label: "Arcs" },
   { key: "graph", label: "Graph" },
   { key: "preview", label: "Preview" },
@@ -63,6 +62,20 @@ const PHASE_OPTIONS = [
 ] as const;
 
 const TYPE_OPTIONS = ["core", "social", "context", "anomaly"] as const;
+const SHOCK_ARC_KEYS = [
+  "shock_academic",
+  "shock_social",
+  "shock_romantic",
+] as const;
+const IDENTITY_TAG_OPTIONS = [
+  "risk",
+  "safety",
+  "people",
+  "achievement",
+  "confront",
+  "avoid",
+] as const;
+const NPC_ID_OPTIONS = ["npc_roommate_dana", "npc_connector_miguel"];
 
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -111,6 +124,7 @@ type EditorState = {
   validation: ValidationSummary | null;
   vectorInputs: ChoiceVectorInput;
   targetInputs: Record<string, string>;
+  conditionInputs: Record<string, string>;
   error: string | null;
   saveState: SaveState;
   lastSavedAt: Date | null;
@@ -194,14 +208,14 @@ function parseVectorInput(value: string): {
   return { ok: true, result };
 }
 
-function createBlankStorylet(): Omit<Storylet, "id"> {
+function createBlankStorylet(tags: string[] = []): Omit<Storylet, "id"> {
   return {
     slug: `draft-${Date.now()}`,
     title: "Untitled storylet",
     body: "Draft body.",
     choices: [{ id: "continue", label: "Continue" }],
     is_active: false,
-    tags: [],
+    tags,
     requirements: {},
     weight: 100,
   };
@@ -262,6 +276,11 @@ export default function ContentStudioLitePage() {
   const [arcJump, setArcJump] = useState("");
   const [arcDefinitionJump, setArcDefinitionJump] = useState("");
   const [resourceHelperValue, setResourceHelperValue] = useState("");
+  const [entryNodeInput, setEntryNodeInput] = useState("");
+  const [shockOnly, setShockOnly] = useState(true);
+  const [activeShockKey, setActiveShockKey] = useState<string>(
+    SHOCK_ARC_KEYS[0]
+  );
 
   useEffect(() => {
     if (defaultTabApplied.current) return;
@@ -288,6 +307,7 @@ export default function ContentStudioLitePage() {
     validation: null,
     vectorInputs: {},
     targetInputs: {},
+    conditionInputs: {},
     error: null,
     saveState: "idle",
     lastSavedAt: null,
@@ -431,7 +451,7 @@ export default function ContentStudioLitePage() {
         const target =
           (choice as StoryletChoice & { targetStoryletId?: string })
             .targetStoryletId ?? "";
-        if (target && !items.some((s) => s.id === target)) {
+        if (target && !items.some((s) => s.id === target || s.slug === target)) {
           extraErrors.push(`choices.${choice.id}.targetStoryletId invalid`);
         }
       });
@@ -544,9 +564,8 @@ export default function ContentStudioLitePage() {
   useEffect(() => {
     if (!flags.contentStudioLiteEnabled) return;
     if (activeTab !== "arcs") return;
-    loadContentArcs();
     loadArcDefinitions();
-  }, [flags.contentStudioLiteEnabled, activeTab, loadContentArcs, loadArcDefinitions]);
+  }, [flags.contentStudioLiteEnabled, activeTab, loadArcDefinitions]);
 
   const stepsByArc = useMemo(() => {
     const map = new Map<string, ContentArcStep[]>();
@@ -600,6 +619,7 @@ export default function ContentStudioLitePage() {
     setArcDefinitionSaveState("idle");
     setArcDefinitionLastSavedAt(null);
     setArcDefinitionSaveError(null);
+    setActiveShockKey(arc.key);
   };
 
   const saveArcDefinition = async () => {
@@ -1204,8 +1224,36 @@ export default function ContentStudioLitePage() {
     }
   };
 
+  const entryTagForArc = useCallback(
+    (arcKey: string) => `entry:${arcKey}`,
+    []
+  );
+
+  const shockStorylets = useMemo(
+    () =>
+      storylets.filter((storylet) =>
+        (storylet.tags ?? []).includes(activeShockKey)
+      ),
+    [storylets, activeShockKey]
+  );
+
+  const entryNodeIds = useMemo(
+    () =>
+      shockStorylets
+        .filter((storylet) =>
+          (storylet.tags ?? []).includes(entryTagForArc(activeShockKey))
+        )
+        .map((storylet) => storylet.id),
+    [shockStorylets, activeShockKey, entryTagForArc]
+  );
+
   const filteredStorylets = useMemo(() => {
-    return storylets.filter((storylet) => {
+    const base = shockOnly
+      ? storylets.filter((storylet) =>
+          (storylet.tags ?? []).includes(activeShockKey)
+        )
+      : storylets;
+    return base.filter((storylet) => {
       const tags = storylet.tags ?? [];
       const phase = getTagValue(tags, "phase:");
       const type = getTagValue(tags, "type:");
@@ -1218,59 +1266,98 @@ export default function ContentStudioLitePage() {
       }
       return true;
     });
-  }, [storylets, filters.phase, filters.type, filters.hasErrors, validationMap]);
+  }, [
+    storylets,
+    filters.phase,
+    filters.type,
+    filters.hasErrors,
+    validationMap,
+    shockOnly,
+    activeShockKey,
+  ]);
 
   const storyletOptions = useMemo(
     () =>
-      storylets.map((storylet) => ({
+      filteredStorylets.map((storylet) => ({
         value: storylet.id,
         label: storylet.title || storylet.slug || storylet.id,
       })),
-    [storylets]
+    [filteredStorylets]
   );
 
   const storyletLookup = useMemo(() => {
     const map = new Map<string, Storylet>();
-    storylets.forEach((storylet) => map.set(storylet.id, storylet));
+    filteredStorylets.forEach((storylet) => {
+      map.set(storylet.id, storylet);
+      if (storylet.slug) {
+        map.set(`slug:${storylet.slug}`, storylet);
+      }
+    });
     return map;
-  }, [storylets]);
+  }, [filteredStorylets]);
+
+  const shockArcDefinitions = useMemo(
+    () => arcDefinitions.filter((arc) => SHOCK_ARC_KEYS.includes(arc.key as any)),
+    [arcDefinitions]
+  );
+
+  const shockArcMissing = useMemo(() => {
+    const existing = new Set(shockArcDefinitions.map((arc) => arc.key));
+    return SHOCK_ARC_KEYS.filter((key) => !existing.has(key));
+  }, [shockArcDefinitions]);
+
+  useEffect(() => {
+    if (!shockArcDefinitions.length) return;
+    if (!shockArcDefinitions.some((arc) => arc.key === activeShockKey)) {
+      setActiveShockKey(shockArcDefinitions[0].key);
+    }
+  }, [shockArcDefinitions, activeShockKey]);
 
   const arcOptions = useMemo(
     () =>
-      contentArcs.map((arc) => ({
+      shockArcDefinitions.map((arc) => ({
         value: arc.key,
         label: arc.title,
       })),
-    [contentArcs]
+    [shockArcDefinitions]
   );
 
   const arcDefinitionOptions = useMemo(
     () =>
-      arcDefinitions.map((arc) => ({
+      shockArcDefinitions.map((arc) => ({
         value: arc.key,
         label: arc.title,
       })),
-    [arcDefinitions]
+    [shockArcDefinitions]
   );
+
+  useEffect(() => {
+    if (!shockArcDefinitions.length) return;
+    if (
+      !selectedArcDefinitionId ||
+      !shockArcDefinitions.some((arc) => arc.id === selectedArcDefinitionId)
+    ) {
+      selectArcDefinition(shockArcDefinitions[0]);
+    }
+  }, [shockArcDefinitions, selectedArcDefinitionId]);
 
   const tagOptions = useMemo(() => {
     const set = new Set<string>();
     storylets.forEach((storylet) => {
       (storylet.tags ?? []).forEach((tag) => set.add(tag));
     });
-    contentArcs.forEach((arc) => {
-      (arc.tags ?? []).forEach((tag) => set.add(tag));
-    });
     arcDefinitions.forEach((arc) => {
       (arc.tags ?? []).forEach((tag) => set.add(tag));
     });
+    SHOCK_ARC_KEYS.forEach((key) => set.add(key));
+    IDENTITY_TAG_OPTIONS.forEach((tag) => set.add(tag));
     PHASE_OPTIONS.forEach((tag) => set.add(`phase:${tag}`));
     TYPE_OPTIONS.forEach((tag) => set.add(`type:${tag}`));
     return Array.from(set)
       .filter(Boolean)
       .sort()
       .map((value) => ({ value }));
-  }, [storylets, contentArcs, arcDefinitions]);
+  }, [storylets, arcDefinitions]);
 
   const resourceKeyOptions = useMemo(
     () => RESOURCE_KEYS.map((value) => ({ value })),
@@ -1281,6 +1368,7 @@ export default function ContentStudioLitePage() {
     (storylet: Storylet) => {
       const nextVectorInputs: ChoiceVectorInput = {};
       const nextTargetInputs: Record<string, string> = {};
+      const nextConditionInputs: Record<string, string> = {};
       storylet.choices.forEach((choice) => {
         nextVectorInputs[choice.id] = formatVectorInput(
           choice.outcome?.deltas?.vectors
@@ -1288,6 +1376,11 @@ export default function ContentStudioLitePage() {
         const target = (choice as StoryletChoice & { targetStoryletId?: string })
           .targetStoryletId;
         nextTargetInputs[choice.id] = target ?? "";
+        nextConditionInputs[choice.id] = JSON.stringify(
+          (choice as any).condition ?? {},
+          null,
+          2
+        );
       });
       const validation = validateStorylet(storylet);
       setEditor({
@@ -1299,6 +1392,7 @@ export default function ContentStudioLitePage() {
         },
         vectorInputs: nextVectorInputs,
         targetInputs: nextTargetInputs,
+        conditionInputs: nextConditionInputs,
         error: null,
         saveState: "idle",
         lastSavedAt: null,
@@ -1314,13 +1408,13 @@ export default function ContentStudioLitePage() {
     [selectStorylet]
   );
 
-  const createStorylet = async () => {
+  const createStorylet = async (baseTags: string[] = []) => {
     setListError(null);
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new Error("No session found.");
-      const draft = createBlankStorylet();
+      const draft = createBlankStorylet(baseTags);
       const id = `draft_${Date.now()}`;
       const body = draft.body?.trim() ? draft.body : "Draft body.";
       const res = await fetch("/api/admin/storylets", {
@@ -1354,6 +1448,130 @@ export default function ContentStudioLitePage() {
     } catch (err) {
       console.error(err);
       setListError(err instanceof Error ? err.message : "Failed to create storylet");
+    }
+  };
+
+  const persistStorylet = async (storylet: Storylet) => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("No session found.");
+    const res = await fetch(`/api/admin/storylets/${storylet.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        ...storylet,
+        requirements: {
+          ...(storylet.requirements ?? {}),
+          audit: buildAuditMeta(data.session?.user?.email ?? null),
+        },
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error ?? "Failed to save storylet");
+    }
+  };
+
+  const setStartNode = async (storyletId: string) => {
+    const entryTag = entryTagForArc(activeShockKey);
+    const updated: Storylet[] = [];
+    const entrySet = new Set(entryNodeIds);
+    storylets.forEach((storylet) => {
+      if (
+        !storylet.tags?.includes(activeShockKey) ||
+        (!entrySet.has(storylet.id) && storylet.id !== storyletId)
+      ) {
+        return;
+      }
+      const tags = new Set(storylet.tags ?? []);
+      tags.delete(entryTag);
+      if (storylet.id === storyletId) {
+        tags.add(entryTag);
+      }
+      updated.push({ ...storylet, tags: Array.from(tags) });
+    });
+    try {
+      await Promise.all(updated.map((storylet) => persistStorylet(storylet)));
+      setStorylets((prev) =>
+        prev.map((row) => updated.find((s) => s.id === row.id) ?? row)
+      );
+    } catch (err) {
+      console.error(err);
+      setListError(
+        err instanceof Error ? err.message : "Failed to set start node"
+      );
+    }
+  };
+
+  const connectChoice = async (
+    sourceId: string,
+    choiceId: string,
+    targetId: string
+  ) => {
+    const source = storylets.find((storylet) => storylet.id === sourceId);
+    if (!source) return;
+    const updatedChoices = source.choices.map((choice) =>
+      choice.id === choiceId
+        ? { ...choice, targetStoryletId: targetId || undefined }
+        : choice
+    );
+    const updatedStorylet = { ...source, choices: updatedChoices };
+    try {
+      await persistStorylet(updatedStorylet);
+      setStorylets((prev) =>
+        prev.map((row) => (row.id === sourceId ? updatedStorylet : row))
+      );
+      if (editor.draft?.id === sourceId) {
+        selectStorylet(updatedStorylet);
+      }
+    } catch (err) {
+      console.error(err);
+      setListError(
+        err instanceof Error ? err.message : "Failed to connect nodes"
+      );
+    }
+  };
+
+  const addEntryNode = async (storyletId: string) => {
+    const entryTag = entryTagForArc(activeShockKey);
+    const storylet = storylets.find((row) => row.id === storyletId);
+    if (!storylet) return;
+    const tags = new Set(storylet.tags ?? []);
+    tags.add(activeShockKey);
+    tags.add(entryTag);
+    const updated = { ...storylet, tags: Array.from(tags) };
+    try {
+      await persistStorylet(updated);
+      setStorylets((prev) =>
+        prev.map((row) => (row.id === storyletId ? updated : row))
+      );
+    } catch (err) {
+      console.error(err);
+      setListError(
+        err instanceof Error ? err.message : "Failed to add entry node"
+      );
+    }
+  };
+
+  const removeEntryNode = async (storyletId: string) => {
+    const entryTag = entryTagForArc(activeShockKey);
+    const storylet = storylets.find((row) => row.id === storyletId);
+    if (!storylet) return;
+    const tags = (storylet.tags ?? []).filter((tag) => tag !== entryTag);
+    const updated = { ...storylet, tags };
+    try {
+      await persistStorylet(updated);
+      setStorylets((prev) =>
+        prev.map((row) => (row.id === storyletId ? updated : row))
+      );
+    } catch (err) {
+      console.error(err);
+      setListError(
+        err instanceof Error ? err.message : "Failed to remove entry node"
+      );
     }
   };
 
@@ -1493,6 +1711,10 @@ export default function ContentStudioLitePage() {
       ...prev,
       vectorInputs: { ...prev.vectorInputs, [nextId]: "" },
       targetInputs: { ...prev.targetInputs, [nextId]: "" },
+      conditionInputs: {
+        ...prev.conditionInputs,
+        [nextId]: JSON.stringify({}, null, 2),
+      },
     }));
   };
 
@@ -1528,16 +1750,44 @@ export default function ContentStudioLitePage() {
   const storyletWarnings = useMemo(() => {
     if (!activeStorylet) return [];
     const warnings: string[] = [];
+    const validIdentityTags = new Set<string>(IDENTITY_TAG_OPTIONS);
+    const validNpcIds = new Set(NPC_ID_OPTIONS);
     activeStorylet.choices.forEach((choice) => {
       const target = (choice as StoryletChoice & { targetStoryletId?: string })
         .targetStoryletId;
-      if (!target) return;
+      if (!target) {
+        warnings.push(`Choice "${choice.id}" is missing a next storylet.`);
+        return;
+      }
       if (target === activeStorylet.id) {
         warnings.push(`Choice "${choice.id}" targets itself.`);
         return;
       }
-      if (!storyletLookup.has(target)) {
+      if (!storyletLookup.has(target) && !storyletLookup.has(`slug:${target}`)) {
         warnings.push(`Choice "${choice.id}" targets missing storylet "${target}".`);
+      }
+      if (
+        choice.identity_tags?.some((tag) => !validIdentityTags.has(tag))
+      ) {
+        warnings.push(`Choice "${choice.id}" has unknown identity tag.`);
+      }
+      if (
+        choice.relational_effects &&
+        Object.keys(choice.relational_effects).some((key) => !validNpcIds.has(key))
+      ) {
+        warnings.push(`Choice "${choice.id}" references unknown NPC id.`);
+      }
+      if (
+        typeof choice.time_cost !== "undefined" &&
+        typeof choice.time_cost !== "number"
+      ) {
+        warnings.push(`Choice "${choice.id}" has invalid time_cost.`);
+      }
+      if (
+        typeof choice.energy_cost !== "undefined" &&
+        typeof choice.energy_cost !== "number"
+      ) {
+        warnings.push(`Choice "${choice.id}" has invalid energy_cost.`);
       }
     });
     return warnings;
@@ -1591,6 +1841,7 @@ export default function ContentStudioLitePage() {
       const tags = [
         activePhase ? `phase:${activePhase}` : null,
         activeType ? `type:${activeType}` : null,
+        activeShockKey,
       ].filter(Boolean) as string[];
 
       const res = await fetch("/api/admin/storylets", {
@@ -1786,7 +2037,7 @@ export default function ContentStudioLitePage() {
                   />
                 ) : activeTab === "graph" ? (
                   <GraphView
-                    storylets={storylets}
+                    storylets={shockStorylets}
                     selectedStorylet={activeStorylet}
                     onSelectStorylet={selectStoryletAndEdit}
                     onRetargetChoice={(choiceId, targetId) => {
@@ -1796,96 +2047,81 @@ export default function ContentStudioLitePage() {
                         targetStoryletId: targetId,
                       } as StoryletChoice);
                     }}
+                    entryNodeIds={entryNodeIds}
+                    onCreateNode={() => createStorylet([activeShockKey])}
+                    onSetStartNode={setStartNode}
+                    onConnectChoice={connectChoice}
                   />
                 ) : activeTab === "arcs" ? (
                   <div className="space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h2 className="text-xl font-semibold text-slate-900">Content arcs</h2>
-                          <p className="text-sm text-slate-600">
-                            Read-only view of content_arcs and steps.
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant={arcViewMode === "editor" ? "default" : "outline"}
-                            onClick={() => setArcViewMode("editor")}
-                          >
-                            Editor
-                          </Button>
-                          <Button
-                            variant={arcViewMode === "graph" ? "default" : "outline"}
-                            onClick={() => setArcViewMode("graph")}
-                          >
-                            Graph
-                          </Button>
-                          <Button variant="outline" onClick={loadContentArcs}>
-                            Refresh
-                          </Button>
-                        </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          Shock arcs
+                        </h2>
+                        <p className="text-sm text-slate-600">
+                          Manage the three shock arcs and their entry nodes.
+                        </p>
                       </div>
+                      <Button variant="outline" onClick={loadArcDefinitions}>
+                        Refresh
+                      </Button>
+                    </div>
 
-                    {contentArcsLoading ? (
+                    {shockArcMissing.length ? (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        Missing shock arcs: {shockArcMissing.join(", ")}.
+                      </div>
+                    ) : null}
+
+                    {arcDefinitionsLoading ? (
                       <p className="text-sm text-slate-600">Loading…</p>
-                    ) : contentArcs.length === 0 ? (
-                      <p className="text-sm text-slate-600">No arcs found.</p>
+                    ) : shockArcDefinitions.length === 0 ? (
+                      <p className="text-sm text-slate-600">
+                        No shock arcs found.
+                      </p>
                     ) : (
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
                         <div className="space-y-2">
                           <label className="text-xs text-slate-600">
-                            Jump to arc
+                            Jump to shock arc
                             <StudioDatalist
-                              id="arc-jump"
+                              id="arc-definition-jump"
                               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-                              value={arcJump}
+                              value={arcDefinitionJump}
                               onChange={(next) => {
-                                setArcJump(next);
-                                const match = contentArcs.find((arc) => arc.key === next);
-                                if (match) selectArc(match);
+                                setArcDefinitionJump(next);
+                                const match = shockArcDefinitions.find(
+                                  (arc) => arc.key === next
+                                );
+                                if (match) selectArcDefinition(match);
                               }}
-                              options={arcOptions}
-                              placeholder="arc key"
+                              options={arcDefinitionOptions}
+                              placeholder="shock arc key"
                             />
                           </label>
-                          {contentArcs.map((arc) => (
+                          {shockArcDefinitions.map((arc) => (
                             <button
-                              key={arc.key}
+                              key={arc.id}
                               className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
-                                selectedArcKey === arc.key
+                                selectedArcDefinitionId === arc.id
                                   ? "border-slate-900 bg-slate-100"
                                   : "border-slate-200 hover:border-slate-300"
                               }`}
-                              onClick={() => selectArc(arc)}
+                              onClick={() => selectArcDefinition(arc)}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-medium">{arc.title}</span>
-                                <span className="text-xs text-slate-500">
-                                  {(stepsByArc.get(arc.key) ?? []).length} steps
-                                </span>
+                                <span className="text-xs text-slate-500">{arc.key}</span>
                               </div>
-                              <div className="text-xs text-slate-500">{arc.key}</div>
                             </button>
                           ))}
                         </div>
                         <div className="space-y-4">
-                          {!selectedArc || !arcDraft ? (
+                          {!selectedArcDefinition || !arcDefinitionDraft ? (
                             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                              Select an arc to edit.
+                              Select a shock arc to edit.
                             </div>
-                          ) : arcViewMode === "graph" ? (
-                            <ArcGraphView
-                              steps={stepsByArc.get(selectedArc.key) ?? []}
-                              selectedStepIndex={stepDraft?.step_index ?? null}
-                              onSelectStep={(index) => {
-                                const step = (stepsByArc.get(selectedArc.key) ?? []).find(
-                                  (candidate) => candidate.step_index === index
-                                );
-                                if (step) {
-                                  selectStep(step);
-                                  setArcViewMode("editor");
-                                }
-                              }}
-                            />
                           ) : (
                             <div className="space-y-4">
                               <div className="space-y-3">
@@ -1894,26 +2130,26 @@ export default function ContentStudioLitePage() {
                                     Arc details
                                   </h3>
                                   <SaveStatusIndicator
-                                    saveState={arcSaveState}
-                                    lastSavedAt={arcLastSavedAt}
-                                    isDirty={arcDirty}
-                                    error={arcSaveError}
-                                    onSave={saveArc}
-                                    disabled={arcSaveState === "saving"}
+                                    saveState={arcDefinitionSaveState}
+                                    lastSavedAt={arcDefinitionLastSavedAt}
+                                    isDirty={arcDefinitionDirty}
+                                    error={arcDefinitionSaveError}
+                                    onSave={saveArcDefinition}
+                                    disabled={arcDefinitionSaveState === "saving"}
                                   />
                                 </div>
                                 <label className="text-sm text-slate-700">
                                   Title
                                   <input
                                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                    value={arcDraft.title}
+                                    value={arcDefinitionDraft.title}
                                     onChange={(e) => {
-                                      setArcDraft({
-                                        ...arcDraft,
+                                      setArcDefinitionDraft({
+                                        ...arcDefinitionDraft,
                                         title: e.target.value,
                                       });
-                                      setArcDirty(true);
-                                      setArcSaveState("idle");
+                                      setArcDefinitionDirty(true);
+                                      setArcDefinitionSaveState("idle");
                                     }}
                                   />
                                 </label>
@@ -1922,33 +2158,33 @@ export default function ContentStudioLitePage() {
                                   <textarea
                                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                                     rows={3}
-                                    value={arcDraft.description}
+                                    value={arcDefinitionDraft.description}
                                     onChange={(e) => {
-                                      setArcDraft({
-                                        ...arcDraft,
+                                      setArcDefinitionDraft({
+                                        ...arcDefinitionDraft,
                                         description: e.target.value,
                                       });
-                                      setArcDirty(true);
-                                      setArcSaveState("idle");
+                                      setArcDefinitionDirty(true);
+                                      setArcDefinitionSaveState("idle");
                                     }}
                                   />
                                 </label>
                                 <label className="text-sm text-slate-700">
                                   Tags (comma-separated)
                                   <StudioDatalist
-                                    id="arc-tags"
+                                    id="arc-definition-tags"
                                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                    value={(arcDraft.tags ?? []).join(", ")}
+                                    value={(arcDefinitionDraft.tags ?? []).join(", ")}
                                     onChange={(next) => {
-                                      setArcDraft({
-                                        ...arcDraft,
+                                      setArcDefinitionDraft({
+                                        ...arcDefinitionDraft,
                                         tags: next
                                           .split(",")
                                           .map((tag) => tag.trim())
                                           .filter(Boolean),
                                       });
-                                      setArcDirty(true);
-                                      setArcSaveState("idle");
+                                      setArcDefinitionDirty(true);
+                                      setArcDefinitionSaveState("idle");
                                     }}
                                     options={tagOptions}
                                   />
@@ -1956,343 +2192,124 @@ export default function ContentStudioLitePage() {
                                 <label className="flex items-center gap-2 text-sm text-slate-700">
                                   <input
                                     type="checkbox"
-                                    checked={arcDraft.is_active}
+                                    checked={arcDefinitionDraft.is_enabled}
                                     onChange={(e) => {
-                                      setArcDraft({
-                                        ...arcDraft,
-                                        is_active: e.target.checked,
+                                      setArcDefinitionDraft({
+                                        ...arcDefinitionDraft,
+                                        is_enabled: e.target.checked,
                                       });
-                                      setArcDirty(true);
-                                      setArcSaveState("idle");
+                                      setArcDefinitionDirty(true);
+                                      setArcDefinitionSaveState("idle");
                                     }}
                                   />
-                                  Active
+                                  Enabled
                                 </label>
                               </div>
-
-                              <div className="border-t border-slate-200 pt-4">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h3 className="text-sm font-semibold text-slate-900">
-                                      Steps
-                                    </h3>
-                                    <p className="text-xs text-slate-500">
-                                      Autosave enabled.
-                                    </p>
+                              <div className="space-y-2 rounded-md border border-slate-200 px-3 py-3">
+                                <h4 className="text-sm font-semibold text-slate-900">
+                                  Entry nodes
+                                </h4>
+                                {entryNodeIds.length === 0 ? (
+                                  <p className="text-xs text-slate-600">
+                                    No entry nodes yet.
+                                  </p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {entryNodeIds.map((id) => {
+                                      const node = shockStorylets.find(
+                                        (storylet) => storylet.id === id
+                                      );
+                                      return (
+                                        <div
+                                          key={id}
+                                          className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-xs"
+                                        >
+                                          <span>{node?.title ?? node?.slug ?? id}</span>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => removeEntryNode(id)}
+                                          >
+                                            Remove
+                                          </Button>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                  <Button variant="outline" onClick={createStep}>
-                                    New step
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <StudioDatalist
+                                    id="entry-node"
+                                    className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                    value={entryNodeInput}
+                                    onChange={setEntryNodeInput}
+                                    options={storyletOptions}
+                                    placeholder="storylet id"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      if (entryNodeInput) {
+                                        addEntryNode(entryNodeInput);
+                                        setEntryNodeInput("");
+                                      }
+                                    }}
+                                  >
+                                    Add
                                   </Button>
                                 </div>
-                                <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[220px_1fr]">
+                                <p className="text-xs text-slate-500">
+                                  Use “Set start node” in the graph to set a single
+                                  start node.
+                                </p>
+                              </div>
+                              <div className="space-y-2 rounded-md border border-slate-200 px-3 py-3">
+                                <h4 className="text-sm font-semibold text-slate-900">
+                                  Steps (storylets)
+                                </h4>
+                                {shockStorylets.length === 0 ? (
+                                  <p className="text-xs text-slate-600">
+                                    No storylets tagged for this arc.
+                                  </p>
+                                ) : (
                                   <div className="space-y-2">
-                                    {(stepsByArc.get(selectedArc.key) ?? []).map((step) => (
+                                    {shockStorylets.map((storylet) => (
                                       <button
-                                        key={`${step.arc_key}-${step.step_index}`}
-                                        className={`w-full rounded-md border px-3 py-2 text-left text-xs transition ${
-                                          stepDraft?.step_index === step.step_index
-                                            ? "border-slate-900 bg-slate-100"
-                                            : "border-slate-200 hover:border-slate-300"
-                                        }`}
-                                        onClick={() => selectStep(step)}
+                                        key={storylet.id}
+                                        className="w-full rounded-md border border-slate-200 px-3 py-2 text-left text-xs transition hover:border-slate-300"
+                                        onClick={() => {
+                                          selectStorylet(storylet);
+                                          setActiveTab("list");
+                                        }}
                                       >
                                         <div className="flex items-center justify-between">
                                           <span className="font-medium">
-                                            {step.step_index}. {step.title}
+                                            {storylet.title || storylet.slug}
                                           </span>
                                           <span className="text-slate-500">
-                                            {step.choices?.length ?? 0}
+                                            {storylet.choices.length} choices
                                           </span>
+                                        </div>
+                                        <div className="text-slate-500">
+                                          {storylet.slug}
                                         </div>
                                       </button>
                                     ))}
                                   </div>
-                                  {!stepDraft ? (
-                                    <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                                      Select a step to edit.
-                                    </div>
-                                  ) : (
-                                    <div className="space-y-3">
-                                      <div className="flex items-center justify-between">
-                                        <h4 className="text-sm font-semibold text-slate-900">
-                                          Step editor
-                                        </h4>
-                                        <SaveStatusIndicator
-                                          saveState={stepSaveState}
-                                          lastSavedAt={stepLastSavedAt}
-                                          isDirty={stepDirty}
-                                          error={stepSaveError}
-                                          onSave={saveStep}
-                                          disabled={stepSaveState === "saving"}
-                                        />
-                                      </div>
-                                      <label className="text-sm text-slate-700">
-                                        Title
-                                        <input
-                                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                          value={stepDraft.title}
-                                          onChange={(e) => {
-                                            setStepDraft({
-                                              ...stepDraft,
-                                              title: e.target.value,
-                                            });
-                                            setStepDirty(true);
-                                            setStepSaveState("idle");
-                                          }}
-                                        />
-                                      </label>
-                                      <label className="text-sm text-slate-700">
-                                        Body
-                                        <textarea
-                                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                          rows={6}
-                                          value={stepDraft.body}
-                                          onChange={(e) => {
-                                            setStepDraft({
-                                              ...stepDraft,
-                                              body: e.target.value,
-                                            });
-                                            setStepDirty(true);
-                                            setStepSaveState("idle");
-                                          }}
-                                        />
-                                      </label>
-                                      <label className="text-sm text-slate-700">
-                                        Choices (JSON)
-                                        <textarea
-                                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
-                                          rows={8}
-                                          value={stepChoicesText}
-                                          onChange={(e) => {
-                                            setStepChoicesText(e.target.value);
-                                            setStepDirty(true);
-                                            setStepSaveState("idle");
-                                          }}
-                                        />
-                                      </label>
-                                      <label className="text-sm text-slate-700">
-                                        Resource key helper
-                                        <StudioDatalist
-                                          id="resource-keys"
-                                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
-                                          value={resourceHelperValue}
-                                          onChange={setResourceHelperValue}
-                                          options={resourceKeyOptions}
-                                          placeholder="Knowledge, CashOnHand, SocialLeverage…"
-                                        />
-                                      </label>
-                                      {stepWarnings.length ? (
-                                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                                          <div className="font-semibold">
-                                            Warnings
-                                          </div>
-                                          <ul className="mt-1 space-y-1">
-                                            {stepWarnings.map((warning) => (
-                                              <li key={warning}>{warning}</li>
-                                            ))}
-                                          </ul>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  )}
-                                </div>
+                                )}
                               </div>
                             </div>
                           )}
                         </div>
                       </div>
                     )}
-                    {contentArcsError ? (
-                      <p className="text-sm text-red-600">{contentArcsError}</p>
+
+                    {arcDefinitionsError ? (
+                      <p className="text-sm text-red-600">{arcDefinitionsError}</p>
                     ) : null}
-
-                    <div className="border-t border-slate-200 pt-6">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h2 className="text-xl font-semibold text-slate-900">
-                            Arc scheduler
-                          </h2>
-                          <p className="text-sm text-slate-600">
-                            Edit arc_definitions and manage arc_steps.
-                          </p>
-                        </div>
-                        <Button variant="outline" onClick={loadArcDefinitions}>
-                          Refresh
-                        </Button>
-                      </div>
-
-                      {arcDefinitionsLoading ? (
-                        <p className="mt-3 text-sm text-slate-600">Loading…</p>
-                      ) : arcDefinitions.length === 0 ? (
-                        <p className="mt-3 text-sm text-slate-600">No arcs found.</p>
-                      ) : (
-                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-                          <div className="space-y-2">
-                            <label className="text-xs text-slate-600">
-                              Jump to arc
-                              <StudioDatalist
-                                id="arc-definition-jump"
-                                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-                                value={arcDefinitionJump}
-                                onChange={(next) => {
-                                  setArcDefinitionJump(next);
-                                  const match = arcDefinitions.find(
-                                    (arc) => arc.key === next
-                                  );
-                                  if (match) selectArcDefinition(match);
-                                }}
-                                options={arcDefinitionOptions}
-                                placeholder="arc key"
-                              />
-                            </label>
-                            {arcDefinitions.map((arc) => (
-                              <button
-                                key={arc.id}
-                                className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
-                                  selectedArcDefinitionId === arc.id
-                                    ? "border-slate-900 bg-slate-100"
-                                    : "border-slate-200 hover:border-slate-300"
-                                }`}
-                                onClick={() => selectArcDefinition(arc)}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium">{arc.title}</span>
-                                  <span className="text-xs text-slate-500">
-                                    {(arcDefinitionStepsByArcId.get(arc.id) ?? []).length} steps
-                                  </span>
-                                </div>
-                                <div className="text-xs text-slate-500">{arc.key}</div>
-                              </button>
-                            ))}
-                          </div>
-                          <div className="space-y-4">
-                            {!selectedArcDefinition || !arcDefinitionDraft ? (
-                              <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                                Select an arc to view details.
-                              </div>
-                            ) : (
-                              <div className="space-y-4">
-                                <div className="space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-semibold text-slate-900">
-                                      Arc details
-                                    </h3>
-                                    <SaveStatusIndicator
-                                      saveState={arcDefinitionSaveState}
-                                      lastSavedAt={arcDefinitionLastSavedAt}
-                                      isDirty={arcDefinitionDirty}
-                                      error={arcDefinitionSaveError}
-                                      onSave={saveArcDefinition}
-                                      disabled={arcDefinitionSaveState === "saving"}
-                                    />
-                                  </div>
-                                  <label className="text-sm text-slate-700">
-                                    Title
-                                    <input
-                                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                      value={arcDefinitionDraft.title}
-                                      onChange={(e) => {
-                                        setArcDefinitionDraft({
-                                          ...arcDefinitionDraft,
-                                          title: e.target.value,
-                                        });
-                                        setArcDefinitionDirty(true);
-                                        setArcDefinitionSaveState("idle");
-                                      }}
-                                    />
-                                  </label>
-                                  <label className="text-sm text-slate-700">
-                                    Description
-                                    <textarea
-                                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                      rows={3}
-                                      value={arcDefinitionDraft.description}
-                                      onChange={(e) => {
-                                        setArcDefinitionDraft({
-                                          ...arcDefinitionDraft,
-                                          description: e.target.value,
-                                        });
-                                        setArcDefinitionDirty(true);
-                                        setArcDefinitionSaveState("idle");
-                                      }}
-                                    />
-                                  </label>
-                                  <label className="text-sm text-slate-700">
-                                    Tags (comma-separated)
-                                    <StudioDatalist
-                                      id="arc-definition-tags"
-                                      className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                      value={(arcDefinitionDraft.tags ?? []).join(", ")}
-                                      onChange={(next) => {
-                                        setArcDefinitionDraft({
-                                          ...arcDefinitionDraft,
-                                          tags: next
-                                            .split(",")
-                                            .map((tag) => tag.trim())
-                                            .filter(Boolean),
-                                        });
-                                        setArcDefinitionDirty(true);
-                                        setArcDefinitionSaveState("idle");
-                                      }}
-                                      options={tagOptions}
-                                    />
-                                  </label>
-                                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input
-                                      type="checkbox"
-                                      checked={arcDefinitionDraft.is_enabled}
-                                      onChange={(e) => {
-                                        setArcDefinitionDraft({
-                                          ...arcDefinitionDraft,
-                                          is_enabled: e.target.checked,
-                                        });
-                                        setArcDefinitionDirty(true);
-                                        setArcDefinitionSaveState("idle");
-                                      }}
-                                    />
-                                    Enabled
-                                  </label>
-                                </div>
-                                <div>
-                                  <h4 className="text-sm font-semibold text-slate-900">Steps</h4>
-                                  <div className="mt-2 space-y-2">
-                                    {(arcDefinitionStepsByArcId.get(selectedArcDefinition.id) ??
-                                      []).map((step) => (
-                                      <div
-                                        key={step.id}
-                                        className="rounded-md border border-slate-200 px-3 py-2 text-xs"
-                                      >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div>
-                                            <div className="font-medium">
-                                              {step.order_index}. {step.title}
-                                            </div>
-                                            <div className="text-slate-500">{step.step_key}</div>
-                                          </div>
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => deleteArcStep(step.id)}
-                                          >
-                                            Delete
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {arcDefinitionsError ? (
-                        <p className="mt-3 text-sm text-red-600">{arcDefinitionsError}</p>
-                      ) : null}
-                    </div>
                   </div>
                 ) : activeTab === "rules" ? (
+
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -2711,7 +2728,13 @@ export default function ContentStudioLitePage() {
                           Drafts save automatically. Publish later.
                         </p>
                       </div>
-                      <Button onClick={createStorylet}>New storylet</Button>
+                      <Button
+                        onClick={() =>
+                          createStorylet(shockOnly ? [activeShockKey] : [])
+                        }
+                      >
+                        New storylet
+                      </Button>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
@@ -2730,6 +2753,25 @@ export default function ContentStudioLitePage() {
                               }
                               onBlur={loadStorylets}
                               placeholder="slug or title"
+                            />
+                          </label>
+                          <label className="flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={shockOnly}
+                              onChange={(e) => setShockOnly(e.target.checked)}
+                            />
+                            Only shock storylets
+                          </label>
+                          <label className="text-sm text-slate-700">
+                            Shock arc
+                            <StudioDatalist
+                              id="shock-arc-select"
+                              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                              value={activeShockKey}
+                              onChange={setActiveShockKey}
+                              options={SHOCK_ARC_KEYS.map((value) => ({ value }))}
+                              placeholder="shock arc key"
                             />
                           </label>
                           <label className="text-sm text-slate-700">
@@ -3057,6 +3099,12 @@ export default function ContentStudioLitePage() {
                                   (choice as StoryletChoice & {
                                     targetStoryletId?: string;
                                   }).targetStoryletId ?? "";
+                                const identityTags = choice.identity_tags ?? [];
+                                const relationalEffects =
+                                  choice.relational_effects ?? {};
+                                const relationalEntries = Object.entries(
+                                  relationalEffects
+                                );
                                 return (
                                   <div
                                     key={choice.id}
@@ -3107,6 +3155,62 @@ export default function ContentStudioLitePage() {
                                         placeholder="What the player sees"
                                       />
                                     </label>
+                                    <div className="grid gap-2 md:grid-cols-3">
+                                      <label className="text-xs text-slate-600">
+                                        Time cost
+                                        <input
+                                          type="number"
+                                          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                          value={choice.time_cost ?? 0}
+                                          onChange={(e) => {
+                                            const next = Number(e.target.value);
+                                            applyChoiceUpdate(choice.id, {
+                                              time_cost: Number.isFinite(next)
+                                                ? next
+                                                : 0,
+                                            });
+                                          }}
+                                          onBlur={() => saveDraft(true)}
+                                        />
+                                      </label>
+                                      <label className="text-xs text-slate-600">
+                                        Energy cost
+                                        <input
+                                          type="number"
+                                          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                          value={choice.energy_cost ?? 0}
+                                          onChange={(e) => {
+                                            const next = Number(e.target.value);
+                                            applyChoiceUpdate(choice.id, {
+                                              energy_cost: Number.isFinite(next)
+                                                ? next
+                                                : 0,
+                                            });
+                                          }}
+                                          onBlur={() => saveDraft(true)}
+                                        />
+                                      </label>
+                                      <label className="text-xs text-slate-600">
+                                        Identity tags
+                                        <StudioDatalist
+                                          id={`identity-tags-${choice.id}`}
+                                          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                          value={identityTags.join(", ")}
+                                          onChange={(next) => {
+                                            applyChoiceUpdate(choice.id, {
+                                              identity_tags: next
+                                                .split(",")
+                                                .map((tag) => tag.trim())
+                                                .filter(Boolean),
+                                            });
+                                          }}
+                                          options={IDENTITY_TAG_OPTIONS.map((value) => ({
+                                            value,
+                                          }))}
+                                          placeholder="risk, people"
+                                        />
+                                      </label>
+                                    </div>
                                     <div className="grid gap-2 md:grid-cols-3">
                                       <label className="text-xs text-slate-600">
                                         Energy delta
@@ -3187,6 +3291,138 @@ export default function ContentStudioLitePage() {
                                         />
                                       </label>
                                     </div>
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-xs font-semibold text-slate-700">
+                                          Relational effects
+                                        </p>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            applyChoiceUpdate(choice.id, {
+                                              relational_effects: {
+                                                ...relationalEffects,
+                                                [NPC_ID_OPTIONS[0]]: {
+                                                  trust: 0,
+                                                  reliability: 0,
+                                                  emotionalLoad: 0,
+                                                },
+                                              },
+                                            });
+                                          }}
+                                        >
+                                          Add NPC
+                                        </Button>
+                                      </div>
+                                      {relationalEntries.length === 0 ? (
+                                        <p className="text-xs text-slate-500">
+                                          No NPC effects yet.
+                                        </p>
+                                      ) : (
+                                        relationalEntries.map(([npcId, deltas]) => (
+                                          <div
+                                            key={npcId}
+                                            className="grid gap-2 md:grid-cols-[1.5fr_1fr_1fr_1fr_auto]"
+                                          >
+                                            <StudioDatalist
+                                              id={`npc-${choice.id}-${npcId}`}
+                                              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                              value={npcId}
+                                              onChange={(next) => {
+                                                const { [npcId]: _, ...rest } =
+                                                  relationalEffects;
+                                                applyChoiceUpdate(choice.id, {
+                                                  relational_effects: {
+                                                    ...rest,
+                                                    [next]: deltas,
+                                                  },
+                                                });
+                                              }}
+                                              options={NPC_ID_OPTIONS.map((value) => ({
+                                                value,
+                                              }))}
+                                              placeholder="npc id"
+                                            />
+                                            <input
+                                              type="number"
+                                              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                              value={(deltas as any)?.trust ?? 0}
+                                              onChange={(e) => {
+                                                const next = Number(e.target.value);
+                                                applyChoiceUpdate(choice.id, {
+                                                  relational_effects: {
+                                                    ...relationalEffects,
+                                                    [npcId]: {
+                                                      ...(deltas as any),
+                                                      trust: Number.isFinite(next)
+                                                        ? next
+                                                        : 0,
+                                                    },
+                                                  },
+                                                });
+                                              }}
+                                              placeholder="trust"
+                                            />
+                                            <input
+                                              type="number"
+                                              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                              value={(deltas as any)?.reliability ?? 0}
+                                              onChange={(e) => {
+                                                const next = Number(e.target.value);
+                                                applyChoiceUpdate(choice.id, {
+                                                  relational_effects: {
+                                                    ...relationalEffects,
+                                                    [npcId]: {
+                                                      ...(deltas as any),
+                                                      reliability: Number.isFinite(next)
+                                                        ? next
+                                                        : 0,
+                                                    },
+                                                  },
+                                                });
+                                              }}
+                                              placeholder="reliability"
+                                            />
+                                            <input
+                                              type="number"
+                                              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                              value={
+                                                (deltas as any)?.emotionalLoad ?? 0
+                                              }
+                                              onChange={(e) => {
+                                                const next = Number(e.target.value);
+                                                applyChoiceUpdate(choice.id, {
+                                                  relational_effects: {
+                                                    ...relationalEffects,
+                                                    [npcId]: {
+                                                      ...(deltas as any),
+                                                      emotionalLoad: Number.isFinite(next)
+                                                        ? next
+                                                        : 0,
+                                                    },
+                                                  },
+                                                });
+                                              }}
+                                              placeholder="emotional load"
+                                            />
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => {
+                                                const { [npcId]: _, ...rest } =
+                                                  relationalEffects;
+                                                applyChoiceUpdate(choice.id, {
+                                                  relational_effects: rest,
+                                                });
+                                              }}
+                                            >
+                                              Remove
+                                            </Button>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
                                     <label className="text-xs text-slate-600">
                                       Target storylet id (optional)
                                       <StudioDatalist
@@ -3211,6 +3447,32 @@ export default function ContentStudioLitePage() {
                                         }}
                                         options={storyletOptions}
                                         placeholder="target storylet id"
+                                      />
+                                    </label>
+                                    <label className="text-xs text-slate-600">
+                                      Condition (JSON)
+                                      <textarea
+                                        className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
+                                        rows={2}
+                                        value={editor.conditionInputs[choice.id] ?? ""}
+                                        onChange={(e) => {
+                                          const next = e.target.value;
+                                          setEditor((prev) => ({
+                                            ...prev,
+                                            conditionInputs: {
+                                              ...prev.conditionInputs,
+                                              [choice.id]: next,
+                                            },
+                                            dirty: true,
+                                          }));
+                                          const parsed = safeParseJson(next);
+                                          if (parsed.ok) {
+                                          applyChoiceUpdate(choice.id, {
+                                            condition: parsed.value ?? undefined,
+                                          });
+                                          }
+                                        }}
+                                        onBlur={() => saveDraft(true)}
                                       />
                                     </label>
                                     <div className="flex items-center justify-between gap-2">
