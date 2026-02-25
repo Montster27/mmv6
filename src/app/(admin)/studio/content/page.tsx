@@ -62,11 +62,7 @@ const PHASE_OPTIONS = [
 ] as const;
 
 const TYPE_OPTIONS = ["core", "social", "context", "anomaly"] as const;
-const SHOCK_ARC_KEYS = [
-  "shock_academic",
-  "shock_social",
-  "shock_romantic",
-] as const;
+const SHOCK_ARC_KEYS = ["arc_one_core"] as const;
 const IDENTITY_TAG_OPTIONS = [
   "risk",
   "safety",
@@ -2054,10 +2050,10 @@ export default function ContentStudioLitePage() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h2 className="text-xl font-semibold text-slate-900">
-                          Shock arcs
+                          Arc
                         </h2>
                         <p className="text-sm text-slate-600">
-                          Manage the three shock arcs and their entry nodes.
+                          Manage the arc and its entry nodes.
                         </p>
                       </div>
                       <Button variant="outline" onClick={loadArcDefinitions}>
@@ -2067,7 +2063,7 @@ export default function ContentStudioLitePage() {
 
                     {shockArcMissing.length ? (
                       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                        Missing shock arcs: {shockArcMissing.join(", ")}.
+                        Missing arc: {shockArcMissing.join(", ")}.
                       </div>
                     ) : null}
 
@@ -2075,13 +2071,13 @@ export default function ContentStudioLitePage() {
                       <p className="text-sm text-slate-600">Loading…</p>
                     ) : shockArcDefinitions.length === 0 ? (
                       <p className="text-sm text-slate-600">
-                        No shock arcs found.
+                        No arc found.
                       </p>
                     ) : (
                       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
                         <div className="space-y-2">
                           <label className="text-xs text-slate-600">
-                            Jump to shock arc
+                            Jump to arc
                             <StudioDatalist
                               id="arc-definition-jump"
                               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -2094,7 +2090,7 @@ export default function ContentStudioLitePage() {
                                 if (match) selectArcDefinition(match);
                               }}
                               options={arcDefinitionOptions}
-                              placeholder="shock arc key"
+                              placeholder="arc key"
                             />
                           </label>
                           {shockArcDefinitions.map((arc) => (
@@ -2117,7 +2113,7 @@ export default function ContentStudioLitePage() {
                         <div className="space-y-4">
                           {!selectedArcDefinition || !arcDefinitionDraft ? (
                             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                              Select a shock arc to edit.
+                              Select an arc to edit.
                             </div>
                           ) : (
                             <div className="space-y-4">
@@ -2768,7 +2764,7 @@ export default function ContentStudioLitePage() {
                               value={activeShockKey}
                               onChange={setActiveShockKey}
                               options={SHOCK_ARC_KEYS.map((value) => ({ value }))}
-                              placeholder="shock arc key"
+                              placeholder="arc key"
                             />
                           </label>
                           <label className="text-sm text-slate-700">
