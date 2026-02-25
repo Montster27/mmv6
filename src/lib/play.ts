@@ -103,6 +103,30 @@ export async function fetchTimeAllocation(
   return data?.allocation ? normalizeAllocation(data.allocation) : null;
 }
 
+export async function fetchStoryletBySlug(
+  slug: string
+): Promise<Storylet | null> {
+  const { data, error } = await supabase
+    .from("storylets")
+    .select("id,slug,title,body,choices,tags,is_active,requirements,weight")
+    .eq("slug", slug)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to fetch storylet by slug", error);
+    return null;
+  }
+  if (!data) return null;
+  const row = coerceStoryletRow(data);
+  const validated = validateStorylet(row);
+  if (!validated.ok) {
+    console.warn("Invalid storylet row; using fallback", validated.errors);
+    return fallbackStorylet();
+  }
+  return validated.value;
+}
+
 export function toChoices(storylet: Storylet | any): StoryletChoice[] {
   if (Array.isArray(storylet?.choices)) {
     return storylet.choices as StoryletChoice[];

@@ -30,6 +30,7 @@ import { fetchDevSettings, saveDevSettings } from "@/lib/devSettings";
 import {
   createStoryletRun,
   fetchDailyState,
+  fetchStoryletBySlug,
   fetchTimeAllocation,
   fetchTodayRuns,
   fetchTodayStoryletCandidates,
@@ -894,15 +895,20 @@ export default function PlayPage() {
             featureFlags.arcOneScarcityEnabled &&
             day <= ARC_ONE_LAST_DAY &&
             existingRuns.length === 0;
-          const entryStorylet = shouldForceEntry
+          let entryStorylet = shouldForceEntry
             ? candidates.find((c) => c.slug === entrySlug)
             : null;
-          const nextStorylets = entryStorylet
-            ? [entryStorylet, ...next.filter((c) => c.id !== entryStorylet.id)].slice(
-                0,
-                2
-              )
-            : next;
+          if (shouldForceEntry && !entryStorylet) {
+            entryStorylet = await fetchStoryletBySlug(entrySlug);
+          }
+          const entryIsUsed = entryStorylet ? used.has(entryStorylet.id) : false;
+          const nextStorylets =
+            entryStorylet && !entryIsUsed
+              ? [
+                  entryStorylet,
+                  ...next.filter((c) => c.id !== entryStorylet!.id),
+                ].slice(0, 2)
+              : next;
           setStorylets(nextStorylets);
 
           const allocationExists = Boolean(existingAllocation);
