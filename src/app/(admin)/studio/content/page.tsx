@@ -3096,9 +3096,13 @@ export default function ContentStudioLitePage() {
                                   (choice as StoryletChoice & {
                                     targetStoryletId?: string;
                                   }).targetStoryletId ?? "";
-                                const identityTags = choice.identity_tags ?? [];
+                                const extendedChoice = choice as StoryletChoice & {
+                                  identity_tags?: string[];
+                                  relational_effects?: Record<string, Record<string, number>>;
+                                };
+                                const identityTags = extendedChoice.identity_tags ?? [];
                                 const relationalEffects =
-                                  choice.relational_effects ?? {};
+                                  extendedChoice.relational_effects ?? {};
                                 const relationalEntries = Object.entries(
                                   relationalEffects
                                 );
