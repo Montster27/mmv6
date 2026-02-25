@@ -311,6 +311,11 @@ export async function fetchTodayStoryletCandidates(
   };
 
   const storylets = await fetchStoryletCatalog(seasonIndex, fetcher);
+  if (featureFlags.arcOneScarcityEnabled) {
+    return storylets.filter((storylet) =>
+      (storylet.tags ?? []).includes("arc_one_core")
+    );
+  }
   if (!featureFlags.verticalSlice30Enabled) {
     return storylets;
   }
