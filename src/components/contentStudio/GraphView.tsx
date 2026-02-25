@@ -4,11 +4,15 @@ import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/events";
 import type { Storylet, StoryletChoice } from "@/types/storylets";
 
-type GraphViewProps = {
+export type GraphViewProps = {
   storylets: Storylet[];
   selectedStorylet: Storylet | null;
   onSelectStorylet: (storylet: Storylet) => void;
   onRetargetChoice: (choiceId: string, targetId: string) => void;
+  entryNodeIds?: string[];
+  onCreateNode?: () => void;
+  onSetStartNode?: (storyletId: string) => void;
+  onConnectChoice?: (sourceId: string, choiceId: string, targetId: string) => void;
 };
 
 const PHASE_ORDER = [
@@ -50,10 +54,17 @@ export function GraphView({
   selectedStorylet,
   onSelectStorylet,
   onRetargetChoice,
+  entryNodeIds = [],
+  onCreateNode,
+  onSetStartNode,
+  onConnectChoice,
 }: GraphViewProps) {
   const [offset, setOffset] = useState({ x: 20, y: 20 });
   const [scale, setScale] = useState(1);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const [connectSourceId, setConnectSourceId] = useState("");
+  const [connectChoiceId, setConnectChoiceId] = useState("");
+  const [connectTargetId, setConnectTargetId] = useState("");
 
   useEffect(() => {
     trackEvent({ event_type: "graph_opened" });
@@ -126,6 +137,13 @@ export function GraphView({
     return counts;
   }, [storylets]);
 
+  const entrySet = useMemo(() => new Set(entryNodeIds), [entryNodeIds]);
+
+  const connectChoices = useMemo(() => {
+    const source = storylets.find((storylet) => storylet.id === connectSourceId);
+    return source?.choices ?? [];
+  }, [storylets, connectSourceId]);
+
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
     const next = Math.min(1.6, Math.max(0.6, scale - event.deltaY * 0.001));
@@ -163,8 +181,23 @@ export function GraphView({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        Drag to pan. Scroll to zoom.
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+        <span>Drag to pan. Scroll to zoom.</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onCreateNode}>
+            Add node
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!selectedStorylet}
+            onClick={() =>
+              selectedStorylet && onSetStartNode?.(selectedStorylet.id)
+            }
+          >
+            Set start node
+          </Button>
+        </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div
@@ -263,6 +296,10 @@ export function GraphView({
               const color = PHASE_COLORS[phase] ?? PHASE_COLORS.unphased;
               const orphan = !incomingCounts[storylet.id];
               const deadEnd = outgoingCounts[storylet.id] === 0;
+              const isEntry = entrySet.has(storylet.id);
+              const missingLinks = storylet.choices.some(
+                (choice) => !getChoiceTarget(choice)
+              );
               const selected = selectedStorylet?.id === storylet.id;
               return (
                 <button
@@ -285,8 +322,10 @@ export function GraphView({
                   </div>
                   <div className="text-xs text-slate-600">{storylet.slug}</div>
                   <div className="mt-1 flex gap-2 text-[11px] text-slate-600">
+                    {isEntry ? <span>Start</span> : null}
                     {orphan ? <span>Orphan</span> : null}
                     {deadEnd ? <span>Dead-end</span> : null}
+                    {missingLinks ? <span>Missing link</span> : null}
                   </div>
                 </button>
               );
@@ -352,6 +391,66 @@ export function GraphView({
               </Button>
             </div>
           )}
+          <div className="border-t border-slate-200 pt-3">
+            <h4 className="text-xs font-semibold text-slate-700">Connect nodes</h4>
+            <div className="mt-2 space-y-2">
+              <select
+                className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                value={connectSourceId}
+                onChange={(event) => {
+                  setConnectSourceId(event.target.value);
+                  setConnectChoiceId("");
+                }}
+              >
+                <option value="">Source node</option>
+                {storylets.map((storylet) => (
+                  <option key={storylet.id} value={storylet.id}>
+                    {storylet.title || storylet.slug}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                value={connectChoiceId}
+                onChange={(event) => setConnectChoiceId(event.target.value)}
+                disabled={!connectSourceId}
+              >
+                <option value="">Choice</option>
+                {connectChoices.map((choice) => (
+                  <option key={choice.id} value={choice.id}>
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                value={connectTargetId}
+                onChange={(event) => setConnectTargetId(event.target.value)}
+                disabled={!connectSourceId}
+              >
+                <option value="">Target node</option>
+                {storylets.map((storylet) => (
+                  <option key={storylet.id} value={storylet.id}>
+                    {storylet.title || storylet.slug}
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="outline"
+                disabled={!connectSourceId || !connectChoiceId}
+                onClick={() => {
+                  if (!connectSourceId || !connectChoiceId) return;
+                  onConnectChoice?.(
+                    connectSourceId,
+                    connectChoiceId,
+                    connectTargetId
+                  );
+                }}
+              >
+                Connect
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
