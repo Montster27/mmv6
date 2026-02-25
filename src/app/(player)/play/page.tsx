@@ -894,21 +894,19 @@ export default function PlayPage() {
           const shouldForceEntry =
             featureFlags.arcOneScarcityEnabled &&
             day <= ARC_ONE_LAST_DAY &&
-            existingRuns.length === 0;
+            day === 1;
           let entryStorylet = shouldForceEntry
             ? candidates.find((c) => c.slug === entrySlug)
             : null;
           if (shouldForceEntry && !entryStorylet) {
             entryStorylet = await fetchStoryletBySlug(entrySlug);
           }
-          const entryIsUsed = entryStorylet ? used.has(entryStorylet.id) : false;
-          const nextStorylets =
-            entryStorylet && !entryIsUsed
-              ? [
-                  entryStorylet,
-                  ...next.filter((c) => c.id !== entryStorylet!.id),
-                ].slice(0, 2)
-              : next;
+          const nextStorylets = entryStorylet
+            ? [entryStorylet, ...next.filter((c) => c.id !== entryStorylet.id)].slice(
+                0,
+                2
+              )
+            : next;
           setStorylets(nextStorylets);
 
           const allocationExists = Boolean(existingAllocation);
