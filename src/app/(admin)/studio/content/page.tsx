@@ -1778,16 +1778,12 @@ export default function ContentStudioLitePage() {
       ) {
         warnings.push(`Choice "${choice.id}" references unknown NPC id.`);
       }
-      if (
-        typeof choice.time_cost !== "undefined" &&
-        typeof choice.time_cost !== "number"
-      ) {
+      const timeCost = (choice as { time_cost?: number }).time_cost;
+      if (typeof timeCost !== "undefined" && typeof timeCost !== "number") {
         warnings.push(`Choice "${choice.id}" has invalid time_cost.`);
       }
-      if (
-        typeof choice.energy_cost !== "undefined" &&
-        typeof choice.energy_cost !== "number"
-      ) {
+      const energyCost = (choice as { energy_cost?: number }).energy_cost;
+      if (typeof energyCost !== "undefined" && typeof energyCost !== "number") {
         warnings.push(`Choice "${choice.id}" has invalid energy_cost.`);
       }
     });
