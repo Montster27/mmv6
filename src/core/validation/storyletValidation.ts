@@ -31,6 +31,9 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
   const targetStoryletId = isString(obj.targetStoryletId)
     ? obj.targetStoryletId
     : undefined;
+  const reactionText = isString(obj.reaction_text)
+    ? obj.reaction_text
+    : undefined;
   return {
     id: obj.id,
     label: obj.label,
@@ -38,6 +41,7 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     outcomes,
     check: checkRaw,
     targetStoryletId,
+    reaction_text: reactionText,
   };
 }
 
