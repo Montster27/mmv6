@@ -3152,6 +3152,21 @@ export default function ContentStudioLitePage() {
                                         placeholder="What the player sees"
                                       />
                                     </label>
+                                    <label className="text-xs text-slate-600">
+                                      Reaction text (optional)
+                                      <textarea
+                                        className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                                        rows={3}
+                                        value={extendedChoice.reaction_text ?? ""}
+                                        onChange={(e) =>
+                                          applyChoiceUpdate(choice.id, {
+                                            reaction_text: e.target.value,
+                                          })
+                                        }
+                                        onBlur={() => saveDraft(true)}
+                                        placeholder="Shown immediately after selection."
+                                      />
+                                    </label>
                                     <div className="grid gap-2 md:grid-cols-3">
                                       <label className="text-xs text-slate-600">
                                         Time cost
