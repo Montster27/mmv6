@@ -48,6 +48,23 @@ describe("dailyLoop helpers", () => {
     expect(stage).toBe("storylet_2");
   });
 
+  it("computes storylet_3 stage for two completed runs", () => {
+    const stage = computeStage(
+      true,
+      2,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    );
+    expect(stage).toBe("storylet_3");
+  });
+
   it("uses allocation stage when arc-first is enabled", () => {
     const stage = computeStage(
       false,

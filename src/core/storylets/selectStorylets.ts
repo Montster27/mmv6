@@ -267,7 +267,7 @@ export function selectStorylets({
 
   if (picked.length < 2) {
     const remaining = preferred.filter((s) => !picked.includes(s));
-    picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
+    picked.push(...pickTop(remaining, seed, 3 - picked.length, context));
   }
 
   if (picked.length < 2) {
@@ -337,21 +337,21 @@ export function selectStorylets({
     picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
   }
 
-  if (picked.length < 2) {
+  if (picked.length < 3) {
     const remaining = activeStorylets.filter((s) => !picked.includes(s) && !todayUsedIds.has(s.id));
-    picked.push(...pickTop(remaining, seed, 2 - picked.length, context));
+    picked.push(...pickTop(remaining, seed, 3 - picked.length, context));
   }
 
   if (picked.length === 0) {
     return [];
   }
 
-  // If still fewer than 2, duplicate fallback to keep length 2 for UI simplicity.
-  while (picked.length < 2) {
+  // If still fewer than 3, duplicate fallback to keep length 3 for UI simplicity.
+  while (picked.length < 3) {
     picked.push(fallbackStorylet());
   }
 
-  return picked.slice(0, 2);
+  return picked.slice(0, 3);
 }
 
 // Export helpers for tests

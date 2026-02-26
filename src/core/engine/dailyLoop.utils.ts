@@ -33,12 +33,13 @@ export function computeStage(
     if (!allocationPresent) return "allocation";
     if (runsForPairCount === 0) return "storylet_1";
     if (runsForPairCount === 1) return "storylet_2";
-    if (runsForPairCount >= 2 && reflectionDone && funPulseEligible && !funPulseDone) {
+    if (runsForPairCount === 2) return "storylet_3";
+    if (runsForPairCount >= 3 && reflectionDone && funPulseEligible && !funPulseDone) {
         return "fun_pulse";
     }
-    if (runsForPairCount >= 2 && reflectionDone) return "complete";
-    if (runsForPairCount >= 2 && microTaskEligible && !microTaskDone) return "microtask";
-    if (runsForPairCount >= 2 && canBoost) return "social";
-    if (runsForPairCount >= 2 && !canBoost) return "reflection";
+    if (runsForPairCount >= 3 && reflectionDone) return "complete";
+    if (runsForPairCount >= 3 && microTaskEligible && !microTaskDone) return "microtask";
+    if (runsForPairCount >= 3 && canBoost) return "social";
+    if (runsForPairCount >= 3 && !canBoost) return "reflection";
     return "complete";
 }

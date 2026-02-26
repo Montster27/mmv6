@@ -19,6 +19,7 @@ export type DailyRunStage =
   | "allocation"
   | "storylet_1"
   | "storylet_2"
+  | "storylet_3"
   | "microtask"
   | "social"
   | "reflection"

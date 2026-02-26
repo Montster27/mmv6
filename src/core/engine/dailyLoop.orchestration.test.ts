@@ -498,15 +498,21 @@ describe("getOrCreateDailyRun", () => {
     expect(run.stage).toBe("storylet_2");
   });
 
-  it("returns microtask when eligible and not done", async () => {
+  it("returns storylet_3 when two runs exist", async () => {
     vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(2));
+    const run = await getOrCreateDailyRun("u", new Date());
+    expect(run.stage).toBe("storylet_3");
+  });
+
+  it("returns microtask when eligible and not done", async () => {
+    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
     vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("microtask");
   });
 
   it("returns social when microtask done and boost available", async () => {
-    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(2));
+    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
     vi.mocked(fetchMicroTaskRun).mockResolvedValue({
       id: "m",
       user_id: "u",
@@ -523,7 +529,7 @@ describe("getOrCreateDailyRun", () => {
   });
 
   it("returns reflection when boost already sent", async () => {
-    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(2));
+    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
     vi.mocked(fetchMicroTaskRun).mockResolvedValue({
       id: "m",
       user_id: "u",
@@ -540,7 +546,7 @@ describe("getOrCreateDailyRun", () => {
   });
 
   it("returns complete when reflection done", async () => {
-    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(2));
+    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
     vi.mocked(fetchMicroTaskRun).mockResolvedValue({
       id: "m",
       user_id: "u",
@@ -557,7 +563,7 @@ describe("getOrCreateDailyRun", () => {
   });
 
   it("returns fun_pulse when eligible after reflection", async () => {
-    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(2));
+    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
     vi.mocked(fetchMicroTaskRun).mockResolvedValue({
       id: "m",
       user_id: "u",

@@ -65,7 +65,7 @@ function StoryletSectionComponent({
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Step 2: Storylets</h2>
         <span className="text-sm text-slate-600">
-          Progress: {Math.min(runs.length, 2)}/2
+          Progress: {Math.min(runs.length, 3)}/3
         </span>
       </div>
 
@@ -84,7 +84,8 @@ function StoryletSectionComponent({
         <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
           <div>
             <p className="text-sm text-slate-600">
-              Storylet {stage === "storylet_2" ? 2 : 1} of 2
+              Storylet{" "}
+              {stage === "storylet_3" ? 3 : stage === "storylet_2" ? 2 : 1} of 3
             </p>
             <h3 className="text-lg font-semibold text-slate-900">
               {currentStorylet.title}

@@ -327,7 +327,7 @@ export async function getOrCreateDailyRun(
       storylets = [
         entryStorylet,
         ...storylets.filter((storylet) => storylet.id !== entryStorylet!.id),
-      ].slice(0, 2);
+      ].slice(0, 3);
     } else {
       console.warn("Arc One entry storylet not found in candidates.");
     }
@@ -478,7 +478,9 @@ export async function getOrCreateDailyRun(
     stage,
     allocation: allocation ?? null,
     allocationSeed,
-    storylets: hasStorylets ? storylets : [fallbackStorylet(), fallbackStorylet()],
+    storylets: hasStorylets
+      ? storylets
+      : [fallbackStorylet(), fallbackStorylet(), fallbackStorylet()],
     storyletRunsToday: runs,
     canBoost,
     tensions,

@@ -896,7 +896,7 @@ export default function PlayPage() {
           setRuns(existingRuns);
 
           const used = new Set(existingRuns.map((r) => r.storylet_id));
-          const next = candidates.filter((c) => !used.has(c.id)).slice(0, 2);
+          const next = candidates.filter((c) => !used.has(c.id)).slice(0, 3);
           const entrySlug = "s1_dorm_wake_dislocation";
           const shouldForceEntry =
             featureFlags.arcOneScarcityEnabled &&
@@ -911,7 +911,7 @@ export default function PlayPage() {
           const nextStorylets = entryStorylet
             ? [entryStorylet, ...next.filter((c) => c.id !== entryStorylet.id)].slice(
                 0,
-                2
+                3
               )
             : next;
           setStorylets(nextStorylets);
@@ -1662,6 +1662,8 @@ export default function PlayPage() {
       ? storylets[0]
       : stage === "storylet_2"
       ? storylets[1]
+      : stage === "storylet_3"
+      ? storylets[2]
       : storylets[currentIndex];
   const choiceLabelMap = useMemo(() => {
     if (!currentStorylet) return new Map<string, string>();
@@ -1908,6 +1910,8 @@ export default function PlayPage() {
         let nextStage: DailyRunStage;
         if (stage === "storylet_1") {
           nextStage = "storylet_2";
+        } else if (stage === "storylet_2") {
+          nextStage = "storylet_3";
         } else {
           nextStage =
             microTaskEligible && microTaskStatus === "pending"
@@ -2653,16 +2657,17 @@ export default function PlayPage() {
 
                   {(stage === "storylet_1" ||
                     stage === "storylet_2" ||
+                    stage === "storylet_3" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
                     <section className="space-y-3">
                         <div className="flex items-center justify-between">
                           <h2 className="text-xl font-semibold">Storylets</h2>
                           <span className="text-sm text-slate-600">
-                            Progress: {Math.min(runs.length, 2)}/2
+                            Progress: {Math.min(runs.length, 3)}/3
                           </span>
                         </div>
                         <p className="text-base text-slate-700">
-                          Pick one choice. You can do two today.
+                          Pick one choice. You can do three today.
                         </p>
 
                         {!currentStorylet ? (
@@ -2680,7 +2685,13 @@ export default function PlayPage() {
                           <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
                             <div>
                               <p className="text-sm text-slate-600">
-                                Storylet {stage === "storylet_2" ? 2 : 1} of 2
+                                Storylet{" "}
+                                {stage === "storylet_3"
+                                  ? 3
+                                  : stage === "storylet_2"
+                                  ? 2
+                                  : 1}{" "}
+                                of 3
                               </p>
                               <h3 className="text-lg font-semibold text-slate-900">
                                 {currentStorylet.title}
