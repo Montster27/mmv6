@@ -26,6 +26,7 @@ export type StoryletChoice = {
   targetStoryletId?: string;
   time_cost?: number;
   energy_cost?: number;
+  reaction_text?: string | null;
   identity_tags?: string[];
   relational_effects?: Record<string, Record<string, number>>;
   condition?: Record<string, unknown>;

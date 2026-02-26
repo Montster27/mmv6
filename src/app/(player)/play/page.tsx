@@ -280,6 +280,13 @@ export default function PlayPage() {
   const [compareError, setCompareError] = useState<string | null>(null);
   const [compareChoiceId, setCompareChoiceId] = useState<string | null>(null);
   const [compareNote, setCompareNote] = useState("");
+  const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
+  const [pendingReactionText, setPendingReactionText] = useState<string | null>(
+    null
+  );
+  const [pendingAdvanceTarget, setPendingAdvanceTarget] = useState<string | null>(
+    null
+  );
   const [compareSending, setCompareSending] = useState(false);
   const [remnantState, setRemnantState] = useState<DailyRun["remnant"] | null>(
     null
@@ -1545,7 +1552,8 @@ export default function PlayPage() {
   );
 
   const allocationValid = totalAllocation === 100;
-  const choicesDisabled = savingChoice || consequenceActive;
+  const choicesDisabled =
+    savingChoice || consequenceActive || Boolean(pendingReactionText);
   const STUDY_TENSION_THRESHOLD = 40;
   const HEALTH_TENSION_THRESHOLD = 30;
 
@@ -1660,9 +1668,21 @@ export default function PlayPage() {
     return new Map(toChoices(currentStorylet).map((choice) => [choice.id, choice.label]));
   }, [currentStorylet]);
 
+  useEffect(() => {
+    setSelectedChoiceId(null);
+    setPendingReactionText(null);
+    setPendingAdvanceTarget(null);
+  }, [currentStorylet?.id]);
+
   const handleChoice = async (choiceId: string) => {
     if (!userId || !currentStorylet) return;
+    if (pendingReactionText) return;
     recordInteraction();
+    const selectedChoice = toChoices(currentStorylet).find(
+      (choice) => choice.id === choiceId
+    );
+    setSelectedChoiceId(choiceId);
+    setPendingAdvanceTarget(selectedChoice?.targetStoryletId ?? null);
     if (!firstChoiceTrackedRef.current && sessionStartAtRef.current) {
       firstChoiceTrackedRef.current = true;
       trackWithSeason({
@@ -1875,6 +1895,15 @@ export default function PlayPage() {
         });
       }
 
+      const reactionText =
+        typeof selectedChoice?.reaction_text === "string" &&
+        selectedChoice.reaction_text.trim().length > 0
+          ? selectedChoice.reaction_text.trim()
+          : null;
+      if (reactionText) {
+        setPendingReactionText(reactionText);
+      }
+
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         let nextStage: DailyRunStage;
         if (stage === "storylet_1") {
@@ -1888,10 +1917,14 @@ export default function PlayPage() {
               : "social";
         }
         pendingTransitionRef.current = () => setStage(nextStage);
-        setConsequenceActive(true);
+        if (!reactionText) {
+          setConsequenceActive(true);
+        }
       } else {
         pendingTransitionRef.current = () => setCurrentIndex((i) => i + 1);
-        setConsequenceActive(true);
+        if (!reactionText) {
+          setConsequenceActive(true);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -1899,6 +1932,15 @@ export default function PlayPage() {
     } finally {
       setSavingChoice(false);
     }
+  };
+
+  const handleReactionContinue = () => {
+    setPendingReactionText(null);
+    setPendingAdvanceTarget(null);
+    setSelectedChoiceId(null);
+    const next = pendingTransitionRef.current;
+    pendingTransitionRef.current = null;
+    if (next) next();
   };
 
   const handleCompareDismiss = () => {
@@ -2667,8 +2709,24 @@ export default function PlayPage() {
                                   </p>
                                 );
                               })()}
+                              {pendingReactionText ? (
+                                <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800">
+                                  {pendingReactionText.split("\n\n").map((para, idx) => (
+                                    <p key={idx} className="text-sm">
+                                      {para}
+                                    </p>
+                                  ))}
+                                  <Button
+                                    className="mt-3"
+                                    onClick={handleReactionContinue}
+                                  >
+                                    Continue
+                                  </Button>
+                                </div>
+                              ) : null}
                               {(outcomeMessage || outcomeDeltas) &&
-                                !consequenceActive && (
+                                !consequenceActive &&
+                                !pendingReactionText && (
                                   <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
                                     {outcomeMessage ? <p>{outcomeMessage}</p> : null}
                                     {outcomeDeltas ? (

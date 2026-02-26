@@ -43,6 +43,7 @@ function parseChoices(raw: unknown): StoryletChoice[] {
             outcomes: (item as any).outcomes,
             check: (item as any).check,
             targetStoryletId: (item as any).targetStoryletId,
+            reaction_text: (item as any).reaction_text ?? null,
           } as StoryletChoice;
         }
         return null;
