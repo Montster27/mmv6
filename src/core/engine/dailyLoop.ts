@@ -10,11 +10,7 @@ import {
 import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
-import {
-  coerceStoryletRow,
-  fallbackStorylet,
-  validateStorylet,
-} from "@/core/validation/storyletValidation";
+import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
@@ -22,7 +18,6 @@ import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
 import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { buildStoryletContext } from "@/core/engine/storyletContext";
-import { supabaseServer } from "@/lib/supabase/server";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
 import { listFactions } from "@/lib/factions";
@@ -325,34 +320,16 @@ export async function getOrCreateDailyRun(
     seasonContext.currentSeason?.season_index >= 0;
 
   if (shouldForceEntry) {
-    let entryStorylet = storyletsRaw.find((storylet) => storylet.slug === entrySlug);
-    if (!entryStorylet) {
-      const { data, error } = await supabaseServer
-        .from("storylets")
-        .select("id,slug,title,body,choices,is_active,created_at,tags,requirements,weight")
-        .eq("slug", entrySlug)
-        .limit(1)
-        .maybeSingle();
-      if (error) {
-        console.error("Failed to fetch Arc One entry storylet", error);
-      } else if (data) {
-        const coerced = coerceStoryletRow({
-          ...data,
-          choices: Array.isArray(data.choices) ? data.choices : [],
-        });
-        const validated = validateStorylet(coerced);
-        if (validated.ok) {
-          entryStorylet = validated.value;
-        } else {
-          console.warn("Invalid entry storylet; using fallback", validated.errors);
-        }
-      }
-    }
+    const entryStorylet = storyletsRaw.find(
+      (storylet) => storylet.slug === entrySlug
+    );
     if (entryStorylet) {
       storylets = [
         entryStorylet,
         ...storylets.filter((storylet) => storylet.id !== entryStorylet!.id),
       ].slice(0, 2);
+    } else {
+      console.warn("Arc One entry storylet not found in candidates.");
     }
   }
 
