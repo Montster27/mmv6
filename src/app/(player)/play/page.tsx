@@ -2079,12 +2079,12 @@ export default function PlayPage() {
       }
 
       const relationshipEvents = [
-        ...(selectedChoice?.events_emitted ?? []),
+        ...((selectedChoice?.events_emitted ?? []) as any),
         ...mapLegacyRelationalEffects(selectedChoice?.relational_effects),
         ...mapLegacyNpcKnowledge(selectedChoice?.set_npc_memory),
         ...mapLegacyRelationalEffects(matchedCondition?.relational_effects),
         ...mapLegacyNpcKnowledge(matchedCondition?.set_npc_memory),
-      ];
+      ] as any;
       if (relationshipEvents.length > 0) {
         const { next: nextRelationships, logs } = applyRelationshipEvents(
           relationshipsState,
