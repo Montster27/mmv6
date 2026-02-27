@@ -38,6 +38,7 @@ import {
   saveTimeAllocation,
   applyOutcomeForChoice,
   toChoices,
+  updateNpcMemory,
   type AllocationPayload,
 } from "@/lib/play";
 import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
@@ -101,6 +102,7 @@ import { getAppMode } from "@/lib/mode";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { useBootstrap } from "@/hooks/queries/useBootstrap";
 import { useDailyRun } from "@/hooks/queries/useDailyRun";
+import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -1678,6 +1680,20 @@ export default function PlayPage() {
     );
     setSelectedChoiceId(choiceId);
     setPendingAdvanceTarget(selectedChoice?.targetStoryletId ?? null);
+    const npcMemoryState = arcOneState?.npcMemory ?? {};
+    const reactionConditions = selectedChoice?.reaction_text_conditions ?? [];
+    let resolvedReactionText =
+      typeof selectedChoice?.reaction_text === "string"
+        ? selectedChoice.reaction_text.trim()
+        : null;
+    let matchedCondition: (typeof reactionConditions)[number] | null = null;
+    for (const condition of reactionConditions) {
+      if (matchesRequirement(condition.if, { npc_memory: npcMemoryState })) {
+        resolvedReactionText = condition.text;
+        matchedCondition = condition;
+        break;
+      }
+    }
     if (!firstChoiceTrackedRef.current && sessionStartAtRef.current) {
       firstChoiceTrackedRef.current = true;
       trackWithSeason({
@@ -1891,9 +1907,9 @@ export default function PlayPage() {
       }
 
       const reactionText =
-        typeof selectedChoice?.reaction_text === "string" &&
-        selectedChoice.reaction_text.trim().length > 0
-          ? selectedChoice.reaction_text.trim()
+        typeof resolvedReactionText === "string" &&
+        resolvedReactionText.trim().length > 0
+          ? resolvedReactionText.trim()
           : null;
       if (reactionText) {
         setPendingReactionText(reactionText);
@@ -1921,6 +1937,51 @@ export default function PlayPage() {
         pendingTransitionRef.current = () => setCurrentIndex((i) => i + 1);
         if (!reactionText) {
           setConsequenceActive(true);
+        }
+      }
+
+      const baseNpcMemory = arcOneState?.npcMemory ?? {};
+      const mergeNpcMemory = (
+        current: Record<string, any>,
+        deltas?: Record<string, Record<string, any>>
+      ) => {
+        if (!deltas) return current;
+        const next: Record<string, any> = { ...current };
+        Object.entries(deltas).forEach(([npcId, delta]) => {
+          const prev = next[npcId] ?? {};
+          const merged: Record<string, any> = { ...prev };
+          Object.entries(delta).forEach(([key, value]) => {
+            if (typeof value === "number") {
+              merged[key] = (typeof prev[key] === "number" ? prev[key] : 0) + value;
+            } else if (typeof value === "boolean") {
+              merged[key] = value;
+            }
+          });
+          next[npcId] = merged;
+        });
+        return next;
+      };
+      const mergedNpcMemory = mergeNpcMemory(
+        mergeNpcMemory(baseNpcMemory as Record<string, any>, selectedChoice?.relational_effects as any),
+        selectedChoice?.set_npc_memory as any
+      );
+      const conditionedNpcMemory = mergeNpcMemory(
+        mergedNpcMemory,
+        matchedCondition?.relational_effects as any
+      );
+      const finalNpcMemory = mergeNpcMemory(
+        conditionedNpcMemory,
+        matchedCondition?.set_npc_memory as any
+      );
+      const npcChanges =
+        Boolean(selectedChoice?.relational_effects) ||
+        Boolean(selectedChoice?.set_npc_memory) ||
+        Boolean(matchedCondition?.relational_effects) ||
+        Boolean(matchedCondition?.set_npc_memory);
+      if (npcChanges) {
+        await updateNpcMemory(userId, finalNpcMemory);
+        if (dailyState) {
+          setDailyState({ ...dailyState, npc_memory: finalNpcMemory });
         }
       }
     } catch (e) {

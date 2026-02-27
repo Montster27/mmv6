@@ -44,6 +44,10 @@ function parseChoices(raw: unknown): StoryletChoice[] {
             check: (item as any).check,
             targetStoryletId: (item as any).targetStoryletId,
             reaction_text: (item as any).reaction_text ?? null,
+            reaction_text_conditions:
+              (item as any).reaction_text_conditions ?? undefined,
+            relational_effects: (item as any).relational_effects ?? undefined,
+            set_npc_memory: (item as any).set_npc_memory ?? undefined,
           } as StoryletChoice;
         }
         return null;
@@ -383,6 +387,24 @@ export async function updateDailyState(
 
   if (error) {
     console.error("Failed to update daily state", error);
+    throw error;
+  }
+}
+
+export async function updateNpcMemory(
+  userId: string,
+  npcMemory: Record<string, unknown>
+) {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({
+      npc_memory: npcMemory,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Failed to update npc memory", error);
     throw error;
   }
 }

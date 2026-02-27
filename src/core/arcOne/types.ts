@@ -22,6 +22,9 @@ export type NpcMemoryEntry = {
   trust: number;
   reliability: number;
   emotionalLoad: number;
+  met?: boolean;
+  knows_name?: boolean;
+  [key: string]: number | boolean | undefined;
 };
 
 export type NpcMemory = Record<string, NpcMemoryEntry>;

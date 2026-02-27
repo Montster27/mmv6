@@ -85,6 +85,8 @@ function normalizeNpcMemory(raw: unknown): NpcMemory {
       trust: normalizeNumber(entry.trust),
       reliability: normalizeNumber(entry.reliability),
       emotionalLoad: normalizeNumber(entry.emotionalLoad),
+      met: entry.met === true,
+      knows_name: entry.knows_name === true,
     };
   });
   return next;

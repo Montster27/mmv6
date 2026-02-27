@@ -27,8 +27,15 @@ export type StoryletChoice = {
   time_cost?: number;
   energy_cost?: number;
   reaction_text?: string | null;
+  reaction_text_conditions?: Array<{
+    if: Record<string, unknown>;
+    text: string;
+    relational_effects?: Record<string, Record<string, number>>;
+    set_npc_memory?: Record<string, Record<string, boolean>>;
+  }>;
   identity_tags?: string[];
   relational_effects?: Record<string, Record<string, number>>;
+  set_npc_memory?: Record<string, Record<string, boolean>>;
   condition?: Record<string, unknown>;
 };
 
