@@ -38,7 +38,7 @@ import {
   saveTimeAllocation,
   applyOutcomeForChoice,
   toChoices,
-  updateNpcMemory,
+  updateRelationships,
   type AllocationPayload,
 } from "@/lib/play";
 import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
@@ -78,6 +78,14 @@ import {
 } from "@/lib/remnants";
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
 import { getArcOneState } from "@/core/arcOne/state";
+import {
+  applyRelationshipEvents,
+  ensureRelationshipDefaults,
+  mapLegacyNpcKnowledge,
+  mapLegacyRelationalEffects,
+  migrateLegacyNpcMemory,
+  renderNpcName,
+} from "@/lib/relationships";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
@@ -478,6 +486,7 @@ export default function PlayPage() {
   const [relDebugFilter, setRelDebugFilter] = useState<
     "all" | "relational" | "flags"
   >("all");
+  const [lastRelSummary, setLastRelSummary] = useState<string[]>([]);
   const seasonResetGameNote = useMemo(
     () =>
       gameMessage("The ledger blurs. You begin again with what you can hold.", {
@@ -522,10 +531,38 @@ export default function PlayPage() {
   );
   const beatBufferEnabled = Boolean(featureFlags.beatBufferEnabled);
   const relationshipDebugEnabled = Boolean(featureFlags.relationshipDebugEnabled);
+  const npcNameForId = useCallback((npcId: string) => {
+    if (npcId === "npc_roommate_dana") return "Dana";
+    if (npcId === "npc_connector_miguel") return "Miguel";
+    return npcId;
+  }, []);
   const arcOneState = useMemo(
     () => (arcOneMode ? getArcOneState(dailyState) : null),
     [arcOneMode, dailyState]
   );
+  const relationshipsState = useMemo(
+    () => arcOneState?.relationships ?? {},
+    [arcOneState?.relationships]
+  );
+  useEffect(() => {
+    if (!arcOneMode || !dailyState || !userId) return;
+    const { next: migrated, changed: migratedChanged } = migrateLegacyNpcMemory(
+      relationshipsState,
+      dailyState.npc_memory as Record<string, unknown>
+    );
+    const { next: ensured, changed: ensuredChanged } =
+      ensureRelationshipDefaults(migrated);
+    if (!migratedChanged && !ensuredChanged) return;
+    updateRelationships(userId, ensured, dayIndex)
+      .then(() => {
+        setDailyState((prev) =>
+          prev ? { ...prev, relationships: ensured } : prev
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to ensure relationship defaults", err);
+      });
+  }, [arcOneMode, dailyState?.id, userId, dayIndex, relationshipsState]);
   const arcOneReflectionReady = Boolean(
     arcOneMode &&
       arcOneState &&
@@ -1744,24 +1781,15 @@ export default function PlayPage() {
     );
     setSelectedChoiceId(choiceId);
     setPendingAdvanceTarget(selectedChoice?.targetStoryletId ?? null);
-    const npcMemoryState = arcOneState?.npcMemory ?? {};
     const derivedNpcMemory = Object.fromEntries(
-      Object.entries(npcMemoryState).map(([npcId, entry]) => {
+      Object.entries(relationshipsState).map(([npcId, entry]) => {
         const record = entry as Record<string, unknown>;
-        const trust = typeof record.trust === "number" ? record.trust : 0;
-        const reliability =
-          typeof record.reliability === "number" ? record.reliability : 0;
-        const emotionalLoad =
-          typeof record.emotionalLoad === "number" ? record.emotionalLoad : 0;
-        const met =
-          record.met === true || trust > 0 || reliability > 0 || emotionalLoad > 0;
-        const knowsName = record.knows_name === true || trust > 0;
         return [
           npcId,
           {
-            ...record,
-            met,
-            knows_name: knowsName,
+            met: record.met === true,
+            knows_name: record.knows_name === true,
+            knows_face: record.knows_face === true,
           },
         ];
       })
@@ -2050,94 +2078,69 @@ export default function PlayPage() {
         if (next) next();
       }
 
-      const baseNpcMemory = arcOneState?.npcMemory ?? {};
-      const mergeNpcMemory = (
-        current: Record<string, any>,
-        deltas?: Record<string, Record<string, any>>
-      ) => {
-        if (!deltas) return current;
-        const next: Record<string, any> = { ...current };
-        Object.entries(deltas).forEach(([npcId, delta]) => {
-          const prev = next[npcId] ?? {};
-          const merged: Record<string, any> = { ...prev };
-          Object.entries(delta).forEach(([key, value]) => {
-            if (typeof value === "number") {
-              merged[key] = (typeof prev[key] === "number" ? prev[key] : 0) + value;
-            } else if (typeof value === "boolean") {
-              merged[key] = value;
-            }
-          });
-          next[npcId] = merged;
-        });
-        return next;
-      };
-      const mergedNpcMemory = mergeNpcMemory(
-        mergeNpcMemory(baseNpcMemory as Record<string, any>, selectedChoice?.relational_effects as any),
-        selectedChoice?.set_npc_memory as any
-      );
-      const conditionedNpcMemory = mergeNpcMemory(
-        mergedNpcMemory,
-        matchedCondition?.relational_effects as any
-      );
-      const finalNpcMemory = mergeNpcMemory(
-        conditionedNpcMemory,
-        matchedCondition?.set_npc_memory as any
-      );
-      const logRelEvent = async (
-        npcId: string,
-        delta: Record<string, unknown>,
-        kind: "relational" | "npc_memory"
-      ) => {
-        const payload = {
-          user_id: userId,
-          day: dayIndex,
-          event_type: "REL_DELTA",
-          arc_id: null,
-          arc_instance_id: null,
-          step_key: null,
-          option_key: choiceId,
-          delta,
-          meta: {
-            storylet_slug: currentStorylet.slug,
-            choice_id: choiceId,
-            npc_id: npcId,
-            kind,
-            result: finalNpcMemory[npcId] ?? null,
-          },
-        };
-        supabase.from("choice_log").insert(payload);
-        if (testerMode && relationshipDebugEnabled) {
-          setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
-        }
-      };
-      const npcChanges =
-        Boolean(selectedChoice?.relational_effects) ||
-        Boolean(selectedChoice?.set_npc_memory) ||
-        Boolean(matchedCondition?.relational_effects) ||
-        Boolean(matchedCondition?.set_npc_memory);
-      if (npcChanges) {
-        const relationalSources = [
-          selectedChoice?.relational_effects,
-          matchedCondition?.relational_effects,
-        ].filter(Boolean) as Array<Record<string, Record<string, unknown>>>;
-        relationalSources.forEach((source) => {
-          Object.entries(source).forEach(([npcId, delta]) => {
-            logRelEvent(npcId, delta as Record<string, unknown>, "relational");
-          });
-        });
-        const memorySources = [
-          selectedChoice?.set_npc_memory,
-          matchedCondition?.set_npc_memory,
-        ].filter(Boolean) as Array<Record<string, Record<string, unknown>>>;
-        memorySources.forEach((source) => {
-          Object.entries(source).forEach(([npcId, delta]) => {
-            logRelEvent(npcId, delta as Record<string, unknown>, "npc_memory");
-          });
-        });
-        await updateNpcMemory(userId, finalNpcMemory, dayIndex);
+      const relationshipEvents = [
+        ...(selectedChoice?.events_emitted ?? []),
+        ...mapLegacyRelationalEffects(selectedChoice?.relational_effects),
+        ...mapLegacyNpcKnowledge(selectedChoice?.set_npc_memory),
+        ...mapLegacyRelationalEffects(matchedCondition?.relational_effects),
+        ...mapLegacyNpcKnowledge(matchedCondition?.set_npc_memory),
+      ];
+      if (relationshipEvents.length > 0) {
+        const { next: nextRelationships, logs } = applyRelationshipEvents(
+          relationshipsState,
+          relationshipEvents,
+          { storylet_slug: currentStorylet.slug, choice_id: choiceId }
+        );
+        await updateRelationships(userId, nextRelationships, dayIndex);
         if (dailyState) {
-          setDailyState({ ...dailyState, npc_memory: finalNpcMemory });
+          setDailyState({ ...dailyState, relationships: nextRelationships });
         }
+        const summary = logs.map((entry) => {
+          const parts: string[] = [];
+          if (typeof entry.delta.relationship === "number") {
+            const prefix = entry.delta.relationship > 0 ? "+" : "";
+            parts.push(`relationship ${prefix}${entry.delta.relationship}`);
+          }
+          if (typeof entry.delta.knows_name === "boolean") {
+            parts.push(`knows name ${entry.delta.knows_name ? "✓" : "✗"}`);
+          }
+          if (typeof entry.delta.met === "boolean") {
+            parts.push(`met ${entry.delta.met ? "✓" : "✗"}`);
+          }
+          if (typeof entry.delta.knows_face === "boolean") {
+            parts.push(`knows face ${entry.delta.knows_face ? "✓" : "✗"}`);
+          }
+          return `${npcNameForId(entry.npc_id)}: ${parts.join(", ")}`;
+        });
+        setLastRelSummary(summary);
+        logs.forEach((entry) => {
+          const flagChanged =
+            typeof entry.delta.met === "boolean" ||
+            typeof entry.delta.knows_name === "boolean" ||
+            typeof entry.delta.knows_face === "boolean";
+          const payload = {
+            user_id: userId,
+            day: dayIndex,
+            event_type: "REL_DELTA",
+            arc_id: null,
+            arc_instance_id: null,
+            step_key: null,
+            option_key: choiceId,
+            delta: entry.delta,
+            meta: {
+              storylet_slug: entry.source.storylet_slug,
+              choice_id: entry.source.choice_id,
+              npc_id: entry.npc_id,
+              kind: flagChanged ? "npc_memory" : "relational",
+              before: entry.before,
+              after: entry.after,
+            },
+          };
+          supabase.from("choice_log").insert(payload);
+          if (testerMode && relationshipDebugEnabled) {
+            setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
+          }
+        });
       }
     } catch (e) {
       console.error(e);
@@ -2151,6 +2154,7 @@ export default function PlayPage() {
     setPendingReactionText(null);
     setPendingAdvanceTarget(null);
     setSelectedChoiceId(null);
+    setLastRelSummary([]);
     const next = pendingTransitionRef.current;
     pendingTransitionRef.current = null;
     if (next) next();
@@ -2718,7 +2722,7 @@ export default function PlayPage() {
                       <div className="mt-2 space-y-2">
                         {["npc_roommate_dana", "npc_connector_miguel"].map(
                           (npcId) => {
-                            const entry = arcOneState.npcMemory?.[npcId] ?? {};
+                            const entry = relationshipsState[npcId] ?? {};
                             const met = entry.met ? "✅" : "❌";
                             const known = entry.knows_name ? "✅" : "❌";
                             return (
@@ -2802,7 +2806,7 @@ export default function PlayPage() {
               onFlagsChanged={() => setFeatureFlagsVersion((v) => v + 1)}
               relationshipDebugEnabled={relationshipDebugEnabled}
               relDebugEvents={relDebugEvents}
-              npcMemory={arcOneState?.npcMemory ?? null}
+              npcMemory={relationshipsState ?? null}
             />
           ) : null}
 
@@ -3055,6 +3059,17 @@ export default function PlayPage() {
                                       {para}
                                     </p>
                                   ))}
+                                  {relationshipDebugEnabled &&
+                                  lastRelSummary.length > 0 ? (
+                                    <div className="mt-2 text-xs text-slate-600 space-y-1">
+                                      <p className="font-semibold text-slate-700">
+                                        Relationship changes
+                                      </p>
+                                      {lastRelSummary.map((line, idx) => (
+                                        <p key={idx}>{line}</p>
+                                      ))}
+                                    </div>
+                                  ) : null}
                                   <Button
                                     className="mt-3"
                                     onClick={handleReactionContinue}
