@@ -78,19 +78,12 @@ function writeOverrides(overrides: Partial<FeatureFlags>, userId?: string | null
 }
 
 const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
-  ["arcFirstEnabled", "Arc First"],
   ["arcOneScarcityEnabled", "Arc One Scarcity"],
-  ["arcs", "Arcs"],
   ["resources", "Resources"],
   ["skills", "Skills"],
   ["alignment", "Alignment/Directives"],
   ["funPulse", "Fun pulse"],
-  ["contentStudioLiteEnabled", "Content Studio Lite"],
-  ["contentStudioGraphEnabled", "Studio Graph"],
-  ["contentStudioPreviewEnabled", "Studio Preview"],
-  ["contentStudioHistoryEnabled", "Studio History"],
-  ["contentStudioPublishEnabled", "Studio Publish"],
-  ["contentStudioRemnantRulesEnabled", "Studio Remnant Rules"],
+  ["contentStudioLiteEnabled", "Content Studio"],
   ["verticalSlice30Enabled", "Vertical Slice 30"],
   ["rookieCircleEnabled", "Rookie Circle"],
   ["askOfferBoardEnabled", "Ask/Offer Board"],
@@ -169,6 +162,15 @@ export default function DevMenu({
   }, []);
 
   const handleToggleFlag = (key: keyof FeatureFlags) => {
+    if (
+      key === "contentStudioGraphEnabled" ||
+      key === "contentStudioPreviewEnabled" ||
+      key === "contentStudioHistoryEnabled" ||
+      key === "contentStudioPublishEnabled" ||
+      key === "contentStudioRemnantRulesEnabled"
+    ) {
+      return;
+    }
     let nextOverrides: Partial<FeatureFlags> = {
       ...flagOverrides,
       [key]: !(flagOverrides[key] ?? flags[key]),
@@ -193,6 +195,16 @@ export default function DevMenu({
     }
     setFlagOverrides(nextOverrides);
     writeOverrides(nextOverrides, currentUserId);
+    if (key === "contentStudioLiteEnabled") {
+      nextOverrides = {
+        ...nextOverrides,
+        contentStudioGraphEnabled: true,
+        contentStudioPreviewEnabled: true,
+        contentStudioHistoryEnabled: true,
+        contentStudioPublishEnabled: true,
+        contentStudioRemnantRulesEnabled: true,
+      };
+    }
     if (key === "verticalSlice30Enabled") {
       window.location.reload();
       return;
@@ -344,7 +356,18 @@ export default function DevMenu({
           Retain toggles for this account
         </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {FLAG_LABELS.map(([key, label]) => {
+          {FLAG_LABELS.filter(([key]) => {
+            if (
+              key === "contentStudioGraphEnabled" ||
+              key === "contentStudioPreviewEnabled" ||
+              key === "contentStudioHistoryEnabled" ||
+              key === "contentStudioPublishEnabled" ||
+              key === "contentStudioRemnantRulesEnabled"
+            ) {
+              return false;
+            }
+            return true;
+          }).map(([key, label]) => {
             const active = flagOverrides[key] ?? flags[key];
             return (
               <div
