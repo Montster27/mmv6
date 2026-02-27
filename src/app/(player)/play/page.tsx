@@ -1753,6 +1753,7 @@ export default function PlayPage() {
       });
 
       const alreadyRecorded = Boolean(runId);
+      let beatFallbackMessage: string | null = null;
       if (!alreadyRecorded) {
         let state = dailyState;
         if (!state) {
@@ -1806,6 +1807,7 @@ export default function PlayPage() {
           typeof appliedDeltas.energy === "number" ||
           typeof appliedDeltas.stress === "number" ||
           hasVectorDeltas;
+        beatFallbackMessage = appliedMessage ?? null;
         setOutcomeMessage(
           appliedMessage || (hasDeltas ? "Choice recorded." : null)
         );
@@ -1936,7 +1938,7 @@ export default function PlayPage() {
           : null;
       const beatText =
         reactionText ??
-        (beatBufferEnabled && appliedMessage ? appliedMessage : null);
+        (beatBufferEnabled && beatFallbackMessage ? beatFallbackMessage : null);
       if (beatBufferEnabled && beatText) {
         setPendingReactionText(beatText);
         supabase.from("choice_log").insert({
