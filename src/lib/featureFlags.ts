@@ -18,6 +18,7 @@ export type FeatureFlags = {
   contentStudioHistoryEnabled: boolean;
   contentStudioPublishEnabled: boolean;
   contentStudioRemnantRulesEnabled: boolean;
+  beatBufferEnabled: boolean;
 };
 
 function parseFlag(value: string | undefined): boolean | null {
@@ -77,6 +78,7 @@ export function getFeatureFlags(): FeatureFlags {
           contentStudioHistoryEnabled: true,
           contentStudioPublishEnabled: false,
           contentStudioRemnantRulesEnabled: false,
+          beatBufferEnabled: true,
         }
       : {
           arcFirstEnabled: true,
@@ -94,6 +96,7 @@ export function getFeatureFlags(): FeatureFlags {
           contentStudioHistoryEnabled: true,
           contentStudioPublishEnabled: false,
           contentStudioRemnantRulesEnabled: false,
+          beatBufferEnabled: true,
         };
 
   const studioFlag =
@@ -151,6 +154,8 @@ export function getFeatureFlags(): FeatureFlags {
     contentStudioRemnantRulesEnabled:
       parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_REMNANT_RULES) ??
       undefined,
+    beatBufferEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_BEAT_BUFFER) ?? undefined,
   };
 
   const localOverrides = getOverrideFlags();

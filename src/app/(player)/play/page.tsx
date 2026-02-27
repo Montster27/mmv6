@@ -115,6 +115,7 @@ const defaultAllocation: AllocationPayload = {
 };
 
 const USE_DAILY_LOOP_ORCHESTRATOR = true;
+const BEAT_AUTO_ADVANCE_MS: number | null = null;
 
 export default function PlayPage() {
   const session = useSession();
@@ -507,6 +508,7 @@ export default function PlayPage() {
       featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY,
     [featureFlags.arcOneScarcityEnabled, dayIndex]
   );
+  const beatBufferEnabled = Boolean(featureFlags.beatBufferEnabled);
   const arcOneState = useMemo(
     () => (arcOneMode ? getArcOneState(dailyState) : null),
     [arcOneMode, dailyState]
@@ -1932,8 +1934,26 @@ export default function PlayPage() {
         resolvedReactionText.trim().length > 0
           ? resolvedReactionText.trim()
           : null;
-      if (reactionText) {
-        setPendingReactionText(reactionText);
+      const beatText =
+        reactionText ??
+        (beatBufferEnabled && appliedMessage ? appliedMessage : null);
+      if (beatBufferEnabled && beatText) {
+        setPendingReactionText(beatText);
+        supabase.from("choice_log").insert({
+          user_id: userId,
+          day: dayIndex,
+          event_type: "BEAT_SHOWN",
+          arc_id: null,
+          arc_instance_id: null,
+          step_key: null,
+          option_key: choiceId,
+          delta: null,
+          meta: {
+            storylet_id: currentStorylet.id,
+            choice_id: choiceId,
+            text: beatText,
+          },
+        });
       }
 
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
@@ -1951,14 +1971,19 @@ export default function PlayPage() {
               : "social";
         }
         pendingTransitionRef.current = () => setStage(nextStage);
-        if (!reactionText) {
+        if (!reactionText || !beatBufferEnabled) {
           setConsequenceActive(true);
         }
       } else {
         pendingTransitionRef.current = () => setCurrentIndex((i) => i + 1);
-        if (!reactionText) {
+        if (!reactionText || !beatBufferEnabled) {
           setConsequenceActive(true);
         }
+      }
+      if (reactionText && !beatBufferEnabled) {
+        const next = pendingTransitionRef.current;
+        pendingTransitionRef.current = null;
+        if (next) next();
       }
 
       const baseNpcMemory = arcOneState?.npcMemory ?? {};
@@ -2021,6 +2046,28 @@ export default function PlayPage() {
     pendingTransitionRef.current = null;
     if (next) next();
   };
+
+  useEffect(() => {
+    if (!beatBufferEnabled || !pendingReactionText) return;
+    if (!BEAT_AUTO_ADVANCE_MS) return;
+    const timer = window.setTimeout(
+      () => handleReactionContinue(),
+      BEAT_AUTO_ADVANCE_MS
+    );
+    return () => window.clearTimeout(timer);
+  }, [beatBufferEnabled, pendingReactionText]);
+
+  useEffect(() => {
+    if (!beatBufferEnabled || !pendingReactionText) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        handleReactionContinue();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [beatBufferEnabled, pendingReactionText]);
 
   const handleCompareDismiss = () => {
     setCompareVisible(false);
@@ -2790,7 +2837,7 @@ export default function PlayPage() {
                                   </p>
                                 );
                               })()}
-                              {pendingReactionText ? (
+                              {beatBufferEnabled && pendingReactionText ? (
                                 <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800">
                                   {pendingReactionText.split("\n\n").map((para, idx) => (
                                     <p key={idx} className="text-sm">
