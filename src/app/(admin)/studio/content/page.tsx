@@ -3201,9 +3201,13 @@ export default function ContentStudioLitePage() {
                                           }));
                                           const parsed = safeParseJson(next);
                                           if (parsed.ok) {
+                                            const conditions = Array.isArray(
+                                              parsed.value
+                                            )
+                                              ? parsed.value
+                                              : undefined;
                                             applyChoiceUpdate(choice.id, {
-                                              reaction_text_conditions:
-                                                parsed.value ?? undefined,
+                                              reaction_text_conditions: conditions,
                                             });
                                           }
                                         }}
