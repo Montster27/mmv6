@@ -1681,6 +1681,27 @@ export default function PlayPage() {
     setSelectedChoiceId(choiceId);
     setPendingAdvanceTarget(selectedChoice?.targetStoryletId ?? null);
     const npcMemoryState = arcOneState?.npcMemory ?? {};
+    const derivedNpcMemory = Object.fromEntries(
+      Object.entries(npcMemoryState).map(([npcId, entry]) => {
+        const record = entry as Record<string, unknown>;
+        const trust = typeof record.trust === "number" ? record.trust : 0;
+        const reliability =
+          typeof record.reliability === "number" ? record.reliability : 0;
+        const emotionalLoad =
+          typeof record.emotionalLoad === "number" ? record.emotionalLoad : 0;
+        const met =
+          record.met === true || trust > 0 || reliability > 0 || emotionalLoad > 0;
+        const knowsName = record.knows_name === true || trust > 0;
+        return [
+          npcId,
+          {
+            ...record,
+            met,
+            knows_name: knowsName,
+          },
+        ];
+      })
+    );
     const reactionConditions = selectedChoice?.reaction_text_conditions ?? [];
     let resolvedReactionText =
       typeof selectedChoice?.reaction_text === "string"
@@ -1688,7 +1709,7 @@ export default function PlayPage() {
         : null;
     let matchedCondition: (typeof reactionConditions)[number] | null = null;
     for (const condition of reactionConditions) {
-      if (matchesRequirement(condition.if, { npc_memory: npcMemoryState })) {
+      if (matchesRequirement(condition.if, { npc_memory: derivedNpcMemory })) {
         resolvedReactionText = condition.text;
         matchedCondition = condition;
         break;
