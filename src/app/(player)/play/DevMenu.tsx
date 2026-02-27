@@ -79,6 +79,7 @@ function writeOverrides(overrides: Partial<FeatureFlags>, userId?: string | null
 
 const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
   ["arcOneScarcityEnabled", "Arc One Scarcity"],
+  ["beatBufferEnabled", "Beat Buffer"],
   ["resources", "Resources"],
   ["skills", "Skills"],
   ["alignment", "Alignment/Directives"],
