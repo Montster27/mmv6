@@ -398,13 +398,6 @@ export default function PlayPage() {
     setUserId(bootstrapQuery.data.userId);
   }, [bootstrapQuery.data, bootstrapQuery.isError]);
 
-  const gameNote = useMemo(
-    () =>
-      gameMessage("The day opens like a file you didn't finish yesterday.", {
-        tone: "neutral",
-      }),
-    []
-  );
   const testerMode = useMemo(() => getAppMode().testerMode, []);
   const phaseRef = useRef<string | null>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2358,7 +2351,6 @@ export default function PlayPage() {
                 Signed in as {session.user.email ?? "unknown user"}.
               </p>
               <div className="mt-3 space-y-2">
-                <MessageCard message={gameNote} variant="inline" />
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
                 </TesterOnly>
@@ -2581,10 +2573,6 @@ export default function PlayPage() {
                   </>
                 ) : (
                   <>
-                  <section className="rounded-md border border-slate-200 bg-white px-4 py-4 text-slate-700">
-                    Today you’re balancing pressure, opportunity, and what you’re willing
-                    to push.
-                  </section>
                   {stagePrompt ? (
                     <TesterOnly>
                       <section className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
