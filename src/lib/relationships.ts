@@ -68,14 +68,12 @@ export function ensureRelationshipDefaults(
       return;
     }
     const merged: RelationshipState = { ...existing };
-    const fill: Partial<RelationshipState> = {};
     (Object.keys(defaults) as Array<keyof RelationshipState>).forEach((key) => {
       if (merged[key] === undefined) {
-        fill[key] = defaults[key];
+        (merged as Record<string, unknown>)[key] = defaults[key];
         changed = true;
       }
     });
-    Object.assign(merged, fill);
     if (changed) {
       merged.updated_at = now;
     }
