@@ -2000,7 +2000,7 @@ export default function PlayPage() {
         Boolean(matchedCondition?.relational_effects) ||
         Boolean(matchedCondition?.set_npc_memory);
       if (npcChanges) {
-        await updateNpcMemory(userId, finalNpcMemory);
+        await updateNpcMemory(userId, finalNpcMemory, dayIndex);
         if (dailyState) {
           setDailyState({ ...dailyState, npc_memory: finalNpcMemory });
         }

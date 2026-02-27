@@ -393,19 +393,37 @@ export async function updateDailyState(
 
 export async function updateNpcMemory(
   userId: string,
-  npcMemory: Record<string, unknown>
+  npcMemory: Record<string, unknown>,
+  dayIndex?: number
 ) {
-  const { error } = await supabase
+  let query = supabase
     .from("daily_states")
     .update({
       npc_memory: npcMemory,
       updated_at: new Date().toISOString(),
     })
     .eq("user_id", userId);
+  if (typeof dayIndex === "number") {
+    query = query.eq("day_index", dayIndex);
+  }
+  const { data, error } = await query.select("id");
 
   if (error) {
     console.error("Failed to update npc memory", error);
     throw error;
+  }
+  if (typeof dayIndex === "number" && (!data || data.length === 0)) {
+    const { error: retryError } = await supabase
+      .from("daily_states")
+      .update({
+        npc_memory: npcMemory,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+    if (retryError) {
+      console.error("Failed to update npc memory (fallback)", retryError);
+      throw retryError;
+    }
   }
 }
 
