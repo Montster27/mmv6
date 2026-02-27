@@ -466,6 +466,18 @@ export default function PlayPage() {
   const [testerStageResponses, setTesterStageResponses] = useState<
     Record<string, string>
   >({});
+  const [relDebugEvents, setRelDebugEvents] = useState<
+    Array<{
+      id?: string;
+      created_at?: string;
+      event_type: string;
+      delta?: Record<string, unknown> | null;
+      meta?: Record<string, unknown> | null;
+    }>
+  >([]);
+  const [relDebugFilter, setRelDebugFilter] = useState<
+    "all" | "relational" | "flags"
+  >("all");
   const seasonResetGameNote = useMemo(
     () =>
       gameMessage("The ledger blurs. You begin again with what you can hold.", {
@@ -509,6 +521,7 @@ export default function PlayPage() {
     [featureFlags.arcOneScarcityEnabled, dayIndex]
   );
   const beatBufferEnabled = Boolean(featureFlags.beatBufferEnabled);
+  const relationshipDebugEnabled = Boolean(featureFlags.relationshipDebugEnabled);
   const arcOneState = useMemo(
     () => (arcOneMode ? getArcOneState(dailyState) : null),
     [arcOneMode, dailyState]
@@ -551,6 +564,30 @@ export default function PlayPage() {
     skills,
     skillBank,
   ]);
+
+  const formatRelDelta = (delta: Record<string, unknown> | null | undefined) => {
+    if (!delta) return "{}";
+    const entries = Object.entries(delta).map(([key, value]) => {
+      if (typeof value === "number") {
+        const prefix = value > 0 ? "+" : "";
+        return `"${key}": ${prefix}${value}`;
+      }
+      if (typeof value === "boolean") {
+        return `"${key}": ${value ? "true" : "false"}`;
+      }
+      return `"${key}": "${String(value)}"`;
+    });
+    return `{ ${entries.join(", ")} }`;
+  };
+
+  const filteredRelEvents = useMemo(() => {
+    if (relDebugFilter === "all") return relDebugEvents;
+    return relDebugEvents.filter((event) => {
+      const kind = (event.meta as any)?.kind;
+      if (relDebugFilter === "relational") return kind === "relational";
+      return kind === "npc_memory";
+    });
+  }, [relDebugEvents, relDebugFilter]);
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
@@ -1527,6 +1564,31 @@ export default function PlayPage() {
   }, [dayIndex, testerMode, pushTesterMessage]);
 
   useEffect(() => {
+    if (!testerMode || !relationshipDebugEnabled || !userId) return;
+    let cancelled = false;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("choice_log")
+        .select("id,created_at,event_type,delta,meta")
+        .eq("user_id", userId)
+        .eq("event_type", "REL_DELTA")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) {
+        console.error("Failed to load relationship debug events", error);
+        return;
+      }
+      if (!cancelled) {
+        setRelDebugEvents(data ?? []);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [testerMode, relationshipDebugEnabled, userId]);
+
+  useEffect(() => {
     return () => {
       if (!userId || sessionEndTracked.current) return;
       sessionEndTracked.current = true;
@@ -2021,12 +2083,57 @@ export default function PlayPage() {
         conditionedNpcMemory,
         matchedCondition?.set_npc_memory as any
       );
+      const logRelEvent = async (
+        npcId: string,
+        delta: Record<string, unknown>,
+        kind: "relational" | "npc_memory"
+      ) => {
+        const payload = {
+          user_id: userId,
+          day: dayIndex,
+          event_type: "REL_DELTA",
+          arc_id: null,
+          arc_instance_id: null,
+          step_key: null,
+          option_key: choiceId,
+          delta,
+          meta: {
+            storylet_slug: currentStorylet.slug,
+            choice_id: choiceId,
+            npc_id: npcId,
+            kind,
+            result: finalNpcMemory[npcId] ?? null,
+          },
+        };
+        supabase.from("choice_log").insert(payload);
+        if (testerMode && relationshipDebugEnabled) {
+          setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
+        }
+      };
       const npcChanges =
         Boolean(selectedChoice?.relational_effects) ||
         Boolean(selectedChoice?.set_npc_memory) ||
         Boolean(matchedCondition?.relational_effects) ||
         Boolean(matchedCondition?.set_npc_memory);
       if (npcChanges) {
+        const relationalSources = [
+          selectedChoice?.relational_effects,
+          matchedCondition?.relational_effects,
+        ].filter(Boolean) as Array<Record<string, Record<string, unknown>>>;
+        relationalSources.forEach((source) => {
+          Object.entries(source).forEach(([npcId, delta]) => {
+            logRelEvent(npcId, delta as Record<string, unknown>, "relational");
+          });
+        });
+        const memorySources = [
+          selectedChoice?.set_npc_memory,
+          matchedCondition?.set_npc_memory,
+        ].filter(Boolean) as Array<Record<string, Record<string, unknown>>>;
+        memorySources.forEach((source) => {
+          Object.entries(source).forEach(([npcId, delta]) => {
+            logRelEvent(npcId, delta as Record<string, unknown>, "npc_memory");
+          });
+        });
         await updateNpcMemory(userId, finalNpcMemory, dayIndex);
         if (dailyState) {
           setDailyState({ ...dailyState, npc_memory: finalNpcMemory });
@@ -2538,6 +2645,69 @@ export default function PlayPage() {
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  </TesterOnly>
+                ) : null}
+                {testerMode && relationshipDebugEnabled ? (
+                  <TesterOnly>
+                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-slate-700">
+                          Relationship deltas
+                        </p>
+                        <div className="flex items-center gap-1">
+                          {(["all", "relational", "flags"] as const).map(
+                            (filter) => (
+                              <Button
+                                key={filter}
+                                variant={relDebugFilter === filter ? "default" : "ghost"}
+                                size="sm"
+                                onClick={() => setRelDebugFilter(filter)}
+                              >
+                                {filter === "all"
+                                  ? "All"
+                                  : filter === "relational"
+                                  ? "Relationship"
+                                  : "Flags"}
+                              </Button>
+                            )
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-2 max-h-48 space-y-2 overflow-auto">
+                        {filteredRelEvents.length === 0 ? (
+                          <p className="text-slate-500">No deltas yet.</p>
+                        ) : (
+                          filteredRelEvents.map((event, idx) => {
+                            const meta = (event.meta ?? {}) as Record<string, any>;
+                            const npcId = meta.npc_id ?? "unknown";
+                            return (
+                              <div
+                                key={`${event.created_at ?? "event"}-${idx}`}
+                                className="rounded border border-slate-200 bg-white px-2 py-1"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-slate-700">
+                                    {npcId}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {event.created_at
+                                      ? new Date(event.created_at).toLocaleTimeString()
+                                      : ""}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-500">
+                                  {meta.storylet_slug ?? "storylet"} ·{" "}
+                                  {meta.choice_id ?? "choice"}
+                                </div>
+                                <div className="mt-1 font-mono text-[11px] text-slate-700">
+                                  {formatRelDelta(event.delta as Record<string, unknown>)}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   </TesterOnly>
                 ) : null}
