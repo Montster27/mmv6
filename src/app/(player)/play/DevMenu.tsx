@@ -343,9 +343,12 @@ export default function DevMenu({
                     (npcMemory && (npcMemory as any)[npcId]) ?? {};
                   const met = entry.met ? "✅" : "❌";
                   const known = entry.knows_name ? "✅" : "❌";
-                  const deltaEntries = Object.entries(entry)
-                    .map(([key, value]) => `${key}: ${String(value)}`)
-                    .join(", ");
+                  const relValue =
+                    typeof entry.relationship === "number"
+                      ? `${entry.relationship}/10`
+                      : "—";
+                  const roleTag =
+                    typeof entry.role_tag === "string" ? entry.role_tag : "—";
                   return (
                     <div
                       key={npcId}
@@ -360,7 +363,7 @@ export default function DevMenu({
                         </span>
                       </div>
                       <div className="mt-1 text-[11px] text-slate-600">
-                        {deltaEntries || "No deltas yet."}
+                        relationship: {relValue} · role: {roleTag}
                       </div>
                     </div>
                   );

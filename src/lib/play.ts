@@ -46,6 +46,7 @@ function parseChoices(raw: unknown): StoryletChoice[] {
             reaction_text: (item as any).reaction_text ?? null,
             reaction_text_conditions:
               (item as any).reaction_text_conditions ?? undefined,
+            events_emitted: (item as any).events_emitted ?? undefined,
             relational_effects: (item as any).relational_effects ?? undefined,
             set_npc_memory: (item as any).set_npc_memory ?? undefined,
           } as StoryletChoice;
@@ -74,7 +75,7 @@ export async function fetchDailyState(
   const { data, error } = await supabase
     .from("daily_states")
     .select(
-      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,expired_opportunities,replay_intention,arc_one_reflection_done,start_date,last_day_completed,last_day_index_completed"
+      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,relationships,expired_opportunities,replay_intention,arc_one_reflection_done,start_date,last_day_completed,last_day_index_completed"
     )
     .eq("user_id", userId)
     .limit(1)
@@ -422,6 +423,41 @@ export async function updateNpcMemory(
       .eq("user_id", userId);
     if (retryError) {
       console.error("Failed to update npc memory (fallback)", retryError);
+      throw retryError;
+    }
+  }
+}
+
+export async function updateRelationships(
+  userId: string,
+  relationships: Record<string, unknown>,
+  dayIndex?: number
+) {
+  let query = supabase
+    .from("daily_states")
+    .update({
+      relationships,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId);
+  if (typeof dayIndex === "number") {
+    query = query.eq("day_index", dayIndex);
+  }
+  const { data, error } = await query.select("id");
+  if (error) {
+    console.error("Failed to update relationships", error);
+    throw error;
+  }
+  if (typeof dayIndex === "number" && (!data || data.length === 0)) {
+    const { error: retryError } = await supabase
+      .from("daily_states")
+      .update({
+        relationships,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+    if (retryError) {
+      console.error("Failed to update relationships (fallback)", retryError);
       throw retryError;
     }
   }

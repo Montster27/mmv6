@@ -12,6 +12,7 @@ export type DailyState = {
   money_band?: "tight" | "okay" | "comfortable";
   skill_flags?: JsonObject;
   npc_memory?: JsonObject;
+  relationships?: JsonObject;
   expired_opportunities?: JsonObject;
   replay_intention?: JsonObject;
   arc_one_reflection_done?: boolean;

@@ -76,6 +76,7 @@ export async function POST(request: Request) {
       money_band: "okay",
       skill_flags: {},
       npc_memory: {},
+      relationships: {},
       expired_opportunities: [],
       replay_intention: dailyState?.replay_intention ?? {},
       // TODO(arc-one): decide whether replay intention persists beyond Arc One.

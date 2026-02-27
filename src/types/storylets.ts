@@ -33,6 +33,11 @@ export type StoryletChoice = {
     relational_effects?: Record<string, Record<string, number>>;
     set_npc_memory?: Record<string, Record<string, boolean>>;
   }>;
+  events_emitted?: Array<{
+    npc_id: string;
+    type: string;
+    magnitude?: number;
+  }>;
   identity_tags?: string[];
   relational_effects?: Record<string, Record<string, number>>;
   set_npc_memory?: Record<string, Record<string, boolean>>;

@@ -37,6 +37,9 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
   const reactionConditions = Array.isArray(obj.reaction_text_conditions)
     ? (obj.reaction_text_conditions as any)
     : undefined;
+  const eventsEmitted = Array.isArray(obj.events_emitted)
+    ? (obj.events_emitted as any)
+    : undefined;
   const relationalEffects =
     obj.relational_effects && typeof obj.relational_effects === "object"
       ? (obj.relational_effects as Record<string, Record<string, number>>)
@@ -54,6 +57,7 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     targetStoryletId,
     reaction_text: reactionText,
     reaction_text_conditions: reactionConditions,
+    events_emitted: eventsEmitted,
     relational_effects: relationalEffects,
     set_npc_memory: setNpcMemory,
   };

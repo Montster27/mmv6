@@ -122,6 +122,7 @@ type EditorState = {
   targetInputs: Record<string, string>;
   conditionInputs: Record<string, string>;
   reactionConditionInputs: Record<string, string>;
+  eventsEmittedInputs: Record<string, string>;
   error: string | null;
   saveState: SaveState;
   lastSavedAt: Date | null;
@@ -306,6 +307,7 @@ export default function ContentStudioLitePage() {
     targetInputs: {},
     conditionInputs: {},
     reactionConditionInputs: {},
+    eventsEmittedInputs: {},
     error: null,
     saveState: "idle",
     lastSavedAt: null,
@@ -1368,6 +1370,7 @@ export default function ContentStudioLitePage() {
       const nextTargetInputs: Record<string, string> = {};
       const nextConditionInputs: Record<string, string> = {};
       const nextReactionConditionInputs: Record<string, string> = {};
+      const nextEventsInputs: Record<string, string> = {};
       storylet.choices.forEach((choice) => {
         nextVectorInputs[choice.id] = formatVectorInput(
           choice.outcome?.deltas?.vectors
@@ -1385,6 +1388,11 @@ export default function ContentStudioLitePage() {
           null,
           2
         );
+        nextEventsInputs[choice.id] = JSON.stringify(
+          (choice as any).events_emitted ?? [],
+          null,
+          2
+        );
       });
       const validation = validateStorylet(storylet);
       setEditor({
@@ -1398,6 +1406,7 @@ export default function ContentStudioLitePage() {
         targetInputs: nextTargetInputs,
         conditionInputs: nextConditionInputs,
         reactionConditionInputs: nextReactionConditionInputs,
+        eventsEmittedInputs: nextEventsInputs,
         error: null,
         saveState: "idle",
         lastSavedAt: null,
@@ -1722,6 +1731,10 @@ export default function ContentStudioLitePage() {
       },
       reactionConditionInputs: {
         ...prev.reactionConditionInputs,
+        [nextId]: JSON.stringify([], null, 2),
+      },
+      eventsEmittedInputs: {
+        ...prev.eventsEmittedInputs,
         [nextId]: JSON.stringify([], null, 2),
       },
     }));
@@ -3217,6 +3230,36 @@ export default function ContentStudioLitePage() {
                                       <span className="mt-1 block text-[11px] text-slate-500">
                                         Helper keys: requires_npc_known, requires_npc_met.
                                       </span>
+                                    </label>
+                                    <label className="text-xs text-slate-600">
+                                      Events emitted (JSON)
+                                      <textarea
+                                        className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
+                                        rows={3}
+                                        value={
+                                          editor.eventsEmittedInputs[choice.id] ??
+                                          "[]"
+                                        }
+                                        onChange={(e) => {
+                                          const next = e.target.value;
+                                          setEditor((prev) => ({
+                                            ...prev,
+                                            eventsEmittedInputs: {
+                                              ...prev.eventsEmittedInputs,
+                                              [choice.id]: next,
+                                            },
+                                            dirty: true,
+                                          }));
+                                          const parsed = safeParseJson(next);
+                                          if (parsed.ok && Array.isArray(parsed.value)) {
+                                            applyChoiceUpdate(choice.id, {
+                                              events_emitted: parsed.value ?? undefined,
+                                            });
+                                          }
+                                        }}
+                                        onBlur={() => saveDraft(true)}
+                                        placeholder='[{\"npc_id\":\"npc_roommate_dana\",\"type\":\"SMALL_KINDNESS\",\"magnitude\":1}]'
+                                      />
                                     </label>
                                     <div className="grid gap-2 md:grid-cols-3">
                                       <label className="text-xs text-slate-600">

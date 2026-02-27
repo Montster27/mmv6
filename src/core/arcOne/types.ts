@@ -29,6 +29,15 @@ export type NpcMemoryEntry = {
 
 export type NpcMemory = Record<string, NpcMemoryEntry>;
 
+export type RelationshipState = {
+  met: boolean;
+  knows_name: boolean;
+  knows_face: boolean;
+  role_tag?: string;
+  relationship: number;
+  updated_at?: string;
+};
+
 export type ReplayIntention = {
   risk_bias?: boolean;
   people_bias?: boolean;
@@ -47,6 +56,7 @@ export type ArcOneState = {
   moneyBand: MoneyBand;
   skillFlags: SkillFlags;
   npcMemory: NpcMemory;
+  relationships: Record<string, RelationshipState>;
   expiredOpportunities: ExpiredOpportunity[];
   replayIntention: ReplayIntention;
   reflectionDone: boolean;

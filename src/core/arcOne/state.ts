@@ -7,6 +7,7 @@ import type {
   MoneyBand,
   NpcMemory,
   SkillFlags,
+  RelationshipState,
 } from "@/core/arcOne/types";
 
 const DEFAULT_LIFE_PRESSURE: LifePressureState = {
@@ -92,6 +93,27 @@ function normalizeNpcMemory(raw: unknown): NpcMemory {
   return next;
 }
 
+function normalizeRelationships(raw: unknown): Record<string, RelationshipState> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const record = raw as Record<string, unknown>;
+  const next: Record<string, RelationshipState> = {};
+  Object.entries(record).forEach(([key, value]) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+    const entry = value as Record<string, unknown>;
+    const relationship =
+      typeof entry.relationship === "number" ? entry.relationship : 5;
+    next[key] = {
+      met: entry.met === true,
+      knows_name: entry.knows_name === true,
+      knows_face: entry.knows_face === true,
+      role_tag: typeof entry.role_tag === "string" ? entry.role_tag : undefined,
+      relationship,
+      updated_at: typeof entry.updated_at === "string" ? entry.updated_at : undefined,
+    };
+  });
+  return next;
+}
+
 function normalizeExpired(raw: unknown): ExpiredOpportunity[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -131,6 +153,7 @@ export function getArcOneState(dailyState: DailyState | null): ArcOneState {
     moneyBand: normalizeMoneyBand(dailyState?.money_band),
     skillFlags: normalizeSkillFlags(dailyState?.skill_flags),
     npcMemory: normalizeNpcMemory(dailyState?.npc_memory),
+    relationships: normalizeRelationships(dailyState?.relationships),
     expiredOpportunities: normalizeExpired(dailyState?.expired_opportunities),
     replayIntention: normalizeReplayIntention(dailyState?.replay_intention),
     reflectionDone: Boolean(dailyState?.arc_one_reflection_done),

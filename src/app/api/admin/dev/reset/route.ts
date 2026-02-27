@@ -118,6 +118,7 @@ export async function POST(request: Request) {
       money_band: "okay",
       skill_flags: {},
       npc_memory: {},
+      relationships: {},
       expired_opportunities: [],
       replay_intention: {},
       arc_one_reflection_done: false,

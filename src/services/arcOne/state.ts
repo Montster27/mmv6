@@ -10,7 +10,7 @@ export async function fetchArcOneState(userId: string): Promise<ArcOneState | nu
   const { data, error } = await supabaseServer
     .from("daily_states")
     .select(
-      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,expired_opportunities,replay_intention,arc_one_reflection_done"
+      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,relationships,expired_opportunities,replay_intention,arc_one_reflection_done"
     )
     .eq("user_id", userId)
     .limit(1)
@@ -31,6 +31,7 @@ export async function updateArcOneState(userId: string, next: Partial<ArcOneStat
   if (next.moneyBand) payload.money_band = normalizeMoneyBand(next.moneyBand);
   if (next.skillFlags) payload.skill_flags = next.skillFlags;
   if (next.npcMemory) payload.npc_memory = next.npcMemory;
+  if (next.relationships) payload.relationships = next.relationships;
   if (next.expiredOpportunities) payload.expired_opportunities = next.expiredOpportunities;
   if (next.replayIntention) payload.replay_intention = next.replayIntention;
   if (typeof next.reflectionDone === "boolean") {
