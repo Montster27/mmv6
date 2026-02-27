@@ -39,6 +39,15 @@ type Props = {
   onResetAccount: (userId: string) => void;
   onToggleAdmin: (userId: string, next: boolean) => void;
   onFlagsChanged?: () => void;
+  relationshipDebugEnabled?: boolean;
+  relDebugEvents?: Array<{
+    id?: string;
+    created_at?: string;
+    event_type: string;
+    delta?: Record<string, unknown> | null;
+    meta?: Record<string, unknown> | null;
+  }>;
+  npcMemory?: Record<string, unknown> | null;
 };
 
 function readOverrides(): Partial<FeatureFlags> {
@@ -80,6 +89,7 @@ function writeOverrides(overrides: Partial<FeatureFlags>, userId?: string | null
 const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
   ["arcOneScarcityEnabled", "Arc One Scarcity"],
   ["beatBufferEnabled", "Beat Buffer"],
+  ["relationshipDebugEnabled", "Relationship Debug"],
   ["resources", "Resources"],
   ["skills", "Skills"],
   ["alignment", "Alignment/Directives"],
@@ -114,6 +124,9 @@ export default function DevMenu({
   onResetAccount,
   onToggleAdmin,
   onFlagsChanged,
+  relationshipDebugEnabled = false,
+  relDebugEvents = [],
+  npcMemory = null,
 }: Props) {
   const [flagOverrides, setFlagOverrides] = useState<Partial<FeatureFlags>>({});
   const [retainOverrides, setRetainOverrides] = useState(false);
@@ -124,6 +137,9 @@ export default function DevMenu({
     ReturnType<typeof getResourceTrace>
   >([]);
   const [traceLoading, setTraceLoading] = useState(false);
+  const [relFilter, setRelFilter] = useState<"all" | "relational" | "flags">(
+    "all"
+  );
 
   useEffect(() => {
     setFlagOverrides(readOverrides());
@@ -157,6 +173,13 @@ export default function DevMenu({
       setTraceLoading(false);
     }
   };
+
+  const filteredRelEvents = relDebugEvents.filter((event) => {
+    if (relFilter === "all") return true;
+    const kind = (event.meta as any)?.kind;
+    if (relFilter === "relational") return kind === "relational";
+    return kind === "npc_memory";
+  });
 
   useEffect(() => {
     loadServerTrace();
@@ -290,6 +313,109 @@ export default function DevMenu({
           </div>
         ) : null}
       </div>
+      {relationshipDebugEnabled ? (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium">Relationship debug</span>
+            <div className="flex items-center gap-1">
+              {(["all", "relational", "flags"] as const).map((filter) => (
+                <Button
+                  key={filter}
+                  variant={relFilter === filter ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setRelFilter(filter)}
+                >
+                  {filter === "all"
+                    ? "All"
+                    : filter === "relational"
+                    ? "Relationship"
+                    : "Flags"}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600">
+              <p className="font-semibold text-slate-700">People</p>
+              <div className="mt-2 space-y-2">
+                {["npc_roommate_dana", "npc_connector_miguel"].map((npcId) => {
+                  const entry =
+                    (npcMemory && (npcMemory as any)[npcId]) ?? {};
+                  const met = entry.met ? "✅" : "❌";
+                  const known = entry.knows_name ? "✅" : "❌";
+                  const deltaEntries = Object.entries(entry)
+                    .map(([key, value]) => `${key}: ${String(value)}`)
+                    .join(", ");
+                  return (
+                    <div
+                      key={npcId}
+                      className="rounded border border-slate-200 bg-slate-50 px-2 py-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-700">
+                          {npcId === "npc_roommate_dana" ? "Dana" : "Miguel"}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          met {met} · name {known}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-600">
+                        {deltaEntries || "No deltas yet."}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600">
+              <p className="font-semibold text-slate-700">Recent deltas</p>
+              <div className="mt-2 max-h-48 space-y-2 overflow-auto">
+                {filteredRelEvents.length === 0 ? (
+                  <p className="text-slate-500">No deltas yet.</p>
+                ) : (
+                  filteredRelEvents.map((event, idx) => {
+                    const meta = (event.meta ?? {}) as Record<string, any>;
+                    const npcId = meta.npc_id ?? "unknown";
+                    const deltaEntries = Object.entries(event.delta ?? {})
+                      .map(([key, value]) => {
+                        if (typeof value === "number") {
+                          const prefix = value > 0 ? "+" : "";
+                          return `${key}:${prefix}${value}`;
+                        }
+                        return `${key}:${String(value)}`;
+                      })
+                      .join(", ");
+                    return (
+                      <div
+                        key={`${event.created_at ?? "event"}-${idx}`}
+                        className="rounded border border-slate-200 bg-slate-50 px-2 py-1"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-slate-700">
+                            {npcId}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {event.created_at
+                              ? new Date(event.created_at).toLocaleTimeString()
+                              : ""}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {meta.storylet_slug ?? "storylet"} ·{" "}
+                          {meta.choice_id ?? "choice"}
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-700">
+                          {deltaEntries || "{}"}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isResourceTraceEnabled() ? (
         <div className="rounded-md border border-slate-200 bg-white px-3 py-3 space-y-2">

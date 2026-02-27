@@ -2800,6 +2800,9 @@ export default function PlayPage() {
               onResetAccount={handleResetAccount}
               onToggleAdmin={handleToggleAdmin}
               onFlagsChanged={() => setFeatureFlagsVersion((v) => v + 1)}
+              relationshipDebugEnabled={relationshipDebugEnabled}
+              relDebugEvents={relDebugEvents}
+              npcMemory={arcOneState?.npcMemory ?? null}
             />
           ) : null}
 
