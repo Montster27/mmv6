@@ -2711,6 +2711,42 @@ export default function PlayPage() {
                     </div>
                   </TesterOnly>
                 ) : null}
+                {testerMode && arcOneState ? (
+                  <TesterOnly>
+                    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      <p className="font-semibold text-slate-700">People</p>
+                      <div className="mt-2 space-y-2">
+                        {["npc_roommate_dana", "npc_connector_miguel"].map(
+                          (npcId) => {
+                            const entry = arcOneState.npcMemory?.[npcId] ?? {};
+                            const met = entry.met ? "✅" : "❌";
+                            const known = entry.knows_name ? "✅" : "❌";
+                            return (
+                              <div
+                                key={npcId}
+                                className="rounded border border-slate-200 bg-white px-2 py-1"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium text-slate-700">
+                                    {npcId === "npc_roommate_dana"
+                                      ? "Dana"
+                                      : "Miguel"}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    met {met} · name {known}
+                                  </span>
+                                </div>
+                                <div className="mt-1 font-mono text-[11px] text-slate-700">
+                                  {formatRelDelta(entry as Record<string, unknown>)}
+                                </div>
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
+                    </div>
+                  </TesterOnly>
+                ) : null}
               </div>
               {dayRolloverNotice ? (
                 <p className="mt-2 text-xs text-slate-500">{dayRolloverNotice}</p>
