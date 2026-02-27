@@ -555,9 +555,9 @@ export default function PlayPage() {
     if (!migratedChanged && !ensuredChanged) return;
     updateRelationships(userId, ensured, dayIndex)
       .then(() => {
-        setDailyState((prev) =>
-          prev ? { ...prev, relationships: ensured } : prev
-        );
+        setDailyState((dailyState ?? null)
+          ? { ...(dailyState as any), relationships: ensured }
+          : (dailyState as any));
       })
       .catch((err) => {
         console.error("Failed to ensure relationship defaults", err);
