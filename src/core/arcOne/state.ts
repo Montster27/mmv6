@@ -174,18 +174,21 @@ export function bumpLifePressure(
   return next;
 }
 
+const NPC_MEMORY_MAX = 10;
+
 export function updateNpcMemory(
   current: NpcMemory,
   npcKey: string,
   deltas: { trust?: number; reliability?: number; emotionalLoad?: number }
 ): NpcMemory {
   const existing = current[npcKey] ?? { trust: 0, reliability: 0, emotionalLoad: 0 };
+  const clamp = (v: number) => Math.max(-NPC_MEMORY_MAX, Math.min(NPC_MEMORY_MAX, v));
   return {
     ...current,
     [npcKey]: {
-      trust: existing.trust + (deltas.trust ?? 0),
-      reliability: existing.reliability + (deltas.reliability ?? 0),
-      emotionalLoad: existing.emotionalLoad + (deltas.emotionalLoad ?? 0),
+      trust: clamp(existing.trust + (deltas.trust ?? 0)),
+      reliability: clamp(existing.reliability + (deltas.reliability ?? 0)),
+      emotionalLoad: clamp(existing.emotionalLoad + (deltas.emotionalLoad ?? 0)),
     },
   };
 }

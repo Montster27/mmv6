@@ -12,34 +12,21 @@ export function computeStage(
     alreadyCompletedToday: boolean,
     canBoost: boolean,
     hasStorylets: boolean,
-    arcFirstEnabled: boolean,
     reflectionDone: boolean,
     microTaskEligible: boolean,
     microTaskDone: boolean,
     funPulseEligible: boolean,
     funPulseDone: boolean
 ): DailyRunStage {
-    if (arcFirstEnabled) {
-        if (alreadyCompletedToday) return "complete";
-        if (!allocationPresent) return "allocation";
-        if (microTaskEligible && !microTaskDone) return "microtask";
-        if (canBoost) return "social";
-        if (!reflectionDone) return "reflection";
-        if (funPulseEligible && !funPulseDone) return "fun_pulse";
-        return "complete";
-    }
     if (!hasStorylets) return "complete";
     if (alreadyCompletedToday) return "complete";
     if (!allocationPresent) return "allocation";
     if (runsForPairCount === 0) return "storylet_1";
     if (runsForPairCount === 1) return "storylet_2";
     if (runsForPairCount === 2) return "storylet_3";
-    if (runsForPairCount >= 3 && reflectionDone && funPulseEligible && !funPulseDone) {
-        return "fun_pulse";
-    }
-    if (runsForPairCount >= 3 && reflectionDone) return "complete";
-    if (runsForPairCount >= 3 && microTaskEligible && !microTaskDone) return "microtask";
     if (runsForPairCount >= 3 && canBoost) return "social";
-    if (runsForPairCount >= 3 && !canBoost) return "reflection";
+    if (runsForPairCount >= 3 && !reflectionDone) return "reflection";
+    if (runsForPairCount >= 3 && microTaskEligible && !microTaskDone) return "microtask";
+    if (runsForPairCount >= 3 && funPulseEligible && !funPulseDone) return "fun_pulse";
     return "complete";
 }

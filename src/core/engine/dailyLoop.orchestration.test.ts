@@ -100,7 +100,6 @@ vi.mock("@/core/validation/storyletValidation", () => ({
 
 vi.mock("@/lib/featureFlags", () => ({
   getFeatureFlags: vi.fn(() => ({
-    arcFirstEnabled: false,
     skills: true,
     funPulse: true,
     alignment: true,

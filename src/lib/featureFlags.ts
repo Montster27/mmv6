@@ -1,5 +1,4 @@
 export type FeatureFlags = {
-  arcFirstEnabled: boolean;
   arcOneScarcityEnabled: boolean;
   arcs: boolean;
   resources: boolean;
@@ -64,7 +63,6 @@ export function getFeatureFlags(): FeatureFlags {
   const base: FeatureFlags =
     set === "muted"
       ? {
-          arcFirstEnabled: true,
           arcOneScarcityEnabled: true,
           arcs: true,
           resources: false,
@@ -72,7 +70,12 @@ export function getFeatureFlags(): FeatureFlags {
           alignment: false,
           funPulse: false,
           verticalSlice30Enabled: verticalSliceFlag,
-          ...sliceDefaults,
+          // muted preset disables social/community features regardless of slice flag
+          rookieCircleEnabled: false,
+          askOfferBoardEnabled: false,
+          buddySystemEnabled: false,
+          afterActionCompareEnabled: false,
+          remnantSystemEnabled: false,
           contentStudioLiteEnabled: true,
           contentStudioGraphEnabled: true,
           contentStudioPreviewEnabled: true,
@@ -83,7 +86,6 @@ export function getFeatureFlags(): FeatureFlags {
           relationshipDebugEnabled: true,
         }
       : {
-          arcFirstEnabled: true,
           arcOneScarcityEnabled: true,
           arcs: true,
           resources: false,
@@ -123,8 +125,6 @@ export function getFeatureFlags(): FeatureFlags {
       };
 
   const overrides: Partial<FeatureFlags> = {
-    arcFirstEnabled:
-      parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARC_FIRST) ?? undefined,
     arcOneScarcityEnabled:
       parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARC_ONE_SCARCITY) ?? undefined,
     arcs: parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARCS) ?? undefined,

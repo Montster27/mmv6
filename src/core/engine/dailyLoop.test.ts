@@ -42,7 +42,6 @@ describe("dailyLoop helpers", () => {
       false,
       false,
       false,
-      false,
       false
     );
     expect(stage).toBe("storylet_2");
@@ -59,19 +58,17 @@ describe("dailyLoop helpers", () => {
       false,
       false,
       false,
-      false,
       false
     );
     expect(stage).toBe("storylet_3");
   });
 
-  it("uses allocation stage when arc-first is enabled", () => {
+  it("returns allocation when allocation is missing and storylets exist", () => {
     const stage = computeStage(
       false,
       0,
       false,
       true,
-      false,
       true,
       false,
       false,

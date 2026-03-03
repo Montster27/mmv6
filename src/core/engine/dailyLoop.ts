@@ -71,11 +71,7 @@ import {
 } from "@/lib/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { RemnantKey } from "@/types/remnants";
-import type {
-  DailyPosture,
-  DailyTension,
-  SkillBank,
-} from "@/types/dailyInteraction";
+
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
 const DIRECTIVE_TAGS: Record<string, string[]> = {
@@ -92,18 +88,6 @@ function devLogStage(snapshot: Record<string, unknown>) {
   }
 }
 
-function needsSetup({
-  skillBank,
-  posture,
-  skillLevels,
-}: {
-  skillBank: SkillBank | null;
-  posture: DailyPosture | null;
-  skillLevels: { focus: number; memory: number; networking: number; grit: number } | null;
-}) {
-  // auto-default posture for user test build (can be reverted)
-  return false;
-}
 
 export async function getOrCreateDailyRun(
   userId: string,
@@ -351,9 +335,13 @@ export async function getOrCreateDailyRun(
       if (initiative && initiative.status === "open" && dayIndex > initiative.ends_day_index) {
         const progress = await fetchInitiativeProgress(initiative.id);
         const nextStatus = progress >= initiative.goal ? "completed" : "expired";
-        await closeInitiative(initiative.id);
-        await updateDirectiveStatus(staleDirective.id, nextStatus);
-        staleDirective.status = nextStatus;
+        try {
+          await closeInitiative(initiative.id);
+          await updateDirectiveStatus(staleDirective.id, nextStatus);
+          staleDirective.status = nextStatus;
+        } catch (err) {
+          console.error("Failed to close initiative or update directive", err);
+        }
       }
 
       if (staleDirective.status === "completed") {
@@ -417,18 +405,14 @@ export async function getOrCreateDailyRun(
   const canBoost = !boosted;
   const arcOneMode =
     featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY;
-  const setupNeeded = needsSetup({
-    skillBank: arcOneMode ? null : skillBank,
-    posture: postureResolved,
-    skillLevels: skills ?? null,
-  });
+  // Setup is handled via auto-default posture above; no additional setup gate needed.
+  const setupNeeded = false;
   const baseStage = computeStage(
     arcOneMode ? true : Boolean(allocation),
     runsForPair.length,
     cadence.alreadyCompletedToday,
     canBoost,
     hasStorylets,
-    false,
     reflectionDone,
     microTaskEligible,
     microTaskDone,

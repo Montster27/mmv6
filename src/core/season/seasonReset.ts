@@ -65,32 +65,35 @@ async function countRows(
   userId: string,
   since?: string | null
 ): Promise<number> {
-  let query = supabase.from(table).select("id").eq("user_id", userId);
+  let query = supabase
+    .from(table)
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
   if (since) {
     query = query.gte("created_at", since);
   }
-  const { data, error } = await query;
+  const { count, error } = await query;
   if (error) {
     console.error(`Failed to count ${table}`, error);
     return 0;
   }
-  return data?.length ?? 0;
+  return count ?? 0;
 }
 
 async function countUserAnomalies(userId: string, since?: string | null): Promise<number> {
   let query = supabase
     .from("user_anomalies")
-    .select("anomaly_id")
+    .select("*", { count: "exact", head: true })
     .eq("user_id", userId);
   if (since) {
     query = query.gte("discovered_at", since);
   }
-  const { data, error } = await query;
+  const { count, error } = await query;
   if (error) {
     console.error("Failed to count user anomalies", error);
     return 0;
   }
-  return data?.length ?? 0;
+  return count ?? 0;
 }
 
 export async function performSeasonReset(
@@ -145,7 +148,7 @@ export async function performSeasonReset(
     .eq("user_id", userId);
 
   if (resetError) {
-    console.error("Failed to reset daily state", resetError);
+    throw new Error(`Season reset failed: could not reset daily state. ${resetError.message}`);
   }
 
   const { error: seasonError } = await supabase
@@ -160,7 +163,7 @@ export async function performSeasonReset(
     .eq("user_id", userId);
 
   if (seasonError) {
-    console.error("Failed to update user season", seasonError);
+    throw new Error(`Season reset failed: could not update user season. ${seasonError.message}`);
   }
 
   trackEvent({
