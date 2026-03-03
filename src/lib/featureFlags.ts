@@ -98,8 +98,8 @@ export function getFeatureFlags(): FeatureFlags {
           contentStudioGraphEnabled: true,
           contentStudioPreviewEnabled: true,
           contentStudioHistoryEnabled: true,
-          contentStudioPublishEnabled: false,
-          contentStudioRemnantRulesEnabled: false,
+          contentStudioPublishEnabled: true,
+          contentStudioRemnantRulesEnabled: true,
           beatBufferEnabled: true,
           relationshipDebugEnabled: true,
         };
@@ -163,6 +163,11 @@ export function getFeatureFlags(): FeatureFlags {
       parseFlag(process.env.NEXT_PUBLIC_REL_DEBUG) ?? undefined,
   };
 
+  // Strip undefined values so unset env vars don't shadow base defaults.
+  const cleanOverrides = Object.fromEntries(
+    Object.entries(overrides).filter(([, v]) => v !== undefined)
+  ) as Partial<FeatureFlags>;
+
   const localOverrides = getOverrideFlags();
-  return { ...base, ...studioDefaults, ...overrides, ...localOverrides };
+  return { ...base, ...studioDefaults, ...cleanOverrides, ...localOverrides };
 }
