@@ -382,7 +382,23 @@ export function selectStorylets({
   }
 
   if (picked.length < 3) {
-    const remaining = activeStorylets.filter((s) => !picked.includes(s) && !todayUsedIds.has(s.id));
+    // Pad to 3 while still honouring NPC gates and max_total_runs.
+    // Season/audience requirements are intentionally relaxed here so we always
+    // have something to show, but a storylet must never appear before the
+    // player has met its required NPCs.
+    const remaining = activeStorylets.filter((s) => {
+      if (picked.includes(s) || todayUsedIds.has(s.id)) return false;
+      return meetsRequirements(
+        s,
+        dayIndex,
+        dailyState,
+        seasonIndex,
+        userId,
+        experiments,
+        isAdmin,
+        { ignoreSeason: true, ignoreAudience: true }
+      );
+    });
     picked.push(...pickTop(remaining, seed, 3 - picked.length, context));
   }
 

@@ -125,7 +125,24 @@ const KNOWN_REQUIREMENT_KEYS = new Set([
   "max_season_index",
   "seasons_any",
   "audience",
+  "max_total_runs",
+  "requires_npc_met",
+  "requires_npc_not_met",
 ]);
+
+/**
+ * NPCs that begin the game unmet. Body text and choice labels must not reveal
+ * their names before the player meets them.
+ * Format: [word-boundary regex, npc_id, display name for messages]
+ */
+const GUARDED_NPC_NAMES: [RegExp, string, string][] = [
+  [/\bMiguel\b/, "npc_connector_miguel", "Miguel"],
+  [/\bMarsh\b/, "npc_prof_marsh", "Marsh"],
+  [/\bPriya\b/, "npc_studious_priya", "Priya"],
+  [/\bCal\b/, "npc_floor_cal", "Cal"],
+  [/\bJordan\b/, "npc_ambiguous_jordan", "Jordan"],
+  [/\bSandra\b/, "npc_ra_sandra", "Sandra"],
+];
 
 function addIssue(
   list: ValidationIssue[],
@@ -546,6 +563,47 @@ export function validateStoryletIssues(
         }
       }
     }
+    // ── max_total_runs ───────────────────────────────────────────────────────
+    if (req.max_total_runs !== undefined) {
+      if (
+        typeof req.max_total_runs !== "number" ||
+        !Number.isInteger(req.max_total_runs) ||
+        req.max_total_runs < 1
+      ) {
+        addIssue(
+          errors,
+          storylet,
+          "requirements.max_total_runs",
+          "max_total_runs must be a positive integer"
+        );
+      }
+    }
+
+    // ── requires_npc_met / requires_npc_not_met ──────────────────────────────
+    for (const field of ["requires_npc_met", "requires_npc_not_met"] as const) {
+      if (req[field] !== undefined) {
+        if (!Array.isArray(req[field])) {
+          addIssue(
+            errors,
+            storylet,
+            `requirements.${field}`,
+            `${field} must be an array of NPC id strings`
+          );
+        } else {
+          (req[field] as unknown[]).forEach((v, i) => {
+            if (typeof v !== "string" || !v.startsWith("npc_")) {
+              addIssue(
+                errors,
+                storylet,
+                `requirements.${field}[${i}]`,
+                `${field} entries must be NPC id strings starting with "npc_"`
+              );
+            }
+          });
+        }
+      }
+    }
+
     Object.keys(req).forEach((key) => {
       if (!KNOWN_REQUIREMENT_KEYS.has(key)) {
         addIssue(
@@ -556,6 +614,49 @@ export function validateStoryletIssues(
         );
       }
     });
+  }
+
+  // ── NPC name-leak detection ────────────────────────────────────────────────
+  // Warn if body text or choice labels reference an NPC by name before the
+  // player could have met them. The correct fix is either:
+  //   (a) add requires_npc_met so the storylet only shows after meeting them, or
+  //   (b) use reaction_text_conditions in choices so the name is conditional.
+  {
+    const req = (storylet.requirements ?? {}) as Record<string, unknown>;
+    const metNpcs = Array.isArray(req.requires_npc_met)
+      ? (req.requires_npc_met as string[])
+      : [];
+
+    if (isString(storylet.body)) {
+      for (const [pattern, npcId, displayName] of GUARDED_NPC_NAMES) {
+        if (pattern.test(storylet.body) && !metNpcs.includes(npcId)) {
+          addIssue(
+            warnings,
+            storylet,
+            "body",
+            `Body text mentions "${displayName}" but storylet lacks requires_npc_met: ["${npcId}"]. ` +
+            `If intentional, add a reaction_text_conditions guard on each choice instead.`
+          );
+        }
+      }
+    }
+
+    if (Array.isArray(storylet.choices)) {
+      storylet.choices.forEach((choice: any, idx: number) => {
+        if (!isString(choice?.label)) return;
+        for (const [pattern, npcId, displayName] of GUARDED_NPC_NAMES) {
+          if (pattern.test(choice.label) && !metNpcs.includes(npcId)) {
+            addIssue(
+              warnings,
+              storylet,
+              `choices[${idx}].label`,
+              `Choice label mentions "${displayName}" but storylet lacks requires_npc_met: ["${npcId}"]. ` +
+              `Choice labels are always visible — use a generic label or add the NPC gate.`
+            );
+          }
+        }
+      });
+    }
   }
 
   return { errors, warnings };

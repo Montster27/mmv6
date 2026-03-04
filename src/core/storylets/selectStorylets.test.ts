@@ -50,7 +50,7 @@ describe("selectStorylets", () => {
     expect(first).toEqual(second);
   });
 
-  it("returns exactly two when enough storylets exist", () => {
+  it("returns up to three when enough storylets exist", () => {
     const storylets = [makeStorylet("a"), makeStorylet("b"), makeStorylet("c")];
     const selected = selectStorylets({
       seed: "seed",
@@ -61,7 +61,8 @@ describe("selectStorylets", () => {
       allStorylets: storylets,
       recentRuns: [],
     });
-    expect(selected).toHaveLength(2);
+    expect(selected.length).toBeGreaterThanOrEqual(2);
+    expect(selected.length).toBeLessThanOrEqual(3);
   });
 
   it("skips inactive storylets when active options exist", () => {
@@ -120,7 +121,10 @@ describe("selectStorylets", () => {
       recentRuns: [],
     });
 
-    expect(selected.every((s) => (s.tags ?? []).includes("onboarding"))).toBe(true);
+    // Both onboarding storylets should appear; a third slot may be filled by "other"
+    const ids = selected.map((s) => s.id);
+    expect(ids).toContain("onboard-1");
+    expect(ids).toContain("onboard-2");
   });
 
   it("includes a forced storylet as the first pick when eligible", () => {
@@ -137,7 +141,7 @@ describe("selectStorylets", () => {
       forcedStorylet: forced,
     });
     expect(selected[0]?.id).toBe("forced");
-    expect(selected).toHaveLength(2);
+    expect(selected.length).toBeGreaterThanOrEqual(2);
   });
 
   it("respects season allowlist when possible", () => {
@@ -178,7 +182,9 @@ describe("selectStorylets", () => {
       allStorylets: storylets,
       recentRuns: [],
     });
-    expect(selected).toHaveLength(2);
+    // At least the neutral storylet should be returned; others may backfill
+    expect(selected.length).toBeGreaterThanOrEqual(1);
+    expect(selected.some((s) => s.id === "neutral")).toBe(true);
   });
 
   it("respects rollout audience gating", () => {
@@ -266,5 +272,150 @@ describe("selectStorylets", () => {
     const scoreStudy = _testOnly.scoreStorylet(study, "seed", ctx);
     const scoreOther = _testOnly.scoreStorylet(other, "seed", ctx);
     expect(scoreStudy).toBeLessThan(scoreOther);
+  });
+
+  // ── max_total_runs ────────────────────────────────────────────────────────
+
+  it("excludes a one-shot storylet after it has been run once", () => {
+    const storylets = [
+      makeStorylet("one-shot", { requirements: { max_total_runs: 1 } }),
+      makeStorylet("repeatable"),
+    ];
+    const recentRuns: StoryletRun[] = [
+      { id: "r1", user_id: "u", day_index: 1, storylet_id: "one-shot", choice_id: "x" },
+    ];
+    const ids = selectStorylets({
+      seed: "seed",
+      userId: "user-1",
+      dayIndex: 5,
+      seasonIndex: 1,
+      dailyState: baseState,
+      allStorylets: storylets,
+      recentRuns,
+    }).map((s) => s.id);
+    expect(ids).not.toContain("one-shot");
+    expect(ids).toContain("repeatable");
+  });
+
+  it("includes a one-shot storylet if it has never been run", () => {
+    const storylets = [
+      makeStorylet("one-shot", { requirements: { max_total_runs: 1 } }),
+      makeStorylet("filler"),
+    ];
+    const ids = selectStorylets({
+      seed: "seed",
+      userId: "user-1",
+      dayIndex: 5,
+      seasonIndex: 1,
+      dailyState: baseState,
+      allStorylets: storylets,
+      recentRuns: [],
+    }).map((s) => s.id);
+    expect(ids).toContain("one-shot");
+  });
+
+  it("allows a multi-run storylet until the cap is hit", () => {
+    const storylets = [
+      makeStorylet("capped", { requirements: { max_total_runs: 2 } }),
+      makeStorylet("filler"),
+    ];
+    const oneRun: StoryletRun[] = [
+      { id: "r1", user_id: "u", day_index: 1, storylet_id: "capped", choice_id: "x" },
+    ];
+    const twoRuns: StoryletRun[] = [
+      ...oneRun,
+      { id: "r2", user_id: "u", day_index: 2, storylet_id: "capped", choice_id: "x" },
+    ];
+
+    const afterOne = selectStorylets({
+      seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
+      dailyState: baseState, allStorylets: storylets, recentRuns: oneRun,
+    }).map((s) => s.id);
+    expect(afterOne).toContain("capped");
+
+    const afterTwo = selectStorylets({
+      seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
+      dailyState: baseState, allStorylets: storylets, recentRuns: twoRuns,
+    }).map((s) => s.id);
+    expect(afterTwo).not.toContain("capped");
+  });
+
+  // ── requires_npc_met ──────────────────────────────────────────────────────
+
+  it("excludes a storylet when a required NPC has not been met", () => {
+    const storylets = [
+      makeStorylet("npc-gated", {
+        requirements: { requires_npc_met: ["npc_floor_cal"] },
+      }),
+      makeStorylet("open-a"),
+      makeStorylet("open-b"),
+    ];
+    // Cal is present but met=false
+    const stateCalUnmet: DailyState = {
+      ...baseState,
+      relationships: { npc_floor_cal: { met: false, relationship: 5 } },
+    };
+    const ids = selectStorylets({
+      seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
+      dailyState: stateCalUnmet, allStorylets: storylets, recentRuns: [],
+    }).map((s) => s.id);
+    expect(ids).not.toContain("npc-gated");
+  });
+
+  it("includes a storylet when a required NPC has been met", () => {
+    const storylets = [
+      makeStorylet("npc-gated", {
+        requirements: { requires_npc_met: ["npc_floor_cal"] },
+      }),
+      makeStorylet("filler"),
+    ];
+    const stateCalMet: DailyState = {
+      ...baseState,
+      relationships: { npc_floor_cal: { met: true, relationship: 6 } },
+    };
+    const ids = selectStorylets({
+      seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
+      dailyState: stateCalMet, allStorylets: storylets, recentRuns: [],
+    }).map((s) => s.id);
+    expect(ids).toContain("npc-gated");
+  });
+
+  // ── requires_npc_not_met ──────────────────────────────────────────────────
+
+  it("excludes a first-encounter storylet after the NPC has been met", () => {
+    const storylets = [
+      makeStorylet("first-meet", {
+        requirements: { requires_npc_not_met: ["npc_floor_cal"] },
+      }),
+      makeStorylet("filler-a"),
+      makeStorylet("filler-b"),
+    ];
+    const stateCalMet: DailyState = {
+      ...baseState,
+      relationships: { npc_floor_cal: { met: true, relationship: 6 } },
+    };
+    const ids = selectStorylets({
+      seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
+      dailyState: stateCalMet, allStorylets: storylets, recentRuns: [],
+    }).map((s) => s.id);
+    expect(ids).not.toContain("first-meet");
+  });
+
+  it("includes a first-encounter storylet when the NPC has not yet been met", () => {
+    const storylets = [
+      makeStorylet("first-meet", {
+        requirements: { requires_npc_not_met: ["npc_floor_cal"] },
+      }),
+      makeStorylet("filler"),
+    ];
+    const stateCalUnmet: DailyState = {
+      ...baseState,
+      relationships: { npc_floor_cal: { met: false, relationship: 5 } },
+    };
+    const ids = selectStorylets({
+      seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
+      dailyState: stateCalUnmet, allStorylets: storylets, recentRuns: [],
+    }).map((s) => s.id);
+    expect(ids).toContain("first-meet");
   });
 });

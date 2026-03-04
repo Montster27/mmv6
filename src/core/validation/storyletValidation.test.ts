@@ -172,4 +172,93 @@ describe("storyletValidation", () => {
     const res = validateStorylet(invalidReq);
     expect(res.ok).toBe(false);
   });
+
+  // ── max_total_runs ──────────────────────────────────────────────────────
+
+  it("accepts a valid max_total_runs integer", () => {
+    const res = validateStorylet({ ...valid, requirements: { max_total_runs: 1 } });
+    expect(res.ok).toBe(true);
+  });
+
+  it("rejects max_total_runs that is not a positive integer", () => {
+    expect(validateStorylet({ ...valid, requirements: { max_total_runs: 0 } }).ok).toBe(false);
+    expect(validateStorylet({ ...valid, requirements: { max_total_runs: -1 } }).ok).toBe(false);
+    expect(validateStorylet({ ...valid, requirements: { max_total_runs: 1.5 } }).ok).toBe(false);
+    expect(validateStorylet({ ...valid, requirements: { max_total_runs: "1" } }).ok).toBe(false);
+  });
+
+  // ── requires_npc_met / requires_npc_not_met ─────────────────────────────
+
+  it("accepts valid requires_npc_met array", () => {
+    const res = validateStorylet({
+      ...valid,
+      requirements: { requires_npc_met: ["npc_floor_cal"] },
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it("rejects requires_npc_met that is not an array", () => {
+    const res = validateStorylet({
+      ...valid,
+      requirements: { requires_npc_met: "npc_floor_cal" },
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects requires_npc_met entries not starting with npc_", () => {
+    const res = validateStorylet({
+      ...valid,
+      requirements: { requires_npc_met: ["cal"] },
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("accepts valid requires_npc_not_met array", () => {
+    const res = validateStorylet({
+      ...valid,
+      requirements: { requires_npc_not_met: ["npc_floor_cal"] },
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  // ── NPC name-leak detection ─────────────────────────────────────────────
+
+  it("warns when body text contains an unguarded NPC name", () => {
+    const withNameLeak = { ...valid, body: "You spot Miguel across the hall." };
+    const res = validateStoryletIssues(withNameLeak);
+    expect(res.warnings.some((w) => w.path === "body" && w.message.includes("Miguel"))).toBe(true);
+  });
+
+  it("does not warn about NPC name when requires_npc_met is set", () => {
+    const guarded = {
+      ...valid,
+      body: "You find Miguel at the table.",
+      requirements: { requires_npc_met: ["npc_connector_miguel"] },
+    };
+    const res = validateStoryletIssues(guarded);
+    expect(res.warnings.some((w) => w.path === "body" && w.message.includes("Miguel"))).toBe(false);
+  });
+
+  it("warns when a choice label contains an unguarded NPC name", () => {
+    const withLabelLeak = {
+      ...valid,
+      choices: [{ id: "a", label: "Follow Miguel to the table" }],
+    };
+    const res = validateStoryletIssues(withLabelLeak);
+    expect(
+      res.warnings.some((w) => w.path.startsWith("choices") && w.message.includes("Miguel"))
+    ).toBe(true);
+  });
+
+  it("does not warn about NPC name in choice label when storylet requires that NPC met", () => {
+    const guarded = {
+      ...valid,
+      choices: [{ id: "a", label: "Ask Miguel about the club" }],
+      requirements: { requires_npc_met: ["npc_connector_miguel"] },
+    };
+    const res = validateStoryletIssues(guarded);
+    expect(
+      res.warnings.some((w) => w.path.startsWith("choices") && w.message.includes("Miguel"))
+    ).toBe(false);
+  });
 });
