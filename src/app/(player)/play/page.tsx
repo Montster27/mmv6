@@ -1601,7 +1601,7 @@ export default function PlayPage() {
   }, [dayIndex, testerMode, pushTesterMessage]);
 
   useEffect(() => {
-    if (!testerMode || !relationshipDebugEnabled || !userId) return;
+    if (!relationshipDebugEnabled || !userId) return;
     let cancelled = false;
     const load = async () => {
       const { data, error } = await supabase
@@ -1623,7 +1623,7 @@ export default function PlayPage() {
     return () => {
       cancelled = true;
     };
-  }, [testerMode, relationshipDebugEnabled, userId]);
+  }, [relationshipDebugEnabled, userId]);
 
   useEffect(() => {
     return () => {
@@ -2137,7 +2137,7 @@ export default function PlayPage() {
             },
           };
           supabase.from("choice_log").insert(payload);
-          if (testerMode && relationshipDebugEnabled) {
+          if (relationshipDebugEnabled) {
             setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
           }
         });
@@ -2807,6 +2807,7 @@ export default function PlayPage() {
               relationshipDebugEnabled={relationshipDebugEnabled}
               relDebugEvents={relDebugEvents}
               npcMemory={relationshipsState ?? null}
+              relationships={relationshipsState ?? null}
             />
           ) : null}
 
