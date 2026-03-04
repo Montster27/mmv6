@@ -18,7 +18,12 @@ export type RelationshipEventType =
   | "CONFLICT_LOW"
   | "CONFLICT_HIGH"
   | "REPAIR_ATTEMPT"
-  | "NOTICED_FACE";
+  | "NOTICED_FACE"
+  | "SHOWED_UP"
+  | "WENT_MISSING"
+  | "CONFIDED_IN"
+  | "DISMISSED"
+  | "DEFERRED_TENSION";
 
 export type RelationshipEvent = {
   npc_id: string;
@@ -40,7 +45,26 @@ const DEFAULT_RELATIONSHIP = 5;
 const ROLE_TAGS: Record<string, string> = {
   npc_roommate_dana: "roommate",
   npc_connector_miguel: "orientation",
+  npc_prof_marsh: "professor",
+  npc_studious_priya: "classmate",
+  npc_floor_cal: "floormate",
+  npc_ambiguous_jordan: "acquaintance",
+  npc_ra_sandra: "ra",
+  npc_parent_voice: "family",
 };
+
+export const ALL_YEAR_ONE_NPCS = [
+  "npc_roommate_dana",
+  "npc_connector_miguel",
+  "npc_prof_marsh",
+  "npc_studious_priya",
+  "npc_floor_cal",
+  "npc_ambiguous_jordan",
+  "npc_ra_sandra",
+  "npc_parent_voice",
+] as const;
+
+export type YearOneNpcId = typeof ALL_YEAR_ONE_NPCS[number];
 
 const clampRelationship = (value: number) => Math.max(1, Math.min(10, value));
 
@@ -80,6 +104,7 @@ export function ensureRelationshipDefaults(
     next[npcId] = merged;
   };
 
+  // Dana: already present when you wake up on Day 1
   ensure("npc_roommate_dana", {
     met: true,
     knows_name: true,
@@ -87,12 +112,55 @@ export function ensureRelationshipDefaults(
     role_tag: "roommate",
     relationship: 6,
   });
+  // All others start unmet — they are introduced through storylet events
   ensure("npc_connector_miguel", {
     met: false,
     knows_name: false,
     knows_face: false,
     role_tag: "orientation",
     relationship: 5,
+  });
+  ensure("npc_prof_marsh", {
+    met: false,
+    knows_name: false,
+    knows_face: false,
+    role_tag: "professor",
+    relationship: 5,
+  });
+  ensure("npc_studious_priya", {
+    met: false,
+    knows_name: false,
+    knows_face: false,
+    role_tag: "classmate",
+    relationship: 5,
+  });
+  ensure("npc_floor_cal", {
+    met: false,
+    knows_name: false,
+    knows_face: false,
+    role_tag: "floormate",
+    relationship: 5,
+  });
+  ensure("npc_ambiguous_jordan", {
+    met: false,
+    knows_name: false,
+    knows_face: false,
+    role_tag: "acquaintance",
+    relationship: 5,
+  });
+  ensure("npc_ra_sandra", {
+    met: false,
+    knows_name: false,
+    knows_face: false,
+    role_tag: "ra",
+    relationship: 5,
+  });
+  ensure("npc_parent_voice", {
+    met: true,
+    knows_name: true,
+    knows_face: true,
+    role_tag: "family",
+    relationship: 7,
   });
 
   return { next, changed };
@@ -169,6 +237,23 @@ export function applyRelationshipEvents(
       case "REPAIR_ATTEMPT":
         relationshipDelta += 1 * magnitude;
         break;
+      case "SHOWED_UP":
+        relationshipDelta += 1 * magnitude;
+        after.met = true;
+        after.knows_face = true;
+        break;
+      case "CONFIDED_IN":
+        relationshipDelta += 1 * magnitude;
+        break;
+      case "WENT_MISSING":
+        relationshipDelta -= 1 * magnitude;
+        break;
+      case "DISMISSED":
+        relationshipDelta -= 2 * magnitude;
+        break;
+      case "DEFERRED_TENSION":
+        // no delta — just records the pattern
+        break;
       case "AWKWARD_MOMENT":
         relationshipDelta -= 1 * magnitude;
         break;
@@ -215,6 +300,17 @@ export function applyRelationshipEvents(
   return { next, logs };
 }
 
+const NPC_DISPLAY_NAMES: Record<string, string> = {
+  npc_roommate_dana: "Dana",
+  npc_connector_miguel: "Miguel",
+  npc_prof_marsh: "Prof. Marsh",
+  npc_studious_priya: "Priya",
+  npc_floor_cal: "Cal",
+  npc_ambiguous_jordan: "Jordan",
+  npc_ra_sandra: "Sandra",
+  npc_parent_voice: "your parent",
+};
+
 export function renderNpcName(
   npcId: string,
   relationships: Record<string, RelationshipState> | null | undefined,
@@ -222,9 +318,7 @@ export function renderNpcName(
 ): string {
   const known = relationships?.[npcId]?.knows_name;
   if (!known) return fallback;
-  if (npcId === "npc_roommate_dana") return "Dana";
-  if (npcId === "npc_connector_miguel") return "Miguel";
-  return fallback;
+  return NPC_DISPLAY_NAMES[npcId] ?? fallback;
 }
 
 export function mapLegacyRelationalEffects(

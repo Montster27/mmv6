@@ -8,6 +8,19 @@ import type { FeatureFlags } from "@/lib/featureFlags";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { getResourceTrace, isResourceTraceEnabled } from "@/core/resources/resourceTrace";
 import { supabase } from "@/lib/supabase/browser";
+import { ALL_YEAR_ONE_NPCS } from "@/lib/relationships";
+import type { RelationshipState } from "@/lib/relationships";
+
+const NPC_LABELS: Record<string, string> = {
+  npc_roommate_dana: "Dana",
+  npc_connector_miguel: "Miguel",
+  npc_prof_marsh: "Prof. Marsh",
+  npc_studious_priya: "Priya",
+  npc_floor_cal: "Cal",
+  npc_ambiguous_jordan: "Jordan",
+  npc_ra_sandra: "Sandra (RA)",
+  npc_parent_voice: "Parent",
+};
 
 type DevCharacter = {
   user_id: string;
@@ -48,6 +61,7 @@ type Props = {
     meta?: Record<string, unknown> | null;
   }>;
   npcMemory?: Record<string, unknown> | null;
+  relationships?: Record<string, RelationshipState> | null;
 };
 
 function readOverrides(): Partial<FeatureFlags> {
@@ -127,6 +141,7 @@ export default function DevMenu({
   relationshipDebugEnabled = false,
   relDebugEvents = [],
   npcMemory = null,
+  relationships = null,
 }: Props) {
   const [flagOverrides, setFlagOverrides] = useState<Partial<FeatureFlags>>({});
   const [retainOverrides, setRetainOverrides] = useState(false);
@@ -337,38 +352,80 @@ export default function DevMenu({
           <div className="grid gap-2 md:grid-cols-2">
             <div className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600">
               <p className="font-semibold text-slate-700">People</p>
-              <div className="mt-2 space-y-2">
-                {["npc_roommate_dana", "npc_connector_miguel"].map((npcId) => {
-                  const entry =
-                    (npcMemory && (npcMemory as any)[npcId]) ?? {};
-                  const met = entry.met ? "✅" : "❌";
-                  const known = entry.knows_name ? "✅" : "❌";
-                  const relValue =
-                    typeof entry.relationship === "number"
-                      ? `${entry.relationship}/10`
-                      : "—";
-                  const roleTag =
-                    typeof entry.role_tag === "string" ? entry.role_tag : "—";
+              {(() => {
+                  // Build full NPC list: canonical + any extras discovered in relationships/npcMemory
+                  const canonicalSet = new Set<string>(ALL_YEAR_ONE_NPCS);
+                  const extraNpcIds: string[] = [];
+                  const relKeys = relationships ? Object.keys(relationships) : [];
+                  const memKeys = npcMemory ? Object.keys(npcMemory) : [];
+                  const allSeenIds = [...new Set([...relKeys, ...memKeys])];
+                  allSeenIds.forEach((id) => {
+                    if (!canonicalSet.has(id)) extraNpcIds.push(id);
+                  });
+                  const allNpcIds = [...ALL_YEAR_ONE_NPCS, ...extraNpcIds];
+
+                  // Resolve state for a given NPC id
+                  const resolveNpc = (npcId: string) => {
+                    const rel = (relationships as any)?.[npcId] as RelationshipState | undefined;
+                    const legacy = (npcMemory as any)?.[npcId] ?? {};
+                    return {
+                      met:       rel ? rel.met       : legacy.met === true,
+                      knowsName: rel ? rel.knows_name : legacy.knows_name === true,
+                      knowsFace: rel ? rel.knows_face : legacy.knows_face === true,
+                      relScore:  rel ? rel.relationship : typeof legacy.trust === "number" ? legacy.trust : null,
+                      roleTag:   rel?.role_tag ?? null,
+                      isNew:     !canonicalSet.has(npcId),
+                    };
+                  };
+
+                  // Sort: met first, then unmet; within each group preserve original order
+                  const sorted = [...allNpcIds].sort((a, b) => {
+                    const aMet = resolveNpc(a).met ? 0 : 1;
+                    const bMet = resolveNpc(b).met ? 0 : 1;
+                    return aMet - bMet;
+                  });
+
                   return (
-                    <div
-                      key={npcId}
-                      className="rounded border border-slate-200 bg-slate-50 px-2 py-1"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-slate-700">
-                          {npcId === "npc_roommate_dana" ? "Dana" : "Miguel"}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          met {met} · name {known}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-[11px] text-slate-600">
-                        relationship: {relValue} · role: {roleTag}
-                      </div>
+                    <div className="mt-2 space-y-2">
+                      {sorted.map((npcId) => {
+                        const { met, knowsName, knowsFace, relScore, roleTag, isNew } = resolveNpc(npcId);
+                        const label = NPC_LABELS[npcId] ?? npcId;
+                        const metIcon   = met       ? "✅" : "❌";
+                        const nameIcon  = knowsName ? "🏷" : "";
+                        const faceIcon  = knowsFace && !knowsName ? "👁" : "";
+                        return (
+                          <div
+                            key={npcId}
+                            className={`rounded border px-2 py-1 ${
+                              met
+                                ? isNew
+                                  ? "border-amber-200 bg-amber-50"
+                                  : "border-slate-200 bg-slate-50"
+                                : "border-slate-100 bg-white opacity-40"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-slate-700">
+                                {label}{nameIcon ? ` ${nameIcon}` : ""}{faceIcon ? ` ${faceIcon}` : ""}
+                                {isNew ? <span className="ml-1 text-[9px] text-amber-600 font-normal">new</span> : null}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                met {metIcon}{relScore != null ? ` · ${relScore}/10` : ""}
+                              </span>
+                            </div>
+                            {(roleTag || met) ? (
+                              <div className="mt-0.5 text-[10px] text-slate-500">
+                                {roleTag ? `role: ${roleTag}` : ""}
+                                {knowsName && !knowsFace ? " · name only" : ""}
+                                {knowsFace && !knowsName ? " · face only" : ""}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
-                })}
-              </div>
+                })()}
             </div>
             <div className="rounded-md border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600">
               <p className="font-semibold text-slate-700">Recent deltas</p>
