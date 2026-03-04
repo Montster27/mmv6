@@ -22,7 +22,6 @@ const PHASE_SEQUENCE = [
   "reflection_arc",
   "community_purpose",
   "remnant_reveal",
-  "cliffhanger",
 ];
 
 function getPhaseTag(storylet: Storylet) {

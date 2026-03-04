@@ -58,7 +58,6 @@ const PHASE_OPTIONS = [
   "reflection_arc",
   "community_purpose",
   "remnant_reveal",
-  "cliffhanger",
 ] as const;
 
 const TYPE_OPTIONS = ["core", "social", "context", "anomaly"] as const;

@@ -311,7 +311,6 @@ export default function PlayPage() {
   const nextRunTrackedRef = useRef(false);
   const remnantUnlockAttemptedRef = useRef(false);
   const firstChoiceTrackedRef = useRef(false);
-  const cliffhangerShownRef = useRef(false);
   const [cohortRoster, setCohortRoster] = useState<{
     count: number;
     handles: string[];
@@ -323,8 +322,7 @@ export default function PlayPage() {
       { id: "guided_core_loop", label: "Guided core loop", window: [3, 10] as const },
       { id: "reflection_arc", label: "Reflection arc", window: [10, 18] as const },
       { id: "community_purpose", label: "Community purpose", window: [18, 24] as const },
-      { id: "remnant_reveal", label: "Remnant reveal", window: [24, 28] as const },
-      { id: "cliffhanger", label: "Cliffhanger", window: [28, 30] as const },
+      { id: "remnant_reveal", label: "Remnant reveal", window: [24, 30] as const },
     ],
     []
   );
@@ -354,16 +352,13 @@ export default function PlayPage() {
               ? "reflection_arc"
               : elapsedMinutes < 24
                 ? "community_purpose"
-                : elapsedMinutes < 28
-                  ? "remnant_reveal"
-                  : "cliffhanger";
+                : "remnant_reveal";
 
       let criteriaPhase = "intro_hook";
       if (allocationSaved) criteriaPhase = "guided_core_loop";
       if (storyletRuns >= 1) criteriaPhase = "reflection_arc";
       if (storyletRuns >= 2 || reflectionDone) criteriaPhase = "community_purpose";
       if (socialComplete) criteriaPhase = "remnant_reveal";
-      if (elapsedMinutes >= 28) criteriaPhase = "cliffhanger";
 
       const order = [
         "intro_hook",
@@ -371,11 +366,10 @@ export default function PlayPage() {
         "reflection_arc",
         "community_purpose",
         "remnant_reveal",
-        "cliffhanger",
       ];
       const timeIndex = order.indexOf(timePhase);
       const criteriaIndex = order.indexOf(criteriaPhase);
-      return order[Math.max(timeIndex, criteriaIndex)] ?? "cliffhanger";
+      return order[Math.max(timeIndex, criteriaIndex)] ?? "remnant_reveal";
     },
     []
   );
@@ -1269,14 +1263,6 @@ export default function PlayPage() {
       });
     }
   }, [featureFlags.remnantSystemEnabled, remnantState, dayIndex]);
-
-  useEffect(() => {
-    if (!featureFlags.verticalSlice30Enabled) return;
-    if (slicePhaseId !== "cliffhanger") return;
-    if (cliffhangerShownRef.current) return;
-    cliffhangerShownRef.current = true;
-    trackWithSeason({ event_type: "cliffhanger_shown", day_index: dayIndex });
-  }, [featureFlags.verticalSlice30Enabled, slicePhaseId, dayIndex]);
 
   useEffect(() => {
     if (!featureFlags.remnantSystemEnabled || !userId) return;
@@ -3537,25 +3523,6 @@ export default function PlayPage() {
                     </section>
                   )}
 
-                  {featureFlags.verticalSlice30Enabled &&
-                    slicePhaseId === "cliffhanger" && (
-                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                      <div>
-                        <h2 className="text-xl font-semibold">Cliffhanger</h2>
-                        <p className="text-sm text-slate-700">
-                          Something follows you out of today. The next run starts
-                          with what you chose to keep.
-                        </p>
-                      </div>
-                      <Button
-                        onClick={handleRunReset}
-                        disabled={runResetting}
-                        className="w-full"
-                      >
-                        {runResetting ? "Starting next run..." : "Start Next Run"}
-                      </Button>
-                    </section>
-                  )}
 
               {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && arcOneReflectionReady ? (
                 <section className="space-y-3">

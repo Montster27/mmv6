@@ -3,8 +3,7 @@ export type SlicePhaseId =
   | "guided_core_loop"
   | "reflection_arc"
   | "community_purpose"
-  | "remnant_reveal"
-  | "cliffhanger";
+  | "remnant_reveal";
 
 export type SlicePhase = {
   id: SlicePhaseId;
@@ -17,8 +16,7 @@ export const SLICE_PHASES: SlicePhase[] = [
   { id: "guided_core_loop", label: "Guided core loop", window: [3, 10] },
   { id: "reflection_arc", label: "Reflection arc", window: [10, 18] },
   { id: "community_purpose", label: "Community purpose", window: [18, 24] },
-  { id: "remnant_reveal", label: "Remnant reveal", window: [24, 28] },
-  { id: "cliffhanger", label: "Cliffhanger", window: [28, 30] },
+  { id: "remnant_reveal", label: "Remnant reveal", window: [24, 30] },
 ];
 
 export function getSlicePhase(params: {
@@ -45,16 +43,13 @@ export function getSlicePhase(params: {
           ? "reflection_arc"
           : elapsedMinutes < 24
             ? "community_purpose"
-            : elapsedMinutes < 28
-              ? "remnant_reveal"
-              : "cliffhanger";
+            : "remnant_reveal";
 
   let criteriaPhase: SlicePhaseId = "intro_hook";
   if (allocationSaved) criteriaPhase = "guided_core_loop";
   if (storyletRuns >= 1) criteriaPhase = "reflection_arc";
   if (storyletRuns >= 2 || reflectionDone) criteriaPhase = "community_purpose";
   if (socialComplete) criteriaPhase = "remnant_reveal";
-  if (elapsedMinutes >= 28) criteriaPhase = "cliffhanger";
 
   const order: SlicePhaseId[] = [
     "intro_hook",
@@ -62,9 +57,8 @@ export function getSlicePhase(params: {
     "reflection_arc",
     "community_purpose",
     "remnant_reveal",
-    "cliffhanger",
   ];
   const timeIndex = order.indexOf(timePhase);
   const criteriaIndex = order.indexOf(criteriaPhase);
-  return order[Math.max(timeIndex, criteriaIndex)] ?? "cliffhanger";
+  return order[Math.max(timeIndex, criteriaIndex)] ?? "remnant_reveal";
 }

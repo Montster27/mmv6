@@ -21,7 +21,6 @@ const PHASE_ORDER = [
   "reflection_arc",
   "community_purpose",
   "remnant_reveal",
-  "cliffhanger",
 ];
 
 const PHASE_COLORS: Record<string, string> = {
@@ -30,7 +29,6 @@ const PHASE_COLORS: Record<string, string> = {
   reflection_arc: "bg-amber-100 border-amber-300 text-amber-800",
   community_purpose: "bg-purple-100 border-purple-300 text-purple-800",
   remnant_reveal: "bg-slate-100 border-slate-300 text-slate-700",
-  cliffhanger: "bg-rose-100 border-rose-300 text-rose-800",
   unphased: "bg-slate-50 border-slate-200 text-slate-600",
 };
 
