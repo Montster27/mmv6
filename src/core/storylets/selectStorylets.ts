@@ -12,6 +12,23 @@ type Requirements = {
   min_season_index?: number;
   max_season_index?: number;
   seasons_any?: number[];
+  /**
+   * Hard cap on lifetime runs. Set to 1 for one-shot events (orientation
+   * fair, first class, bookstore visit, etc.) that must never repeat.
+   * Requires recentRuns to include all-time history (not just 7-day window).
+   */
+  max_total_runs?: number;
+  /**
+   * Storylet-level NPC prerequisite: every listed NPC must have met=true
+   * in the player's relationship state. Use when the storylet body or
+   * premise assumes prior contact with that person.
+   */
+  requires_npc_met?: string[];
+  /**
+   * Inverse guard: none of the listed NPCs may be met yet. Useful for
+   * "first encounter" storylets that should not surface after introduction.
+   */
+  requires_npc_not_met?: string[];
   audience?: {
     rollout_pct?: number;
     experiment?: { id?: string; variants_any?: string[] };
@@ -114,6 +131,20 @@ function meetsRequirements(
     if (!meetsSeasonRules(req, seasonIndex)) return false;
   }
 
+  // Storylet-level NPC guards (relationship state)
+  if (Array.isArray(req.requires_npc_met) && req.requires_npc_met.length > 0) {
+    const rels = (dailyState as any)?.relationships as Record<string, { met?: boolean }> | undefined;
+    for (const npcId of req.requires_npc_met) {
+      if (!rels?.[npcId]?.met) return false;
+    }
+  }
+  if (Array.isArray(req.requires_npc_not_met) && req.requires_npc_not_met.length > 0) {
+    const rels = (dailyState as any)?.relationships as Record<string, { met?: boolean }> | undefined;
+    for (const npcId of req.requires_npc_not_met) {
+      if (rels?.[npcId]?.met) return false;
+    }
+  }
+
   if (!opts?.ignoreAudience && req.audience && typeof req.audience === "object" && !Array.isArray(req.audience)) {
     const audience = req.audience as Requirements["audience"];
     if (audience?.allow_admin && isAdmin) return true;
@@ -213,7 +244,20 @@ export function selectStorylets({
       .map((r) => r.storylet_id)
   );
 
-  const activeStorylets = allStorylets.filter((s) => s.is_active);
+  // Build all-time run counts (recentRuns must cover full history for
+  // max_total_runs to work correctly; see dailyLoop.ts daysBack value).
+  const allTimeRunCounts = new Map<string, number>();
+  for (const run of recentRuns) {
+    allTimeRunCounts.set(run.storylet_id, (allTimeRunCounts.get(run.storylet_id) ?? 0) + 1);
+  }
+
+  const activeStorylets = allStorylets
+    .filter((s) => s.is_active)
+    .filter((s) => {
+      const req = (s.requirements ?? {}) as Requirements;
+      if (typeof req.max_total_runs !== "number") return true;
+      return (allTimeRunCounts.get(s.id) ?? 0) < req.max_total_runs;
+    });
 
   const baseEligible = activeStorylets.filter(
     (s) =>

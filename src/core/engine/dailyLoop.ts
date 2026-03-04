@@ -186,7 +186,9 @@ export async function getOrCreateDailyRun(
     !allocation && dayIndex > 0
       ? fetchTimeAllocation(userId, dayIndex - 1).catch(() => null)
       : Promise.resolve(null),
-    fetchRecentStoryletRuns(userId, dayIndex, 7).catch(() => []),
+    // Pass dayIndex as daysBack so fromDay=0 — gives all-time history needed
+    // for max_total_runs lifetime caps in selectStorylets.
+    fetchRecentStoryletRuns(userId, dayIndex, dayIndex).catch(() => []),
     ensureUserInCohort(userId).catch(() => null),
   ]);
   const cohortId = cohort?.cohortId ?? null;
