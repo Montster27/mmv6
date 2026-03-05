@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
 import { Button } from "@/components/ui/button";
-import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
 import { FactionStatusPanel } from "@/components/play/FactionStatusPanel";
@@ -25,7 +24,6 @@ import { appendGroupFeedEvent } from "@/lib/groups/feed";
 import { incrementGroupObjective } from "@/lib/groups/objective";
 import { upsertFunPulse } from "@/lib/funPulse";
 import { useExperiments } from "@/lib/experiments";
-import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { fetchDevSettings, saveDevSettings } from "@/lib/devSettings";
 import {
   createStoryletRun,
@@ -44,7 +42,6 @@ import {
   updatePreclusionGates,
   type AllocationPayload,
 } from "@/lib/play";
-import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
 import { upsertReflection } from "@/lib/reflections";
 import {
   allocateSkillPoint,
@@ -144,7 +141,6 @@ export default function PlayPage() {
     seasonContext,
     funPulseEligible,
     funPulseDone,
-    microTaskStatus,
     outcomeMessage,
     outcomeDeltas,
     lastCheck,
@@ -171,7 +167,6 @@ export default function PlayPage() {
     setSeasonContext,
     setFunPulseEligible,
     setFunPulseDone,
-    setMicroTaskStatus,
     setOutcomeMessage,
     setOutcomeDeltas,
     setLastCheck,
@@ -213,11 +208,10 @@ export default function PlayPage() {
   const [bootstrapIsAdmin, setBootstrapIsAdmin] = useState(false);
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [bootstrapUserId, setBootstrapUserId] = useState<string | null>(null);
-  const { assignments, getVariant, ready: experimentsReady } = useExperiments(
-    ["microtask_freq_v1"],
+  const { assignments, ready: experimentsReady } = useExperiments(
+    [],
     bootstrapAssignments
   );
-  const microtaskVariant = getVariant("microtask_freq_v1", "A");
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
   const [showDevMenu, setShowDevMenu] = useState(() => getAppMode().testerMode);
@@ -343,7 +337,6 @@ export default function PlayPage() {
     bootstrapIsAdmin;
   const dailyRunQuery = useDailyRun(bootstrapUserId, {
     experiments,
-    microtaskVariant,
     isAdmin,
     enabled:
       USE_DAILY_LOOP_ORCHESTRATOR &&
@@ -457,7 +450,6 @@ export default function PlayPage() {
       ),
     []
   );
-  const [microTaskSaving, setMicroTaskSaving] = useState(false);
   const [consequenceActive, setConsequenceActive] = useState(false);
   const sessionStartTracked = useRef(false);
   const sessionEndTracked = useRef(false);
@@ -466,7 +458,6 @@ export default function PlayPage() {
   const latestStageRef = useRef<DailyRunStage | null>(null);
   const latestDayIndexRef = useRef<number | null>(null);
   const lastRunDayIndexRef = useRef<number | null>(null);
-  const microTaskStartTracked = useRef(false);
   const funPulseShownTracked = useRef(false);
   const pendingTransitionRef = useRef<(() => void) | null>(null);
 
@@ -474,11 +465,6 @@ export default function PlayPage() {
     () => dailyState?.day_index ?? dayIndexState,
     [dailyState?.day_index, dayIndexState]
   );
-  const microTaskEligible = useMemo(
-    () => isMicrotaskEligible(dayIndex, microtaskVariant),
-    [dayIndex, microtaskVariant]
-  );
-
   const arcOneMode = useMemo(
     () =>
       featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY,
@@ -732,7 +718,6 @@ export default function PlayPage() {
   }, [dayIndex]);
 
   useEffect(() => {
-    microTaskStartTracked.current = false;
     funPulseShownTracked.current = false;
     pendingTransitionRef.current = null;
     setConsequenceActive(false);
@@ -801,7 +786,6 @@ export default function PlayPage() {
               ...defaultAllocation,
               ...(run.allocation ?? run.allocationSeed ?? {}),
             },
-            microTaskStatus: run.microTaskStatus ?? "pending",
             seasonContext: run.seasonContext ?? null,
             funPulseEligible: Boolean(run.funPulseEligible),
             funPulseDone: Boolean(run.funPulseDone),
@@ -1294,17 +1278,6 @@ export default function PlayPage() {
 
   useEffect(() => {
     if (!userId || loading) return;
-    if (stage !== "microtask" || microTaskStartTracked.current) return;
-    microTaskStartTracked.current = true;
-    trackWithSeason({
-      event_type: "microtask_start",
-      day_index: dayIndex,
-      stage: "microtask",
-    });
-  }, [stage, userId, dayIndex, loading]);
-
-  useEffect(() => {
-    if (!userId || loading) return;
     if (stage !== "fun_pulse" || funPulseShownTracked.current) return;
     funPulseShownTracked.current = true;
     trackWithSeason({ event_type: "fun_pulse_shown", day_index: dayIndex, stage });
@@ -1362,11 +1335,6 @@ export default function PlayPage() {
         id: "storylet_1_clarity",
         body: "Did you understand why that outcome happened?",
         options: ["Yes", "Mostly", "No"],
-      },
-      microtask: {
-        id: "microtask_value",
-        body: "Would you miss the micro interaction if it were gone?",
-        options: ["Yes", "Maybe", "No"],
       },
       storylet_2: {
         id: "storylet_2_clarity",
@@ -1529,7 +1497,6 @@ export default function PlayPage() {
       );
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         const refreshed = await getOrCreateDailyRun(userId, new Date(), {
-          microtaskVariant,
           experiments,
           isAdmin: devIsAdmin,
         });
@@ -1907,10 +1874,7 @@ export default function PlayPage() {
         } else if (stage === "storylet_2") {
           nextStage = "storylet_3";
         } else {
-          nextStage =
-            microTaskEligible && microTaskStatus === "pending"
-              ? "microtask"
-              : "reflection";
+          nextStage = "reflection";
         }
         pendingTransitionRef.current = () => setStage(nextStage);
         if (!reactionText || !beatBufferEnabled) {
@@ -2175,65 +2139,6 @@ export default function PlayPage() {
       setError(e instanceof Error ? e.message : "Failed to save intention.");
     } finally {
       setArcOneReflectionSaving(false);
-    }
-  };
-
-  const handleMicroTaskComplete = async (result: {
-    score: number;
-    duration_ms: number;
-  }) => {
-    if (!userId) return;
-    if (microTaskSaving) return;
-    setError(null);
-    setMicroTaskSaving(true);
-    try {
-      const outcome = await completeMicroTask(
-        userId,
-        dayIndex,
-        result.score,
-        result.duration_ms
-      );
-      if (!outcome.alreadyRecorded) {
-        if (outcome.nextDailyState) {
-          setDailyState(outcome.nextDailyState);
-        }
-        setOutcomeDeltas(outcome.appliedDeltas ?? null);
-      }
-      setMicroTaskStatus("done");
-      trackWithSeason({
-        event_type: "microtask_complete",
-        day_index: dayIndex,
-        stage: "microtask",
-        payload: { score: result.score, duration_ms: result.duration_ms },
-      });
-      setStage("reflection");
-    } catch (e) {
-      console.error(e);
-      setError("Failed to save micro-task.");
-    } finally {
-      setMicroTaskSaving(false);
-    }
-  };
-
-  const handleMicroTaskSkip = async () => {
-    if (!userId) return;
-    if (microTaskSaving) return;
-    setError(null);
-    setMicroTaskSaving(true);
-    try {
-      await skipMicroTask(userId, dayIndex);
-      setMicroTaskStatus("skipped");
-      trackWithSeason({
-        event_type: "microtask_skip",
-        day_index: dayIndex,
-        stage: "microtask",
-      });
-      setStage("reflection");
-    } catch (e) {
-      console.error(e);
-      setError("Failed to skip micro-task.");
-    } finally {
-      setMicroTaskSaving(false);
     }
   };
 
@@ -3017,26 +2922,6 @@ export default function PlayPage() {
                       />
                     </section>
                     )}
-
-                  {USE_DAILY_LOOP_ORCHESTRATOR && stage === "microtask" && (
-                    <section className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">Micro-task</h2>
-                        <span className="text-sm text-slate-600">
-                          Optional · ~1 minute
-                        </span>
-                      </div>
-                      <div className="rounded-md border border-slate-200 bg-white px-4 py-4">
-                        <PatternMatchTask
-                          onComplete={handleMicroTaskComplete}
-                          onSkip={handleMicroTaskSkip}
-                        />
-                        {microTaskSaving ? (
-                          <p className="text-xs text-slate-500">Saving…</p>
-                        ) : null}
-                      </div>
-                    </section>
-                  )}
 
 
                   {featureFlags.remnantSystemEnabled &&

@@ -20,7 +20,6 @@ export type DailyRunStage =
   | "storylet_1"
   | "storylet_2"
   | "storylet_3"
-  | "microtask"
   | "reflection"
   | "fun_pulse"
   | "complete";
@@ -121,7 +120,6 @@ export type DailyRun = {
   };
   initiatives?: Array<Initiative & { contributedToday?: boolean; progress?: number }> | null;
   reflectionStatus: "pending" | "done";
-  microTaskStatus?: "pending" | "done" | "skipped";
   funPulseEligible?: boolean;
   funPulseDone?: boolean;
   dailyState?: DailyState | null;

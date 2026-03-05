@@ -26,10 +26,6 @@ const COPY: Record<DailyRunStage, StageCopy> = {
     title: "Third event of the day",
     body: "One more choice before you move on.",
   },
-  microtask: {
-    title: "Optional micro-task",
-    body: "A short pattern to sharpen the edges.",
-  },
   reflection: {
     title: "A quick reflection",
     body: "Leave a trace of how today felt.",

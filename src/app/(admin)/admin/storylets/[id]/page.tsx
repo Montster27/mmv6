@@ -550,7 +550,7 @@ export default function StoryletEditPage({
                         requirements: updateRequirementsJson(f.requirements, {
                           audience: {
                             rollout_pct: 10,
-                            experiment: { id: "microtask_freq_v1", variants_any: ["B"] },
+                            experiment: { id: "experiment_id", variants_any: ["B"] },
                             allow_admin: true,
                           },
                         }),

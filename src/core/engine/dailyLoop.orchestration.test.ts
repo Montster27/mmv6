@@ -17,9 +17,6 @@ vi.mock("@/lib/reflections", () => ({
   getReflection: vi.fn(),
   isReflectionDone: vi.fn(),
 }));
-vi.mock("@/lib/microtasks", () => ({
-  fetchMicroTaskRun: vi.fn(),
-}));
 vi.mock("@/core/season/getSeasonContext", () => ({
   getSeasonContext: vi.fn(),
 }));
@@ -126,7 +123,6 @@ import {
   fetchRecentStoryletRuns,
 } from "@/lib/play";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
-import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
@@ -277,7 +273,6 @@ beforeEach(() => {
   vi.mocked(fetchRecentStoryletRuns).mockResolvedValue([]);
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
-  vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
@@ -498,41 +493,14 @@ describe("getOrCreateDailyRun", () => {
     expect(run.stage).toBe("storylet_3");
   });
 
-  it("returns microtask when eligible and not done", async () => {
+  it("returns reflection when three runs complete", async () => {
     vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
-    vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
-    const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.stage).toBe("microtask");
-  });
-
-  it("returns reflection when microtask done", async () => {
-    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
-    vi.mocked(fetchMicroTaskRun).mockResolvedValue({
-      id: "m",
-      user_id: "u",
-      day_index: 2,
-      task_id: "pattern_match_v1",
-      status: "completed",
-      score: 2,
-      duration_ms: 1000,
-      created_at: new Date().toISOString(),
-    });
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("reflection");
   });
 
   it("returns complete when reflection done", async () => {
     vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
-    vi.mocked(fetchMicroTaskRun).mockResolvedValue({
-      id: "m",
-      user_id: "u",
-      day_index: 2,
-      task_id: "pattern_match_v1",
-      status: "completed",
-      score: 2,
-      duration_ms: 1000,
-      created_at: new Date().toISOString(),
-    });
     vi.mocked(isReflectionDone).mockReturnValue(true);
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("complete");
@@ -540,16 +508,6 @@ describe("getOrCreateDailyRun", () => {
 
   it("returns fun_pulse when eligible after reflection", async () => {
     vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
-    vi.mocked(fetchMicroTaskRun).mockResolvedValue({
-      id: "m",
-      user_id: "u",
-      day_index: 2,
-      task_id: "pattern_match_v1",
-      status: "completed",
-      score: 2,
-      duration_ms: 1000,
-      created_at: new Date().toISOString(),
-    });
     vi.mocked(isReflectionDone).mockReturnValue(true);
     vi.mocked(shouldShowFunPulse).mockReturnValue(true);
     vi.mocked(getFunPulse).mockResolvedValue(null);

@@ -39,7 +39,6 @@ export type DailyProgressState = {
   seasonContext: SeasonContext | null;
   funPulseEligible: boolean;
   funPulseDone: boolean;
-  microTaskStatus: "pending" | "done" | "skipped";
   outcomeMessage: string | null;
   outcomeDeltas: {
     energy?: number;
@@ -75,7 +74,6 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     seasonContext: null,
     funPulseEligible: false,
     funPulseDone: false,
-    microTaskStatus: "pending",
     outcomeMessage: null,
     outcomeDeltas: null,
     lastCheck: null,
@@ -191,11 +189,6 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     (funPulseDone: boolean) => setDailyProgress({ funPulseDone }),
     [setDailyProgress]
   );
-  const setMicroTaskStatus = useCallback(
-    (microTaskStatus: "pending" | "done" | "skipped") =>
-      setDailyProgress({ microTaskStatus }),
-    [setDailyProgress]
-  );
   const setOutcomeMessage = useCallback(
     (outcomeMessage: string | null) => setDailyProgress({ outcomeMessage }),
     [setDailyProgress]
@@ -245,7 +238,6 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     setSeasonContext,
     setFunPulseEligible,
     setFunPulseDone,
-    setMicroTaskStatus,
     setOutcomeMessage,
     setOutcomeDeltas,
     setLastCheck,

@@ -8,14 +8,12 @@ import {
   fetchRecentStoryletRuns,
 } from "@/lib/play";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
-import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
-import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { buildStoryletContext } from "@/core/engine/storyletContext";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
@@ -92,7 +90,6 @@ export async function getOrCreateDailyRun(
   userId: string,
   today: Date,
   options?: {
-    microtaskVariant?: string;
     experiments?: Record<string, string>;
     isAdmin?: boolean;
   }
@@ -387,17 +384,6 @@ export async function getOrCreateDailyRun(
       ? await getFunPulse(userId, currentSeasonIndex, dayIndex)
       : null;
   const funPulseDone = featureFlags.funPulse ? Boolean(funPulseRow) : false;
-  const microTaskVariant = options?.microtaskVariant ?? "A";
-  const microTaskEligible = isMicrotaskEligible(dayIndex, microTaskVariant);
-  const microTaskRun = microTaskEligible
-    ? await fetchMicroTaskRun(userId, dayIndex)
-    : null;
-  const microTaskStatus = microTaskRun
-    ? microTaskRun.status === "completed"
-      ? "done"
-      : "skipped"
-    : "pending";
-  const microTaskDone = Boolean(microTaskRun);
 
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
@@ -411,8 +397,6 @@ export async function getOrCreateDailyRun(
     cadence.alreadyCompletedToday,
     hasStorylets,
     reflectionDone,
-    microTaskEligible,
-    microTaskDone,
     funPulseEligible,
     funPulseDone
   );
@@ -426,8 +410,6 @@ export async function getOrCreateDailyRun(
     hasAllocation: Boolean(allocation),
     runsForPair: runsForPair.length,
     reflectionDone,
-    microTaskEligible,
-    microTaskDone,
     needsSetup: setupNeeded,
     stage,
   });
@@ -503,7 +485,6 @@ export async function getOrCreateDailyRun(
     directive: featureFlags.alignment ? directiveSummary : null,
     initiatives,
     reflectionStatus: reflectionDone ? "done" : "pending",
-    microTaskStatus,
     funPulseEligible,
     funPulseDone,
     dailyState: daily,

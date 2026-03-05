@@ -17,9 +17,6 @@ vi.mock("@/lib/reflections", () => ({
   getReflection: vi.fn(),
   isReflectionDone: vi.fn(),
 }));
-vi.mock("@/lib/microtasks", () => ({
-  fetchMicroTaskRun: vi.fn(),
-}));
 vi.mock("@/core/season/getSeasonContext", () => ({
   getSeasonContext: vi.fn(),
 }));
@@ -125,7 +122,6 @@ import {
   fetchRecentStoryletRuns,
 } from "@/lib/play";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
-import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
@@ -253,7 +249,6 @@ beforeEach(() => {
   vi.mocked(fetchRecentStoryletRuns).mockResolvedValue([]);
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
-  vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
@@ -369,17 +364,6 @@ describe("daily loop validation", () => {
 
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("storylet_1");
-  });
-
-  it("includes microtask only when eligible", async () => {
-    vi.mocked(fetchTodayRuns).mockResolvedValue([
-      { id: "r1", user_id: "u", day_index: 2, storylet_id: "a", choice_id: "c1" },
-      { id: "r2", user_id: "u", day_index: 2, storylet_id: "b", choice_id: "c2" },
-    ]);
-    vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
-
-    const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.stage).toBe("microtask");
   });
 
   it("attaches cohort and initiatives", async () => {
