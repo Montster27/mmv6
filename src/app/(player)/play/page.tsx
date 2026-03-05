@@ -2147,7 +2147,7 @@ export default function PlayPage() {
         const nextFlags = updateSkillFlag(arcOneState.skillFlags, skillModifier as any);
         await updateSkillFlags(userId, nextFlags);
         if (dailyState) {
-          setDailyState((prev) => prev ? { ...prev, skill_flags: nextFlags } : prev);
+          setDailyState({ ...dailyState, skill_flags: nextFlags });
         }
       }
 
@@ -2158,7 +2158,7 @@ export default function PlayPage() {
         const nextGates = [...new Set([...currentGates, ...precludes])];
         await updatePreclusionGates(userId, nextGates);
         if (dailyState) {
-          setDailyState((prev) => prev ? { ...prev, preclusion_gates: nextGates } : prev);
+          setDailyState({ ...dailyState, preclusion_gates: nextGates });
         }
       }
     } catch (e) {
