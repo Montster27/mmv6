@@ -75,7 +75,7 @@ export async function fetchDailyState(
   const { data, error } = await supabase
     .from("daily_states")
     .select(
-      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,relationships,expired_opportunities,replay_intention,arc_one_reflection_done,start_date,last_day_completed,last_day_index_completed"
+      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,relationships,expired_opportunities,replay_intention,arc_one_reflection_done,preclusion_gates,start_date,last_day_completed,last_day_index_completed"
     )
     .eq("user_id", userId)
     .limit(1)
@@ -691,4 +691,37 @@ export async function markDailyComplete(
   }
 
   await finalizeDay(userId, dayIndex);
+}
+
+export async function updateLifePressureState(
+  userId: string,
+  lifePressureState: Record<string, number>
+): Promise<void> {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({ life_pressure_state: lifePressureState, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("Failed to update life_pressure_state", error);
+}
+
+export async function updateSkillFlags(
+  userId: string,
+  skillFlags: Record<string, number>
+): Promise<void> {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({ skill_flags: skillFlags, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("Failed to update skill_flags", error);
+}
+
+export async function updatePreclusionGates(
+  userId: string,
+  gates: string[]
+): Promise<void> {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({ preclusion_gates: gates, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("Failed to update preclusion_gates", error);
 }

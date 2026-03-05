@@ -29,6 +29,12 @@ type Requirements = {
    * "first encounter" storylets that should not surface after introduction.
    */
   requires_npc_not_met?: string[];
+  /**
+   * Self-referential preclusion: if this string appears in the player's
+   * preclusion_gates array, this storylet is permanently closed. The value
+   * is the storylet's own slug, set on the storylet's requirements field.
+   */
+  requires_not_precluded?: string;
   audience?: {
     rollout_pct?: number;
     experiment?: { id?: string; variants_any?: string[] };
@@ -143,6 +149,11 @@ function meetsRequirements(
     for (const npcId of req.requires_npc_not_met) {
       if (rels?.[npcId]?.met) return false;
     }
+  }
+
+  if (typeof req.requires_not_precluded === "string") {
+    const gates = (dailyState as any)?.preclusion_gates as string[] | undefined;
+    if (Array.isArray(gates) && gates.includes(req.requires_not_precluded)) return false;
   }
 
   if (!opts?.ignoreAudience && req.audience && typeof req.audience === "object" && !Array.isArray(req.audience)) {

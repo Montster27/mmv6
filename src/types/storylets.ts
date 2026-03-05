@@ -39,6 +39,8 @@ export type StoryletChoice = {
     magnitude?: number;
   }>;
   identity_tags?: string[];
+  skill_modifier?: string;
+  precludes?: string[];
   relational_effects?: Record<string, Record<string, number>>;
   set_npc_memory?: Record<string, Record<string, boolean>>;
   condition?: Record<string, unknown>;

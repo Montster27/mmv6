@@ -1,4 +1,4 @@
-import type { ArcOneState, LifePressureState, MoneyBand, SkillFlags, NpcMemory } from "@/core/arcOne/types";
+import type { ArcOneState, LifePressureState, MoneyBand, SkillFlags, RelationshipState } from "@/core/arcOne/types";
 
 const SKEW_THRESHOLD = 2;
 
@@ -30,15 +30,15 @@ function expiredLine(expiredCount: number, peopleDominant: boolean): string | nu
   return "Some opportunities slipped while you focused elsewhere.";
 }
 
-function relationalLine(npcMemory: NpcMemory): string | null {
-  const entries = Object.values(npcMemory);
+function relationalLine(relationships: Record<string, RelationshipState>): string | null {
+  const entries = Object.values(relationships).filter((e) => e.met);
   if (entries.length === 0) return null;
-  const trustAvg = entries.reduce((sum, entry) => sum + entry.trust, 0) / entries.length;
-  const reliabilityAvg = entries.reduce((sum, entry) => sum + entry.reliability, 0) / entries.length;
-  if (reliabilityAvg < 0) {
+  const trustAvg = entries.reduce((sum, entry) => sum + (entry.trust ?? 0), 0) / entries.length;
+  const reliabilityAvg = entries.reduce((sum, entry) => sum + (entry.reliability ?? 0), 0) / entries.length;
+  if (reliabilityAvg < -0.5) {
     return "Others may have experienced you as inconsistent.";
   }
-  if (trustAvg > 1) {
+  if (trustAvg > 0.5) {
     return "You built trust through direct engagement.";
   }
   return null;
@@ -81,7 +81,7 @@ export function buildReflectionSummary(params: {
   lines.push(energyLine(arcOneState.energyLevel));
   lines.push(expiredLine(arcOneState.expiredOpportunities.length, lp.people >= lp.achievement));
   lines.push(moneyLine(params.moneyBandHistory ?? []));
-  lines.push(relationalLine(arcOneState.npcMemory));
+  lines.push(relationalLine(arcOneState.relationships ?? {}));
 
   return lines.filter((line): line is string => Boolean(line)).slice(0, 5);
 }

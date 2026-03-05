@@ -39,6 +39,9 @@ import {
   applyOutcomeForChoice,
   toChoices,
   updateRelationships,
+  updateLifePressureState,
+  updateSkillFlags,
+  updatePreclusionGates,
   type AllocationPayload,
 } from "@/lib/play";
 import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
@@ -77,7 +80,7 @@ import {
   unlockRemnant,
 } from "@/lib/remnants";
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
-import { getArcOneState } from "@/core/arcOne/state";
+import { getArcOneState, bumpLifePressure, updateSkillFlag } from "@/core/arcOne/state";
 import {
   applyRelationshipEvents,
   ensureRelationshipDefaults,
@@ -2127,6 +2130,36 @@ export default function PlayPage() {
             setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
           }
         });
+      }
+      // Wire identity_tags → lifePressureState
+      const choiceIdentityTags = (selectedChoice?.identity_tags ?? []) as string[];
+      if (choiceIdentityTags.length > 0 && arcOneState) {
+        const nextLp = bumpLifePressure(arcOneState.lifePressureState, choiceIdentityTags);
+        await updateLifePressureState(userId, nextLp);
+        if (dailyState) {
+          setDailyState({ ...dailyState, life_pressure_state: nextLp });
+        }
+      }
+
+      // Wire skill_modifier → skillFlags
+      const skillModifier = selectedChoice?.skill_modifier as string | undefined;
+      if (skillModifier && arcOneState?.skillFlags) {
+        const nextFlags = updateSkillFlag(arcOneState.skillFlags, skillModifier as any);
+        await updateSkillFlags(userId, nextFlags);
+        if (dailyState) {
+          setDailyState((prev) => prev ? { ...prev, skill_flags: nextFlags } : prev);
+        }
+      }
+
+      // Wire precludes → preclusionGates
+      const precludes = (selectedChoice?.precludes ?? []) as string[];
+      if (precludes.length > 0) {
+        const currentGates = (dailyState?.preclusion_gates as string[] | undefined) ?? [];
+        const nextGates = [...new Set([...currentGates, ...precludes])];
+        await updatePreclusionGates(userId, nextGates);
+        if (dailyState) {
+          setDailyState((prev) => prev ? { ...prev, preclusion_gates: nextGates } : prev);
+        }
       }
     } catch (e) {
       console.error(e);
