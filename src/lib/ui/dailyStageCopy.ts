@@ -30,10 +30,6 @@ const COPY: Record<DailyRunStage, StageCopy> = {
     title: "Optional micro-task",
     body: "A short pattern to sharpen the edges.",
   },
-  social: {
-    title: "One small social action",
-    body: "Send a boost to someone else.",
-  },
   reflection: {
     title: "A quick reflection",
     body: "Leave a trace of how today felt.",
