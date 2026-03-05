@@ -179,6 +179,7 @@ const storyletA: Storylet = {
 };
 
 const storyletB: Storylet = { ...storyletA, id: "b", slug: "b", title: "B" };
+const storyletC: Storylet = { ...storyletA, id: "c", slug: "c", title: "C" };
 
 const dailyState: DailyState = {
   id: "d",
@@ -227,6 +228,15 @@ function mockRuns(count: number): StoryletRun[] {
       choice_id: "c2",
     });
   }
+  if (count >= 3) {
+    runs.push({
+      id: "r3",
+      user_id: "u",
+      day_index: 2,
+      storylet_id: "c",
+      choice_id: "c3",
+    });
+  }
   return runs;
 }
 
@@ -269,11 +279,11 @@ beforeEach(() => {
     fun: 20,
   });
   vi.mocked(fetchTodayRuns).mockResolvedValue([]);
-  vi.mocked(fetchTodayStoryletCandidates).mockResolvedValue([storyletA, storyletB]);
+  vi.mocked(fetchTodayStoryletCandidates).mockResolvedValue([storyletA, storyletB, storyletC]);
   vi.mocked(fetchRecentStoryletRuns).mockResolvedValue([]);
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
-  vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
+  vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB, storyletC]);
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
   vi.mocked(ensureSkillBankUpToDate).mockResolvedValue();
