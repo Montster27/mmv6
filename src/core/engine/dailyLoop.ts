@@ -7,7 +7,6 @@ import {
   fetchTodayStoryletCandidates,
   fetchRecentStoryletRuns,
 } from "@/lib/play";
-import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
@@ -136,7 +135,6 @@ export async function getOrCreateDailyRun(
     allocation,
     runs,
     storyletsRaw,
-    boosted,
     tensions,
     skillBankRaw,
     postureRaw,
@@ -148,7 +146,6 @@ export async function getOrCreateDailyRun(
     fetchTimeAllocation(userId, dayIndex),
     fetchTodayRuns(userId, dayIndex),
     fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
-    hasSentBoostToday(userId, dayIndex),
     fetchTensions(userId, dayIndex),
     featureFlags.skills ? fetchSkillBank(userId) : Promise.resolve(null),
     fetchPosture(userId, dayIndex),
@@ -404,7 +401,6 @@ export async function getOrCreateDailyRun(
 
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
-  const canBoost = !boosted;
   const arcOneMode =
     featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY;
   // Setup is handled via auto-default posture above; no additional setup gate needed.
@@ -413,7 +409,6 @@ export async function getOrCreateDailyRun(
     arcOneMode ? true : Boolean(allocation),
     runsForPair.length,
     cadence.alreadyCompletedToday,
-    canBoost,
     hasStorylets,
     reflectionDone,
     microTaskEligible,
@@ -430,7 +425,6 @@ export async function getOrCreateDailyRun(
     dayIndex,
     hasAllocation: Boolean(allocation),
     runsForPair: runsForPair.length,
-    canBoost,
     reflectionDone,
     microTaskEligible,
     microTaskDone,
@@ -468,7 +462,6 @@ export async function getOrCreateDailyRun(
       ? storylets
       : [fallbackStorylet(), fallbackStorylet(), fallbackStorylet()],
     storyletRunsToday: runs,
-    canBoost,
     tensions,
     skillBank: featureFlags.skills ? skillBank : null,
     posture: postureResolved,

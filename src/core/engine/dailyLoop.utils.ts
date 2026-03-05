@@ -10,7 +10,6 @@ export function computeStage(
     allocationPresent: boolean,
     runsForPairCount: number,
     alreadyCompletedToday: boolean,
-    canBoost: boolean,
     hasStorylets: boolean,
     reflectionDone: boolean,
     microTaskEligible: boolean,
@@ -24,7 +23,6 @@ export function computeStage(
     if (runsForPairCount === 0) return "storylet_1";
     if (runsForPairCount === 1) return "storylet_2";
     if (runsForPairCount === 2) return "storylet_3";
-    if (runsForPairCount >= 3 && canBoost) return "social";
     if (runsForPairCount >= 3 && !reflectionDone) return "reflection";
     if (runsForPairCount >= 3 && microTaskEligible && !microTaskDone) return "microtask";
     if (runsForPairCount >= 3 && funPulseEligible && !funPulseDone) return "fun_pulse";

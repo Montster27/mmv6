@@ -13,9 +13,6 @@ vi.mock("@/lib/play", () => ({
   fetchTodayStoryletCandidates: vi.fn(),
   fetchRecentStoryletRuns: vi.fn(),
 }));
-vi.mock("@/lib/social", () => ({
-  hasSentBoostToday: vi.fn(),
-}));
 vi.mock("@/lib/reflections", () => ({
   getReflection: vi.fn(),
   isReflectionDone: vi.fn(),
@@ -128,7 +125,6 @@ import {
   fetchTodayStoryletCandidates,
   fetchRecentStoryletRuns,
 } from "@/lib/play";
-import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
@@ -279,7 +275,6 @@ beforeEach(() => {
   vi.mocked(fetchTodayRuns).mockResolvedValue([]);
   vi.mocked(fetchTodayStoryletCandidates).mockResolvedValue([storyletA, storyletB]);
   vi.mocked(fetchRecentStoryletRuns).mockResolvedValue([]);
-  vi.mocked(hasSentBoostToday).mockResolvedValue(false);
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
   vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
@@ -510,7 +505,7 @@ describe("getOrCreateDailyRun", () => {
     expect(run.stage).toBe("microtask");
   });
 
-  it("returns social when microtask done and boost available", async () => {
+  it("returns reflection when microtask done", async () => {
     vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
     vi.mocked(fetchMicroTaskRun).mockResolvedValue({
       id: "m",
@@ -522,24 +517,6 @@ describe("getOrCreateDailyRun", () => {
       duration_ms: 1000,
       created_at: new Date().toISOString(),
     });
-    vi.mocked(hasSentBoostToday).mockResolvedValue(false);
-    const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.stage).toBe("social");
-  });
-
-  it("returns reflection when boost already sent", async () => {
-    vi.mocked(fetchTodayRuns).mockResolvedValue(mockRuns(3));
-    vi.mocked(fetchMicroTaskRun).mockResolvedValue({
-      id: "m",
-      user_id: "u",
-      day_index: 2,
-      task_id: "pattern_match_v1",
-      status: "completed",
-      score: 2,
-      duration_ms: 1000,
-      created_at: new Date().toISOString(),
-    });
-    vi.mocked(hasSentBoostToday).mockResolvedValue(true);
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("reflection");
   });

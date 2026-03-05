@@ -15,8 +15,6 @@ import type { SeasonRecap } from "@/types/seasons";
 import type { SeasonContext } from "@/types/season";
 import type { AllocationPayload } from "@/lib/play";
 import type { ReflectionResponse } from "@/types/reflections";
-import type { PublicProfile, ReceivedBoost } from "@/lib/social";
-
 export type DailyProgressState = {
   dailyState: DailyState | null;
   dayState: DailyRun["dayState"] | null;
@@ -251,74 +249,6 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     setOutcomeMessage,
     setOutcomeDeltas,
     setLastCheck,
-  };
-}
-
-export type UserSocialState = {
-  publicProfiles: PublicProfile[];
-  selectedRecipient: string;
-  boostsReceived: ReceivedBoost[];
-  hasSentBoost: boolean;
-  loadingSocial: boolean;
-  boostMessage: string | null;
-};
-
-export function useUserSocial() {
-  const [state, setState] = useState<UserSocialState>({
-    publicProfiles: [],
-    selectedRecipient: "",
-    boostsReceived: [],
-    hasSentBoost: false,
-    loadingSocial: false,
-    boostMessage: null,
-  });
-
-  const setUserSocial = useCallback(
-    (patch: Partial<UserSocialState>) => {
-      setState((prev) => ({ ...prev, ...patch }));
-    },
-    []
-  );
-
-  const setPublicProfiles = useCallback(
-    (publicProfiles: PublicProfile[]) => setUserSocial({ publicProfiles }),
-    [setUserSocial]
-  );
-  const setSelectedRecipient = useCallback(
-    (next: string | ((prev: string) => string)) =>
-      setState((prev) => ({
-        ...prev,
-        selectedRecipient:
-          typeof next === "function" ? next(prev.selectedRecipient) : next,
-      })),
-    []
-  );
-  const setBoostsReceived = useCallback(
-    (boostsReceived: ReceivedBoost[]) => setUserSocial({ boostsReceived }),
-    [setUserSocial]
-  );
-  const setHasSentBoost = useCallback(
-    (hasSentBoost: boolean) => setUserSocial({ hasSentBoost }),
-    [setUserSocial]
-  );
-  const setLoadingSocial = useCallback(
-    (loadingSocial: boolean) => setUserSocial({ loadingSocial }),
-    [setUserSocial]
-  );
-  const setBoostMessage = useCallback(
-    (boostMessage: string | null) => setUserSocial({ boostMessage }),
-    [setUserSocial]
-  );
-
-  return {
-    ...state,
-    setUserSocial,
-    setPublicProfiles,
-    setSelectedRecipient,
-    setBoostsReceived,
-    setHasSentBoost,
-    setLoadingSocial,
-    setBoostMessage,
   };
 }
 

@@ -13,9 +13,6 @@ vi.mock("@/lib/play", () => ({
   fetchTodayStoryletCandidates: vi.fn(),
   fetchRecentStoryletRuns: vi.fn(),
 }));
-vi.mock("@/lib/social", () => ({
-  hasSentBoostToday: vi.fn(),
-}));
 vi.mock("@/lib/reflections", () => ({
   getReflection: vi.fn(),
   isReflectionDone: vi.fn(),
@@ -127,7 +124,6 @@ import {
   fetchTodayStoryletCandidates,
   fetchRecentStoryletRuns,
 } from "@/lib/play";
-import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
 import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
@@ -255,7 +251,6 @@ beforeEach(() => {
   vi.mocked(fetchTodayRuns).mockResolvedValue([]);
   vi.mocked(fetchTodayStoryletCandidates).mockResolvedValue([storyletA, storyletB]);
   vi.mocked(fetchRecentStoryletRuns).mockResolvedValue([]);
-  vi.mocked(hasSentBoostToday).mockResolvedValue(false);
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
   vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);

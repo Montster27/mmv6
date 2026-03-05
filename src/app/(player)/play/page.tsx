@@ -45,12 +45,6 @@ import {
   type AllocationPayload,
 } from "@/lib/play";
 import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
-import {
-  fetchPublicProfiles,
-  fetchTodayReceivedBoosts,
-  hasSentBoostToday,
-  sendBoost,
-} from "@/lib/social";
 import { upsertReflection } from "@/lib/reflections";
 import {
   allocateSkillPoint,
@@ -60,13 +54,6 @@ import {
 } from "@/lib/dailyInteractions";
 import { fetchCohortRoster } from "@/lib/cohorts";
 import { contributeToInitiative } from "@/lib/initiatives";
-import {
-  createCohortPost,
-  fetchCohortBoard,
-  markPostHelpful,
-  sendCohortReply,
-} from "@/lib/askOfferBoard";
-import type { AskOfferPostView } from "@/types/askOffer";
 import { getBuddyNudges, getOrAssignBuddy, trackBuddyNudge } from "@/lib/buddy";
 import {
   fetchCompareSnapshot,
@@ -105,7 +92,7 @@ import { OutcomeExplain } from "@/components/play/OutcomeExplain";
 import { SeasonBadge } from "@/components/SeasonBadge";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
-import { useDailyProgress, useGameContent, useUserSocial } from "./hooks";
+import { useDailyProgress, useGameContent } from "./hooks";
 import { MessageCard } from "@/components/ux/MessageCard";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
@@ -193,21 +180,6 @@ export default function PlayPage() {
   const [savingAllocation, setSavingAllocation] = useState(false);
   const [savingChoice, setSavingChoice] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const {
-    publicProfiles,
-    selectedRecipient,
-    boostsReceived,
-    hasSentBoost,
-    loadingSocial,
-    boostMessage,
-    setPublicProfiles,
-    setSelectedRecipient,
-    setBoostsReceived,
-    setHasSentBoost,
-    setLoadingSocial,
-    setBoostMessage,
-    setUserSocial,
-  } = useUserSocial();
   const [allocatingSkill, setAllocatingSkill] = useState(false);
   const [submittingPosture, setSubmittingPosture] = useState(false);
   const [setupActionError, setSetupActionError] = useState<string | null>(null);
@@ -272,15 +244,6 @@ export default function PlayPage() {
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
   const [arcOneReflectionSaving, setArcOneReflectionSaving] = useState(false);
-  const [askOfferPosts, setAskOfferPosts] = useState<AskOfferPostView[]>([]);
-  const [askOfferLoading, setAskOfferLoading] = useState(false);
-  const [askOfferError, setAskOfferError] = useState<string | null>(null);
-  const [askOfferType, setAskOfferType] = useState<"ask" | "offer">("ask");
-  const [askOfferBody, setAskOfferBody] = useState("");
-  const [askOfferPosting, setAskOfferPosting] = useState(false);
-  const [replyNotes, setReplyNotes] = useState<Record<string, string>>({});
-  const [replySending, setReplySending] = useState<Record<string, boolean>>({});
-  const [helpfulSending, setHelpfulSending] = useState<Record<string, boolean>>({});
   const [buddyAssignment, setBuddyAssignment] = useState<{
     buddy_type: "human" | "ai";
     buddy_user_id: string | null;
@@ -335,14 +298,12 @@ export default function PlayPage() {
       elapsedMinutes: number;
       allocationSaved: boolean;
       storyletRuns: number;
-      socialComplete: boolean;
       reflectionDone: boolean;
     }) => {
       const {
         elapsedMinutes,
         allocationSaved,
         storyletRuns,
-        socialComplete,
         reflectionDone,
       } = params;
 
@@ -361,7 +322,6 @@ export default function PlayPage() {
       if (allocationSaved) criteriaPhase = "guided_core_loop";
       if (storyletRuns >= 1) criteriaPhase = "reflection_arc";
       if (storyletRuns >= 2 || reflectionDone) criteriaPhase = "community_purpose";
-      if (socialComplete) criteriaPhase = "remnant_reveal";
 
       const order = [
         "intro_hook",
@@ -418,7 +378,6 @@ export default function PlayPage() {
     stage,
     allocationSaved,
     runs.length,
-    hasSentBoost,
   ]);
   const slicePhaseLabel = useMemo(() => {
     if (!featureFlags.verticalSlice30Enabled) return null;
@@ -432,7 +391,6 @@ export default function PlayPage() {
     stage,
     allocationSaved,
     runs.length,
-    hasSentBoost,
     SLICE_PHASES_LOCAL,
   ]);
   const remnantDefinitions = useMemo(() => listRemnantDefinitions(), []);
@@ -863,7 +821,6 @@ export default function PlayPage() {
             cohortId: run.cohortId ?? null,
           });
           setRemnantState(run.remnant ?? null);
-          setUserSocial({ hasSentBoost: !run.canBoost });
           const ds =
             run.dailyState ?? (await fetchDailyState(bootstrapUserId));
           if (ds) {
@@ -905,15 +862,6 @@ export default function PlayPage() {
             });
           }
 
-          const [profiles, received] = await Promise.all([
-            fetchPublicProfiles(bootstrapUserId),
-            fetchTodayReceivedBoosts(bootstrapUserId, run.dayIndex),
-          ]);
-          setUserSocial({
-            publicProfiles: profiles,
-            selectedRecipient: profiles[0]?.user_id ?? "",
-            boostsReceived: received,
-          });
         } else {
           const cadence = await ensureCadenceUpToDate(bootstrapUserId);
           setDailyProgress({
@@ -985,17 +933,6 @@ export default function PlayPage() {
           setStorylets(nextStorylets);
 
           const allocationExists = Boolean(existingAllocation);
-          const [profiles, received, sent] = await Promise.all([
-            fetchPublicProfiles(bootstrapUserId),
-            fetchTodayReceivedBoosts(bootstrapUserId, day),
-            hasSentBoostToday(bootstrapUserId, day),
-          ]);
-          setUserSocial({
-            publicProfiles: profiles,
-            selectedRecipient: profiles[0]?.user_id ?? "",
-            boostsReceived: received,
-            hasSentBoost: sent,
-          });
           setStage(
             cadence.alreadyCompletedToday
               ? "complete"
@@ -1134,78 +1071,6 @@ export default function PlayPage() {
     trackWithSeason({ event_type: "session_start", day_index: dayIndex, stage });
   }, [userId, dayIndex, stage, loading, seasonContext]);
 
-  const refreshAskOfferBoard = useCallback(async () => {
-    if (!userId || !cohortId || !featureFlags.askOfferBoardEnabled) return;
-    setAskOfferLoading(true);
-    setAskOfferError(null);
-    try {
-      const res = await fetchCohortBoard(cohortId, userId);
-      setAskOfferPosts(res.posts);
-    } catch (err) {
-      console.error(err);
-      setAskOfferError("Unable to load the board right now.");
-    } finally {
-      setAskOfferLoading(false);
-    }
-  }, [userId, cohortId, featureFlags.askOfferBoardEnabled]);
-
-  useEffect(() => {
-    if (!featureFlags.askOfferBoardEnabled || !cohortId || !userId) return;
-    refreshAskOfferBoard();
-  }, [featureFlags.askOfferBoardEnabled, cohortId, userId, refreshAskOfferBoard]);
-
-  const handleCreateAskOffer = async () => {
-    if (!userId || !cohortId) return;
-    setAskOfferPosting(true);
-    setAskOfferError(null);
-    const res = await createCohortPost({
-      cohortId,
-      userId,
-      postType: askOfferType,
-      body: askOfferBody,
-    });
-    if (!res.ok) {
-      setAskOfferError(res.error ?? "Unable to post right now.");
-      setAskOfferPosting(false);
-      return;
-    }
-    setAskOfferBody("");
-    await refreshAskOfferBoard();
-    setAskOfferPosting(false);
-  };
-
-  const handleSendReply = async (postId: string, templateKey: string) => {
-    if (!userId) return;
-    setReplySending((prev) => ({ ...prev, [postId]: true }));
-    const res = await sendCohortReply({
-      postId,
-      userId,
-      templateKey,
-      body: replyNotes[postId],
-    });
-    if (!res.ok) {
-      setAskOfferError(res.error ?? "Unable to send reply.");
-      setReplySending((prev) => ({ ...prev, [postId]: false }));
-      return;
-    }
-    setReplyNotes((prev) => ({ ...prev, [postId]: "" }));
-    await refreshAskOfferBoard();
-    setReplySending((prev) => ({ ...prev, [postId]: false }));
-  };
-
-  const handleHelpful = async (postId: string) => {
-    if (!userId) return;
-    setHelpfulSending((prev) => ({ ...prev, [postId]: true }));
-    const res = await markPostHelpful({ postId, userId });
-    if (!res.ok) {
-      setAskOfferError(res.error ?? "Unable to save reaction.");
-      setHelpfulSending((prev) => ({ ...prev, [postId]: false }));
-      return;
-    }
-    await refreshAskOfferBoard();
-    setHelpfulSending((prev) => ({ ...prev, [postId]: false }));
-  };
-
   useEffect(() => {
     if (!testerMode || !featureFlags.rookieCircleEnabled || !cohortId) {
       setCohortRoster(null);
@@ -1317,7 +1182,6 @@ export default function PlayPage() {
       elapsedMinutes,
       allocationSaved,
       storyletRuns: runs.length,
-      socialComplete: Boolean(hasSentBoost),
       reflectionDone: stage === "complete" || stage === "reflection",
     });
     if (phaseRef.current !== phase) {
@@ -1342,7 +1206,6 @@ export default function PlayPage() {
     dayIndex,
     allocationSaved,
     runs.length,
-    hasSentBoost,
     stage,
   ]);
 
@@ -2047,9 +1910,7 @@ export default function PlayPage() {
           nextStage =
             microTaskEligible && microTaskStatus === "pending"
               ? "microtask"
-              : hasSentBoost
-              ? "reflection"
-              : "social";
+              : "reflection";
         }
         pendingTransitionRef.current = () => setStage(nextStage);
         if (!reactionText || !beatBufferEnabled) {
@@ -2317,57 +2178,6 @@ export default function PlayPage() {
     }
   };
 
-  const loadSocialData = async (uid: string, day: number) => {
-    setLoadingSocial(true);
-    const [profiles, received, sent] = await Promise.all([
-      fetchPublicProfiles(uid),
-      fetchTodayReceivedBoosts(uid, day),
-      hasSentBoostToday(uid, day),
-    ]);
-    setPublicProfiles(profiles);
-    setSelectedRecipient((prev) => prev || profiles[0]?.user_id || "");
-    setBoostsReceived(received);
-    setHasSentBoost(sent);
-    setLoadingSocial(false);
-  };
-
-  const handleSendBoost = async () => {
-    if (!userId || !selectedRecipient) return;
-    recordInteraction();
-    setError(null);
-    setBoostMessage(null);
-    setLoadingSocial(true);
-    try {
-      await sendBoost(userId, selectedRecipient, dayIndex);
-      appendGroupFeedEvent(userId, "boost_sent", { to_user_id: selectedRecipient }).catch(
-        () => {}
-      );
-      incrementGroupObjective(1, "boost_sent").catch(() => {});
-      await loadSocialData(userId, dayIndex);
-      setHasSentBoost(true);
-      setBoostMessage(
-        "You feel more connected. Someone else feels supported."
-      );
-      const refreshed = await fetchDailyState(userId);
-      if (refreshed) {
-        setDailyState(refreshed);
-        setOutcomeDeltas({
-          vectors: { social: 1 },
-        });
-      }
-      if (USE_DAILY_LOOP_ORCHESTRATOR) {
-        setStage("reflection");
-      }
-    } catch (e) {
-      console.error(e);
-      const message =
-        e instanceof Error ? e.message : "Failed to send boost. Try again.";
-      setError(message);
-    } finally {
-      setLoadingSocial(false);
-    }
-  };
-
   const handleMicroTaskComplete = async (result: {
     score: number;
     duration_ms: number;
@@ -2396,7 +2206,7 @@ export default function PlayPage() {
         stage: "microtask",
         payload: { score: result.score, duration_ms: result.duration_ms },
       });
-      setStage(hasSentBoost ? "reflection" : "social");
+      setStage("reflection");
     } catch (e) {
       console.error(e);
       setError("Failed to save micro-task.");
@@ -2418,7 +2228,7 @@ export default function PlayPage() {
         day_index: dayIndex,
         stage: "microtask",
       });
-      setStage(hasSentBoost ? "reflection" : "social");
+      setStage("reflection");
     } catch (e) {
       console.error(e);
       setError("Failed to skip micro-task.");
@@ -2501,7 +2311,6 @@ export default function PlayPage() {
       } else {
         setStage("complete");
       }
-      setBoostMessage("Thanks — see you tomorrow.");
     } catch (e) {
       console.error(e);
       setError("Failed to save reflection.");
@@ -2909,31 +2718,6 @@ export default function PlayPage() {
                       ) : null}
                     </section>
 
-                    <section className="space-y-3">
-                      <h2 className="text-xl font-semibold">Boosts Received Today</h2>
-                      {boostsReceived.length === 0 ? (
-                        <p className="text-sm text-slate-700">
-                          None yet. Maybe tomorrow.
-                        </p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {boostsReceived.map((boost, idx) => {
-                            const sender =
-                              publicProfiles.find(
-                                (p) => p.user_id === boost.from_user_id
-                              )?.display_name ?? "Unknown player";
-                            return (
-                              <li
-                                key={`${boost.from_user_id}-${idx}`}
-                                className="rounded border border-slate-200 bg-white px-3 py-2 text-slate-800"
-                              >
-                                {sender} sent you a boost.
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </section>
                   </>
                 ) : (
                   <>
@@ -2959,10 +2743,9 @@ export default function PlayPage() {
                     </TesterOnly>
                   ) : null}
 
-                  {(stage === "social" ||
-                    (!USE_DAILY_LOOP_ORCHESTRATOR &&
+                  {(!USE_DAILY_LOOP_ORCHESTRATOR &&
                       allocationSaved &&
-                      !currentStorylet)) && initiatives.length > 0 ? (
+                      !currentStorylet) && initiatives.length > 0 ? (
                     <section className="space-y-3">
                       <InitiativePanel
                         initiative={initiatives[0]}
@@ -3255,258 +3038,6 @@ export default function PlayPage() {
                     </section>
                   )}
 
-                  {(stage === "social" ||
-                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved && !currentStorylet)) && (
-                    <section className="space-y-3">
-                      {featureFlags.askOfferBoardEnabled && cohortId ? (
-                        <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                          <div>
-                            <h2 className="text-xl font-semibold">Ask / Offer Board</h2>
-                            <p className="text-sm text-slate-600">
-                              Share a short ask or offer with your circle.
-                            </p>
-                            {featureFlags.buddySystemEnabled && buddyAssignment ? (
-                              <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                                <p>
-                                  Buddy:{" "}
-                                  {buddyAssignment.buddy_type === "human"
-                                    ? "Human (same circle)"
-                                    : "AI fallback"}
-                                </p>
-                                {buddyAssignment.buddy_type === "human" ? (
-                                  <p>
-                                    Handle: {`Handle ${buddyAssignment.buddy_user_id?.slice(0, 4)}`}
-                                  </p>
-                                ) : null}
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {getBuddyNudges().map((nudge) => (
-                                    <Button
-                                      key={nudge.id}
-                                      variant="outline"
-                                      onClick={() => {
-                                        setBuddyNudge(nudge.message);
-                                        trackBuddyNudge(nudge.id);
-                                      }}
-                                    >
-                                      {nudge.label}
-                                    </Button>
-                                  ))}
-                                </div>
-                                {buddyNudge ? (
-                                  <p className="mt-2 text-sm text-slate-700">
-                                    {buddyNudge}
-                                  </p>
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </div>
-                          {askOfferError ? (
-                            <p className="text-sm text-red-600">{askOfferError}</p>
-                          ) : null}
-                          <div className="space-y-2">
-                            <label className="block text-sm text-slate-700">
-                              Post type
-                            </label>
-                            <select
-                              className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                              value={askOfferType}
-                              onChange={(e) =>
-                                setAskOfferType(
-                                  e.target.value === "offer" ? "offer" : "ask"
-                                )
-                              }
-                            >
-                              <option value="ask">ASK — I need advice on…</option>
-                              <option value="offer">OFFER — I chose X because…</option>
-                            </select>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm text-slate-700">
-                              Your message (max 160)
-                            </label>
-                            <textarea
-                              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                              rows={3}
-                              value={askOfferBody}
-                              onChange={(e) => setAskOfferBody(e.target.value)}
-                            />
-                            <Button
-                              variant="secondary"
-                              onClick={handleCreateAskOffer}
-                              disabled={askOfferPosting}
-                            >
-                              {askOfferPosting ? "Posting..." : "Post to circle"}
-                            </Button>
-                          </div>
-                          <div className="space-y-3">
-                            <h3 className="text-lg font-semibold">Recent posts</h3>
-                            {askOfferLoading ? (
-                              <p className="text-sm text-slate-600">Loading…</p>
-                            ) : askOfferPosts.length === 0 ? (
-                              <p className="text-sm text-slate-600">
-                                No posts yet. Be the first to share.
-                              </p>
-                            ) : (
-                              <div className="space-y-3">
-                                {askOfferPosts.map((post) => (
-                                  <div
-                                    key={post.id}
-                                    className="rounded-md border border-slate-200 px-3 py-3"
-                                  >
-                                    <div className="flex items-center justify-between text-xs text-slate-500">
-                                      <span className="uppercase tracking-wide">
-                                        {post.post_type}
-                                      </span>
-                                      <span>{post.author_handle}</span>
-                                    </div>
-                                    <p className="mt-2 text-sm text-slate-800">
-                                      {post.body}
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                                      <Button
-                                        variant={post.helpful_given ? "secondary" : "outline"}
-                                        onClick={() => handleHelpful(post.id)}
-                                        disabled={post.helpful_given || helpfulSending[post.id]}
-                                      >
-                                        Helpful · {post.helpful_count}
-                                      </Button>
-                                    </div>
-                                    <div className="mt-3 space-y-2">
-                                      <p className="text-xs text-slate-500">
-                                        Quick reply
-                                      </p>
-                                      <div className="flex flex-wrap gap-2">
-                                        {[
-                                          {
-                                            key: "one_small_step",
-                                            label: "One small step helped me.",
-                                          },
-                                          {
-                                            key: "offer_tip",
-                                            label: "I can offer a quick tip.",
-                                          },
-                                          {
-                                            key: "try_this",
-                                            label: "I tried this.",
-                                          },
-                                        ].map((template) => (
-                                          <Button
-                                            key={template.key}
-                                            variant="outline"
-                                            onClick={() =>
-                                              handleSendReply(post.id, template.key)
-                                            }
-                                            disabled={replySending[post.id]}
-                                          >
-                                            {template.label}
-                                          </Button>
-                                        ))}
-                                      </div>
-                                      <input
-                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                                        placeholder="Add a short note (optional)"
-                                        value={replyNotes[post.id] ?? ""}
-                                        onChange={(e) =>
-                                          setReplyNotes((prev) => ({
-                                            ...prev,
-                                            [post.id]: e.target.value,
-                                          }))
-                                        }
-                                      />
-                                    </div>
-                                    {post.replies.length > 0 ? (
-                                      <div className="mt-3 space-y-2">
-                                        <p className="text-xs text-slate-500">
-                                          Replies
-                                        </p>
-                                        <ul className="space-y-2">
-                                          {post.replies.map((reply) => (
-                                            <li
-                                              key={reply.id}
-                                              className="rounded-md border border-slate-100 bg-slate-50 px-2 py-2 text-sm"
-                                            >
-                                              <p className="text-xs text-slate-500">
-                                                {reply.author_handle}
-                                              </p>
-                                              <p className="text-slate-700">
-                                                {reply.body ?? "Shared a quick reply."}
-                                              </p>
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
-                      <h2 className="text-xl font-semibold">Send a Boost</h2>
-                      {boostMessage ? (
-                        <p className="text-sm text-slate-700">{boostMessage}</p>
-                      ) : null}
-                      {hasSentBoost ? (
-                        <p className="text-slate-700">Boost sent for today ✅</p>
-                      ) : publicProfiles.length === 0 ? (
-                          <p className="text-slate-700">
-                            No other players yet. Invite someone and try again.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            <label className="block text-sm text-slate-700">
-                              Choose a player
-                            </label>
-                            <select
-                              className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                              value={selectedRecipient}
-                              onChange={(e) => setSelectedRecipient(e.target.value)}
-                              disabled={loadingSocial}
-                            >
-                              {publicProfiles.map((p) => (
-                                <option key={p.user_id} value={p.user_id}>
-                                  {p.display_name}
-                                </option>
-                              ))}
-                            </select>
-                            <Button
-                              variant="outline"
-                              onClick={handleSendBoost}
-                              disabled={!selectedRecipient || loadingSocial}
-                            >
-                              {loadingSocial ? "Sending..." : "Send Boost"}
-                            </Button>
-                          </div>
-                        )}
-
-                        <div className="space-y-2">
-                          <h3 className="text-lg font-semibold">Boosts Received Today</h3>
-                          {boostsReceived.length === 0 ? (
-                            <p className="text-sm text-slate-700">
-                              None yet. Maybe tomorrow.
-                            </p>
-                          ) : (
-                            <ul className="space-y-2">
-                              {boostsReceived.map((boost, idx) => {
-                                const sender =
-                                  publicProfiles.find(
-                                    (p) => p.user_id === boost.from_user_id
-                                  )?.display_name ?? "Unknown player";
-                                return (
-                                  <li
-                                    key={`${boost.from_user_id}-${idx}`}
-                                    className="rounded border border-slate-200 bg-white px-3 py-2 text-slate-800"
-                                  >
-                                    {sender} sent you a boost.
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-                    </section>
-                  )}
 
                   {featureFlags.remnantSystemEnabled &&
                     slicePhaseId === "remnant_reveal" && (
@@ -3608,7 +3139,6 @@ export default function PlayPage() {
                   dayState={dayState}
                   skillBank={skillBank}
                   lastAppliedDeltas={outcomeDeltas}
-                  boostsReceivedCount={boostsReceived.length}
                   skills={skills}
                   resourcesEnabled={featureFlags.resources && !arcOneMode}
                   skillsEnabled={skillUiEnabled}

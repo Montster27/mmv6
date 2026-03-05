@@ -21,7 +21,6 @@ export type DailyRunStage =
   | "storylet_2"
   | "storylet_3"
   | "microtask"
-  | "social"
   | "reflection"
   | "fun_pulse"
   | "complete";
@@ -35,7 +34,6 @@ export type DailyRun = {
   allocationSeed?: AllocationMap | null;
   storylets: Storylet[];
   storyletRunsToday: StoryletRun[];
-  canBoost: boolean;
   tensions?: DailyTension[];
   skillBank?: SkillBank | null;
   posture?: DailyPosture | null;
