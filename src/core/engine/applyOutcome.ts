@@ -5,7 +5,7 @@ import type { ResourceKey } from "@/core/resources/resourceKeys";
 
 type Outcome = StoryletChoice["outcome"];
 
-type AppliedDeltas = {
+export type AppliedDeltas = {
   energy?: number;
   stress?: number;
   vectors?: Record<string, number>;

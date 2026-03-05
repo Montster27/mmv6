@@ -7,7 +7,7 @@ import {
   fallbackStorylet,
   validateStorylet,
 } from "@/core/validation/storyletValidation";
-import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
+import { applyOutcomeToDailyState, type AppliedDeltas } from "@/core/engine/applyOutcome";
 import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
 import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
@@ -548,11 +548,7 @@ export async function applyOutcomeForChoice(
 ): Promise<{
   nextDailyState: DailyState;
   appliedMessage: string;
-  appliedDeltas: {
-    energy?: number;
-    stress?: number;
-    vectors?: Record<string, number>;
-  };
+  appliedDeltas: AppliedDeltas;
   resolvedOutcomeId?: string;
   resolvedOutcomeAnomalies?: string[];
   lastCheck?: CheckResult;
@@ -739,7 +735,14 @@ export async function applyResourceDeltaToDayState(
   resources: Partial<Record<string, number>>
 ): Promise<void> {
   if (!resources || Object.keys(resources).length === 0) return;
-  await applyResourceDelta(userId, dayIndex, { resources }, {
+  // Filter out undefined values to satisfy Record<string, number>
+  const definedResources: Record<string, number> = Object.fromEntries(
+    Object.entries(resources).filter((entry): entry is [string, number] =>
+      typeof entry[1] === "number"
+    )
+  );
+  if (Object.keys(definedResources).length === 0) return;
+  await applyResourceDelta(userId, dayIndex, { resources: definedResources }, {
     source: "storylet_outcome",
   });
 }
