@@ -35,6 +35,7 @@ import {
   markDailyComplete,
   saveTimeAllocation,
   applyOutcomeForChoice,
+  applyResourceDeltaToDayState,
   toChoices,
   updateRelationships,
   updateLifePressureState,
@@ -1694,20 +1695,53 @@ export default function PlayPage() {
   );
 
         setDailyState(nextDailyState);
-        if (
-          dayState &&
-          (typeof appliedDeltas.energy === "number" ||
-            typeof appliedDeltas.stress === "number")
-        ) {
-          const nextEnergy =
-            typeof appliedDeltas.energy === "number"
-              ? Math.max(0, Math.min(100, dayState.energy + appliedDeltas.energy))
-              : dayState.energy;
-          const nextStress =
-            typeof appliedDeltas.stress === "number"
-              ? Math.max(0, Math.min(100, dayState.stress + appliedDeltas.stress))
-              : dayState.stress;
-          setDayState({ ...dayState, energy: nextEnergy, stress: nextStress });
+        if (dayState) {
+          const hasEnergyStress =
+            typeof appliedDeltas.energy === "number" ||
+            typeof appliedDeltas.stress === "number";
+          const hasResources =
+            appliedDeltas.resources &&
+            Object.keys(appliedDeltas.resources).length > 0;
+
+          if (hasEnergyStress || hasResources) {
+            const nextEnergy =
+              typeof appliedDeltas.energy === "number"
+                ? Math.max(0, Math.min(100, dayState.energy + appliedDeltas.energy))
+                : dayState.energy;
+            const nextStress =
+              typeof appliedDeltas.stress === "number"
+                ? Math.max(0, Math.min(100, dayState.stress + appliedDeltas.stress))
+                : dayState.stress;
+            // Optimistically apply resource deltas to local UI state
+            const res = appliedDeltas.resources ?? {};
+            const nextDayState = {
+              ...dayState,
+              energy: nextEnergy,
+              stress: nextStress,
+              cashOnHand: dayState.cashOnHand + (res.cashOnHand ?? 0),
+              knowledge: dayState.knowledge + (res.knowledge ?? 0),
+              socialLeverage: dayState.socialLeverage + (res.socialLeverage ?? 0),
+              physicalResilience: Math.max(
+                0,
+                Math.min(100, dayState.physicalResilience + (res.physicalResilience ?? 0))
+              ),
+            };
+            setDayState(nextDayState);
+          }
+
+          // Persist resource deltas to player_day_state (fire-and-forget)
+          if (
+            appliedDeltas.resources &&
+            Object.keys(appliedDeltas.resources).length > 0
+          ) {
+            applyResourceDeltaToDayState(
+              userId,
+              dayIndex,
+              appliedDeltas.resources
+            ).catch((err) =>
+              console.error("Failed to persist resource delta from outcome", err)
+            );
+          }
         }
         const hasVectorDeltas =
           appliedDeltas.vectors &&
@@ -1715,7 +1749,11 @@ export default function PlayPage() {
         const hasDeltas =
           typeof appliedDeltas.energy === "number" ||
           typeof appliedDeltas.stress === "number" ||
-          hasVectorDeltas;
+          hasVectorDeltas ||
+          Boolean(
+            appliedDeltas.resources &&
+              Object.keys(appliedDeltas.resources).length > 0
+          );
         beatFallbackMessage = appliedMessage ?? null;
         setOutcomeMessage(
           appliedMessage || (hasDeltas ? "Choice recorded." : null)
@@ -2692,6 +2730,7 @@ export default function PlayPage() {
                       savingAllocation={savingAllocation}
                       onAllocationChange={handleAllocationChange}
                       onSave={handleSaveAllocation}
+                      resourcesEnabled={featureFlags.resources && !arcOneMode}
                     />
                   )}
 
@@ -2742,18 +2781,57 @@ export default function PlayPage() {
                               {(() => {
                                 const choices = toChoices(currentStorylet);
 
+                                const RESOURCE_LABELS: Record<string, string> = {
+                                  cashOnHand: "cash",
+                                  knowledge: "knowledge",
+                                  socialLeverage: "social leverage",
+                                  physicalResilience: "resilience",
+                                };
                                 return choices.length > 0 ? (
-                                  choices.map((choice) => (
-                                    <Button
-                                      key={choice.id}
-                                      variant="secondary"
-                                      disabled={choicesDisabled}
-                                      onClick={() => handleChoice(choice.id)}
-                                      className="w-full justify-start"
-                                    >
-                                      {choice.label}
-                                    </Button>
-                                  ))
+                                  choices.map((choice) => {
+                                    const typedChoice = choice as {
+                                      id: string;
+                                      label: string;
+                                      requires_resource?: { key: string; min: number };
+                                      costs_resource?: { key: string; amount: number };
+                                    };
+                                    const reqRes = featureFlags.resources
+                                      ? typedChoice.requires_resource
+                                      : undefined;
+                                    const costRes = featureFlags.resources
+                                      ? typedChoice.costs_resource
+                                      : undefined;
+                                    const meetsGate =
+                                      !reqRes || !dayState
+                                        ? true
+                                        : ((dayState as Record<string, number>)[reqRes.key] ?? 0) >= reqRes.min;
+                                    const isDisabled = choicesDisabled || !meetsGate;
+
+                                    return (
+                                      <div key={typedChoice.id} className="space-y-0.5">
+                                        <Button
+                                          variant="secondary"
+                                          disabled={isDisabled}
+                                          onClick={() => handleChoice(typedChoice.id)}
+                                          className="w-full justify-start"
+                                        >
+                                          <span>{typedChoice.label}</span>
+                                          {costRes ? (
+                                            <span className="ml-auto pl-2 text-amber-600 text-xs font-normal shrink-0">
+                                              −{costRes.amount}{" "}
+                                              {RESOURCE_LABELS[costRes.key] ?? costRes.key}
+                                            </span>
+                                          ) : null}
+                                        </Button>
+                                        {!meetsGate && reqRes ? (
+                                          <p className="text-xs text-slate-500 pl-1">
+                                            🔒 Requires {reqRes.min}{" "}
+                                            {RESOURCE_LABELS[reqRes.key] ?? reqRes.key}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })
                                 ) : (
                                   <p className="text-slate-600 text-sm">
                                     No choices available.

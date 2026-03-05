@@ -58,6 +58,8 @@ import {
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { getArcOneState } from "@/core/arcOne/state";
+import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
+import { computeMorale } from "@/core/resources/resourceDelta";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import {
   applyRemnantEffectForDay,
@@ -218,6 +220,20 @@ export async function getOrCreateDailyRun(
     };
   }
 
+  // Build resource snapshot from current dayState (after remnant effects may have
+  // mutated it). Used for storylet gating and scoring bonuses.
+  const resourceSnapshot: ResourceSnapshot | null = dayState
+    ? {
+        energy: daily?.energy ?? 100,
+        stress: daily?.stress ?? 0,
+        knowledge: dayState.knowledge,
+        cashOnHand: dayState.cashOnHand,
+        socialLeverage: dayState.socialLeverage,
+        physicalResilience: dayState.physicalResilience,
+        morale: computeMorale(daily?.energy ?? 100, daily?.stress ?? 0),
+      }
+    : null;
+
   let factions: DailyRun["factions"] = [];
   let alignment = {} as Record<string, number>;
   let contentInitiatives = [] as Awaited<ReturnType<typeof listActiveInitiativesCatalog>>;
@@ -283,10 +299,12 @@ export async function getOrCreateDailyRun(
     recentRuns,
     experiments: options?.experiments,
     isAdmin: options?.isAdmin,
+    resourceSnapshot,
     context: buildStoryletContext({
       posture: postureResolved,
       tensions,
       directiveTags,
+      resourceSnapshot,
     }),
   });
 

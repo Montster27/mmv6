@@ -4,6 +4,8 @@ export type StoryletOutcome = {
     energy?: number;
     stress?: number;
     vectors?: Record<string, number>;
+    /** Resource grants (positive) or costs (negative) applied when this outcome fires. */
+    resources?: Partial<Record<import("../core/resources/resourceKeys").ResourceKey, number>>;
   };
   anomalies?: string[];
 };
@@ -44,6 +46,16 @@ export type StoryletChoice = {
   relational_effects?: Record<string, Record<string, number>>;
   set_npc_memory?: Record<string, Record<string, boolean>>;
   condition?: Record<string, unknown>;
+  /** Gate: this choice is only selectable when the named resource meets the minimum. */
+  requires_resource?: {
+    key: import("../core/resources/resourceKeys").ResourceKey;
+    min: number;
+  };
+  /** Cost: this amount is deducted from the resource when the choice is selected. */
+  costs_resource?: {
+    key: import("../core/resources/resourceKeys").ResourceKey;
+    amount: number;
+  };
 };
 
 export type Storylet = {

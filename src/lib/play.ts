@@ -725,3 +725,21 @@ export async function updatePreclusionGates(
     .eq("user_id", userId);
   if (error) console.error("Failed to update preclusion_gates", error);
 }
+
+/**
+ * Apply resource grants or costs (from a storylet outcome's `deltas.resources`)
+ * to the player's `player_day_state` row.
+ *
+ * Delegates to the existing `applyResourceDelta` which handles fetch → delta →
+ * persist → trace → choice_log in one shot.
+ */
+export async function applyResourceDeltaToDayState(
+  userId: string,
+  dayIndex: number,
+  resources: Partial<Record<string, number>>
+): Promise<void> {
+  if (!resources || Object.keys(resources).length === 0) return;
+  await applyResourceDelta(userId, dayIndex, { resources }, {
+    source: "storylet_outcome",
+  });
+}

@@ -1,6 +1,7 @@
 import type { DailyState } from "@/types/daily";
 import type { StoryletChoice } from "@/types/storylets";
 import type { SevenVectors } from "@/types/vectors";
+import type { ResourceKey } from "@/core/resources/resourceKeys";
 
 type Outcome = StoryletChoice["outcome"];
 
@@ -8,6 +9,8 @@ type AppliedDeltas = {
   energy?: number;
   stress?: number;
   vectors?: Record<string, number>;
+  /** Resource grants (positive) or costs (negative) to be applied to PlayerDayState. */
+  resources?: Partial<Record<ResourceKey, number>>;
 };
 
 type OutcomeResult = {
@@ -48,6 +51,10 @@ export function applyOutcomeToDailyState(
     deltas.vectors && typeof deltas.vectors === "object"
       ? deltas.vectors
       : {};
+  const resourceDeltas: Partial<Record<ResourceKey, number>> =
+    deltas.resources && typeof deltas.resources === "object"
+      ? (deltas.resources as Partial<Record<ResourceKey, number>>)
+      : {};
 
   const currentVectors = toVectors(dailyState.vectors);
   const nextVectors: SevenVectors = { ...currentVectors };
@@ -76,6 +83,9 @@ export function applyOutcomeToDailyState(
       ...(stressDelta ? { stress: stressDelta } : {}),
       ...(Object.keys(appliedVectorDeltas).length
         ? { vectors: appliedVectorDeltas }
+        : {}),
+      ...(Object.keys(resourceDeltas).length
+        ? { resources: resourceDeltas }
         : {}),
     },
     message: outcome.text ?? "",
