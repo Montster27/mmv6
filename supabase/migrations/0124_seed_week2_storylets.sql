@@ -30,7 +30,7 @@ There is a pause that might be an invitation.$$,
       "events_emitted": [
         { "npc_id": "npc_studious_priya", "type": "SHOWED_UP", "magnitude": 1 }
       ],
-      "reaction_text": "She considers this for a moment.\n\n\"Fine,\" she says. \"But I don't talk while I work.\"\n\nYou sit down. Twenty minutes later she asks what you thought of the third chapter."
+      "reaction_text": "She considers this for a moment.\n\n\"Fine,\" she says. \"But I don''t talk while I work.\"\n\nYou sit down. Twenty minutes later she asks what you thought of the third chapter."
     },
     {
       "id": "sit_near_quietly",
@@ -189,7 +189,7 @@ Small things. The kind that compound.$$,
       "events_emitted": [
         { "npc_id": "npc_roommate_dana", "type": "REPAIR_ATTEMPT", "magnitude": 1 }
       ],
-      "reaction_text": "She pauses before answering.\n\n\"Your stuff keeps ending up on my side,\" she says. \"I didn't want to make a thing of it.\"\n\nYou talk for ten minutes. It doesn't resolve everything. But the air in the room changes."
+      "reaction_text": "She pauses before answering.\n\n\"Your stuff keeps ending up on my side,\" she says. \"I didn''t want to make a thing of it.\"\n\nYou talk for ten minutes. It doesn''t resolve everything. But the air in the room changes."
     },
     {
       "id": "move_coffee_cup_silently",
