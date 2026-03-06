@@ -63,7 +63,7 @@ import { computeMorale } from "@/core/resources/resourceDelta";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import { selectArcBeats, buildInitialArcInstances } from "@/core/arcs/selectArcBeats";
 import { ARC_ONE_STREAM_KEYS, ARC_KEY_TO_STREAM_ID } from "@/types/arcOneStreams";
-import { supabaseServer } from "@/lib/supabase/server";
+import { supabase } from "@/lib/supabase/browser";
 import type { DailyRun, DailyRunStage, ArcBeat } from "@/types/dailyRun";
 import type { ArcDefinition, ArcInstance, ArcStep } from "@/domain/arcs/types";
 
@@ -405,7 +405,7 @@ export async function getOrCreateDailyRun(
   if (arcOneMode) {
     try {
       // 1. Load the six Arc One arc definitions
-      const { data: arcDefs } = await supabaseServer
+      const { data: arcDefs } = await supabase
         .from("arc_definitions")
         .select("id,key,title,description,tags,is_enabled")
         .in("key", ARC_ONE_STREAM_KEYS)
@@ -424,7 +424,7 @@ export async function getOrCreateDailyRun(
         const arcIds = streamArcs.map((a) => a.id);
 
         // 2. Load steps for these arcs
-        const { data: stepRows } = await supabaseServer
+        const { data: stepRows } = await supabase
           .from("arc_steps")
           .select("id,arc_id,step_key,order_index,title,body,options,default_next_step_key,due_offset_days,expires_after_days")
           .in("arc_id", arcIds)
@@ -444,7 +444,7 @@ export async function getOrCreateDailyRun(
         }));
 
         // 3. Load or create arc instances for this user
-        const { data: instanceRows } = await supabaseServer
+        const { data: instanceRows } = await supabase
           .from("arc_instances")
           .select("id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key")
           .eq("user_id", userId)
@@ -469,7 +469,7 @@ export async function getOrCreateDailyRun(
         if (instances.length === 0 && streamSteps.length > 0) {
           const toInsert = buildInitialArcInstances(userId, streamArcs, streamSteps, dayIndex);
           if (toInsert.length > 0) {
-            const { data: inserted } = await supabaseServer
+            const { data: inserted } = await supabase
               .from("arc_instances")
               .insert(toInsert)
               .select("id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key");
