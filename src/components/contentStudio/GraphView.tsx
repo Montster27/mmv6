@@ -13,6 +13,8 @@ export type GraphViewProps = {
   onCreateNode?: () => void;
   onSetStartNode?: (storyletId: string) => void;
   onConnectChoice?: (sourceId: string, choiceId: string, targetId: string) => void;
+  /** Called when "Jump to editor" is clicked. Defaults to onSelectStorylet. */
+  onJumpToEditor?: (storylet: Storylet) => void;
 };
 
 const PHASE_ORDER = [
@@ -54,6 +56,7 @@ export function GraphView({
   onCreateNode,
   onSetStartNode,
   onConnectChoice,
+  onJumpToEditor,
 }: GraphViewProps) {
   const [offset, setOffset] = useState({ x: 20, y: 20 });
   const [scale, setScale] = useState(1);
@@ -382,7 +385,12 @@ export function GraphView({
                   );
                 })}
               </div>
-              <Button variant="outline" onClick={() => onSelectStorylet(selectedStorylet)}>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  (onJumpToEditor ?? onSelectStorylet)(selectedStorylet)
+                }
+              >
                 Jump to editor
               </Button>
             </div>

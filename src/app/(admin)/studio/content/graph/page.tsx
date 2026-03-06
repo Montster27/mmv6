@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
 import type { Storylet } from "@/types/storylets";
@@ -12,6 +13,7 @@ const GraphView = dynamic(
 );
 
 export default function GraphPage() {
+  const router = useRouter();
   const { loadStorylets } = useStoryletsAPI();
   const [storylets, setStorylets] = useState<Storylet[]>([]);
   const [selected, setSelected] = useState<Storylet | null>(null);
@@ -43,6 +45,9 @@ export default function GraphPage() {
             selectedStorylet={selected}
             onSelectStorylet={setSelected}
             onRetargetChoice={handleRetarget}
+            onJumpToEditor={(storylet) =>
+              router.push(`/studio/content/storylets?id=${storylet.id}`)
+            }
           />
         </div>
       )}
