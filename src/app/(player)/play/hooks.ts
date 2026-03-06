@@ -14,6 +14,7 @@ import type { AlignmentEvent, Faction } from "@/types/factions";
 import type { SeasonRecap } from "@/types/seasons";
 import type { SeasonContext } from "@/types/season";
 import type { AllocationPayload } from "@/lib/play";
+import type { AppliedDeltas } from "@/core/engine/applyOutcome";
 import type { ReflectionResponse } from "@/types/reflections";
 export type DailyProgressState = {
   dailyState: DailyState | null;
@@ -40,11 +41,7 @@ export type DailyProgressState = {
   funPulseEligible: boolean;
   funPulseDone: boolean;
   outcomeMessage: string | null;
-  outcomeDeltas: {
-    energy?: number;
-    stress?: number;
-    vectors?: Record<string, number>;
-  } | null;
+  outcomeDeltas: AppliedDeltas | null;
   lastCheck: DailyRun["lastCheck"] | null;
   reflectionResponse?: ReflectionResponse | null;
 };
