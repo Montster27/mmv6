@@ -68,6 +68,7 @@ function StoryletsContent() {
   );
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
@@ -124,15 +125,21 @@ function StoryletsContent() {
 
   async function handleSave(updated: Storylet, session: Session) {
     setSaving(true);
+    setSaveError(null);
     if (isNew) {
       const result = await createStorylet(updated, session.user.email ?? null);
       if (result.ok) {
         setIsNew(false);
         setSelectedId(result.id);
         await loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
+      } else {
+        setSaveError(result.error ?? "Create failed");
       }
     } else {
-      await saveStorylet(updated, session.user.email ?? null);
+      const result = await saveStorylet(updated, session.user.email ?? null);
+      if (!result.ok) {
+        setSaveError(result.error ?? "Save failed");
+      }
       await loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
     }
     setSaving(false);
@@ -288,6 +295,7 @@ function StoryletsContent() {
                 allTags={allTags}
                 storyletOptions={storyletOptions}
                 saving={saving}
+                saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
                 onCancel={() => setIsNew(false)}
               />
@@ -298,6 +306,7 @@ function StoryletsContent() {
                 allTags={allTags}
                 storyletOptions={storyletOptions}
                 saving={saving}
+                saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
               />
             ) : (

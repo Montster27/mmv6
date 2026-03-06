@@ -17,6 +17,7 @@ interface StoryletEditorProps {
   onSave: (updated: Storylet) => Promise<void>;
   onCancel?: () => void;
   saving?: boolean;
+  saveError?: string | null;
 }
 
 export function StoryletEditor({
@@ -27,6 +28,7 @@ export function StoryletEditor({
   onSave,
   onCancel,
   saving = false,
+  saveError = null,
 }: StoryletEditorProps) {
   const [tab, setTab] = useState<Tab>("basic");
   const [draft, setDraft] = useState<Storylet>(initial);
@@ -122,6 +124,11 @@ export function StoryletEditor({
       {/* Validation + save */}
       <div className="shrink-0 border-t border-slate-200 bg-slate-50 p-4 space-y-3">
         <ValidationPanel storylet={draft} />
+        {saveError && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+            Save failed: {saveError}
+          </p>
+        )}
         <div className="flex items-center justify-end gap-3">
           {onCancel && (
             <button

@@ -2,9 +2,9 @@
 
 import { RESOURCE_KEYS, type ResourceKey } from "@/core/resources/resourceKeys";
 
-// Show the primary gameplay-relevant keys in the picker
+// Show authoring-relevant resource keys; exclude purely internal/derived ones
 const PICKER_KEYS = RESOURCE_KEYS.filter(
-  (k) => !["morale", "skillPoints", "focus", "memory", "networking", "grit"].includes(k)
+  (k) => !["skillPoints", "focus", "memory", "networking", "grit"].includes(k)
 );
 
 interface ResourcePickerProps {

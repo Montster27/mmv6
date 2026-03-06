@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   const admin = getAdminClient();
   let query = admin
     .from("storylets")
-    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body");
+    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body,requirements");
 
   if (active === "true") {
     query = query.eq("is_active", true);
