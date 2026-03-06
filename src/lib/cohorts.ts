@@ -37,7 +37,7 @@ export async function ensureUserInCohort(
 ): Promise<{ cohortId: string }> {
   const featureFlags = getFeatureFlags();
   const useRookieCap =
-    featureFlags.rookieCircleEnabled || featureFlags.verticalSlice30Enabled;
+    featureFlags.rookieCircleEnabled;
 
   // Get auth token for API call
   const { data: sessionData } = await supabase.auth.getSession();

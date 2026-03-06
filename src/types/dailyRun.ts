@@ -11,7 +11,6 @@ import type {
 import type { Initiative } from "./initiatives";
 import type { AlignmentEvent, Faction } from "./factions";
 import type { PlayerDayState } from "./dayState";
-import type { RemnantDefinition } from "./remnants";
 import type { ArcOneState } from "@/core/arcOne/types";
 
 export type DailyRunStage =
@@ -20,8 +19,6 @@ export type DailyRunStage =
   | "storylet_1"
   | "storylet_2"
   | "storylet_3"
-  | "microtask"
-  | "social"
   | "reflection"
   | "fun_pulse"
   | "complete";
@@ -35,7 +32,6 @@ export type DailyRun = {
   allocationSeed?: AllocationMap | null;
   storylets: Storylet[];
   storyletRunsToday: StoryletRun[];
-  canBoost: boolean;
   tensions?: DailyTension[];
   skillBank?: SkillBank | null;
   posture?: DailyPosture | null;
@@ -123,7 +119,6 @@ export type DailyRun = {
   };
   initiatives?: Array<Initiative & { contributedToday?: boolean; progress?: number }> | null;
   reflectionStatus: "pending" | "done";
-  microTaskStatus?: "pending" | "done" | "skipped";
   funPulseEligible?: boolean;
   funPulseDone?: boolean;
   dailyState?: DailyState | null;
@@ -141,11 +136,6 @@ export type DailyRun = {
     | "total_health"
     | "total_fun"
   > | null;
-  remnant?: {
-    unlocked: RemnantDefinition[];
-    active: RemnantDefinition | null;
-    applied: boolean;
-  } | null;
   arcOneState?: ArcOneState;
   lastCheck?: import("./checks").CheckResult | null;
   seasonResetNeeded?: boolean;

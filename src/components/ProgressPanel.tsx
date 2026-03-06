@@ -25,7 +25,6 @@ type Props = {
   skillBank?: { available_points: number; cap: number } | null;
   skills?: DailyRun["skills"] | null;
   lastAppliedDeltas?: DeltaInfo | null;
-  boostsReceivedCount?: number;
   resourcesEnabled?: boolean;
   skillsEnabled?: boolean;
   scarcityMode?: boolean;
@@ -87,7 +86,6 @@ function ProgressPanelComponent({
   skillBank,
   skills,
   lastAppliedDeltas,
-  boostsReceivedCount,
   resourcesEnabled = true,
   skillsEnabled = true,
   scarcityMode = false,
@@ -294,9 +292,6 @@ function ProgressPanelComponent({
       {!scarcityMode ? (
         <div className="text-sm text-slate-700 space-y-1">
           <p>{summary}</p>
-          <p className="text-xs text-slate-600">
-            Boosts received today: {boostsReceivedCount ?? 0}
-          </p>
         </div>
       ) : null}
     </aside>

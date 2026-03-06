@@ -7,16 +7,13 @@ import {
   fetchTodayStoryletCandidates,
   fetchRecentStoryletRuns,
 } from "@/lib/play";
-import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
-import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { shouldShowFunPulse } from "@/core/funPulse/shouldShowFunPulse";
 import { getFunPulse } from "@/lib/funPulse";
-import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { buildStoryletContext } from "@/core/engine/storyletContext";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
@@ -61,16 +58,10 @@ import {
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { getArcOneState } from "@/core/arcOne/state";
+import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
+import { computeMorale } from "@/core/resources/resourceDelta";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
-import {
-  applyRemnantEffectForDay,
-  fetchActiveRemnant,
-  fetchUnlockedRemnants,
-  getRemnantDefinition,
-  listRemnantDefinitions,
-} from "@/lib/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
-import type { RemnantKey } from "@/types/remnants";
 
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -93,7 +84,6 @@ export async function getOrCreateDailyRun(
   userId: string,
   today: Date,
   options?: {
-    microtaskVariant?: string;
     experiments?: Record<string, string>;
     isAdmin?: boolean;
   }
@@ -136,7 +126,6 @@ export async function getOrCreateDailyRun(
     allocation,
     runs,
     storyletsRaw,
-    boosted,
     tensions,
     skillBankRaw,
     postureRaw,
@@ -148,7 +137,6 @@ export async function getOrCreateDailyRun(
     fetchTimeAllocation(userId, dayIndex),
     fetchTodayRuns(userId, dayIndex),
     fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
-    hasSentBoostToday(userId, dayIndex),
     fetchTensions(userId, dayIndex),
     featureFlags.skills ? fetchSkillBank(userId) : Promise.resolve(null),
     fetchPosture(userId, dayIndex),
@@ -193,36 +181,18 @@ export async function getOrCreateDailyRun(
   ]);
   const cohortId = cohort?.cohortId ?? null;
 
-  let remnantState: DailyRun["remnant"] = null;
-  if (featureFlags.remnantSystemEnabled) {
-    const [unlockedKeys, activeSelection] = await Promise.all([
-      fetchUnlockedRemnants(userId).catch(() => [] as RemnantKey[]),
-      fetchActiveRemnant(userId).catch(() => null),
-    ]);
-    const unlockedDefs = listRemnantDefinitions().filter((remnant) =>
-      unlockedKeys.includes(remnant.key)
-    );
-    const activeDef = activeSelection?.remnant_key
-      ? getRemnantDefinition(activeSelection.remnant_key)
-      : null;
-    let applied = false;
-    if (dayState) {
-      const appliedResult = await applyRemnantEffectForDay({
-        userId,
-        dayIndex,
-        dayState,
-      });
-      applied = appliedResult.applied;
-      if (appliedResult.dayState) {
-        dayState = appliedResult.dayState;
+  // Build resource snapshot from current dayState. Used for storylet gating and scoring bonuses.
+  const resourceSnapshot: ResourceSnapshot | null = dayState
+    ? {
+        energy: daily?.energy ?? 100,
+        stress: daily?.stress ?? 0,
+        knowledge: dayState.knowledge,
+        cashOnHand: dayState.cashOnHand,
+        socialLeverage: dayState.socialLeverage,
+        physicalResilience: dayState.physicalResilience,
+        morale: computeMorale(daily?.energy ?? 100, daily?.stress ?? 0),
       }
-    }
-    remnantState = {
-      unlocked: unlockedDefs,
-      active: activeDef ?? null,
-      applied,
-    };
-  }
+    : null;
 
   let factions: DailyRun["factions"] = [];
   let alignment = {} as Record<string, number>;
@@ -289,10 +259,12 @@ export async function getOrCreateDailyRun(
     recentRuns,
     experiments: options?.experiments,
     isAdmin: options?.isAdmin,
+    resourceSnapshot,
     context: buildStoryletContext({
       posture: postureResolved,
       tensions,
       directiveTags,
+      resourceSnapshot,
     }),
   });
 
@@ -390,34 +362,19 @@ export async function getOrCreateDailyRun(
       ? await getFunPulse(userId, currentSeasonIndex, dayIndex)
       : null;
   const funPulseDone = featureFlags.funPulse ? Boolean(funPulseRow) : false;
-  const microTaskVariant = options?.microtaskVariant ?? "A";
-  const microTaskEligible = isMicrotaskEligible(dayIndex, microTaskVariant);
-  const microTaskRun = microTaskEligible
-    ? await fetchMicroTaskRun(userId, dayIndex)
-    : null;
-  const microTaskStatus = microTaskRun
-    ? microTaskRun.status === "completed"
-      ? "done"
-      : "skipped"
-    : "pending";
-  const microTaskDone = Boolean(microTaskRun);
 
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
-  const canBoost = !boosted;
   const arcOneMode =
     featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY;
   // Setup is handled via auto-default posture above; no additional setup gate needed.
   const setupNeeded = false;
   const baseStage = computeStage(
-    arcOneMode ? true : Boolean(allocation),
+    Boolean(allocation) || (arcOneMode && !featureFlags.resources),
     runsForPair.length,
     cadence.alreadyCompletedToday,
-    canBoost,
     hasStorylets,
     reflectionDone,
-    microTaskEligible,
-    microTaskDone,
     funPulseEligible,
     funPulseDone
   );
@@ -430,10 +387,7 @@ export async function getOrCreateDailyRun(
     dayIndex,
     hasAllocation: Boolean(allocation),
     runsForPair: runsForPair.length,
-    canBoost,
     reflectionDone,
-    microTaskEligible,
-    microTaskDone,
     needsSetup: setupNeeded,
     stage,
   });
@@ -468,7 +422,6 @@ export async function getOrCreateDailyRun(
       ? storylets
       : [fallbackStorylet(), fallbackStorylet(), fallbackStorylet()],
     storyletRunsToday: runs,
-    canBoost,
     tensions,
     skillBank: featureFlags.skills ? skillBank : null,
     posture: postureResolved,
@@ -510,7 +463,6 @@ export async function getOrCreateDailyRun(
     directive: featureFlags.alignment ? directiveSummary : null,
     initiatives,
     reflectionStatus: reflectionDone ? "done" : "pending",
-    microTaskStatus,
     funPulseEligible,
     funPulseDone,
     dailyState: daily,
@@ -530,7 +482,6 @@ export async function getOrCreateDailyRun(
       }
       : null,
     arcOneState: arcOneState ?? undefined,
-    remnant: featureFlags.remnantSystemEnabled ? remnantState : null,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
     seasonRecap: seasonResetNeeded ? seasonRecap : undefined,

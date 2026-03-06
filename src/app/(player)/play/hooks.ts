@@ -14,9 +14,8 @@ import type { AlignmentEvent, Faction } from "@/types/factions";
 import type { SeasonRecap } from "@/types/seasons";
 import type { SeasonContext } from "@/types/season";
 import type { AllocationPayload } from "@/lib/play";
+import type { AppliedDeltas } from "@/core/engine/applyOutcome";
 import type { ReflectionResponse } from "@/types/reflections";
-import type { PublicProfile, ReceivedBoost } from "@/lib/social";
-
 export type DailyProgressState = {
   dailyState: DailyState | null;
   dayState: DailyRun["dayState"] | null;
@@ -41,13 +40,8 @@ export type DailyProgressState = {
   seasonContext: SeasonContext | null;
   funPulseEligible: boolean;
   funPulseDone: boolean;
-  microTaskStatus: "pending" | "done" | "skipped";
   outcomeMessage: string | null;
-  outcomeDeltas: {
-    energy?: number;
-    stress?: number;
-    vectors?: Record<string, number>;
-  } | null;
+  outcomeDeltas: AppliedDeltas | null;
   lastCheck: DailyRun["lastCheck"] | null;
   reflectionResponse?: ReflectionResponse | null;
 };
@@ -77,7 +71,6 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     seasonContext: null,
     funPulseEligible: false,
     funPulseDone: false,
-    microTaskStatus: "pending",
     outcomeMessage: null,
     outcomeDeltas: null,
     lastCheck: null,
@@ -193,11 +186,6 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     (funPulseDone: boolean) => setDailyProgress({ funPulseDone }),
     [setDailyProgress]
   );
-  const setMicroTaskStatus = useCallback(
-    (microTaskStatus: "pending" | "done" | "skipped") =>
-      setDailyProgress({ microTaskStatus }),
-    [setDailyProgress]
-  );
   const setOutcomeMessage = useCallback(
     (outcomeMessage: string | null) => setDailyProgress({ outcomeMessage }),
     [setDailyProgress]
@@ -247,78 +235,9 @@ export function useDailyProgress(initialAllocation: AllocationPayload) {
     setSeasonContext,
     setFunPulseEligible,
     setFunPulseDone,
-    setMicroTaskStatus,
     setOutcomeMessage,
     setOutcomeDeltas,
     setLastCheck,
-  };
-}
-
-export type UserSocialState = {
-  publicProfiles: PublicProfile[];
-  selectedRecipient: string;
-  boostsReceived: ReceivedBoost[];
-  hasSentBoost: boolean;
-  loadingSocial: boolean;
-  boostMessage: string | null;
-};
-
-export function useUserSocial() {
-  const [state, setState] = useState<UserSocialState>({
-    publicProfiles: [],
-    selectedRecipient: "",
-    boostsReceived: [],
-    hasSentBoost: false,
-    loadingSocial: false,
-    boostMessage: null,
-  });
-
-  const setUserSocial = useCallback(
-    (patch: Partial<UserSocialState>) => {
-      setState((prev) => ({ ...prev, ...patch }));
-    },
-    []
-  );
-
-  const setPublicProfiles = useCallback(
-    (publicProfiles: PublicProfile[]) => setUserSocial({ publicProfiles }),
-    [setUserSocial]
-  );
-  const setSelectedRecipient = useCallback(
-    (next: string | ((prev: string) => string)) =>
-      setState((prev) => ({
-        ...prev,
-        selectedRecipient:
-          typeof next === "function" ? next(prev.selectedRecipient) : next,
-      })),
-    []
-  );
-  const setBoostsReceived = useCallback(
-    (boostsReceived: ReceivedBoost[]) => setUserSocial({ boostsReceived }),
-    [setUserSocial]
-  );
-  const setHasSentBoost = useCallback(
-    (hasSentBoost: boolean) => setUserSocial({ hasSentBoost }),
-    [setUserSocial]
-  );
-  const setLoadingSocial = useCallback(
-    (loadingSocial: boolean) => setUserSocial({ loadingSocial }),
-    [setUserSocial]
-  );
-  const setBoostMessage = useCallback(
-    (boostMessage: string | null) => setUserSocial({ boostMessage }),
-    [setUserSocial]
-  );
-
-  return {
-    ...state,
-    setUserSocial,
-    setPublicProfiles,
-    setSelectedRecipient,
-    setBoostsReceived,
-    setHasSentBoost,
-    setLoadingSocial,
-    setBoostMessage,
   };
 }
 

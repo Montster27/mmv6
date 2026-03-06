@@ -1,6 +1,7 @@
 import type { DailyState } from "@/types/daily";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 import type { StoryletContext } from "@/core/engine/storyletContext";
+import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
 import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { pctInRollout } from "@/core/eligibility/rollout";
 
@@ -29,11 +30,22 @@ type Requirements = {
    * "first encounter" storylets that should not surface after introduction.
    */
   requires_npc_not_met?: string[];
+  /**
+   * Self-referential preclusion: if this string appears in the player's
+   * preclusion_gates array, this storylet is permanently closed. The value
+   * is the storylet's own slug, set on the storylet's requirements field.
+   */
+  requires_not_precluded?: string;
   audience?: {
     rollout_pct?: number;
     experiment?: { id?: string; variants_any?: string[] };
     allow_admin?: boolean;
   };
+  /** Resource gates — storylet is hidden until the player has accumulated enough. */
+  requires_cash_min?: number;
+  requires_knowledge_min?: number;
+  requires_social_leverage_min?: number;
+  requires_physical_resilience_min?: number;
   [key: string]: unknown;
 };
 
@@ -49,6 +61,8 @@ type SelectorArgs = {
   experiments?: Record<string, string>;
   isAdmin?: boolean;
   context?: StoryletContext | null;
+  /** Current resource levels used for resource gate checks. */
+  resourceSnapshot?: ResourceSnapshot | null;
 };
 
 function hashString(input: string): number {
@@ -108,11 +122,28 @@ function meetsRequirements(
   userId: string,
   experiments: Record<string, string>,
   isAdmin: boolean,
-  opts?: { ignoreSeason?: boolean; ignoreAudience?: boolean }
+  opts?: { ignoreSeason?: boolean; ignoreAudience?: boolean; ignoreResources?: boolean },
+  resourceSnapshot?: ResourceSnapshot | null
 ): boolean {
   const req = (storylet.requirements || {}) as Requirements;
   if (typeof req.min_day_index === "number" && dayIndex < req.min_day_index) return false;
   if (typeof req.max_day_index === "number" && dayIndex > req.max_day_index) return false;
+
+  // Resource gates — skip when relaxing constraints for pool-padding fallback
+  if (!opts?.ignoreResources) {
+    if (typeof req.requires_cash_min === "number") {
+      if ((resourceSnapshot?.cashOnHand ?? 0) < req.requires_cash_min) return false;
+    }
+    if (typeof req.requires_knowledge_min === "number") {
+      if ((resourceSnapshot?.knowledge ?? 0) < req.requires_knowledge_min) return false;
+    }
+    if (typeof req.requires_social_leverage_min === "number") {
+      if ((resourceSnapshot?.socialLeverage ?? 0) < req.requires_social_leverage_min) return false;
+    }
+    if (typeof req.requires_physical_resilience_min === "number") {
+      if ((resourceSnapshot?.physicalResilience ?? 0) < req.requires_physical_resilience_min) return false;
+    }
+  }
 
   if (Array.isArray(req.requires_tags_any) && req.requires_tags_any.length > 0) {
     if (!tagsIntersect(storylet.tags ?? [], req.requires_tags_any)) return false;
@@ -143,6 +174,11 @@ function meetsRequirements(
     for (const npcId of req.requires_npc_not_met) {
       if (rels?.[npcId]?.met) return false;
     }
+  }
+
+  if (typeof req.requires_not_precluded === "string") {
+    const gates = (dailyState as any)?.preclusion_gates as string[] | undefined;
+    if (Array.isArray(gates) && gates.includes(req.requires_not_precluded)) return false;
   }
 
   if (!opts?.ignoreAudience && req.audience && typeof req.audience === "object" && !Array.isArray(req.audience)) {
@@ -201,6 +237,22 @@ function scoreStorylet(
     bonus += 0.05;
   }
 
+  // Resource-aware bonuses: surface thematically appropriate content based on
+  // the player's accumulated capital.
+  const res = context?.resourceSnapshot;
+  if (res) {
+    // Broke players get "budget_stress" stories floated to the top
+    if (res.cashOnHand < 10 && hasTag("budget_stress")) bonus += 0.25;
+    // Flush players get "treat_yourself" options surfaced
+    if (res.cashOnHand > 50 && hasTag("treat_yourself")) bonus += 0.15;
+    // Academic storylets rise for studious players
+    if (res.knowledge > 30 && hasTag("academic")) bonus += 0.15;
+    // Social storylets rise for socially active players
+    if (res.socialLeverage > 30 && hasTag("social")) bonus += 0.1;
+    // Fitness storylets rise for health-focused players
+    if (res.physicalResilience > 50 && hasTag("health")) bonus += 0.1;
+  }
+
   return base / (Math.max(weight, 1) * (1 + bonus));
 }
 
@@ -233,6 +285,7 @@ export function selectStorylets({
   experiments = {},
   isAdmin = false,
   context = null,
+  resourceSnapshot = null,
 }: SelectorArgs): Storylet[] {
   const todayUsedIds = new Set(
     recentRuns.filter((r) => r.day_index === dayIndex).map((r) => r.storylet_id)
@@ -262,7 +315,7 @@ export function selectStorylets({
   const baseEligible = activeStorylets.filter(
     (s) =>
       !todayUsedIds.has(s.id) &&
-      meetsRequirements(s, dayIndex, dailyState, seasonIndex, userId, experiments, isAdmin)
+      meetsRequirements(s, dayIndex, dailyState, seasonIndex, userId, experiments, isAdmin, undefined, resourceSnapshot)
   );
 
   const preferred = baseEligible.filter((s) => !recentIds.has(s.id));
@@ -296,7 +349,9 @@ export function selectStorylets({
         seasonIndex,
         userId,
         experiments,
-        isAdmin
+        isAdmin,
+        undefined,
+        resourceSnapshot
       )
     ) {
       console.warn(
@@ -331,7 +386,7 @@ export function selectStorylets({
         !hasAudienceRules(req) &&
         meetsRequirements(s, dayIndex, dailyState, seasonIndex, userId, experiments, isAdmin, {
           ignoreSeason: true,
-        })
+        }, resourceSnapshot)
       );
     });
     const nonSeasonPreferred = nonSeasonEligible.filter((s) => !recentIds.has(s.id));
@@ -350,9 +405,8 @@ export function selectStorylets({
         userId,
         experiments,
         isAdmin,
-        {
-          ignoreSeason: true,
-        }
+        { ignoreSeason: true },
+        resourceSnapshot
       );
     });
     const relaxedPreferred = relaxedEligible.filter((s) => !recentIds.has(s.id));
@@ -374,7 +428,8 @@ export function selectStorylets({
         userId,
         experiments,
         isAdmin,
-        { ignoreSeason: true, ignoreAudience: true }
+        { ignoreSeason: true, ignoreAudience: true },
+        resourceSnapshot
       );
     });
     const remaining = relaxedAudience.filter((s) => !picked.includes(s));
@@ -383,9 +438,9 @@ export function selectStorylets({
 
   if (picked.length < 3) {
     // Pad to 3 while still honouring NPC gates and max_total_runs.
-    // Season/audience requirements are intentionally relaxed here so we always
-    // have something to show, but a storylet must never appear before the
-    // player has met its required NPCs.
+    // Season/audience/resource requirements are intentionally relaxed here so
+    // we always have something to show, but a storylet must never appear before
+    // the player has met its required NPCs.
     const remaining = activeStorylets.filter((s) => {
       if (picked.includes(s) || todayUsedIds.has(s.id)) return false;
       return meetsRequirements(
@@ -396,7 +451,7 @@ export function selectStorylets({
         userId,
         experiments,
         isAdmin,
-        { ignoreSeason: true, ignoreAudience: true }
+        { ignoreSeason: true, ignoreAudience: true, ignoreResources: true }
       );
     });
     picked.push(...pickTop(remaining, seed, 3 - picked.length, context));

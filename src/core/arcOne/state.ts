@@ -108,6 +108,9 @@ function normalizeRelationships(raw: unknown): Record<string, RelationshipState>
       knows_face: entry.knows_face === true,
       role_tag: typeof entry.role_tag === "string" ? entry.role_tag : undefined,
       relationship,
+      trust: typeof entry.trust === "number" ? entry.trust : 0,
+      reliability: typeof entry.reliability === "number" ? entry.reliability : 0,
+      emotionalLoad: typeof entry.emotionalLoad === "number" ? entry.emotionalLoad : 0,
       updated_at: typeof entry.updated_at === "string" ? entry.updated_at : undefined,
     };
   });

@@ -128,6 +128,20 @@ const KNOWN_REQUIREMENT_KEYS = new Set([
   "max_total_runs",
   "requires_npc_met",
   "requires_npc_not_met",
+  // Resource gates
+  "requires_cash_min",
+  "requires_knowledge_min",
+  "requires_social_leverage_min",
+  "requires_physical_resilience_min",
+]);
+
+const RESOURCE_GATE_KEYS = new Set([
+  "cashOnHand",
+  "knowledge",
+  "socialLeverage",
+  "physicalResilience",
+  "energy",
+  "stress",
 ]);
 
 /**
@@ -353,6 +367,53 @@ export function validateStoryletIssues(
           }
         }
       }
+      // ── requires_resource ─────────────────────────────────────────────────
+      if ((choice as any).requires_resource !== undefined) {
+        const rr = (choice as any).requires_resource;
+        if (!rr || typeof rr !== "object" || Array.isArray(rr)) {
+          addIssue(
+            errors, storylet, `choices[${idx}].requires_resource`,
+            "requires_resource must be an object with {key, min}"
+          );
+        } else {
+          if (!isString(rr.key) || !RESOURCE_GATE_KEYS.has(rr.key)) {
+            addIssue(
+              errors, storylet, `choices[${idx}].requires_resource.key`,
+              `requires_resource.key must be one of: ${[...RESOURCE_GATE_KEYS].join(", ")}`
+            );
+          }
+          if (typeof rr.min !== "number" || rr.min <= 0) {
+            addIssue(
+              errors, storylet, `choices[${idx}].requires_resource.min`,
+              "requires_resource.min must be a positive number"
+            );
+          }
+        }
+      }
+      // ── costs_resource ────────────────────────────────────────────────────
+      if ((choice as any).costs_resource !== undefined) {
+        const cr = (choice as any).costs_resource;
+        if (!cr || typeof cr !== "object" || Array.isArray(cr)) {
+          addIssue(
+            errors, storylet, `choices[${idx}].costs_resource`,
+            "costs_resource must be an object with {key, amount}"
+          );
+        } else {
+          if (!isString(cr.key) || !RESOURCE_GATE_KEYS.has(cr.key)) {
+            addIssue(
+              errors, storylet, `choices[${idx}].costs_resource.key`,
+              `costs_resource.key must be one of: ${[...RESOURCE_GATE_KEYS].join(", ")}`
+            );
+          }
+          if (typeof cr.amount !== "number" || cr.amount <= 0) {
+            addIssue(
+              errors, storylet, `choices[${idx}].costs_resource.amount`,
+              "costs_resource.amount must be a positive number"
+            );
+          }
+        }
+      }
+
       if ((choice as any).check) {
         const check = (choice as any).check as Check;
         if (!check || typeof check !== "object") {
@@ -563,6 +624,25 @@ export function validateStoryletIssues(
         }
       }
     }
+    // ── resource gate requirements ────────────────────────────────────────────
+    for (const key of [
+      "requires_cash_min",
+      "requires_knowledge_min",
+      "requires_social_leverage_min",
+      "requires_physical_resilience_min",
+    ] as const) {
+      if (req[key] !== undefined) {
+        if (typeof req[key] !== "number" || (req[key] as number) < 0) {
+          addIssue(
+            errors,
+            storylet,
+            `requirements.${key}`,
+            `requirements.${key} must be a non-negative number`
+          );
+        }
+      }
+    }
+
     // ── max_total_runs ───────────────────────────────────────────────────────
     if (req.max_total_runs !== undefined) {
       if (

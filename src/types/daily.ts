@@ -16,6 +16,7 @@ export type DailyState = {
   expired_opportunities?: JsonObject;
   replay_intention?: JsonObject;
   arc_one_reflection_done?: boolean;
+  preclusion_gates?: string[];
   start_date?: string;
   last_day_completed?: string | null;
   last_day_index_completed?: number | null;

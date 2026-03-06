@@ -72,7 +72,6 @@ export async function POST(request: Request) {
 
   await supabaseServer.from("storylet_runs").delete().eq("user_id", userId);
   await supabaseServer.from("reflections").delete().eq("user_id", userId);
-  await supabaseServer.from("micro_task_runs").delete().eq("user_id", userId);
   await supabaseServer.from("time_allocations").delete().eq("user_id", userId);
   await supabaseServer.from("daily_tensions").delete().eq("user_id", userId);
   await supabaseServer.from("skill_bank").delete().eq("user_id", userId);

@@ -21,7 +21,6 @@ const PHASE_SEQUENCE = [
   "guided_core_loop",
   "reflection_arc",
   "community_purpose",
-  "remnant_reveal",
 ];
 
 function getPhaseTag(storylet: Storylet) {
@@ -49,7 +48,6 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
     phase: "intro_hook",
   });
   const [simulateConsequences, setSimulateConsequences] = useState(false);
-  const [selectedRemnant, setSelectedRemnant] = useState<string>("");
 
   useEffect(() => {
     trackEvent({ event_type: "preview_started" });
@@ -164,15 +162,6 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
               onChange={(e) => setSimulateConsequences(e.target.checked)}
             />
             Simulate delayed consequences
-          </label>
-          <label className="text-xs text-slate-600">
-            Simulate with remnant
-            <input
-              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
-              value={selectedRemnant}
-              onChange={(e) => setSelectedRemnant(e.target.value)}
-              placeholder="remnant key"
-            />
           </label>
           <Button variant="outline" onClick={reset}>
             Reset preview

@@ -4,6 +4,9 @@ export type RelationshipState = {
   knows_face: boolean;
   role_tag?: string;
   relationship: number;
+  trust: number;
+  reliability: number;
+  emotionalLoad: number;
   updated_at?: string;
 };
 
@@ -67,6 +70,9 @@ export const ALL_YEAR_ONE_NPCS = [
 export type YearOneNpcId = typeof ALL_YEAR_ONE_NPCS[number];
 
 const clampRelationship = (value: number) => Math.max(1, Math.min(10, value));
+const clampTrust = (value: number) => Math.max(-3, Math.min(3, value));
+const clampReliability = (value: number) => Math.max(-3, Math.min(3, value));
+const clampEmotionalLoad = (value: number) => Math.max(0, Math.min(3, value));
 
 const buildDefaultState = (npcId: string): RelationshipState => ({
   met: false,
@@ -74,8 +80,40 @@ const buildDefaultState = (npcId: string): RelationshipState => ({
   knows_face: false,
   role_tag: ROLE_TAGS[npcId],
   relationship: DEFAULT_RELATIONSHIP,
+  trust: 0,
+  reliability: 0,
+  emotionalLoad: 0,
   updated_at: new Date().toISOString(),
 });
+
+// Maps each relationship event type to trust/reliability/emotionalLoad deltas.
+// Aligns with the Design Bible NPC memory model (trust -3..+3, reliability -3..+3,
+// emotionalLoad 0..3).
+function eventToMemoryDeltas(
+  type: RelationshipEventType,
+  magnitude: number
+): { trust: number; reliability: number; emotionalLoad: number } {
+  const m = magnitude ?? 1;
+  const map: Partial<Record<RelationshipEventType, { trust: number; reliability: number; emotionalLoad: number }>> = {
+    INTRODUCED_SELF:   { trust: 1 * m,    reliability: 0,         emotionalLoad: 0 },
+    WOKE_IN_SAME_ROOM: { trust: 0,         reliability: 0,         emotionalLoad: 0 },
+    SHARED_MEAL:       { trust: 0.5 * m,   reliability: 0.5 * m,   emotionalLoad: 0 },
+    SMALL_KINDNESS:    { trust: 0.5 * m,   reliability: 0.5 * m,   emotionalLoad: 0 },
+    REPAIR_ATTEMPT:    { trust: 0,         reliability: 1 * m,     emotionalLoad: 0 },
+    SHOWED_UP:         { trust: 0,         reliability: 1 * m,     emotionalLoad: 0 },
+    CONFIDED_IN:       { trust: 1 * m,     reliability: 0,         emotionalLoad: 1 * m },
+    WENT_MISSING:      { trust: 0,         reliability: -1 * m,    emotionalLoad: 0 },
+    DISMISSED:         { trust: -2 * m,    reliability: 0,         emotionalLoad: 0 },
+    CONFLICT_HIGH:     { trust: -2 * m,    reliability: -1 * m,    emotionalLoad: 0 },
+    CONFLICT_LOW:      { trust: -1 * m,    reliability: 0,         emotionalLoad: 0 },
+    AWKWARD_MOMENT:    { trust: -0.5 * m,  reliability: 0,         emotionalLoad: 0 },
+    DEFERRED_TENSION:  { trust: 0,         reliability: -0.5 * m,  emotionalLoad: 0 },
+    DISRESPECT:        { trust: -2 * m,    reliability: -1 * m,    emotionalLoad: 0 },
+    OVERHEARD_NAME:    { trust: 0,         reliability: 0,         emotionalLoad: 0 },
+    NOTICED_FACE:      { trust: 0,         reliability: 0,         emotionalLoad: 0 },
+  };
+  return map[type] ?? { trust: 0, reliability: 0, emotionalLoad: 0 };
+}
 
 export function ensureRelationshipDefaults(
   current: Record<string, RelationshipState> | null | undefined
@@ -276,6 +314,11 @@ export function applyRelationshipEvents(
     if (relationshipDelta !== 0) {
       after.relationship = clampRelationship(after.relationship + relationshipDelta);
     }
+
+    const memoryDeltas = eventToMemoryDeltas(event.type, magnitude);
+    after.trust = clampTrust((after.trust ?? 0) + memoryDeltas.trust);
+    after.reliability = clampReliability((after.reliability ?? 0) + memoryDeltas.reliability);
+    after.emotionalLoad = clampEmotionalLoad((after.emotionalLoad ?? 0) + memoryDeltas.emotionalLoad);
 
     after.updated_at = now;
     next[event.npc_id] = after;

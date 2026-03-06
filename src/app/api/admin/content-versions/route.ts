@@ -75,19 +75,9 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-  const remnantRes = await admin.from("remnant_rules").select("*");
-  if (remnantRes.error) {
-    console.error("Failed to load remnant rules", remnantRes.error);
-    return NextResponse.json(
-      { error: "Failed to snapshot remnant rules" },
-      { status: 500 }
-    );
-  }
-
   const snapshot = {
     storylets: storyletsRes.data ?? [],
     consequences: consequencesRes.data ?? [],
-    remnantRules: remnantRes.data ?? [],
   };
 
   const { data, error } = await admin

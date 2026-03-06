@@ -35,6 +35,9 @@ export type RelationshipState = {
   knows_face: boolean;
   role_tag?: string;
   relationship: number;
+  trust: number;
+  reliability: number;
+  emotionalLoad: number;
   updated_at?: string;
 };
 

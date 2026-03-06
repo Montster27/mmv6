@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
 import { Button } from "@/components/ui/button";
-import { PatternMatchTask } from "@/components/microtasks/PatternMatchTask";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
 import { FactionStatusPanel } from "@/components/play/FactionStatusPanel";
@@ -25,7 +24,6 @@ import { appendGroupFeedEvent } from "@/lib/groups/feed";
 import { incrementGroupObjective } from "@/lib/groups/objective";
 import { upsertFunPulse } from "@/lib/funPulse";
 import { useExperiments } from "@/lib/experiments";
-import { isMicrotaskEligible } from "@/core/experiments/microtaskRule";
 import { fetchDevSettings, saveDevSettings } from "@/lib/devSettings";
 import {
   createStoryletRun,
@@ -37,17 +35,14 @@ import {
   markDailyComplete,
   saveTimeAllocation,
   applyOutcomeForChoice,
+  applyResourceDeltaToDayState,
   toChoices,
   updateRelationships,
+  updateLifePressureState,
+  updateSkillFlags,
+  updatePreclusionGates,
   type AllocationPayload,
 } from "@/lib/play";
-import { completeMicroTask, skipMicroTask } from "@/lib/microtasks";
-import {
-  fetchPublicProfiles,
-  fetchTodayReceivedBoosts,
-  hasSentBoostToday,
-  sendBoost,
-} from "@/lib/social";
 import { upsertReflection } from "@/lib/reflections";
 import {
   allocateSkillPoint,
@@ -57,27 +52,14 @@ import {
 } from "@/lib/dailyInteractions";
 import { fetchCohortRoster } from "@/lib/cohorts";
 import { contributeToInitiative } from "@/lib/initiatives";
-import {
-  createCohortPost,
-  fetchCohortBoard,
-  markPostHelpful,
-  sendCohortReply,
-} from "@/lib/askOfferBoard";
-import type { AskOfferPostView } from "@/types/askOffer";
 import { getBuddyNudges, getOrAssignBuddy, trackBuddyNudge } from "@/lib/buddy";
 import {
   fetchCompareSnapshot,
   submitRationale,
   type CompareSnapshot,
 } from "@/lib/afterActionCompare";
-import {
-  listRemnantDefinitions,
-  pickRemnantKeyForUnlock,
-  selectRemnant,
-  unlockRemnant,
-} from "@/lib/remnants";
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
-import { getArcOneState } from "@/core/arcOne/state";
+import { getArcOneState, bumpLifePressure, updateSkillFlag } from "@/core/arcOne/state";
 import {
   applyRelationshipEvents,
   ensureRelationshipDefaults,
@@ -89,7 +71,6 @@ import {
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
-import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { TelemetryEvent } from "@/types/telemetry";
 import type {
@@ -102,7 +83,7 @@ import { OutcomeExplain } from "@/components/play/OutcomeExplain";
 import { SeasonBadge } from "@/components/SeasonBadge";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
-import { useDailyProgress, useGameContent, useUserSocial } from "./hooks";
+import { useDailyProgress, useGameContent } from "./hooks";
 import { MessageCard } from "@/components/ux/MessageCard";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
@@ -154,7 +135,6 @@ export default function PlayPage() {
     seasonContext,
     funPulseEligible,
     funPulseDone,
-    microTaskStatus,
     outcomeMessage,
     outcomeDeltas,
     lastCheck,
@@ -181,7 +161,6 @@ export default function PlayPage() {
     setSeasonContext,
     setFunPulseEligible,
     setFunPulseDone,
-    setMicroTaskStatus,
     setOutcomeMessage,
     setOutcomeDeltas,
     setLastCheck,
@@ -190,21 +169,6 @@ export default function PlayPage() {
   const [savingAllocation, setSavingAllocation] = useState(false);
   const [savingChoice, setSavingChoice] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const {
-    publicProfiles,
-    selectedRecipient,
-    boostsReceived,
-    hasSentBoost,
-    loadingSocial,
-    boostMessage,
-    setPublicProfiles,
-    setSelectedRecipient,
-    setBoostsReceived,
-    setHasSentBoost,
-    setLoadingSocial,
-    setBoostMessage,
-    setUserSocial,
-  } = useUserSocial();
   const [allocatingSkill, setAllocatingSkill] = useState(false);
   const [submittingPosture, setSubmittingPosture] = useState(false);
   const [setupActionError, setSetupActionError] = useState<string | null>(null);
@@ -238,11 +202,10 @@ export default function PlayPage() {
   const [bootstrapIsAdmin, setBootstrapIsAdmin] = useState(false);
   const [bootstrapReady, setBootstrapReady] = useState(false);
   const [bootstrapUserId, setBootstrapUserId] = useState<string | null>(null);
-  const { assignments, getVariant, ready: experimentsReady } = useExperiments(
-    ["microtask_freq_v1"],
+  const { assignments, ready: experimentsReady } = useExperiments(
+    [],
     bootstrapAssignments
   );
-  const microtaskVariant = getVariant("microtask_freq_v1", "A");
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
   const [showDevMenu, setShowDevMenu] = useState(() => getAppMode().testerMode);
@@ -269,15 +232,6 @@ export default function PlayPage() {
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
   const [arcOneReflectionSaving, setArcOneReflectionSaving] = useState(false);
-  const [askOfferPosts, setAskOfferPosts] = useState<AskOfferPostView[]>([]);
-  const [askOfferLoading, setAskOfferLoading] = useState(false);
-  const [askOfferError, setAskOfferError] = useState<string | null>(null);
-  const [askOfferType, setAskOfferType] = useState<"ask" | "offer">("ask");
-  const [askOfferBody, setAskOfferBody] = useState("");
-  const [askOfferPosting, setAskOfferPosting] = useState(false);
-  const [replyNotes, setReplyNotes] = useState<Record<string, string>>({});
-  const [replySending, setReplySending] = useState<Record<string, boolean>>({});
-  const [helpfulSending, setHelpfulSending] = useState<Record<string, boolean>>({});
   const [buddyAssignment, setBuddyAssignment] = useState<{
     buddy_type: "human" | "ai";
     buddy_user_id: string | null;
@@ -299,80 +253,17 @@ export default function PlayPage() {
     null
   );
   const [compareSending, setCompareSending] = useState(false);
-  const [remnantState, setRemnantState] = useState<DailyRun["remnant"] | null>(
-    null
-  );
   const [testerEventLog, setTesterEventLog] = useState<TelemetryEvent[]>([]);
   const [runResetting, setRunResetting] = useState(false);
   const sessionIdRef = useRef(
     `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
   );
-  const remnantAppliedRef = useRef(false);
   const nextRunTrackedRef = useRef(false);
-  const remnantUnlockAttemptedRef = useRef(false);
   const firstChoiceTrackedRef = useRef(false);
   const [cohortRoster, setCohortRoster] = useState<{
     count: number;
     handles: string[];
   } | null>(null);
-
-  const SLICE_PHASES_LOCAL = useMemo(
-    () => [
-      { id: "intro_hook", label: "Intro hook", window: [0, 3] as const },
-      { id: "guided_core_loop", label: "Guided core loop", window: [3, 10] as const },
-      { id: "reflection_arc", label: "Reflection arc", window: [10, 18] as const },
-      { id: "community_purpose", label: "Community purpose", window: [18, 24] as const },
-      { id: "remnant_reveal", label: "Remnant reveal", window: [24, 30] as const },
-    ],
-    []
-  );
-
-  const getSlicePhaseLocal = useCallback(
-    (params: {
-      elapsedMinutes: number;
-      allocationSaved: boolean;
-      storyletRuns: number;
-      socialComplete: boolean;
-      reflectionDone: boolean;
-    }) => {
-      const {
-        elapsedMinutes,
-        allocationSaved,
-        storyletRuns,
-        socialComplete,
-        reflectionDone,
-      } = params;
-
-      const timePhase =
-        elapsedMinutes < 3
-          ? "intro_hook"
-          : elapsedMinutes < 10
-            ? "guided_core_loop"
-            : elapsedMinutes < 18
-              ? "reflection_arc"
-              : elapsedMinutes < 24
-                ? "community_purpose"
-                : "remnant_reveal";
-
-      let criteriaPhase = "intro_hook";
-      if (allocationSaved) criteriaPhase = "guided_core_loop";
-      if (storyletRuns >= 1) criteriaPhase = "reflection_arc";
-      if (storyletRuns >= 2 || reflectionDone) criteriaPhase = "community_purpose";
-      if (socialComplete) criteriaPhase = "remnant_reveal";
-
-      const order = [
-        "intro_hook",
-        "guided_core_loop",
-        "reflection_arc",
-        "community_purpose",
-        "remnant_reveal",
-      ];
-      const timeIndex = order.indexOf(timePhase);
-      const criteriaIndex = order.indexOf(criteriaPhase);
-      return order[Math.max(timeIndex, criteriaIndex)] ?? "remnant_reveal";
-    },
-    []
-  );
 
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
@@ -380,7 +271,6 @@ export default function PlayPage() {
     bootstrapIsAdmin;
   const dailyRunQuery = useDailyRun(bootstrapUserId, {
     experiments,
-    microtaskVariant,
     isAdmin,
     enabled:
       USE_DAILY_LOOP_ORCHESTRATOR &&
@@ -404,35 +294,8 @@ export default function PlayPage() {
   }, [bootstrapQuery.data, bootstrapQuery.isError]);
 
   const testerMode = useMemo(() => getAppMode().testerMode, []);
-  const phaseRef = useRef<string | null>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const featureFlags = useMemo(() => getFeatureFlags(), [featureFlagsVersion]);
-  const slicePhaseId = useMemo(() => {
-    if (!featureFlags.verticalSlice30Enabled) return null;
-    return phaseRef.current;
-  }, [
-    featureFlags.verticalSlice30Enabled,
-    stage,
-    allocationSaved,
-    runs.length,
-    hasSentBoost,
-  ]);
-  const slicePhaseLabel = useMemo(() => {
-    if (!featureFlags.verticalSlice30Enabled) return null;
-    const phaseId = phaseRef.current;
-    if (!phaseId) return null;
-    return (
-      SLICE_PHASES_LOCAL.find((phase) => phase.id === phaseId)?.label ?? phaseId
-    );
-  }, [
-    featureFlags.verticalSlice30Enabled,
-    stage,
-    allocationSaved,
-    runs.length,
-    hasSentBoost,
-    SLICE_PHASES_LOCAL,
-  ]);
-  const remnantDefinitions = useMemo(() => listRemnantDefinitions(), []);
   const testerNote = useMemo(
     () =>
       testerMessage("Tester: Set posture, allocate time, then pick a storylet.", {
@@ -496,7 +359,6 @@ export default function PlayPage() {
       ),
     []
   );
-  const [microTaskSaving, setMicroTaskSaving] = useState(false);
   const [consequenceActive, setConsequenceActive] = useState(false);
   const sessionStartTracked = useRef(false);
   const sessionEndTracked = useRef(false);
@@ -505,7 +367,6 @@ export default function PlayPage() {
   const latestStageRef = useRef<DailyRunStage | null>(null);
   const latestDayIndexRef = useRef<number | null>(null);
   const lastRunDayIndexRef = useRef<number | null>(null);
-  const microTaskStartTracked = useRef(false);
   const funPulseShownTracked = useRef(false);
   const pendingTransitionRef = useRef<(() => void) | null>(null);
 
@@ -513,11 +374,6 @@ export default function PlayPage() {
     () => dailyState?.day_index ?? dayIndexState,
     [dailyState?.day_index, dayIndexState]
   );
-  const microTaskEligible = useMemo(
-    () => isMicrotaskEligible(dayIndex, microtaskVariant),
-    [dayIndex, microtaskVariant]
-  );
-
   const arcOneMode = useMemo(
     () =>
       featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY,
@@ -771,7 +627,6 @@ export default function PlayPage() {
   }, [dayIndex]);
 
   useEffect(() => {
-    microTaskStartTracked.current = false;
     funPulseShownTracked.current = false;
     pendingTransitionRef.current = null;
     setConsequenceActive(false);
@@ -840,7 +695,6 @@ export default function PlayPage() {
               ...defaultAllocation,
               ...(run.allocation ?? run.allocationSeed ?? {}),
             },
-            microTaskStatus: run.microTaskStatus ?? "pending",
             seasonContext: run.seasonContext ?? null,
             funPulseEligible: Boolean(run.funPulseEligible),
             funPulseDone: Boolean(run.funPulseDone),
@@ -859,8 +713,6 @@ export default function PlayPage() {
             rivalry: run.rivalry ?? null,
             cohortId: run.cohortId ?? null,
           });
-          setRemnantState(run.remnant ?? null);
-          setUserSocial({ hasSentBoost: !run.canBoost });
           const ds =
             run.dailyState ?? (await fetchDailyState(bootstrapUserId));
           if (ds) {
@@ -902,15 +754,6 @@ export default function PlayPage() {
             });
           }
 
-          const [profiles, received] = await Promise.all([
-            fetchPublicProfiles(bootstrapUserId),
-            fetchTodayReceivedBoosts(bootstrapUserId, run.dayIndex),
-          ]);
-          setUserSocial({
-            publicProfiles: profiles,
-            selectedRecipient: profiles[0]?.user_id ?? "",
-            boostsReceived: received,
-          });
         } else {
           const cadence = await ensureCadenceUpToDate(bootstrapUserId);
           setDailyProgress({
@@ -918,8 +761,6 @@ export default function PlayPage() {
             alreadyCompletedToday: cadence.alreadyCompletedToday,
             seasonContext: null,
           });
-          setRemnantState(null);
-
           const day = cadence.dayIndex;
           const [ds, existingAllocation, existingRuns, candidates] = await Promise.all([
             fetchDailyState(bootstrapUserId),
@@ -982,17 +823,6 @@ export default function PlayPage() {
           setStorylets(nextStorylets);
 
           const allocationExists = Boolean(existingAllocation);
-          const [profiles, received, sent] = await Promise.all([
-            fetchPublicProfiles(bootstrapUserId),
-            fetchTodayReceivedBoosts(bootstrapUserId, day),
-            hasSentBoostToday(bootstrapUserId, day),
-          ]);
-          setUserSocial({
-            publicProfiles: profiles,
-            selectedRecipient: profiles[0]?.user_id ?? "",
-            boostsReceived: received,
-            hasSentBoost: sent,
-          });
           setStage(
             cadence.alreadyCompletedToday
               ? "complete"
@@ -1082,7 +912,6 @@ export default function PlayPage() {
       ...(params.payload ?? {}),
       ...(seasonIndexValue ? { season_index: seasonIndexValue } : {}),
       session_id: sessionIdRef.current,
-      phase: slicePhaseId ?? null,
       ...(cohortId ? { cohort_id: cohortId } : {}),
     };
     if (testerMode) {
@@ -1131,78 +960,6 @@ export default function PlayPage() {
     trackWithSeason({ event_type: "session_start", day_index: dayIndex, stage });
   }, [userId, dayIndex, stage, loading, seasonContext]);
 
-  const refreshAskOfferBoard = useCallback(async () => {
-    if (!userId || !cohortId || !featureFlags.askOfferBoardEnabled) return;
-    setAskOfferLoading(true);
-    setAskOfferError(null);
-    try {
-      const res = await fetchCohortBoard(cohortId, userId);
-      setAskOfferPosts(res.posts);
-    } catch (err) {
-      console.error(err);
-      setAskOfferError("Unable to load the board right now.");
-    } finally {
-      setAskOfferLoading(false);
-    }
-  }, [userId, cohortId, featureFlags.askOfferBoardEnabled]);
-
-  useEffect(() => {
-    if (!featureFlags.askOfferBoardEnabled || !cohortId || !userId) return;
-    refreshAskOfferBoard();
-  }, [featureFlags.askOfferBoardEnabled, cohortId, userId, refreshAskOfferBoard]);
-
-  const handleCreateAskOffer = async () => {
-    if (!userId || !cohortId) return;
-    setAskOfferPosting(true);
-    setAskOfferError(null);
-    const res = await createCohortPost({
-      cohortId,
-      userId,
-      postType: askOfferType,
-      body: askOfferBody,
-    });
-    if (!res.ok) {
-      setAskOfferError(res.error ?? "Unable to post right now.");
-      setAskOfferPosting(false);
-      return;
-    }
-    setAskOfferBody("");
-    await refreshAskOfferBoard();
-    setAskOfferPosting(false);
-  };
-
-  const handleSendReply = async (postId: string, templateKey: string) => {
-    if (!userId) return;
-    setReplySending((prev) => ({ ...prev, [postId]: true }));
-    const res = await sendCohortReply({
-      postId,
-      userId,
-      templateKey,
-      body: replyNotes[postId],
-    });
-    if (!res.ok) {
-      setAskOfferError(res.error ?? "Unable to send reply.");
-      setReplySending((prev) => ({ ...prev, [postId]: false }));
-      return;
-    }
-    setReplyNotes((prev) => ({ ...prev, [postId]: "" }));
-    await refreshAskOfferBoard();
-    setReplySending((prev) => ({ ...prev, [postId]: false }));
-  };
-
-  const handleHelpful = async (postId: string) => {
-    if (!userId) return;
-    setHelpfulSending((prev) => ({ ...prev, [postId]: true }));
-    const res = await markPostHelpful({ postId, userId });
-    if (!res.ok) {
-      setAskOfferError(res.error ?? "Unable to save reaction.");
-      setHelpfulSending((prev) => ({ ...prev, [postId]: false }));
-      return;
-    }
-    await refreshAskOfferBoard();
-    setHelpfulSending((prev) => ({ ...prev, [postId]: false }));
-  };
-
   useEffect(() => {
     if (!testerMode || !featureFlags.rookieCircleEnabled || !cohortId) {
       setCohortRoster(null);
@@ -1243,105 +1000,6 @@ export default function PlayPage() {
       active = false;
     };
   }, [featureFlags.buddySystemEnabled, cohortId, userId]);
-
-  useEffect(() => {
-    if (!featureFlags.remnantSystemEnabled) return;
-    if (dayIndex === 1 && !nextRunTrackedRef.current) {
-      trackWithSeason({ event_type: "next_run_started", day_index: dayIndex });
-      nextRunTrackedRef.current = true;
-    }
-  }, [featureFlags.remnantSystemEnabled, dayIndex]);
-
-  useEffect(() => {
-    if (!featureFlags.remnantSystemEnabled) return;
-    if (remnantState?.applied && !remnantAppliedRef.current) {
-      remnantAppliedRef.current = true;
-      trackWithSeason({
-        event_type: "remnant_applied",
-        day_index: dayIndex,
-        payload: { remnant_key: remnantState.active?.key ?? null },
-      });
-    }
-  }, [featureFlags.remnantSystemEnabled, remnantState, dayIndex]);
-
-  useEffect(() => {
-    if (!featureFlags.remnantSystemEnabled || !userId) return;
-    if (slicePhaseId !== "remnant_reveal") return;
-    if (remnantState?.unlocked?.length) return;
-    if (remnantUnlockAttemptedRef.current) return;
-    remnantUnlockAttemptedRef.current = true;
-    const key = pickRemnantKeyForUnlock({
-      dailyState,
-      dayState: null,
-    });
-    unlockRemnant(userId, key).then((created) => {
-      if (!created) return;
-      const def = listRemnantDefinitions().find((rem) => rem.key === key) ?? null;
-      if (def) {
-        setRemnantState({
-          unlocked: [def],
-          active: remnantState?.active ?? null,
-          applied: false,
-        });
-        trackWithSeason({
-          event_type: "remnant_discovered",
-          day_index: dayIndex,
-          payload: { remnant_key: key },
-        });
-        trackWithSeason({
-          event_type: "remnant_earned",
-          day_index: dayIndex,
-          payload: { remnant_key: key },
-        });
-      }
-    });
-  }, [
-    featureFlags.remnantSystemEnabled,
-    slicePhaseId,
-    userId,
-    dailyState,
-    dayState,
-    remnantState,
-    dayIndex,
-  ]);
-
-  useEffect(() => {
-    if (!featureFlags.verticalSlice30Enabled) return;
-    if (!sessionStartAtRef.current) return;
-    if (!userId || loading) return;
-    const elapsedMinutes = (Date.now() - sessionStartAtRef.current) / 60000;
-    const phase = getSlicePhaseLocal({
-      elapsedMinutes,
-      allocationSaved,
-      storyletRuns: runs.length,
-      socialComplete: Boolean(hasSentBoost),
-      reflectionDone: stage === "complete" || stage === "reflection",
-    });
-    if (phaseRef.current !== phase) {
-      if (phaseRef.current) {
-        trackWithSeason({
-          event_type: "phase_completed",
-          day_index: dayIndex,
-          stage: phaseRef.current,
-        });
-      }
-      phaseRef.current = phase;
-      trackWithSeason({
-        event_type: "phase_entered",
-        day_index: dayIndex,
-        stage: phase,
-      });
-    }
-  }, [
-    featureFlags.verticalSlice30Enabled,
-    userId,
-    loading,
-    dayIndex,
-    allocationSaved,
-    runs.length,
-    hasSentBoost,
-    stage,
-  ]);
 
   useEffect(() => {
     if (!userId || loading) return;
@@ -1428,17 +1086,6 @@ export default function PlayPage() {
 
   useEffect(() => {
     if (!userId || loading) return;
-    if (stage !== "microtask" || microTaskStartTracked.current) return;
-    microTaskStartTracked.current = true;
-    trackWithSeason({
-      event_type: "microtask_start",
-      day_index: dayIndex,
-      stage: "microtask",
-    });
-  }, [stage, userId, dayIndex, loading]);
-
-  useEffect(() => {
-    if (!userId || loading) return;
     if (stage !== "fun_pulse" || funPulseShownTracked.current) return;
     funPulseShownTracked.current = true;
     trackWithSeason({ event_type: "fun_pulse_shown", day_index: dayIndex, stage });
@@ -1496,11 +1143,6 @@ export default function PlayPage() {
         id: "storylet_1_clarity",
         body: "Did you understand why that outcome happened?",
         options: ["Yes", "Mostly", "No"],
-      },
-      microtask: {
-        id: "microtask_value",
-        body: "Would you miss the micro interaction if it were gone?",
-        options: ["Yes", "Maybe", "No"],
       },
       storylet_2: {
         id: "storylet_2_clarity",
@@ -1663,7 +1305,6 @@ export default function PlayPage() {
       );
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
         const refreshed = await getOrCreateDailyRun(userId, new Date(), {
-          microtaskVariant,
           experiments,
           isAdmin: devIsAdmin,
         });
@@ -1861,20 +1502,53 @@ export default function PlayPage() {
   );
 
         setDailyState(nextDailyState);
-        if (
-          dayState &&
-          (typeof appliedDeltas.energy === "number" ||
-            typeof appliedDeltas.stress === "number")
-        ) {
-          const nextEnergy =
-            typeof appliedDeltas.energy === "number"
-              ? Math.max(0, Math.min(100, dayState.energy + appliedDeltas.energy))
-              : dayState.energy;
-          const nextStress =
-            typeof appliedDeltas.stress === "number"
-              ? Math.max(0, Math.min(100, dayState.stress + appliedDeltas.stress))
-              : dayState.stress;
-          setDayState({ ...dayState, energy: nextEnergy, stress: nextStress });
+        if (dayState) {
+          const hasEnergyStress =
+            typeof appliedDeltas.energy === "number" ||
+            typeof appliedDeltas.stress === "number";
+          const hasResources =
+            appliedDeltas.resources &&
+            Object.keys(appliedDeltas.resources).length > 0;
+
+          if (hasEnergyStress || hasResources) {
+            const nextEnergy =
+              typeof appliedDeltas.energy === "number"
+                ? Math.max(0, Math.min(100, dayState.energy + appliedDeltas.energy))
+                : dayState.energy;
+            const nextStress =
+              typeof appliedDeltas.stress === "number"
+                ? Math.max(0, Math.min(100, dayState.stress + appliedDeltas.stress))
+                : dayState.stress;
+            // Optimistically apply resource deltas to local UI state
+            const res = appliedDeltas.resources ?? {};
+            const nextDayState = {
+              ...dayState,
+              energy: nextEnergy,
+              stress: nextStress,
+              cashOnHand: dayState.cashOnHand + (res.cashOnHand ?? 0),
+              knowledge: dayState.knowledge + (res.knowledge ?? 0),
+              socialLeverage: dayState.socialLeverage + (res.socialLeverage ?? 0),
+              physicalResilience: Math.max(
+                0,
+                Math.min(100, dayState.physicalResilience + (res.physicalResilience ?? 0))
+              ),
+            };
+            setDayState(nextDayState);
+          }
+
+          // Persist resource deltas to player_day_state (fire-and-forget)
+          if (
+            appliedDeltas.resources &&
+            Object.keys(appliedDeltas.resources).length > 0
+          ) {
+            applyResourceDeltaToDayState(
+              userId,
+              dayIndex,
+              appliedDeltas.resources
+            ).catch((err) =>
+              console.error("Failed to persist resource delta from outcome", err)
+            );
+          }
         }
         const hasVectorDeltas =
           appliedDeltas.vectors &&
@@ -1882,7 +1556,11 @@ export default function PlayPage() {
         const hasDeltas =
           typeof appliedDeltas.energy === "number" ||
           typeof appliedDeltas.stress === "number" ||
-          hasVectorDeltas;
+          hasVectorDeltas ||
+          Boolean(
+            appliedDeltas.resources &&
+              Object.keys(appliedDeltas.resources).length > 0
+          );
         beatFallbackMessage = appliedMessage ?? null;
         setOutcomeMessage(
           appliedMessage || (hasDeltas ? "Choice recorded." : null)
@@ -2041,12 +1719,7 @@ export default function PlayPage() {
         } else if (stage === "storylet_2") {
           nextStage = "storylet_3";
         } else {
-          nextStage =
-            microTaskEligible && microTaskStatus === "pending"
-              ? "microtask"
-              : hasSentBoost
-              ? "reflection"
-              : "social";
+          nextStage = "reflection";
         }
         pendingTransitionRef.current = () => setStage(nextStage);
         if (!reactionText || !beatBufferEnabled) {
@@ -2128,6 +1801,36 @@ export default function PlayPage() {
           }
         });
       }
+      // Wire identity_tags → lifePressureState
+      const choiceIdentityTags = (selectedChoice?.identity_tags ?? []) as string[];
+      if (choiceIdentityTags.length > 0 && arcOneState) {
+        const nextLp = bumpLifePressure(arcOneState.lifePressureState, choiceIdentityTags);
+        await updateLifePressureState(userId, nextLp);
+        if (dailyState) {
+          setDailyState({ ...dailyState, life_pressure_state: nextLp });
+        }
+      }
+
+      // Wire skill_modifier → skillFlags
+      const skillModifier = selectedChoice?.skill_modifier as string | undefined;
+      if (skillModifier && arcOneState?.skillFlags) {
+        const nextFlags = updateSkillFlag(arcOneState.skillFlags, skillModifier as any);
+        await updateSkillFlags(userId, nextFlags);
+        if (dailyState) {
+          setDailyState({ ...dailyState, skill_flags: nextFlags });
+        }
+      }
+
+      // Wire precludes → preclusionGates
+      const precludes = (selectedChoice?.precludes ?? []) as string[];
+      if (precludes.length > 0) {
+        const currentGates = (dailyState?.preclusion_gates as string[] | undefined) ?? [];
+        const nextGates = [...new Set([...currentGates, ...precludes])];
+        await updatePreclusionGates(userId, nextGates);
+        if (dailyState) {
+          setDailyState({ ...dailyState, preclusion_gates: nextGates });
+        }
+      }
     } catch (e) {
       console.error(e);
       setError("Failed to record choice.");
@@ -2204,23 +1907,6 @@ export default function PlayPage() {
     setCompareSending(false);
   };
 
-  const handleSelectRemnant = async (key: RemnantKey) => {
-    if (!userId) return;
-    const ok = await selectRemnant(userId, key);
-    if (!ok) return;
-    const def = remnantDefinitions.find((rem) => rem.key === key) ?? null;
-    setRemnantState((prev) => ({
-      unlocked: prev?.unlocked ?? [],
-      active: def,
-      applied: prev?.applied ?? false,
-    }));
-    trackWithSeason({
-      event_type: "remnant_selected",
-      day_index: dayIndex,
-      payload: { remnant_key: key },
-    });
-  };
-
   const handleRunReset = async () => {
     setRunResetting(true);
     setError(null);
@@ -2281,116 +1967,6 @@ export default function PlayPage() {
       setError(e instanceof Error ? e.message : "Failed to save intention.");
     } finally {
       setArcOneReflectionSaving(false);
-    }
-  };
-
-  const loadSocialData = async (uid: string, day: number) => {
-    setLoadingSocial(true);
-    const [profiles, received, sent] = await Promise.all([
-      fetchPublicProfiles(uid),
-      fetchTodayReceivedBoosts(uid, day),
-      hasSentBoostToday(uid, day),
-    ]);
-    setPublicProfiles(profiles);
-    setSelectedRecipient((prev) => prev || profiles[0]?.user_id || "");
-    setBoostsReceived(received);
-    setHasSentBoost(sent);
-    setLoadingSocial(false);
-  };
-
-  const handleSendBoost = async () => {
-    if (!userId || !selectedRecipient) return;
-    recordInteraction();
-    setError(null);
-    setBoostMessage(null);
-    setLoadingSocial(true);
-    try {
-      await sendBoost(userId, selectedRecipient, dayIndex);
-      appendGroupFeedEvent(userId, "boost_sent", { to_user_id: selectedRecipient }).catch(
-        () => {}
-      );
-      incrementGroupObjective(1, "boost_sent").catch(() => {});
-      await loadSocialData(userId, dayIndex);
-      setHasSentBoost(true);
-      setBoostMessage(
-        "You feel more connected. Someone else feels supported."
-      );
-      const refreshed = await fetchDailyState(userId);
-      if (refreshed) {
-        setDailyState(refreshed);
-        setOutcomeDeltas({
-          vectors: { social: 1 },
-        });
-      }
-      if (USE_DAILY_LOOP_ORCHESTRATOR) {
-        setStage("reflection");
-      }
-    } catch (e) {
-      console.error(e);
-      const message =
-        e instanceof Error ? e.message : "Failed to send boost. Try again.";
-      setError(message);
-    } finally {
-      setLoadingSocial(false);
-    }
-  };
-
-  const handleMicroTaskComplete = async (result: {
-    score: number;
-    duration_ms: number;
-  }) => {
-    if (!userId) return;
-    if (microTaskSaving) return;
-    setError(null);
-    setMicroTaskSaving(true);
-    try {
-      const outcome = await completeMicroTask(
-        userId,
-        dayIndex,
-        result.score,
-        result.duration_ms
-      );
-      if (!outcome.alreadyRecorded) {
-        if (outcome.nextDailyState) {
-          setDailyState(outcome.nextDailyState);
-        }
-        setOutcomeDeltas(outcome.appliedDeltas ?? null);
-      }
-      setMicroTaskStatus("done");
-      trackWithSeason({
-        event_type: "microtask_complete",
-        day_index: dayIndex,
-        stage: "microtask",
-        payload: { score: result.score, duration_ms: result.duration_ms },
-      });
-      setStage(hasSentBoost ? "reflection" : "social");
-    } catch (e) {
-      console.error(e);
-      setError("Failed to save micro-task.");
-    } finally {
-      setMicroTaskSaving(false);
-    }
-  };
-
-  const handleMicroTaskSkip = async () => {
-    if (!userId) return;
-    if (microTaskSaving) return;
-    setError(null);
-    setMicroTaskSaving(true);
-    try {
-      await skipMicroTask(userId, dayIndex);
-      setMicroTaskStatus("skipped");
-      trackWithSeason({
-        event_type: "microtask_skip",
-        day_index: dayIndex,
-        stage: "microtask",
-      });
-      setStage(hasSentBoost ? "reflection" : "social");
-    } catch (e) {
-      console.error(e);
-      setError("Failed to skip micro-task.");
-    } finally {
-      setMicroTaskSaving(false);
     }
   };
 
@@ -2468,7 +2044,6 @@ export default function PlayPage() {
       } else {
         setStage("complete");
       }
-      setBoostMessage("Thanks — see you tomorrow.");
     } catch (e) {
       console.error(e);
       setError("Failed to save reflection.");
@@ -2582,13 +2157,6 @@ export default function PlayPage() {
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
                 </TesterOnly>
-                {testerMode && slicePhaseLabel ? (
-                  <TesterOnly>
-                    <p className="text-xs text-slate-500">
-                      Phase: {slicePhaseLabel}
-                    </p>
-                  </TesterOnly>
-                ) : null}
                 {testerMode &&
                 featureFlags.rookieCircleEnabled &&
                 cohortId ? (
@@ -2876,31 +2444,6 @@ export default function PlayPage() {
                       ) : null}
                     </section>
 
-                    <section className="space-y-3">
-                      <h2 className="text-xl font-semibold">Boosts Received Today</h2>
-                      {boostsReceived.length === 0 ? (
-                        <p className="text-sm text-slate-700">
-                          None yet. Maybe tomorrow.
-                        </p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {boostsReceived.map((boost, idx) => {
-                            const sender =
-                              publicProfiles.find(
-                                (p) => p.user_id === boost.from_user_id
-                              )?.display_name ?? "Unknown player";
-                            return (
-                              <li
-                                key={`${boost.from_user_id}-${idx}`}
-                                className="rounded border border-slate-200 bg-white px-3 py-2 text-slate-800"
-                              >
-                                {sender} sent you a boost.
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </section>
                   </>
                 ) : (
                   <>
@@ -2926,10 +2469,9 @@ export default function PlayPage() {
                     </TesterOnly>
                   ) : null}
 
-                  {(stage === "social" ||
-                    (!USE_DAILY_LOOP_ORCHESTRATOR &&
+                  {(!USE_DAILY_LOOP_ORCHESTRATOR &&
                       allocationSaved &&
-                      !currentStorylet)) && initiatives.length > 0 ? (
+                      !currentStorylet) && initiatives.length > 0 ? (
                     <section className="space-y-3">
                       <InitiativePanel
                         initiative={initiatives[0]}
@@ -2971,6 +2513,7 @@ export default function PlayPage() {
                       savingAllocation={savingAllocation}
                       onAllocationChange={handleAllocationChange}
                       onSave={handleSaveAllocation}
+                      resourcesEnabled={featureFlags.resources}
                     />
                   )}
 
@@ -3021,18 +2564,57 @@ export default function PlayPage() {
                               {(() => {
                                 const choices = toChoices(currentStorylet);
 
+                                const RESOURCE_LABELS: Record<string, string> = {
+                                  cashOnHand: "cash",
+                                  knowledge: "knowledge",
+                                  socialLeverage: "social leverage",
+                                  physicalResilience: "resilience",
+                                };
                                 return choices.length > 0 ? (
-                                  choices.map((choice) => (
-                                    <Button
-                                      key={choice.id}
-                                      variant="secondary"
-                                      disabled={choicesDisabled}
-                                      onClick={() => handleChoice(choice.id)}
-                                      className="w-full justify-start"
-                                    >
-                                      {choice.label}
-                                    </Button>
-                                  ))
+                                  choices.map((choice) => {
+                                    const typedChoice = choice as {
+                                      id: string;
+                                      label: string;
+                                      requires_resource?: { key: string; min: number };
+                                      costs_resource?: { key: string; amount: number };
+                                    };
+                                    const reqRes = featureFlags.resources
+                                      ? typedChoice.requires_resource
+                                      : undefined;
+                                    const costRes = featureFlags.resources
+                                      ? typedChoice.costs_resource
+                                      : undefined;
+                                    const meetsGate =
+                                      !reqRes || !dayState
+                                        ? true
+                                        : ((dayState as Record<string, number>)[reqRes.key] ?? 0) >= reqRes.min;
+                                    const isDisabled = choicesDisabled || !meetsGate;
+
+                                    return (
+                                      <div key={typedChoice.id} className="space-y-0.5">
+                                        <Button
+                                          variant="secondary"
+                                          disabled={isDisabled}
+                                          onClick={() => handleChoice(typedChoice.id)}
+                                          className="w-full justify-start"
+                                        >
+                                          <span>{typedChoice.label}</span>
+                                          {costRes ? (
+                                            <span className="ml-auto pl-2 text-amber-600 text-xs font-normal shrink-0">
+                                              −{costRes.amount}{" "}
+                                              {RESOURCE_LABELS[costRes.key] ?? costRes.key}
+                                            </span>
+                                          ) : null}
+                                        </Button>
+                                        {!meetsGate && reqRes ? (
+                                          <p className="text-xs text-slate-500 pl-1">
+                                            🔒 Requires {reqRes.min}{" "}
+                                            {RESOURCE_LABELS[reqRes.key] ?? reqRes.key}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })
                                 ) : (
                                   <p className="text-slate-600 text-sm">
                                     No choices available.
@@ -3095,6 +2677,28 @@ export default function PlayPage() {
                                                 </li>
                                               )
                                             )
+                                          : null}
+                                        {featureFlags.resources && outcomeDeltas.resources
+                                          ? Object.entries(outcomeDeltas.resources)
+                                              .filter(
+                                                ([, delta]) =>
+                                                  typeof delta === "number" && delta !== 0
+                                              )
+                                              .map(([key, delta]) => {
+                                                const LABELS: Record<string, string> = {
+                                                  cashOnHand: "cash",
+                                                  knowledge: "knowledge",
+                                                  socialLeverage: "social leverage",
+                                                  physicalResilience: "resilience",
+                                                };
+                                                return (
+                                                  <li key={key}>
+                                                    {LABELS[key] ?? key}{" "}
+                                                    {(delta as number) >= 0 ? "+" : ""}
+                                                    {delta}
+                                                  </li>
+                                                );
+                                              })
                                           : null}
                                       </ul>
                                     ) : null}
@@ -3202,327 +2806,6 @@ export default function PlayPage() {
                     </section>
                     )}
 
-                  {USE_DAILY_LOOP_ORCHESTRATOR && stage === "microtask" && (
-                    <section className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold">Micro-task</h2>
-                        <span className="text-sm text-slate-600">
-                          Optional · ~1 minute
-                        </span>
-                      </div>
-                      <div className="rounded-md border border-slate-200 bg-white px-4 py-4">
-                        <PatternMatchTask
-                          onComplete={handleMicroTaskComplete}
-                          onSkip={handleMicroTaskSkip}
-                        />
-                        {microTaskSaving ? (
-                          <p className="text-xs text-slate-500">Saving…</p>
-                        ) : null}
-                      </div>
-                    </section>
-                  )}
-
-                  {(stage === "social" ||
-                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved && !currentStorylet)) && (
-                    <section className="space-y-3">
-                      {featureFlags.askOfferBoardEnabled && cohortId ? (
-                        <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                          <div>
-                            <h2 className="text-xl font-semibold">Ask / Offer Board</h2>
-                            <p className="text-sm text-slate-600">
-                              Share a short ask or offer with your circle.
-                            </p>
-                            {featureFlags.buddySystemEnabled && buddyAssignment ? (
-                              <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                                <p>
-                                  Buddy:{" "}
-                                  {buddyAssignment.buddy_type === "human"
-                                    ? "Human (same circle)"
-                                    : "AI fallback"}
-                                </p>
-                                {buddyAssignment.buddy_type === "human" ? (
-                                  <p>
-                                    Handle: {`Handle ${buddyAssignment.buddy_user_id?.slice(0, 4)}`}
-                                  </p>
-                                ) : null}
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                  {getBuddyNudges().map((nudge) => (
-                                    <Button
-                                      key={nudge.id}
-                                      variant="outline"
-                                      onClick={() => {
-                                        setBuddyNudge(nudge.message);
-                                        trackBuddyNudge(nudge.id);
-                                      }}
-                                    >
-                                      {nudge.label}
-                                    </Button>
-                                  ))}
-                                </div>
-                                {buddyNudge ? (
-                                  <p className="mt-2 text-sm text-slate-700">
-                                    {buddyNudge}
-                                  </p>
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </div>
-                          {askOfferError ? (
-                            <p className="text-sm text-red-600">{askOfferError}</p>
-                          ) : null}
-                          <div className="space-y-2">
-                            <label className="block text-sm text-slate-700">
-                              Post type
-                            </label>
-                            <select
-                              className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                              value={askOfferType}
-                              onChange={(e) =>
-                                setAskOfferType(
-                                  e.target.value === "offer" ? "offer" : "ask"
-                                )
-                              }
-                            >
-                              <option value="ask">ASK — I need advice on…</option>
-                              <option value="offer">OFFER — I chose X because…</option>
-                            </select>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm text-slate-700">
-                              Your message (max 160)
-                            </label>
-                            <textarea
-                              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                              rows={3}
-                              value={askOfferBody}
-                              onChange={(e) => setAskOfferBody(e.target.value)}
-                            />
-                            <Button
-                              variant="secondary"
-                              onClick={handleCreateAskOffer}
-                              disabled={askOfferPosting}
-                            >
-                              {askOfferPosting ? "Posting..." : "Post to circle"}
-                            </Button>
-                          </div>
-                          <div className="space-y-3">
-                            <h3 className="text-lg font-semibold">Recent posts</h3>
-                            {askOfferLoading ? (
-                              <p className="text-sm text-slate-600">Loading…</p>
-                            ) : askOfferPosts.length === 0 ? (
-                              <p className="text-sm text-slate-600">
-                                No posts yet. Be the first to share.
-                              </p>
-                            ) : (
-                              <div className="space-y-3">
-                                {askOfferPosts.map((post) => (
-                                  <div
-                                    key={post.id}
-                                    className="rounded-md border border-slate-200 px-3 py-3"
-                                  >
-                                    <div className="flex items-center justify-between text-xs text-slate-500">
-                                      <span className="uppercase tracking-wide">
-                                        {post.post_type}
-                                      </span>
-                                      <span>{post.author_handle}</span>
-                                    </div>
-                                    <p className="mt-2 text-sm text-slate-800">
-                                      {post.body}
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                                      <Button
-                                        variant={post.helpful_given ? "secondary" : "outline"}
-                                        onClick={() => handleHelpful(post.id)}
-                                        disabled={post.helpful_given || helpfulSending[post.id]}
-                                      >
-                                        Helpful · {post.helpful_count}
-                                      </Button>
-                                    </div>
-                                    <div className="mt-3 space-y-2">
-                                      <p className="text-xs text-slate-500">
-                                        Quick reply
-                                      </p>
-                                      <div className="flex flex-wrap gap-2">
-                                        {[
-                                          {
-                                            key: "one_small_step",
-                                            label: "One small step helped me.",
-                                          },
-                                          {
-                                            key: "offer_tip",
-                                            label: "I can offer a quick tip.",
-                                          },
-                                          {
-                                            key: "try_this",
-                                            label: "I tried this.",
-                                          },
-                                        ].map((template) => (
-                                          <Button
-                                            key={template.key}
-                                            variant="outline"
-                                            onClick={() =>
-                                              handleSendReply(post.id, template.key)
-                                            }
-                                            disabled={replySending[post.id]}
-                                          >
-                                            {template.label}
-                                          </Button>
-                                        ))}
-                                      </div>
-                                      <input
-                                        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                                        placeholder="Add a short note (optional)"
-                                        value={replyNotes[post.id] ?? ""}
-                                        onChange={(e) =>
-                                          setReplyNotes((prev) => ({
-                                            ...prev,
-                                            [post.id]: e.target.value,
-                                          }))
-                                        }
-                                      />
-                                    </div>
-                                    {post.replies.length > 0 ? (
-                                      <div className="mt-3 space-y-2">
-                                        <p className="text-xs text-slate-500">
-                                          Replies
-                                        </p>
-                                        <ul className="space-y-2">
-                                          {post.replies.map((reply) => (
-                                            <li
-                                              key={reply.id}
-                                              className="rounded-md border border-slate-100 bg-slate-50 px-2 py-2 text-sm"
-                                            >
-                                              <p className="text-xs text-slate-500">
-                                                {reply.author_handle}
-                                              </p>
-                                              <p className="text-slate-700">
-                                                {reply.body ?? "Shared a quick reply."}
-                                              </p>
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
-                      <h2 className="text-xl font-semibold">Send a Boost</h2>
-                      {boostMessage ? (
-                        <p className="text-sm text-slate-700">{boostMessage}</p>
-                      ) : null}
-                      {hasSentBoost ? (
-                        <p className="text-slate-700">Boost sent for today ✅</p>
-                      ) : publicProfiles.length === 0 ? (
-                          <p className="text-slate-700">
-                            No other players yet. Invite someone and try again.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            <label className="block text-sm text-slate-700">
-                              Choose a player
-                            </label>
-                            <select
-                              className="w-full rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-500"
-                              value={selectedRecipient}
-                              onChange={(e) => setSelectedRecipient(e.target.value)}
-                              disabled={loadingSocial}
-                            >
-                              {publicProfiles.map((p) => (
-                                <option key={p.user_id} value={p.user_id}>
-                                  {p.display_name}
-                                </option>
-                              ))}
-                            </select>
-                            <Button
-                              variant="outline"
-                              onClick={handleSendBoost}
-                              disabled={!selectedRecipient || loadingSocial}
-                            >
-                              {loadingSocial ? "Sending..." : "Send Boost"}
-                            </Button>
-                          </div>
-                        )}
-
-                        <div className="space-y-2">
-                          <h3 className="text-lg font-semibold">Boosts Received Today</h3>
-                          {boostsReceived.length === 0 ? (
-                            <p className="text-sm text-slate-700">
-                              None yet. Maybe tomorrow.
-                            </p>
-                          ) : (
-                            <ul className="space-y-2">
-                              {boostsReceived.map((boost, idx) => {
-                                const sender =
-                                  publicProfiles.find(
-                                    (p) => p.user_id === boost.from_user_id
-                                  )?.display_name ?? "Unknown player";
-                                return (
-                                  <li
-                                    key={`${boost.from_user_id}-${idx}`}
-                                    className="rounded border border-slate-200 bg-white px-3 py-2 text-slate-800"
-                                  >
-                                    {sender} sent you a boost.
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          )}
-                        </div>
-                    </section>
-                  )}
-
-                  {featureFlags.remnantSystemEnabled &&
-                    slicePhaseId === "remnant_reveal" && (
-                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                      <div>
-                        <h2 className="text-xl font-semibold">Remnant reveal</h2>
-                        <p className="text-sm text-slate-600">
-                          One fragment carries into the next run.
-                        </p>
-                      </div>
-                      {remnantState?.unlocked?.length ? (
-                        <div className="space-y-3">
-                          {remnantState.unlocked.map((remnant) => {
-                            const selected = remnantState.active?.key === remnant.key;
-                            return (
-                              <div
-                                key={remnant.key}
-                                className="rounded-md border border-slate-200 px-3 py-3"
-                              >
-                                <p className="font-semibold text-slate-900">
-                                  {remnant.name}
-                                </p>
-                                <p className="text-sm text-slate-600">
-                                  {remnant.description}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {remnant.effect}
-                                </p>
-                                <Button
-                                  variant={selected ? "secondary" : "outline"}
-                                  onClick={() =>
-                                    handleSelectRemnant(remnant.key as RemnantKey)
-                                  }
-                                  className="mt-2"
-                                >
-                                  {selected ? "Selected" : "Select remnant"}
-                                </Button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-slate-600">
-                          No remnant yet. Stay with the thread a little longer.
-                        </p>
-                      )}
-                    </section>
-                  )}
-
 
               {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && arcOneReflectionReady ? (
                 <section className="space-y-3">
@@ -3575,11 +2858,10 @@ export default function PlayPage() {
                   dayState={dayState}
                   skillBank={skillBank}
                   lastAppliedDeltas={outcomeDeltas}
-                  boostsReceivedCount={boostsReceived.length}
                   skills={skills}
-                  resourcesEnabled={featureFlags.resources && !arcOneMode}
+                  resourcesEnabled={featureFlags.resources}
                   skillsEnabled={skillUiEnabled}
-                  scarcityMode={arcOneMode}
+                  scarcityMode={arcOneMode && !featureFlags.resources}
                   energyLevel={arcOneState?.energyLevel}
                   onResourcesHoverStart={() => startHover("resources_panel")}
                   onResourcesHoverEnd={() => endHover("resources_panel")}

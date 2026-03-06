@@ -13,15 +13,9 @@ vi.mock("@/lib/play", () => ({
   fetchTodayStoryletCandidates: vi.fn(),
   fetchRecentStoryletRuns: vi.fn(),
 }));
-vi.mock("@/lib/social", () => ({
-  hasSentBoostToday: vi.fn(),
-}));
 vi.mock("@/lib/reflections", () => ({
   getReflection: vi.fn(),
   isReflectionDone: vi.fn(),
-}));
-vi.mock("@/lib/microtasks", () => ({
-  fetchMicroTaskRun: vi.fn(),
 }));
 vi.mock("@/core/season/getSeasonContext", () => ({
   getSeasonContext: vi.fn(),
@@ -56,8 +50,6 @@ vi.mock("@/lib/featureFlags", () => ({
     alignment: true,
     arcs: true,
     resources: true,
-    remnantSystemEnabled: true,
-    verticalSlice30Enabled: false,
     rookieCircleEnabled: false,
     askOfferBoardEnabled: false,
     buddySystemEnabled: false,
@@ -67,7 +59,6 @@ vi.mock("@/lib/featureFlags", () => ({
     contentStudioPreviewEnabled: false,
     contentStudioHistoryEnabled: false,
     contentStudioPublishEnabled: false,
-    contentStudioRemnantRulesEnabled: false,
   })),
 }));
 vi.mock("@/lib/dailyInteractions", () => ({
@@ -127,9 +118,7 @@ import {
   fetchTodayStoryletCandidates,
   fetchRecentStoryletRuns,
 } from "@/lib/play";
-import { hasSentBoostToday } from "@/lib/social";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
-import { fetchMicroTaskRun } from "@/lib/microtasks";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
@@ -255,10 +244,8 @@ beforeEach(() => {
   vi.mocked(fetchTodayRuns).mockResolvedValue([]);
   vi.mocked(fetchTodayStoryletCandidates).mockResolvedValue([storyletA, storyletB]);
   vi.mocked(fetchRecentStoryletRuns).mockResolvedValue([]);
-  vi.mocked(hasSentBoostToday).mockResolvedValue(false);
   vi.mocked(getReflection).mockResolvedValue(null);
   vi.mocked(isReflectionDone).mockReturnValue(false);
-  vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
   vi.mocked(selectStorylets).mockReturnValue([storyletA, storyletB]);
   vi.mocked(shouldShowFunPulse).mockReturnValue(false);
   vi.mocked(getFunPulse).mockResolvedValue(null);
@@ -374,17 +361,6 @@ describe("daily loop validation", () => {
 
     const run = await getOrCreateDailyRun("u", new Date());
     expect(run.stage).toBe("storylet_1");
-  });
-
-  it("includes microtask only when eligible", async () => {
-    vi.mocked(fetchTodayRuns).mockResolvedValue([
-      { id: "r1", user_id: "u", day_index: 2, storylet_id: "a", choice_id: "c1" },
-      { id: "r2", user_id: "u", day_index: 2, storylet_id: "b", choice_id: "c2" },
-    ]);
-    vi.mocked(fetchMicroTaskRun).mockResolvedValue(null);
-
-    const run = await getOrCreateDailyRun("u", new Date());
-    expect(run.stage).toBe("microtask");
   });
 
   it("attaches cohort and initiatives", async () => {

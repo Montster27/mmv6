@@ -7,7 +7,7 @@ import {
   fallbackStorylet,
   validateStorylet,
 } from "@/core/validation/storyletValidation";
-import { applyOutcomeToDailyState } from "@/core/engine/applyOutcome";
+import { applyOutcomeToDailyState, type AppliedDeltas } from "@/core/engine/applyOutcome";
 import { chooseWeightedOutcome } from "@/core/engine/deterministicRoll";
 import { fetchStoryletCatalog } from "@/lib/cache/storyletCatalogCache";
 import { applyAllocationToDayState, hashAllocation } from "@/core/sim/allocationEffects";
@@ -75,7 +75,7 @@ export async function fetchDailyState(
   const { data, error } = await supabase
     .from("daily_states")
     .select(
-      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,relationships,expired_opportunities,replay_intention,arc_one_reflection_done,start_date,last_day_completed,last_day_index_completed"
+      "id,user_id,day_index,energy,stress,vectors,life_pressure_state,energy_level,money_band,skill_flags,npc_memory,relationships,expired_opportunities,replay_intention,arc_one_reflection_done,preclusion_gates,start_date,last_day_completed,last_day_index_completed"
     )
     .eq("user_id", userId)
     .limit(1)
@@ -322,35 +322,7 @@ export async function fetchTodayStoryletCandidates(
       (storylet.tags ?? []).includes("arc_one_core")
     );
   }
-  if (!featureFlags.verticalSlice30Enabled) {
-    return storylets;
-  }
-  const filtered = storylets.filter((storylet) =>
-    (storylet.tags ?? []).includes("slice30_pack_v1")
-  );
-  validateSlicePack(filtered);
-  return filtered;
-}
-
-function validateSlicePack(storylets: Storylet[]) {
-  const ids = new Set<string>();
-  const slugs = new Set<string>();
-  const duplicateIds: string[] = [];
-  const duplicateSlugs: string[] = [];
-
-  storylets.forEach((storylet) => {
-    if (ids.has(storylet.id)) duplicateIds.push(storylet.id);
-    else ids.add(storylet.id);
-    if (slugs.has(storylet.slug)) duplicateSlugs.push(storylet.slug);
-    else slugs.add(storylet.slug);
-  });
-
-  if (duplicateIds.length || duplicateSlugs.length) {
-    console.warn("Slice30 storylet pack has duplicates", {
-      duplicateIds,
-      duplicateSlugs,
-    });
-  }
+  return storylets;
 }
 
 export async function fetchTodayRuns(
@@ -548,11 +520,7 @@ export async function applyOutcomeForChoice(
 ): Promise<{
   nextDailyState: DailyState;
   appliedMessage: string;
-  appliedDeltas: {
-    energy?: number;
-    stress?: number;
-    vectors?: Record<string, number>;
-  };
+  appliedDeltas: AppliedDeltas;
   resolvedOutcomeId?: string;
   resolvedOutcomeAnomalies?: string[];
   lastCheck?: CheckResult;
@@ -631,6 +599,20 @@ export async function applyOutcomeForChoice(
     dailyState,
     resolvedOutcome
   );
+
+  // Merge costs_resource deduction into appliedDeltas.resources so it is
+  // persisted and reflected in the UI alongside outcome resource grants.
+  const costsResource = (choice as any).costs_resource as
+    | { key: string; amount: number }
+    | undefined;
+  if (costsResource?.key && typeof costsResource.amount === "number") {
+    const existing = (appliedDeltas.resources ?? {}) as Record<string, number>;
+    appliedDeltas.resources = {
+      ...existing,
+      [costsResource.key]: (existing[costsResource.key] ?? 0) - costsResource.amount,
+    };
+  }
+
   await updateDailyState(userId, nextDailyState);
 
   if (
@@ -691,4 +673,62 @@ export async function markDailyComplete(
   }
 
   await finalizeDay(userId, dayIndex);
+}
+
+export async function updateLifePressureState(
+  userId: string,
+  lifePressureState: Record<string, number>
+): Promise<void> {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({ life_pressure_state: lifePressureState, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("Failed to update life_pressure_state", error);
+}
+
+export async function updateSkillFlags(
+  userId: string,
+  skillFlags: Record<string, number>
+): Promise<void> {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({ skill_flags: skillFlags, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("Failed to update skill_flags", error);
+}
+
+export async function updatePreclusionGates(
+  userId: string,
+  gates: string[]
+): Promise<void> {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({ preclusion_gates: gates, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("Failed to update preclusion_gates", error);
+}
+
+/**
+ * Apply resource grants or costs (from a storylet outcome's `deltas.resources`)
+ * to the player's `player_day_state` row.
+ *
+ * Delegates to the existing `applyResourceDelta` which handles fetch → delta →
+ * persist → trace → choice_log in one shot.
+ */
+export async function applyResourceDeltaToDayState(
+  userId: string,
+  dayIndex: number,
+  resources: Partial<Record<string, number>>
+): Promise<void> {
+  if (!resources || Object.keys(resources).length === 0) return;
+  // Filter out undefined values to satisfy Record<string, number>
+  const definedResources: Record<string, number> = Object.fromEntries(
+    Object.entries(resources).filter((entry): entry is [string, number] =>
+      typeof entry[1] === "number"
+    )
+  );
+  if (Object.keys(definedResources).length === 0) return;
+  await applyResourceDelta(userId, dayIndex, { resources: definedResources }, {
+    source: "storylet_outcome",
+  });
 }

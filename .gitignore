@@ -44,3 +44,6 @@ import.env
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# simulation logs
+sim-log-*.json

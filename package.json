@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "arcflow": "node scripts/arcFlow/run.mjs"
+    "arcflow": "node scripts/arcFlow/run.mjs",
+    "simulate": "tsx scripts/simulate-run.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
