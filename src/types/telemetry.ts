@@ -6,8 +6,6 @@ export const REQUIRED_TELEMETRY_EVENTS = [
   "community_reply_sent",
   "buddy_nudge_used",
   "compare_view_opened",
-  "remnant_earned",
-  "remnant_selected",
   "next_run_started",
   "dropoff_point",
   "session_end",

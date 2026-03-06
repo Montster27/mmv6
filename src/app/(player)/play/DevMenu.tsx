@@ -113,7 +113,6 @@ const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
   ["askOfferBoardEnabled", "Ask/Offer Board"],
   ["buddySystemEnabled", "Buddy System"],
   ["afterActionCompareEnabled", "After-Action Compare"],
-  ["remnantSystemEnabled", "Remnant System"],
 ];
 
 export default function DevMenu({
@@ -204,8 +203,7 @@ export default function DevMenu({
       key === "contentStudioGraphEnabled" ||
       key === "contentStudioPreviewEnabled" ||
       key === "contentStudioHistoryEnabled" ||
-      key === "contentStudioPublishEnabled" ||
-      key === "contentStudioRemnantRulesEnabled"
+      key === "contentStudioPublishEnabled"
     ) {
       return;
     }
@@ -222,7 +220,6 @@ export default function DevMenu({
         contentStudioPreviewEnabled: true,
         contentStudioHistoryEnabled: true,
         contentStudioPublishEnabled: true,
-        contentStudioRemnantRulesEnabled: true,
       };
     }
     onFlagsChanged?.();
@@ -525,8 +522,7 @@ export default function DevMenu({
               key === "contentStudioGraphEnabled" ||
               key === "contentStudioPreviewEnabled" ||
               key === "contentStudioHistoryEnabled" ||
-              key === "contentStudioPublishEnabled" ||
-              key === "contentStudioRemnantRulesEnabled"
+              key === "contentStudioPublishEnabled"
             ) {
               return false;
             }

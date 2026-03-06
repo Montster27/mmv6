@@ -61,15 +61,7 @@ import { getArcOneState } from "@/core/arcOne/state";
 import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
 import { computeMorale } from "@/core/resources/resourceDelta";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
-import {
-  applyRemnantEffectForDay,
-  fetchActiveRemnant,
-  fetchUnlockedRemnants,
-  getRemnantDefinition,
-  listRemnantDefinitions,
-} from "@/lib/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
-import type { RemnantKey } from "@/types/remnants";
 
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -189,39 +181,7 @@ export async function getOrCreateDailyRun(
   ]);
   const cohortId = cohort?.cohortId ?? null;
 
-  let remnantState: DailyRun["remnant"] = null;
-  if (featureFlags.remnantSystemEnabled) {
-    const [unlockedKeys, activeSelection] = await Promise.all([
-      fetchUnlockedRemnants(userId).catch(() => [] as RemnantKey[]),
-      fetchActiveRemnant(userId).catch(() => null),
-    ]);
-    const unlockedDefs = listRemnantDefinitions().filter((remnant) =>
-      unlockedKeys.includes(remnant.key)
-    );
-    const activeDef = activeSelection?.remnant_key
-      ? getRemnantDefinition(activeSelection.remnant_key)
-      : null;
-    let applied = false;
-    if (dayState) {
-      const appliedResult = await applyRemnantEffectForDay({
-        userId,
-        dayIndex,
-        dayState,
-      });
-      applied = appliedResult.applied;
-      if (appliedResult.dayState) {
-        dayState = appliedResult.dayState;
-      }
-    }
-    remnantState = {
-      unlocked: unlockedDefs,
-      active: activeDef ?? null,
-      applied,
-    };
-  }
-
-  // Build resource snapshot from current dayState (after remnant effects may have
-  // mutated it). Used for storylet gating and scoring bonuses.
+  // Build resource snapshot from current dayState. Used for storylet gating and scoring bonuses.
   const resourceSnapshot: ResourceSnapshot | null = dayState
     ? {
         energy: daily?.energy ?? 100,
@@ -522,7 +482,6 @@ export async function getOrCreateDailyRun(
       }
       : null,
     arcOneState: arcOneState ?? undefined,
-    remnant: featureFlags.remnantSystemEnabled ? remnantState : null,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
     seasonRecap: seasonResetNeeded ? seasonRecap : undefined,

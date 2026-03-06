@@ -21,11 +21,6 @@ const NUDGES: BuddyNudge[] = [
     message: "Trust your first read. Pick the option that keeps today clean.",
   },
   {
-    id: "bank_remnant",
-    label: "Remind to bank a remnant",
-    message: "If something sticks out today, mark it. Later it becomes a remnant.",
-  },
-  {
     id: "anomaly_explore",
     label: "Anomaly exploration suggestion",
     message: "If the strange detail returns, test it once. A pattern starts there.",

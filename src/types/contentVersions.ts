@@ -3,7 +3,6 @@ export type ContentVersionState = "draft" | "published" | "archived";
 export type ContentSnapshot = {
   storylets: unknown[];
   consequences: unknown[];
-  remnantRules: unknown[];
 };
 
 export type ContentVersion = {

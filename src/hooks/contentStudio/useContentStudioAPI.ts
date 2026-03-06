@@ -4,7 +4,6 @@ import { supabase } from "@/lib/supabase/browser";
 import { buildAuditMeta } from "@/lib/contentStudio/audit";
 import type { Storylet } from "@/types/storylets";
 import type { DelayedConsequenceRule } from "@/types/consequences";
-import type { RemnantRule } from "@/types/remnants";
 import type { ContentVersion } from "@/types/contentVersions";
 
 export type APIState = {
@@ -59,10 +58,6 @@ export function useContentStudioAPI() {
     error: null,
   });
   const [rulesState, setRulesState] = useState<APIState>({
-    loading: false,
-    error: null,
-  });
-  const [remnantRulesState, setRemnantRulesState] = useState<APIState>({
     loading: false,
     error: null,
   });
@@ -194,42 +189,6 @@ export function useContentStudioAPI() {
     []
   );
 
-  // Remnant Rules
-  const loadRemnantRules = useCallback(async (): Promise<RemnantRule[]> => {
-    setRemnantRulesState({ loading: true, error: null });
-
-    const result = await apiRequest<{ rules: RemnantRule[] }>(
-      "/api/admin/remnant-rules"
-    );
-
-    if (!result.ok) {
-      setRemnantRulesState({ loading: false, error: result.error ?? null });
-      return [];
-    }
-
-    setRemnantRulesState({ loading: false, error: null });
-    return result.data?.rules ?? [];
-  }, []);
-
-  const saveRemnantRule = useCallback(
-    async (
-      rule: RemnantRule,
-      isNew: boolean
-    ): Promise<{ ok: boolean; error?: string }> => {
-      const url = isNew
-        ? "/api/admin/remnant-rules"
-        : `/api/admin/remnant-rules/${rule.remnant_key}`;
-
-      const result = await apiRequest(url, {
-        method: isNew ? "POST" : "PUT",
-        body: JSON.stringify(rule),
-      });
-
-      return { ok: result.ok, error: result.error };
-    },
-    []
-  );
-
   // Content Versions
   const loadVersions = useCallback(async (): Promise<ContentVersion[]> => {
     setVersionsState({ loading: true, error: null });
@@ -282,7 +241,6 @@ export function useContentStudioAPI() {
     // States
     storyletsState,
     rulesState,
-    remnantRulesState,
     versionsState,
 
     // Storylet operations
@@ -294,10 +252,6 @@ export function useContentStudioAPI() {
     loadRules,
     saveRule,
     deleteRule,
-
-    // Remnant rule operations
-    loadRemnantRules,
-    saveRemnantRule,
 
     // Version operations
     loadVersions,

@@ -19,17 +19,9 @@ import { StudioDatalist } from "@/components/contentStudio/StudioDatalist";
 import type { Storylet, StoryletChoice } from "@/types/storylets";
 import type { ContentArc, ContentArcStep } from "@/types/content";
 import type { DelayedConsequenceRule } from "@/types/consequences";
-import type { RemnantRule } from "@/types/remnants";
 import type { ContentVersion, ContentSnapshot } from "@/types/contentVersions";
 
 import { SaveStatusIndicator } from "@/components/contentStudio/SaveStatusIndicator";
-
-const REMNANT_KEYS = [
-  "memory_fragment",
-  "relationship_echo",
-  "composure_scar",
-  "anomaly_thread",
-] as const;
 
 const GraphView = dynamic(
   () => import("@/components/contentStudio/GraphView").then((mod) => mod.GraphView),
@@ -57,7 +49,6 @@ const PHASE_OPTIONS = [
   "guided_core_loop",
   "reflection_arc",
   "community_purpose",
-  "remnant_reveal",
 ] as const;
 
 const TYPE_OPTIONS = ["core", "social", "context", "anomaly"] as const;
@@ -317,19 +308,6 @@ export default function ContentStudioLitePage() {
   const [ruleDraft, setRuleDraft] = useState<RuleDraft | null>(null);
   const [ruleSaveState, setRuleSaveState] = useState<SaveState>("idle");
   const [ruleTestOutput, setRuleTestOutput] = useState<string | null>(null);
-  const [remnantRules, setRemnantRules] = useState<RemnantRule[]>([]);
-  const [remnantRulesLoading, setRemnantRulesLoading] = useState(false);
-  const [remnantRulesError, setRemnantRulesError] = useState<string | null>(null);
-  const [remnantRuleDraft, setRemnantRuleDraft] = useState<{
-    remnant_key: string;
-    discoveryText: string;
-    unlockText: string;
-    capsText: string;
-  } | null>(null);
-  const [remnantRuleSaveState, setRemnantRuleSaveState] =
-    useState<SaveState>("idle");
-  const [remnantRuleTestOutput, setRemnantRuleTestOutput] =
-    useState<string | null>(null);
   const [publishNote, setPublishNote] = useState("");
   const [publishState, setPublishState] = useState<SaveState>("idle");
   const [versions, setVersions] = useState<ContentVersion[]>([]);
@@ -340,7 +318,6 @@ export default function ContentStudioLitePage() {
   const [diffSummary, setDiffSummary] = useState<{
     storylets: { added: string[]; removed: string[]; modified: string[] };
     consequences: { added: string[]; removed: string[]; modified: string[] };
-    remnantRules: { added: string[]; removed: string[]; modified: string[] };
   } | null>(null);
   const [rollbackState, setRollbackState] = useState<SaveState>("idle");
   const autosaveTimerRef = useRef<number | null>(null);
@@ -374,7 +351,6 @@ export default function ContentStudioLitePage() {
     if (tab === "graph") return flags.contentStudioGraphEnabled;
     if (tab === "preview") return flags.contentStudioPreviewEnabled;
     if (tab === "history") return flags.contentStudioHistoryEnabled;
-    if (tab === "rules") return flags.contentStudioRemnantRulesEnabled;
     return true;
   };
 
@@ -528,37 +504,6 @@ export default function ContentStudioLitePage() {
     if (activeTab !== "rules") return;
     loadRules();
   }, [flags.contentStudioLiteEnabled, activeTab, loadRules]);
-
-  const loadRemnantRules = useCallback(async () => {
-    setRemnantRulesLoading(true);
-    setRemnantRulesError(null);
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("No session found.");
-      const res = await fetch("/api/admin/remnant-rules", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error ?? "Failed to load remnant rules");
-      }
-      setRemnantRules(json.rules ?? []);
-    } catch (err) {
-      console.error(err);
-      setRemnantRulesError(
-        err instanceof Error ? err.message : "Failed to load remnant rules"
-      );
-    } finally {
-      setRemnantRulesLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!flags.contentStudioLiteEnabled) return;
-    if (activeTab !== "rules") return;
-    loadRemnantRules();
-  }, [flags.contentStudioLiteEnabled, activeTab, loadRemnantRules]);
 
   useEffect(() => {
     if (!flags.contentStudioLiteEnabled) return;
@@ -946,107 +891,6 @@ export default function ContentStudioLitePage() {
     });
   };
 
-  const selectRemnantRule = (rule: RemnantRule) => {
-    setRemnantRuleDraft({
-      remnant_key: rule.remnant_key,
-      discoveryText: formatJson(rule.discovery),
-      unlockText: formatJson(rule.unlock),
-      capsText: formatJson(rule.caps),
-    });
-    setRemnantRuleSaveState("idle");
-    setRemnantRuleTestOutput(null);
-  };
-
-  const createRemnantRule = () => {
-    const key = REMNANT_KEYS[0] ?? "";
-    setRemnantRuleDraft({
-      remnant_key: key,
-      discoveryText: "",
-      unlockText: "",
-      capsText: "",
-    });
-    setRemnantRuleSaveState("idle");
-    setRemnantRuleTestOutput(null);
-  };
-
-  const saveRemnantRule = async () => {
-    if (!remnantRuleDraft) return;
-    const discovery = safeParseJson(remnantRuleDraft.discoveryText);
-    const unlock = safeParseJson(remnantRuleDraft.unlockText);
-    const caps = safeParseJson(remnantRuleDraft.capsText);
-    if (!remnantRuleDraft.remnant_key) {
-      setRemnantRulesError("Remnant key is required.");
-      return;
-    }
-    if (!discovery.ok || !unlock.ok || !caps.ok) {
-      setRemnantRulesError("One or more JSON blocks are invalid.");
-      return;
-    }
-    setRemnantRuleSaveState("saving");
-    setRemnantRulesError(null);
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error("No session found.");
-      const existing = remnantRules.find(
-        (rule) => rule.remnant_key === remnantRuleDraft.remnant_key
-      );
-      const res = await fetch(
-        existing
-          ? `/api/admin/remnant-rules/${remnantRuleDraft.remnant_key}`
-          : "/api/admin/remnant-rules",
-        {
-          method: existing ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            remnant_key: remnantRuleDraft.remnant_key,
-            discovery: discovery.value,
-            unlock: unlock.value,
-            caps: caps.value,
-          }),
-        }
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.error ?? "Failed to save remnant rule");
-      }
-      await loadRemnantRules();
-      setRemnantRuleSaveState("saved");
-      trackEvent({
-        event_type: "remnant_rule_updated",
-        payload: { remnant_key: remnantRuleDraft.remnant_key },
-      });
-    } catch (err) {
-      console.error(err);
-      setRemnantRulesError(
-        err instanceof Error ? err.message : "Failed to save remnant rule"
-      );
-      setRemnantRuleSaveState("error");
-    }
-  };
-
-  const testRemnantRule = () => {
-    if (!remnantRuleDraft) return;
-    const discovery = safeParseJson(remnantRuleDraft.discoveryText);
-    const unlock = safeParseJson(remnantRuleDraft.unlockText);
-    if (!discovery.ok || !unlock.ok) {
-      setRemnantRuleTestOutput("Invalid JSON in discovery or unlock.");
-      return;
-    }
-    setRemnantRuleTestOutput(
-      `Discovery: ${JSON.stringify(discovery.value)} · Unlock: ${JSON.stringify(
-        unlock.value
-      )}`
-    );
-    trackEvent({
-      event_type: "remnant_rule_tested",
-      payload: { remnant_key: remnantRuleDraft.remnant_key },
-    });
-  };
-
   const loadVersions = useCallback(async () => {
     setVersionsLoading(true);
     try {
@@ -1117,10 +961,9 @@ export default function ContentStudioLitePage() {
     current: {
       storylets: Storylet[];
       consequences: DelayedConsequenceRule[];
-      remnantRules: RemnantRule[];
     }
   ) => {
-    const diffList = <T extends { id?: string; key?: string; remnant_key?: string }>(
+    const diffList = <T extends { id?: string; key?: string }>(
       next: T[],
       prev: T[],
       keySelector: (item: T) => string
@@ -1157,11 +1000,6 @@ export default function ContentStudioLitePage() {
         current.consequences,
         (item) => (item as DelayedConsequenceRule).key
       ),
-      remnantRules: diffList(
-        snapshot.remnantRules as RemnantRule[],
-        current.remnantRules,
-        (item) => (item as RemnantRule).remnant_key
-      ),
     };
   };
 
@@ -1170,7 +1008,6 @@ export default function ContentStudioLitePage() {
     const diff = buildDiff(version.snapshot, {
       storylets,
       consequences: rules,
-      remnantRules,
     });
     setDiffSummary(diff);
     trackEvent({
@@ -2497,159 +2334,6 @@ export default function ContentStudioLitePage() {
                       </div>
                     </div>
 
-                    <div className="border-t border-slate-200 pt-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h2 className="text-xl font-semibold text-slate-900">
-                            Remnant rules
-                          </h2>
-                          <p className="text-sm text-slate-600">
-                            Discovery and unlock conditions.
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" onClick={loadRemnantRules}>
-                            Refresh
-                          </Button>
-                          <Button onClick={createRemnantRule}>New rule</Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-                        <div className="space-y-2">
-                          {remnantRulesLoading ? (
-                            <p className="text-sm text-slate-600">Loading…</p>
-                          ) : remnantRules.length === 0 ? (
-                            <p className="text-sm text-slate-600">
-                              No remnant rules yet.
-                            </p>
-                          ) : (
-                            remnantRules.map((rule) => (
-                              <button
-                                key={rule.remnant_key}
-                                className={`w-full rounded-md border px-3 py-2 text-left text-sm transition ${
-                                  remnantRuleDraft?.remnant_key === rule.remnant_key
-                                    ? "border-slate-900 bg-slate-100"
-                                    : "border-slate-200 hover:border-slate-300"
-                                }`}
-                                onClick={() => selectRemnantRule(rule)}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium">
-                                    {rule.remnant_key}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                  Updated {rule.updated_at ?? "unknown"}
-                                </div>
-                              </button>
-                            ))
-                          )}
-                          {remnantRulesError ? (
-                            <p className="text-sm text-red-600">
-                              {remnantRulesError}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div className="space-y-3">
-                          {!remnantRuleDraft ? (
-                            <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
-                              Select a remnant rule to edit.
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              <label className="text-sm text-slate-700">
-                                Remnant key
-                                <select
-                                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
-                                  value={remnantRuleDraft.remnant_key}
-                                  onChange={(e) =>
-                                    setRemnantRuleDraft({
-                                      ...remnantRuleDraft,
-                                      remnant_key: e.target.value,
-                                    })
-                                  }
-                                >
-                                  {REMNANT_KEYS.map((key) => (
-                                    <option key={key} value={key}>
-                                      {key}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                              <div className="grid gap-3 md:grid-cols-2">
-                                <label className="text-sm text-slate-700">
-                                  Discovery (JSON)
-                                  <textarea
-                                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
-                                    rows={4}
-                                    value={remnantRuleDraft.discoveryText}
-                                    onChange={(e) =>
-                                      setRemnantRuleDraft({
-                                        ...remnantRuleDraft,
-                                        discoveryText: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </label>
-                                <label className="text-sm text-slate-700">
-                                  Unlock (JSON)
-                                  <textarea
-                                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
-                                    rows={4}
-                                    value={remnantRuleDraft.unlockText}
-                                    onChange={(e) =>
-                                      setRemnantRuleDraft({
-                                        ...remnantRuleDraft,
-                                        unlockText: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </label>
-                                <label className="text-sm text-slate-700">
-                                  Caps (JSON)
-                                  <textarea
-                                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
-                                    rows={4}
-                                    value={remnantRuleDraft.capsText}
-                                    onChange={(e) =>
-                                      setRemnantRuleDraft({
-                                        ...remnantRuleDraft,
-                                        capsText: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </label>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  onClick={saveRemnantRule}
-                                  disabled={remnantRuleSaveState === "saving"}
-                                >
-                                  {remnantRuleSaveState === "saving"
-                                    ? "Saving..."
-                                    : "Save rule"}
-                                </Button>
-                                <Button variant="outline" onClick={testRemnantRule}>
-                                  Test rule
-                                </Button>
-                                {remnantRuleSaveState === "saved" ? (
-                                  <span className="text-xs text-slate-500">
-                                    Saved
-                                  </span>
-                                ) : null}
-                              </div>
-                              {remnantRuleTestOutput ? (
-                                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-                                  {remnantRuleTestOutput}
-                                </div>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 ) : activeTab === "history" ? (
                   <div className="space-y-3">
@@ -2726,11 +2410,6 @@ export default function ContentStudioLitePage() {
                           Consequences: +{diffSummary.consequences.added.length} / -
                           {diffSummary.consequences.removed.length} · ~
                           {diffSummary.consequences.modified.length} changed
-                        </p>
-                        <p>
-                          Remnants: +{diffSummary.remnantRules.added.length} / -
-                          {diffSummary.remnantRules.removed.length} · ~
-                          {diffSummary.remnantRules.modified.length} changed
                         </p>
                       </div>
                     ) : null}

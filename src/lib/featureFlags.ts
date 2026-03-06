@@ -9,13 +9,11 @@ export type FeatureFlags = {
   askOfferBoardEnabled: boolean;
   buddySystemEnabled: boolean;
   afterActionCompareEnabled: boolean;
-  remnantSystemEnabled: boolean;
   contentStudioLiteEnabled: boolean;
   contentStudioGraphEnabled: boolean;
   contentStudioPreviewEnabled: boolean;
   contentStudioHistoryEnabled: boolean;
   contentStudioPublishEnabled: boolean;
-  contentStudioRemnantRulesEnabled: boolean;
   beatBufferEnabled: boolean;
   relationshipDebugEnabled: boolean;
 };
@@ -56,13 +54,11 @@ export function getFeatureFlags(): FeatureFlags {
           askOfferBoardEnabled: false,
           buddySystemEnabled: false,
           afterActionCompareEnabled: false,
-          remnantSystemEnabled: false,
           contentStudioLiteEnabled: true,
           contentStudioGraphEnabled: true,
           contentStudioPreviewEnabled: true,
           contentStudioHistoryEnabled: true,
           contentStudioPublishEnabled: false,
-          contentStudioRemnantRulesEnabled: false,
           beatBufferEnabled: true,
           relationshipDebugEnabled: true,
         }
@@ -77,13 +73,11 @@ export function getFeatureFlags(): FeatureFlags {
           askOfferBoardEnabled: true,
           buddySystemEnabled: true,
           afterActionCompareEnabled: true,
-          remnantSystemEnabled: true,
           contentStudioLiteEnabled: true,
           contentStudioGraphEnabled: true,
           contentStudioPreviewEnabled: true,
           contentStudioHistoryEnabled: true,
           contentStudioPublishEnabled: true,
-          contentStudioRemnantRulesEnabled: true,
           beatBufferEnabled: true,
           relationshipDebugEnabled: true,
         };
@@ -97,7 +91,6 @@ export function getFeatureFlags(): FeatureFlags {
         contentStudioPreviewEnabled: true,
         contentStudioHistoryEnabled: true,
         contentStudioPublishEnabled: true,
-        contentStudioRemnantRulesEnabled: true,
       }
     : {
         contentStudioLiteEnabled: false,
@@ -105,7 +98,6 @@ export function getFeatureFlags(): FeatureFlags {
         contentStudioPreviewEnabled: false,
         contentStudioHistoryEnabled: false,
         contentStudioPublishEnabled: false,
-        contentStudioRemnantRulesEnabled: false,
       };
 
   const overrides: Partial<FeatureFlags> = {
@@ -124,8 +116,6 @@ export function getFeatureFlags(): FeatureFlags {
       parseFlag(process.env.NEXT_PUBLIC_BUDDY_SYSTEM) ?? undefined,
     afterActionCompareEnabled:
       parseFlag(process.env.NEXT_PUBLIC_AFTER_ACTION_COMPARE) ?? undefined,
-    remnantSystemEnabled:
-      parseFlag(process.env.NEXT_PUBLIC_REMNANT_SYSTEM) ?? undefined,
     contentStudioLiteEnabled:
       parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_LITE) ?? undefined,
     contentStudioGraphEnabled:
@@ -136,9 +126,6 @@ export function getFeatureFlags(): FeatureFlags {
       parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_HISTORY) ?? undefined,
     contentStudioPublishEnabled:
       parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_PUBLISH) ?? undefined,
-    contentStudioRemnantRulesEnabled:
-      parseFlag(process.env.NEXT_PUBLIC_CONTENT_STUDIO_REMNANT_RULES) ??
-      undefined,
     beatBufferEnabled:
       parseFlag(process.env.NEXT_PUBLIC_BEAT_BUFFER) ?? undefined,
     relationshipDebugEnabled:

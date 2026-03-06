@@ -50,7 +50,6 @@ vi.mock("@/lib/featureFlags", () => ({
     alignment: true,
     arcs: true,
     resources: true,
-    remnantSystemEnabled: true,
     rookieCircleEnabled: false,
     askOfferBoardEnabled: false,
     buddySystemEnabled: false,
@@ -60,7 +59,6 @@ vi.mock("@/lib/featureFlags", () => ({
     contentStudioPreviewEnabled: false,
     contentStudioHistoryEnabled: false,
     contentStudioPublishEnabled: false,
-    contentStudioRemnantRulesEnabled: false,
   })),
 }));
 vi.mock("@/lib/dailyInteractions", () => ({

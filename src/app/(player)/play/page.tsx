@@ -58,12 +58,6 @@ import {
   submitRationale,
   type CompareSnapshot,
 } from "@/lib/afterActionCompare";
-import {
-  listRemnantDefinitions,
-  pickRemnantKeyForUnlock,
-  selectRemnant,
-  unlockRemnant,
-} from "@/lib/remnants";
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
 import { getArcOneState, bumpLifePressure, updateSkillFlag } from "@/core/arcOne/state";
 import {
@@ -77,7 +71,6 @@ import {
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
-import type { RemnantKey } from "@/types/remnants";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { TelemetryEvent } from "@/types/telemetry";
 import type {
@@ -260,17 +253,12 @@ export default function PlayPage() {
     null
   );
   const [compareSending, setCompareSending] = useState(false);
-  const [remnantState, setRemnantState] = useState<DailyRun["remnant"] | null>(
-    null
-  );
   const [testerEventLog, setTesterEventLog] = useState<TelemetryEvent[]>([]);
   const [runResetting, setRunResetting] = useState(false);
   const sessionIdRef = useRef(
     `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
   );
-  const remnantAppliedRef = useRef(false);
   const nextRunTrackedRef = useRef(false);
-  const remnantUnlockAttemptedRef = useRef(false);
   const firstChoiceTrackedRef = useRef(false);
   const [cohortRoster, setCohortRoster] = useState<{
     count: number;
@@ -308,7 +296,6 @@ export default function PlayPage() {
   const testerMode = useMemo(() => getAppMode().testerMode, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const featureFlags = useMemo(() => getFeatureFlags(), [featureFlagsVersion]);
-  const remnantDefinitions = useMemo(() => listRemnantDefinitions(), []);
   const testerNote = useMemo(
     () =>
       testerMessage("Tester: Set posture, allocate time, then pick a storylet.", {
@@ -726,7 +713,6 @@ export default function PlayPage() {
             rivalry: run.rivalry ?? null,
             cohortId: run.cohortId ?? null,
           });
-          setRemnantState(run.remnant ?? null);
           const ds =
             run.dailyState ?? (await fetchDailyState(bootstrapUserId));
           if (ds) {
@@ -775,8 +761,6 @@ export default function PlayPage() {
             alreadyCompletedToday: cadence.alreadyCompletedToday,
             seasonContext: null,
           });
-          setRemnantState(null);
-
           const day = cadence.dayIndex;
           const [ds, existingAllocation, existingRuns, candidates] = await Promise.all([
             fetchDailyState(bootstrapUserId),
@@ -1016,65 +1000,6 @@ export default function PlayPage() {
       active = false;
     };
   }, [featureFlags.buddySystemEnabled, cohortId, userId]);
-
-  useEffect(() => {
-    if (!featureFlags.remnantSystemEnabled) return;
-    if (dayIndex === 1 && !nextRunTrackedRef.current) {
-      trackWithSeason({ event_type: "next_run_started", day_index: dayIndex });
-      nextRunTrackedRef.current = true;
-    }
-  }, [featureFlags.remnantSystemEnabled, dayIndex]);
-
-  useEffect(() => {
-    if (!featureFlags.remnantSystemEnabled) return;
-    if (remnantState?.applied && !remnantAppliedRef.current) {
-      remnantAppliedRef.current = true;
-      trackWithSeason({
-        event_type: "remnant_applied",
-        day_index: dayIndex,
-        payload: { remnant_key: remnantState.active?.key ?? null },
-      });
-    }
-  }, [featureFlags.remnantSystemEnabled, remnantState, dayIndex]);
-
-  useEffect(() => {
-    if (!featureFlags.remnantSystemEnabled || !userId) return;
-    if (remnantState?.unlocked?.length) return;
-    if (remnantUnlockAttemptedRef.current) return;
-    remnantUnlockAttemptedRef.current = true;
-    const key = pickRemnantKeyForUnlock({
-      dailyState,
-      dayState: null,
-    });
-    unlockRemnant(userId, key).then((created) => {
-      if (!created) return;
-      const def = listRemnantDefinitions().find((rem) => rem.key === key) ?? null;
-      if (def) {
-        setRemnantState({
-          unlocked: [def],
-          active: remnantState?.active ?? null,
-          applied: false,
-        });
-        trackWithSeason({
-          event_type: "remnant_discovered",
-          day_index: dayIndex,
-          payload: { remnant_key: key },
-        });
-        trackWithSeason({
-          event_type: "remnant_earned",
-          day_index: dayIndex,
-          payload: { remnant_key: key },
-        });
-      }
-    });
-  }, [
-    featureFlags.remnantSystemEnabled,
-    userId,
-    dailyState,
-    dayState,
-    remnantState,
-    dayIndex,
-  ]);
 
   useEffect(() => {
     if (!userId || loading) return;
@@ -1982,23 +1907,6 @@ export default function PlayPage() {
     setCompareSending(false);
   };
 
-  const handleSelectRemnant = async (key: RemnantKey) => {
-    if (!userId) return;
-    const ok = await selectRemnant(userId, key);
-    if (!ok) return;
-    const def = remnantDefinitions.find((rem) => rem.key === key) ?? null;
-    setRemnantState((prev) => ({
-      unlocked: prev?.unlocked ?? [],
-      active: def,
-      applied: prev?.applied ?? false,
-    }));
-    trackWithSeason({
-      event_type: "remnant_selected",
-      day_index: dayIndex,
-      payload: { remnant_key: key },
-    });
-  };
-
   const handleRunReset = async () => {
     setRunResetting(true);
     setError(null);
@@ -2897,54 +2805,6 @@ export default function PlayPage() {
                       />
                     </section>
                     )}
-
-
-                  {featureFlags.remnantSystemEnabled && (
-                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
-                      <div>
-                        <h2 className="text-xl font-semibold">Remnant reveal</h2>
-                        <p className="text-sm text-slate-600">
-                          One fragment carries into the next run.
-                        </p>
-                      </div>
-                      {remnantState?.unlocked?.length ? (
-                        <div className="space-y-3">
-                          {remnantState.unlocked.map((remnant) => {
-                            const selected = remnantState.active?.key === remnant.key;
-                            return (
-                              <div
-                                key={remnant.key}
-                                className="rounded-md border border-slate-200 px-3 py-3"
-                              >
-                                <p className="font-semibold text-slate-900">
-                                  {remnant.name}
-                                </p>
-                                <p className="text-sm text-slate-600">
-                                  {remnant.description}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {remnant.effect}
-                                </p>
-                                <Button
-                                  variant={selected ? "secondary" : "outline"}
-                                  onClick={() =>
-                                    handleSelectRemnant(remnant.key as RemnantKey)
-                                  }
-                                  className="mt-2"
-                                >
-                                  {selected ? "Selected" : "Select remnant"}
-                                </Button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-slate-600">
-                          No remnant yet. Stay with the thread a little longer.
-                        </p>
-                      )}
-                    </section>
-                  )}
 
 
               {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && arcOneReflectionReady ? (
