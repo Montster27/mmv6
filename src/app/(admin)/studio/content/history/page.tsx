@@ -15,6 +15,7 @@ export default function HistoryPage() {
   const [publishNote, setPublishNote] = useState("");
   const [publishState, setPublishState] = useState<"idle" | "saving" | "saved">("idle");
   const [rollbackState, setRollbackState] = useState<"idle" | "saving">("idle");
+  const [rollbackError, setRollbackError] = useState<string | null>(null);
 
   useEffect(() => {
     loadVersions();
@@ -38,9 +39,14 @@ export default function HistoryPage() {
   async function handleRollback(version: ContentVersion) {
     if (!confirm(`Roll back to version ${version.version_id.slice(0, 8)}?`)) return;
     setRollbackState("saving");
-    await rollbackVersion(version.version_id);
+    setRollbackError(null);
+    const result = await rollbackVersion(version.version_id);
     setRollbackState("idle");
-    await loadVersions();
+    if (result.ok) {
+      await loadVersions();
+    } else {
+      setRollbackError(result.error ?? "Rollback failed");
+    }
   }
 
   return (
@@ -79,6 +85,12 @@ export default function HistoryPage() {
                 </Button>
               </div>
             </div>
+          )}
+
+          {rollbackError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+              Rollback failed: {rollbackError}
+            </p>
           )}
 
           {loading ? (
