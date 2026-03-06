@@ -62,3 +62,22 @@ export async function PUT(
 
   return NextResponse.json({ ok: true });
 }
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const user = await ensureContentStudioAccess(request);
+  if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+  const { id } = await context.params;
+  const admin = getAdminClient();
+  const { error } = await admin.from("arc_definitions").delete().eq("id", id);
+
+  if (error) {
+    console.error("Failed to delete arc definition", error);
+    return NextResponse.json({ error: "Failed to delete arc definition" }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
