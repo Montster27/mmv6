@@ -128,11 +128,13 @@ const KNOWN_REQUIREMENT_KEYS = new Set([
   "max_total_runs",
   "requires_npc_met",
   "requires_npc_not_met",
+  "requires_not_precluded",
   // Resource gates
   "requires_cash_min",
   "requires_knowledge_min",
   "requires_social_leverage_min",
   "requires_physical_resilience_min",
+  "requires_money_band",
 ]);
 
 const RESOURCE_GATE_KEYS = new Set([

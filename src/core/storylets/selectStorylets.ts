@@ -2,7 +2,6 @@ import type { DailyState } from "@/types/daily";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 import type { StoryletContext } from "@/core/engine/storyletContext";
 import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
-import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { pctInRollout } from "@/core/eligibility/rollout";
 
 type Requirements = {
@@ -468,15 +467,6 @@ export function selectStorylets({
       );
     });
     picked.push(...pickTop(remaining, seed, 3 - picked.length, context));
-  }
-
-  if (picked.length === 0) {
-    return [];
-  }
-
-  // If still fewer than 3, duplicate fallback to keep length 3 for UI simplicity.
-  while (picked.length < 3) {
-    picked.push(fallbackStorylet());
   }
 
   return picked.slice(0, 3);
