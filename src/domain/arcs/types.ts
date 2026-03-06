@@ -46,6 +46,15 @@ export type ArcStepOption = {
   rewards?: ResourceDelta;
   next_step_key?: string | null;
   outcome_type?: "success" | "fail" | "neutral";
+  /**
+   * Transition the named stream to a new FSM state when this option is chosen.
+   * Example: { stream: "roommate", state: "genuine_connection" }
+   */
+  sets_stream_state?: { stream: string; state: string };
+  /**
+   * Mark the named opportunity type as expired when this option is chosen.
+   */
+  sets_expired_opportunity?: "academic" | "social" | "financial";
 };
 
 export type ArcStep = {

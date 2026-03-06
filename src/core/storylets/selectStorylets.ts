@@ -46,6 +46,12 @@ type Requirements = {
   requires_knowledge_min?: number;
   requires_social_leverage_min?: number;
   requires_physical_resilience_min?: number;
+  /**
+   * Arc One money band gate. Storylet only surfaces when the player's
+   * current money_band matches one of the listed values.
+   * Values: "tight" | "okay" | "comfortable"
+   */
+  requires_money_band?: Array<"tight" | "okay" | "comfortable">;
   [key: string]: unknown;
 };
 
@@ -142,6 +148,13 @@ function meetsRequirements(
     }
     if (typeof req.requires_physical_resilience_min === "number") {
       if ((resourceSnapshot?.physicalResilience ?? 0) < req.requires_physical_resilience_min) return false;
+    }
+    // Money band gate: storylet only surfaces when player's current band matches
+    if (Array.isArray(req.requires_money_band) && req.requires_money_band.length > 0) {
+      const band = (dailyState as any)?.money_band as string | undefined;
+      if (!band || !req.requires_money_band.includes(band as "tight" | "okay" | "comfortable")) {
+        return false;
+      }
     }
   }
 

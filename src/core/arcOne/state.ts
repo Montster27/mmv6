@@ -9,6 +9,7 @@ import type {
   SkillFlags,
   RelationshipState,
 } from "@/core/arcOne/types";
+import { normalizeStreamStates } from "@/core/arcOne/streamState";
 
 const DEFAULT_LIFE_PRESSURE: LifePressureState = {
   risk: 0,
@@ -160,6 +161,7 @@ export function getArcOneState(dailyState: DailyState | null): ArcOneState {
     expiredOpportunities: normalizeExpired(dailyState?.expired_opportunities),
     replayIntention: normalizeReplayIntention(dailyState?.replay_intention),
     reflectionDone: Boolean(dailyState?.arc_one_reflection_done),
+    streamStates: normalizeStreamStates(dailyState?.stream_states),
   };
 }
 

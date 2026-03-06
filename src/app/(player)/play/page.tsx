@@ -92,6 +92,9 @@ import { getFeatureFlags } from "@/lib/featureFlags";
 import { useBootstrap } from "@/hooks/queries/useBootstrap";
 import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
+import { ArcBeatCard } from "@/components/play/ArcBeatCard";
+import type { ArcBeat } from "@/types/dailyRun";
+import type { ArcStepOption } from "@/domain/arcs/types";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -264,6 +267,9 @@ export default function PlayPage() {
     count: number;
     handles: string[];
   } | null>(null);
+  const [resolvedArcBeatIds, setResolvedArcBeatIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
@@ -389,6 +395,10 @@ export default function PlayPage() {
   const arcOneState = useMemo(
     () => (arcOneMode ? getArcOneState(dailyState) : null),
     [arcOneMode, dailyState]
+  );
+  const arcBeats = useMemo(
+    () => dailyRunQuery.data?.arcBeats ?? [],
+    [dailyRunQuery.data?.arcBeats]
   );
   const relationshipsState = useMemo(
     () => arcOneState?.relationships ?? {},
@@ -1970,6 +1980,34 @@ export default function PlayPage() {
     }
   };
 
+  const handleArcBeatChoice = useCallback(
+    async (beat: ArcBeat, option: ArcStepOption) => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("No session");
+
+      const res = await fetch("/api/arc-one/beat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          instance_id: beat.instance_id,
+          option_key: option.option_key,
+          day_index: dayIndex,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? "Request failed");
+      }
+      setResolvedArcBeatIds((prev) => new Set([...prev, beat.instance_id]));
+      setRefreshTick((t) => t + 1);
+    },
+    [dayIndex]
+  );
+
   const handleAllocateSkillPoint = async (skillKey: string) => {
     if (!userId) return;
     setError(null);
@@ -2806,6 +2844,25 @@ export default function PlayPage() {
                     </section>
                     )}
 
+                  {USE_DAILY_LOOP_ORCHESTRATOR &&
+                    arcOneMode &&
+                    arcBeats.filter((b) => !resolvedArcBeatIds.has(b.instance_id)).length > 0 && (
+                    <section className="space-y-3">
+                      <h2 className="text-sm font-medium uppercase tracking-wider text-gray-500">
+                        Today&apos;s Moments
+                      </h2>
+                      {arcBeats
+                        .filter((b) => !resolvedArcBeatIds.has(b.instance_id))
+                        .map((beat) => (
+                          <ArcBeatCard
+                            key={beat.instance_id}
+                            beat={beat}
+                            dayIndex={dayIndex}
+                            onChoice={handleArcBeatChoice}
+                          />
+                        ))}
+                    </section>
+                  )}
 
               {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && arcOneReflectionReady ? (
                 <section className="space-y-3">
