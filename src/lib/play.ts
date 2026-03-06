@@ -627,6 +627,20 @@ export async function applyOutcomeForChoice(
     dailyState,
     resolvedOutcome
   );
+
+  // Merge costs_resource deduction into appliedDeltas.resources so it is
+  // persisted and reflected in the UI alongside outcome resource grants.
+  const costsResource = (choice as any).costs_resource as
+    | { key: string; amount: number }
+    | undefined;
+  if (costsResource?.key && typeof costsResource.amount === "number") {
+    const existing = (appliedDeltas.resources ?? {}) as Record<string, number>;
+    appliedDeltas.resources = {
+      ...existing,
+      [costsResource.key]: (existing[costsResource.key] ?? 0) - costsResource.amount,
+    };
+  }
+
   await updateDailyState(userId, nextDailyState);
 
   if (

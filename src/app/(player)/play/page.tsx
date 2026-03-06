@@ -2895,6 +2895,28 @@ export default function PlayPage() {
                                               )
                                             )
                                           : null}
+                                        {featureFlags.resources && outcomeDeltas.resources
+                                          ? Object.entries(outcomeDeltas.resources)
+                                              .filter(
+                                                ([, delta]) =>
+                                                  typeof delta === "number" && delta !== 0
+                                              )
+                                              .map(([key, delta]) => {
+                                                const LABELS: Record<string, string> = {
+                                                  cashOnHand: "cash",
+                                                  knowledge: "knowledge",
+                                                  socialLeverage: "social leverage",
+                                                  physicalResilience: "resilience",
+                                                };
+                                                return (
+                                                  <li key={key}>
+                                                    {LABELS[key] ?? key}{" "}
+                                                    {(delta as number) >= 0 ? "+" : ""}
+                                                    {delta}
+                                                  </li>
+                                                );
+                                              })
+                                          : null}
                                       </ul>
                                     ) : null}
                                     {lastCheck ? (
