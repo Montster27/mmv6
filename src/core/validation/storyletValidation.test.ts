@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   coerceStoryletRow,
-  fallbackStorylet,
   validateStorylet,
   validateStoryletIssues,
 } from "./storyletValidation";
@@ -35,12 +34,6 @@ describe("storyletValidation", () => {
     const coerced = coerceStoryletRow({ ...valid, choices: null });
     expect(Array.isArray(coerced.choices)).toBe(true);
     expect(coerced.choices.length).toBe(0);
-  });
-
-  it("returns a fallback storylet", () => {
-    const fb = fallbackStorylet();
-    expect(fb.title.includes("Corrupted")).toBe(true);
-    expect(fb.choices[0]?.id).toBe("continue");
   });
 
   it("accepts probabilistic outcomes with weights", () => {

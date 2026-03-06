@@ -53,7 +53,6 @@ import { selectStorylets } from "../src/core/storylets/selectStorylets";
 import {
   coerceStoryletRow,
   validateStorylet,
-  fallbackStorylet,
 } from "../src/core/validation/storyletValidation";
 import {
   applyRelationshipEvents,
@@ -185,22 +184,20 @@ async function fetchArcOneStorylets(db: DB): Promise<Storylet[]> {
 
   if (error) throw new Error(`fetchArcOneStorylets: ${error.message}`);
 
-  return (data ?? [])
-    .map((row: any) => {
-      const choices = Array.isArray(row.choices)
-        ? row.choices
-        : typeof row.choices === "string"
-          ? (() => { try { return JSON.parse(row.choices); } catch { return []; } })()
-          : [];
-      const coerced = coerceStoryletRow({ ...row, choices });
-      const validated = validateStorylet(coerced);
-      if (!validated.ok) {
-        console.warn(`  ⚠ Invalid storylet row (${row.slug}): ${validated.errors}`);
-        return fallbackStorylet();
-      }
-      return validated.value;
-    })
-    .filter((s: Storylet) => s.slug !== "corrupted-storylet");
+  return (data ?? []).flatMap((row: any) => {
+    const choices = Array.isArray(row.choices)
+      ? row.choices
+      : typeof row.choices === "string"
+        ? (() => { try { return JSON.parse(row.choices); } catch { return []; } })()
+        : [];
+    const coerced = coerceStoryletRow({ ...row, choices });
+    const validated = validateStorylet(coerced);
+    if (!validated.ok) {
+      console.warn(`  ⚠ Invalid storylet row (${row.slug}): ${validated.errors}`);
+      return [];
+    }
+    return [validated.value];
+  });
 }
 
 async function fetchDailyState(db: DB, userId: string): Promise<DailyState | null> {

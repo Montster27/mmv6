@@ -81,17 +81,6 @@ vi.mock("@/core/storylets/selectStorylets", () => ({
   selectStorylets: vi.fn(),
 }));
 
-vi.mock("@/core/validation/storyletValidation", () => ({
-  fallbackStorylet: vi.fn(() => ({
-    id: "fallback",
-    slug: "fallback",
-    title: "Fallback",
-    body: "",
-    choices: [],
-    is_active: true,
-  })),
-}));
-
 vi.mock("@/lib/featureFlags", () => ({
   getFeatureFlags: vi.fn(() => ({
     skills: true,

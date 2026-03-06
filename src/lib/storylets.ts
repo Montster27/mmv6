@@ -1,7 +1,6 @@
 import { supabase } from "@/lib/supabase/browser";
 import {
   coerceStoryletRow,
-  fallbackStorylet,
   validateStorylet,
 } from "@/core/validation/storyletValidation";
 import type { Storylet } from "@/types/storylets";
@@ -21,12 +20,12 @@ export async function fetchActiveStorylets(): Promise<Storylet[]> {
   }
 
   return (
-    data?.map((row) => {
+    data?.flatMap((row) => {
       const coerced = coerceStoryletRow(row);
       const validated = validateStorylet(coerced);
-      if (validated.ok) return validated.value;
-      console.warn("Invalid storylet row; using fallback", validated.errors);
-      return fallbackStorylet();
+      if (validated.ok) return [validated.value];
+      console.warn("Invalid storylet row; skipping", validated.errors);
+      return [];
     }) ?? []
   );
 }

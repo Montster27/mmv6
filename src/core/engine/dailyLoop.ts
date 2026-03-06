@@ -8,7 +8,6 @@ import {
   fetchRecentStoryletRuns,
 } from "@/lib/play";
 import { getReflection, isReflectionDone } from "@/lib/reflections";
-import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { selectStorylets } from "@/core/storylets/selectStorylets";
 import { performSeasonReset } from "@/core/season/seasonReset";
 import { getSeasonContext } from "@/core/season/getSeasonContext";
@@ -273,8 +272,7 @@ export async function getOrCreateDailyRun(
   });
 
   const entrySlug = "s1_dorm_wake_dislocation";
-  let storylets =
-    storyletsSelected.length > 0 ? storyletsSelected : [fallbackStorylet()];
+  let storylets = storyletsSelected;
 
   const shouldForceEntry =
     featureFlags.arcOneScarcityEnabled &&
@@ -531,9 +529,7 @@ export async function getOrCreateDailyRun(
     stage,
     allocation: allocation ?? null,
     allocationSeed,
-    storylets: hasStorylets
-      ? storylets
-      : [fallbackStorylet(), fallbackStorylet(), fallbackStorylet()],
+    storylets,
     storyletRunsToday: runs,
     tensions,
     skillBank: featureFlags.skills ? skillBank : null,

@@ -744,17 +744,6 @@ export function validateStoryletIssues(
   return { errors, warnings };
 }
 
-export function fallbackStorylet(): Storylet {
-  return {
-    id: "corrupted-storylet",
-    slug: "corrupted-storylet",
-    title: "Corrupted Storylet",
-    body: "This event could not be loaded. Please continue.",
-    choices: [{ id: "continue", label: "Continue" }],
-    is_active: false,
-  };
-}
-
 export function validateArcDefinitions(storylets: Storylet[]) {
   void storylets;
   return [];

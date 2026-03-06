@@ -4,7 +4,6 @@ import type { Storylet, StoryletChoice, StoryletRun, StoryletOutcome } from "@/t
 import type { JsonObject } from "@/types/vectors";
 import {
   coerceStoryletRow,
-  fallbackStorylet,
   validateStorylet,
 } from "@/core/validation/storyletValidation";
 import { applyOutcomeToDailyState, type AppliedDeltas } from "@/core/engine/applyOutcome";
@@ -127,8 +126,8 @@ export async function fetchStoryletBySlug(
   const row = coerceStoryletRow(data);
   const validated = validateStorylet(row);
   if (!validated.ok) {
-    console.warn("Invalid storylet row; using fallback", validated.errors);
-    return fallbackStorylet();
+    console.warn("Invalid storylet row; skipping", validated.errors);
+    return null;
   }
   return validated.value;
 }
@@ -303,15 +302,15 @@ export async function fetchTodayStoryletCandidates(
     }
 
     return (
-      data?.map((item) => {
+      data?.flatMap((item) => {
         const coerced = coerceStoryletRow({
           ...item,
           choices: parseChoices(item.choices),
         });
         const validated = validateStorylet(coerced);
-        if (validated.ok) return validated.value;
-        console.warn("Invalid storylet row; using fallback", validated.errors);
-        return fallbackStorylet();
+        if (validated.ok) return [validated.value];
+        console.warn("Invalid storylet row; skipping", validated.errors);
+        return [];
       }) ?? []
     );
   };
