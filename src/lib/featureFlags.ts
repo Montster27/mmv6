@@ -65,7 +65,7 @@ export function getFeatureFlags(): FeatureFlags {
       ? {
           arcOneScarcityEnabled: true,
           arcs: true,
-          resources: false,
+          resources: true,
           skills: true,
           alignment: false,
           funPulse: false,
@@ -88,7 +88,7 @@ export function getFeatureFlags(): FeatureFlags {
       : {
           arcOneScarcityEnabled: true,
           arcs: true,
-          resources: false,
+          resources: true,
           skills: true,
           alignment: false,
           funPulse: false,

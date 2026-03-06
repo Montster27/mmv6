@@ -2730,7 +2730,7 @@ export default function PlayPage() {
                       savingAllocation={savingAllocation}
                       onAllocationChange={handleAllocationChange}
                       onSave={handleSaveAllocation}
-                      resourcesEnabled={featureFlags.resources && !arcOneMode}
+                      resourcesEnabled={featureFlags.resources}
                     />
                   )}
 
@@ -3103,9 +3103,9 @@ export default function PlayPage() {
                   skillBank={skillBank}
                   lastAppliedDeltas={outcomeDeltas}
                   skills={skills}
-                  resourcesEnabled={featureFlags.resources && !arcOneMode}
+                  resourcesEnabled={featureFlags.resources}
                   skillsEnabled={skillUiEnabled}
-                  scarcityMode={arcOneMode}
+                  scarcityMode={arcOneMode && !featureFlags.resources}
                   energyLevel={arcOneState?.energyLevel}
                   onResourcesHoverStart={() => startHover("resources_panel")}
                   onResourcesHoverEnd={() => endHover("resources_panel")}
