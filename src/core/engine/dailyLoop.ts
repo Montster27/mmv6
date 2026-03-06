@@ -61,7 +61,11 @@ import { getArcOneState } from "@/core/arcOne/state";
 import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
 import { computeMorale } from "@/core/resources/resourceDelta";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
-import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
+import { selectArcBeats, buildInitialArcInstances } from "@/core/arcs/selectArcBeats";
+import { ARC_ONE_STREAM_KEYS, ARC_KEY_TO_STREAM_ID } from "@/types/arcOneStreams";
+import { supabase } from "@/lib/supabase/browser";
+import type { DailyRun, DailyRunStage, ArcBeat } from "@/types/dailyRun";
+import type { ArcDefinition, ArcInstance, ArcStep } from "@/domain/arcs/types";
 
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -394,6 +398,115 @@ export async function getOrCreateDailyRun(
 
   const availableArcs: DailyRun["availableArcs"] = [];
 
+  // ---------------------------------------------------------------------------
+  // Arc One beat scheduler
+  // ---------------------------------------------------------------------------
+  let arcBeats: ArcBeat[] = [];
+  if (arcOneMode) {
+    try {
+      // 1. Load the six Arc One arc definitions
+      const { data: arcDefs } = await supabase
+        .from("arc_definitions")
+        .select("id,key,title,description,tags,is_enabled")
+        .in("key", ARC_ONE_STREAM_KEYS)
+        .eq("is_enabled", true);
+
+      const streamArcs: ArcDefinition[] = (arcDefs ?? []).map((r) => ({
+        id: r.id,
+        key: r.key,
+        title: r.title,
+        description: r.description,
+        tags: Array.isArray(r.tags) ? r.tags : [],
+        is_enabled: Boolean(r.is_enabled),
+      }));
+
+      if (streamArcs.length > 0) {
+        const arcIds = streamArcs.map((a) => a.id);
+
+        // 2. Load steps for these arcs
+        const { data: stepRows } = await supabase
+          .from("arc_steps")
+          .select("id,arc_id,step_key,order_index,title,body,options,default_next_step_key,due_offset_days,expires_after_days")
+          .in("arc_id", arcIds)
+          .order("order_index");
+
+        const streamSteps: ArcStep[] = (stepRows ?? []).map((r) => ({
+          id: r.id,
+          arc_id: r.arc_id,
+          step_key: r.step_key,
+          order_index: r.order_index,
+          title: r.title,
+          body: r.body,
+          options: Array.isArray(r.options) ? r.options : [],
+          default_next_step_key: r.default_next_step_key ?? null,
+          due_offset_days: r.due_offset_days,
+          expires_after_days: r.expires_after_days,
+        }));
+
+        // 3. Load or create arc instances for this user
+        const { data: instanceRows } = await supabase
+          .from("arc_instances")
+          .select("id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key")
+          .eq("user_id", userId)
+          .in("arc_id", arcIds);
+
+        let instances: ArcInstance[] = (instanceRows ?? []).map((r) => ({
+          id: r.id,
+          user_id: r.user_id,
+          arc_id: r.arc_id,
+          state: r.state as ArcInstance["state"],
+          current_step_key: r.current_step_key,
+          step_due_day: r.step_due_day,
+          step_defer_count: r.step_defer_count,
+          started_day: r.started_day,
+          updated_day: r.updated_day,
+          completed_day: r.completed_day ?? null,
+          failure_reason: r.failure_reason ?? null,
+          branch_key: r.branch_key ?? null,
+        }));
+
+        // 4. On day 1 (or whenever there are no instances yet), create them
+        if (instances.length === 0 && streamSteps.length > 0) {
+          const toInsert = buildInitialArcInstances(userId, streamArcs, streamSteps, dayIndex);
+          if (toInsert.length > 0) {
+            const { data: inserted } = await supabase
+              .from("arc_instances")
+              .insert(toInsert)
+              .select("id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key");
+            instances = (inserted ?? []).map((r) => ({
+              id: r.id,
+              user_id: r.user_id,
+              arc_id: r.arc_id,
+              state: r.state as ArcInstance["state"],
+              current_step_key: r.current_step_key,
+              step_due_day: r.step_due_day,
+              step_defer_count: r.step_defer_count,
+              started_day: r.started_day,
+              updated_day: r.updated_day,
+              completed_day: r.completed_day ?? null,
+              failure_reason: r.failure_reason ?? null,
+              branch_key: r.branch_key ?? null,
+            }));
+          }
+        }
+
+        // 5. Select due beats and format for DailyRun
+        const dueSteps = selectArcBeats({ dayIndex, instances, steps: streamSteps, arcs: streamArcs });
+        arcBeats = dueSteps.map((due) => ({
+          instance_id: due.instance.id,
+          arc_key: due.arc.key,
+          stream_id: ARC_KEY_TO_STREAM_ID[due.arc.key] ?? due.arc.key.replace("arc_", ""),
+          title: due.step.title,
+          body: due.step.body,
+          options: due.step.options,
+          expires_on_day: due.expires_on_day,
+        }));
+      }
+    } catch (err) {
+      console.error("[daily-run] Failed to load arc beats", err);
+    }
+  }
+
   const { weekStart, weekEnd } = computeWeekWindow(dayIndex);
   const [worldInfluence, cohortInfluence, rivalrySnapshot] = await Promise.all([
     featureFlags.alignment
@@ -482,6 +595,7 @@ export async function getOrCreateDailyRun(
       }
       : null,
     arcOneState: arcOneState ?? undefined,
+    arcBeats: arcBeats.length > 0 ? arcBeats : undefined,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
     seasonRecap: seasonResetNeeded ? seasonRecap : undefined,

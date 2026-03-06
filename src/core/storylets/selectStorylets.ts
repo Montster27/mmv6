@@ -2,7 +2,6 @@ import type { DailyState } from "@/types/daily";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 import type { StoryletContext } from "@/core/engine/storyletContext";
 import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
-import { fallbackStorylet } from "@/core/validation/storyletValidation";
 import { pctInRollout } from "@/core/eligibility/rollout";
 
 type Requirements = {
@@ -46,6 +45,12 @@ type Requirements = {
   requires_knowledge_min?: number;
   requires_social_leverage_min?: number;
   requires_physical_resilience_min?: number;
+  /**
+   * Arc One money band gate. Storylet only surfaces when the player's
+   * current money_band matches one of the listed values.
+   * Values: "tight" | "okay" | "comfortable"
+   */
+  requires_money_band?: Array<"tight" | "okay" | "comfortable">;
   [key: string]: unknown;
 };
 
@@ -142,6 +147,13 @@ function meetsRequirements(
     }
     if (typeof req.requires_physical_resilience_min === "number") {
       if ((resourceSnapshot?.physicalResilience ?? 0) < req.requires_physical_resilience_min) return false;
+    }
+    // Money band gate: storylet only surfaces when player's current band matches
+    if (Array.isArray(req.requires_money_band) && req.requires_money_band.length > 0) {
+      const band = (dailyState as any)?.money_band as string | undefined;
+      if (!band || !req.requires_money_band.includes(band as "tight" | "okay" | "comfortable")) {
+        return false;
+      }
     }
   }
 
@@ -455,15 +467,6 @@ export function selectStorylets({
       );
     });
     picked.push(...pickTop(remaining, seed, 3 - picked.length, context));
-  }
-
-  if (picked.length === 0) {
-    return [];
-  }
-
-  // If still fewer than 3, duplicate fallback to keep length 3 for UI simplicity.
-  while (picked.length < 3) {
-    picked.push(fallbackStorylet());
   }
 
   return picked.slice(0, 3);

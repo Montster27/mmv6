@@ -12,6 +12,19 @@ import type { Initiative } from "./initiatives";
 import type { AlignmentEvent, Faction } from "./factions";
 import type { PlayerDayState } from "./dayState";
 import type { ArcOneState } from "@/core/arcOne/types";
+import type { ArcStepOption } from "@/domain/arcs/types";
+
+/** A single arc narrative beat that is due today for the player. */
+export type ArcBeat = {
+  instance_id: string;
+  arc_key: string;
+  /** Which of the six streams this beat belongs to. */
+  stream_id: string;
+  title: string;
+  body: string;
+  options: ArcStepOption[];
+  expires_on_day: number;
+};
 
 export type DailyRunStage =
   | "setup"
@@ -137,6 +150,8 @@ export type DailyRun = {
     | "total_fun"
   > | null;
   arcOneState?: ArcOneState;
+  /** Arc One narrative beats due today (one per stream, up to 2 shown). */
+  arcBeats?: ArcBeat[];
   lastCheck?: import("./checks").CheckResult | null;
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;

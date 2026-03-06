@@ -17,6 +17,7 @@ export type DailyState = {
   replay_intention?: JsonObject;
   arc_one_reflection_done?: boolean;
   preclusion_gates?: string[];
+  stream_states?: JsonObject;
   start_date?: string;
   last_day_completed?: string | null;
   last_day_index_completed?: number | null;

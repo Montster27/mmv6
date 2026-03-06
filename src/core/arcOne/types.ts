@@ -63,4 +63,6 @@ export type ArcOneState = {
   expiredOpportunities: ExpiredOpportunity[];
   replayIntention: ReplayIntention;
   reflectionDone: boolean;
+  /** Per-stream FSM states for the six Arc One narrative streams. */
+  streamStates?: import("@/types/arcOneStreams").StreamStates;
 };
