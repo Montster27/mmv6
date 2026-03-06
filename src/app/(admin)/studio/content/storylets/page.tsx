@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ function makeNewStorylet(): Omit<Storylet, "id"> {
   };
 }
 
-export default function StoryletsPage() {
+function StoryletsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -309,5 +309,13 @@ export default function StoryletsPage() {
         </div>
       )}
     </AuthGate>
+  );
+}
+
+export default function StoryletsPage() {
+  return (
+    <Suspense>
+      <StoryletsContent />
+    </Suspense>
   );
 }
