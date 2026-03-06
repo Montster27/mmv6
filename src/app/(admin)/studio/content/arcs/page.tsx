@@ -3,7 +3,153 @@
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
-import { useArcsAPI, type ArcDefinitionRow, type ArcStepRow } from "@/hooks/contentStudio/useArcsAPI";
+import {
+  useArcsAPI,
+  type ArcDefinitionRow,
+  type ArcStepRow,
+} from "@/hooks/contentStudio/useArcsAPI";
+
+// ── Step Editor ──────────────────────────────────────────────────────────────
+
+interface StepEditorProps {
+  step: ArcStepRow;
+  onSave: (updated: ArcStepRow) => Promise<void>;
+  onDelete: (step: ArcStepRow) => Promise<void>;
+  onClose: () => void;
+  saving: boolean;
+}
+
+function StepEditor({ step, onSave, onDelete, onClose, saving }: StepEditorProps) {
+  const [draft, setDraft] = useState<ArcStepRow>({ ...step });
+  const [optionsText, setOptionsText] = useState(
+    JSON.stringify(step.options ?? [], null, 2)
+  );
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+
+  function patch(updates: Partial<ArcStepRow>) {
+    setDraft((prev) => ({ ...prev, ...updates }));
+  }
+
+  function handleOptionsChange(raw: string) {
+    setOptionsText(raw);
+    try {
+      const parsed = JSON.parse(raw);
+      setDraft((prev) => ({ ...prev, options: parsed }));
+      setOptionsError(null);
+    } catch {
+      setOptionsError("Invalid JSON");
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-slate-800">
+          Editing step #{draft.order_index}: {draft.title || "untitled"}
+        </h4>
+        <button
+          type="button"
+          className="text-xs text-slate-400 hover:text-slate-700"
+          onClick={onClose}
+        >
+          ✕ Close
+        </button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-xs text-slate-600">
+          Step key
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs font-mono"
+            value={draft.step_key}
+            onChange={(e) => patch({ step_key: e.target.value })}
+          />
+        </label>
+        <label className="block text-xs text-slate-600">
+          Title
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            value={draft.title}
+            onChange={(e) => patch({ title: e.target.value })}
+          />
+        </label>
+        <label className="block text-xs text-slate-600">
+          Order index
+          <input
+            type="number"
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            value={draft.order_index}
+            onChange={(e) => patch({ order_index: Number(e.target.value) })}
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block text-xs text-slate-600">
+            Due offset (days)
+            <input
+              type="number"
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={draft.due_offset_days ?? ""}
+              onChange={(e) =>
+                patch({ due_offset_days: e.target.value ? Number(e.target.value) : 0 })
+              }
+            />
+          </label>
+          <label className="block text-xs text-slate-600">
+            Expires after (days)
+            <input
+              type="number"
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              value={draft.expires_after_days ?? ""}
+              onChange={(e) =>
+                patch({ expires_after_days: e.target.value ? Number(e.target.value) : 0 })
+              }
+            />
+          </label>
+        </div>
+      </div>
+
+      <label className="block text-xs text-slate-600">
+        Body
+        <textarea
+          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          rows={4}
+          value={draft.body}
+          onChange={(e) => patch({ body: e.target.value })}
+        />
+      </label>
+
+      <label className="block text-xs text-slate-600">
+        Options (JSON array)
+        {optionsError && (
+          <span className="ml-2 text-red-500">{optionsError}</span>
+        )}
+        <textarea
+          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 font-mono text-xs"
+          rows={6}
+          value={optionsText}
+          onChange={(e) => handleOptionsChange(e.target.value)}
+        />
+      </label>
+
+      <div className="flex gap-2">
+        <Button
+          onClick={() => onSave(draft)}
+          disabled={saving || !!optionsError}
+        >
+          {saving ? "Saving…" : "Save step"}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => onDelete(step)}
+        >
+          Delete step
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ArcsPage() {
   const {
@@ -13,40 +159,57 @@ export default function ArcsPage() {
     error,
     loadArcDefinitions,
     saveArcDefinition,
+    saveArcStep,
     deleteArcStep,
   } = useArcsAPI();
 
   const [selectedArc, setSelectedArc] = useState<ArcDefinitionRow | null>(null);
   const [arcDraft, setArcDraft] = useState<ArcDefinitionRow | null>(null);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [arcSaveState, setArcSaveState] = useState<"idle" | "saving" | "saved">("idle");
+
+  const [selectedStep, setSelectedStep] = useState<ArcStepRow | null>(null);
+  const [stepSaving, setStepSaving] = useState(false);
 
   useEffect(() => {
     loadArcDefinitions();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function selectArc(arc: ArcDefinitionRow) {
     setSelectedArc(arc);
     setArcDraft({ ...arc });
-    setSaveState("idle");
+    setArcSaveState("idle");
+    setSelectedStep(null);
   }
 
-  async function handleSave() {
+  async function handleSaveArc() {
     if (!arcDraft) return;
-    setSaveState("saving");
+    setArcSaveState("saving");
     const result = await saveArcDefinition(arcDraft);
     if (result.ok) {
-      setSaveState("saved");
-      setTimeout(() => setSaveState("idle"), 2000);
+      setArcSaveState("saved");
+      setTimeout(() => setArcSaveState("idle"), 2000);
       await loadArcDefinitions();
     } else {
-      setSaveState("idle");
+      setArcSaveState("idle");
+    }
+  }
+
+  async function handleSaveStep(updated: ArcStepRow) {
+    setStepSaving(true);
+    const result = await saveArcStep(updated);
+    setStepSaving(false);
+    if (result.ok) {
+      await loadArcDefinitions();
+      // Refresh selected step with updated data (order_index may have changed)
+      setSelectedStep(updated);
     }
   }
 
   async function handleDeleteStep(step: ArcStepRow) {
     if (!confirm(`Delete step "${step.title}"?`)) return;
     await deleteArcStep(step.id);
+    setSelectedStep(null);
     await loadArcDefinitions();
   }
 
@@ -62,7 +225,7 @@ export default function ArcsPage() {
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Narrative Arcs</h2>
               <p className="text-sm text-slate-600">
-                Arc definitions and their steps.
+                Arc definitions and their steps. Click a step to edit it.
               </p>
             </div>
             <Button variant="outline" onClick={loadArcDefinitions}>
@@ -110,7 +273,7 @@ export default function ArcsPage() {
               {error && <p className="text-sm text-red-600">{error}</p>}
             </div>
 
-            {/* Arc editor */}
+            {/* Right panel */}
             <div>
               {!arcDraft ? (
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
@@ -124,7 +287,7 @@ export default function ArcsPage() {
                       <label className="block text-sm text-slate-700">
                         Key
                         <input
-                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono"
+                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono bg-slate-50"
                           value={arcDraft.key}
                           readOnly
                         />
@@ -163,10 +326,10 @@ export default function ArcsPage() {
                       Enabled
                     </label>
                     <div className="flex gap-2">
-                      <Button onClick={handleSave} disabled={saveState === "saving"}>
-                        {saveState === "saving"
+                      <Button onClick={handleSaveArc} disabled={arcSaveState === "saving"}>
+                        {arcSaveState === "saving"
                           ? "Saving…"
-                          : saveState === "saved"
+                          : arcSaveState === "saved"
                             ? "Saved ✓"
                             : "Save arc"}
                       </Button>
@@ -183,30 +346,53 @@ export default function ArcsPage() {
                     ) : (
                       <div className="space-y-2">
                         {stepsForArc.map((step) => (
-                          <div
-                            key={step.id}
-                            className="flex items-start justify-between gap-2 rounded-md border border-slate-200 px-3 py-2"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-400 shrink-0">
-                                  #{step.order_index}
-                                </span>
-                                <span className="text-sm font-medium text-slate-700 truncate">
-                                  {step.title}
-                                </span>
-                              </div>
-                              <div className="text-xs text-slate-500 font-mono">
-                                {step.step_key}
-                              </div>
-                            </div>
+                          <div key={step.id} className="space-y-2">
+                            {/* Step row */}
                             <button
                               type="button"
-                              className="text-xs text-red-400 hover:text-red-600 shrink-0"
-                              onClick={() => handleDeleteStep(step)}
+                              className={`w-full flex items-start gap-3 rounded-md border px-3 py-2 text-left transition ${
+                                selectedStep?.id === step.id
+                                  ? "border-indigo-400 bg-indigo-50"
+                                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                              }`}
+                              onClick={() =>
+                                setSelectedStep(
+                                  selectedStep?.id === step.id ? null : step
+                                )
+                              }
                             >
-                              Delete
+                              <span className="text-xs text-slate-400 shrink-0 mt-0.5">
+                                #{step.order_index}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-slate-700 truncate">
+                                  {step.title || "untitled"}
+                                </div>
+                                <div className="text-xs text-slate-500 font-mono">
+                                  {step.step_key}
+                                </div>
+                                {step.body && (
+                                  <div className="text-xs text-slate-400 truncate mt-0.5">
+                                    {step.body.slice(0, 80)}
+                                    {step.body.length > 80 ? "…" : ""}
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-xs text-slate-400 shrink-0">
+                                {selectedStep?.id === step.id ? "▾" : "▸"}
+                              </span>
                             </button>
+
+                            {/* Inline step editor */}
+                            {selectedStep?.id === step.id && (
+                              <StepEditor
+                                step={selectedStep}
+                                onSave={handleSaveStep}
+                                onDelete={handleDeleteStep}
+                                onClose={() => setSelectedStep(null)}
+                                saving={stepSaving}
+                              />
+                            )}
                           </div>
                         ))}
                       </div>

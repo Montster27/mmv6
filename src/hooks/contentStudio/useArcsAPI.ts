@@ -73,6 +73,25 @@ export function useArcsAPI() {
     []
   );
 
+  const saveArcStep = useCallback(
+    async (step: ArcStepRow): Promise<{ ok: boolean; error?: string }> => {
+      const result = await apiRequest(`/api/admin/arc-steps/${step.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: step.title,
+          body: step.body,
+          step_key: step.step_key,
+          order_index: step.order_index,
+          due_offset_days: step.due_offset_days,
+          expires_after_days: step.expires_after_days,
+          options: step.options,
+        }),
+      });
+      return { ok: result.ok, error: result.error };
+    },
+    []
+  );
+
   const deleteArcStep = useCallback(
     async (stepId: string): Promise<{ ok: boolean; error?: string }> => {
       const result = await apiRequest(`/api/admin/arc-steps/${stepId}`, {
@@ -90,6 +109,7 @@ export function useArcsAPI() {
     error,
     loadArcDefinitions,
     saveArcDefinition,
+    saveArcStep,
     deleteArcStep,
   };
 }
