@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   const userId = user.id;
   const featureFlags = getFeatureFlags();
   const useRookieCap =
-    featureFlags.rookieCircleEnabled || featureFlags.verticalSlice30Enabled;
+    featureFlags.rookieCircleEnabled;
   const cohortCap = useRookieCap ? ROOKIE_COHORT_CAP : DEFAULT_COHORT_CAP;
 
   // Check if user already has a cohort (using service role bypasses RLS)

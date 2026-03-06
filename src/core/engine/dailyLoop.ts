@@ -410,7 +410,7 @@ export async function getOrCreateDailyRun(
   // Setup is handled via auto-default posture above; no additional setup gate needed.
   const setupNeeded = false;
   const baseStage = computeStage(
-    arcOneMode ? true : Boolean(allocation),
+    Boolean(allocation) || (arcOneMode && !featureFlags.resources),
     runsForPair.length,
     cadence.alreadyCompletedToday,
     hasStorylets,

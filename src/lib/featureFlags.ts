@@ -5,7 +5,6 @@ export type FeatureFlags = {
   skills: boolean;
   alignment: boolean;
   funPulse: boolean;
-  verticalSlice30Enabled: boolean;
   rookieCircleEnabled: boolean;
   askOfferBoardEnabled: boolean;
   buddySystemEnabled: boolean;
@@ -42,23 +41,6 @@ function getOverrideFlags(): Partial<FeatureFlags> {
 
 export function getFeatureFlags(): FeatureFlags {
   const set = process.env.NEXT_PUBLIC_FEATURE_SET;
-  const verticalSliceFlag =
-    parseFlag(process.env.NEXT_PUBLIC_VERTICAL_SLICE_30) ?? true;
-  const sliceDefaults = verticalSliceFlag
-    ? {
-        rookieCircleEnabled: true,
-        askOfferBoardEnabled: true,
-        buddySystemEnabled: true,
-        afterActionCompareEnabled: true,
-        remnantSystemEnabled: true,
-      }
-    : {
-        rookieCircleEnabled: false,
-        askOfferBoardEnabled: false,
-        buddySystemEnabled: false,
-        afterActionCompareEnabled: false,
-        remnantSystemEnabled: false,
-      };
 
   const base: FeatureFlags =
     set === "muted"
@@ -69,8 +51,7 @@ export function getFeatureFlags(): FeatureFlags {
           skills: true,
           alignment: false,
           funPulse: false,
-          verticalSlice30Enabled: verticalSliceFlag,
-          // muted preset disables social/community features regardless of slice flag
+          // muted preset disables social/community features
           rookieCircleEnabled: false,
           askOfferBoardEnabled: false,
           buddySystemEnabled: false,
@@ -92,8 +73,11 @@ export function getFeatureFlags(): FeatureFlags {
           skills: true,
           alignment: false,
           funPulse: false,
-          verticalSlice30Enabled: verticalSliceFlag,
-          ...sliceDefaults,
+          rookieCircleEnabled: true,
+          askOfferBoardEnabled: true,
+          buddySystemEnabled: true,
+          afterActionCompareEnabled: true,
+          remnantSystemEnabled: true,
           contentStudioLiteEnabled: true,
           contentStudioGraphEnabled: true,
           contentStudioPreviewEnabled: true,
@@ -132,8 +116,6 @@ export function getFeatureFlags(): FeatureFlags {
     skills: parseFlag(process.env.NEXT_PUBLIC_FEATURE_SKILLS) ?? undefined,
     alignment: parseFlag(process.env.NEXT_PUBLIC_FEATURE_ALIGNMENT) ?? undefined,
     funPulse: parseFlag(process.env.NEXT_PUBLIC_FEATURE_FUN_PULSE) ?? undefined,
-    verticalSlice30Enabled:
-      parseFlag(process.env.NEXT_PUBLIC_VERTICAL_SLICE_30) ?? undefined,
     rookieCircleEnabled:
       parseFlag(process.env.NEXT_PUBLIC_ROOKIE_CIRCLE) ?? undefined,
     askOfferBoardEnabled:

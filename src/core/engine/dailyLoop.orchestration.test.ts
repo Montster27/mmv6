@@ -100,7 +100,6 @@ vi.mock("@/lib/featureFlags", () => ({
     arcs: true,
     resources: true,
     remnantSystemEnabled: true,
-    verticalSlice30Enabled: false,
     rookieCircleEnabled: false,
     askOfferBoardEnabled: false,
     buddySystemEnabled: false,

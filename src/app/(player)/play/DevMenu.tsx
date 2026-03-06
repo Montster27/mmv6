@@ -109,7 +109,6 @@ const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
   ["alignment", "Alignment/Directives"],
   ["funPulse", "Fun pulse"],
   ["contentStudioLiteEnabled", "Content Studio"],
-  ["verticalSlice30Enabled", "Vertical Slice 30"],
   ["rookieCircleEnabled", "Rookie Circle"],
   ["askOfferBoardEnabled", "Ask/Offer Board"],
   ["buddySystemEnabled", "Buddy System"],
@@ -214,24 +213,6 @@ export default function DevMenu({
       ...flagOverrides,
       [key]: !(flagOverrides[key] ?? flags[key]),
     };
-    if (
-      key === "verticalSlice30Enabled" &&
-      (nextOverrides.verticalSlice30Enabled ?? flags.verticalSlice30Enabled)
-    ) {
-      nextOverrides = {
-        ...nextOverrides,
-        rookieCircleEnabled:
-          flagOverrides.rookieCircleEnabled ?? flags.rookieCircleEnabled,
-        askOfferBoardEnabled:
-          flagOverrides.askOfferBoardEnabled ?? flags.askOfferBoardEnabled,
-        buddySystemEnabled:
-          flagOverrides.buddySystemEnabled ?? flags.buddySystemEnabled,
-        afterActionCompareEnabled:
-          flagOverrides.afterActionCompareEnabled ?? flags.afterActionCompareEnabled,
-        remnantSystemEnabled:
-          flagOverrides.remnantSystemEnabled ?? flags.remnantSystemEnabled,
-      };
-    }
     setFlagOverrides(nextOverrides);
     writeOverrides(nextOverrides, currentUserId);
     if (key === "contentStudioLiteEnabled") {
@@ -243,10 +224,6 @@ export default function DevMenu({
         contentStudioPublishEnabled: true,
         contentStudioRemnantRulesEnabled: true,
       };
-    }
-    if (key === "verticalSlice30Enabled") {
-      window.location.reload();
-      return;
     }
     onFlagsChanged?.();
   };

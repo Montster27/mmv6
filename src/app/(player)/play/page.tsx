@@ -277,61 +277,6 @@ export default function PlayPage() {
     handles: string[];
   } | null>(null);
 
-  const SLICE_PHASES_LOCAL = useMemo(
-    () => [
-      { id: "intro_hook", label: "Intro hook", window: [0, 3] as const },
-      { id: "guided_core_loop", label: "Guided core loop", window: [3, 10] as const },
-      { id: "reflection_arc", label: "Reflection arc", window: [10, 18] as const },
-      { id: "community_purpose", label: "Community purpose", window: [18, 24] as const },
-      { id: "remnant_reveal", label: "Remnant reveal", window: [24, 30] as const },
-    ],
-    []
-  );
-
-  const getSlicePhaseLocal = useCallback(
-    (params: {
-      elapsedMinutes: number;
-      allocationSaved: boolean;
-      storyletRuns: number;
-      reflectionDone: boolean;
-    }) => {
-      const {
-        elapsedMinutes,
-        allocationSaved,
-        storyletRuns,
-        reflectionDone,
-      } = params;
-
-      const timePhase =
-        elapsedMinutes < 3
-          ? "intro_hook"
-          : elapsedMinutes < 10
-            ? "guided_core_loop"
-            : elapsedMinutes < 18
-              ? "reflection_arc"
-              : elapsedMinutes < 24
-                ? "community_purpose"
-                : "remnant_reveal";
-
-      let criteriaPhase = "intro_hook";
-      if (allocationSaved) criteriaPhase = "guided_core_loop";
-      if (storyletRuns >= 1) criteriaPhase = "reflection_arc";
-      if (storyletRuns >= 2 || reflectionDone) criteriaPhase = "community_purpose";
-
-      const order = [
-        "intro_hook",
-        "guided_core_loop",
-        "reflection_arc",
-        "community_purpose",
-        "remnant_reveal",
-      ];
-      const timeIndex = order.indexOf(timePhase);
-      const criteriaIndex = order.indexOf(criteriaPhase);
-      return order[Math.max(timeIndex, criteriaIndex)] ?? "remnant_reveal";
-    },
-    []
-  );
-
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
     devIsAdmin ||
@@ -361,32 +306,8 @@ export default function PlayPage() {
   }, [bootstrapQuery.data, bootstrapQuery.isError]);
 
   const testerMode = useMemo(() => getAppMode().testerMode, []);
-  const phaseRef = useRef<string | null>(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const featureFlags = useMemo(() => getFeatureFlags(), [featureFlagsVersion]);
-  const slicePhaseId = useMemo(() => {
-    if (!featureFlags.verticalSlice30Enabled) return null;
-    return phaseRef.current;
-  }, [
-    featureFlags.verticalSlice30Enabled,
-    stage,
-    allocationSaved,
-    runs.length,
-  ]);
-  const slicePhaseLabel = useMemo(() => {
-    if (!featureFlags.verticalSlice30Enabled) return null;
-    const phaseId = phaseRef.current;
-    if (!phaseId) return null;
-    return (
-      SLICE_PHASES_LOCAL.find((phase) => phase.id === phaseId)?.label ?? phaseId
-    );
-  }, [
-    featureFlags.verticalSlice30Enabled,
-    stage,
-    allocationSaved,
-    runs.length,
-    SLICE_PHASES_LOCAL,
-  ]);
   const remnantDefinitions = useMemo(() => listRemnantDefinitions(), []);
   const testerNote = useMemo(
     () =>
@@ -1007,7 +928,6 @@ export default function PlayPage() {
       ...(params.payload ?? {}),
       ...(seasonIndexValue ? { season_index: seasonIndexValue } : {}),
       session_id: sessionIdRef.current,
-      phase: slicePhaseId ?? null,
       ...(cohortId ? { cohort_id: cohortId } : {}),
     };
     if (testerMode) {
@@ -1119,7 +1039,6 @@ export default function PlayPage() {
 
   useEffect(() => {
     if (!featureFlags.remnantSystemEnabled || !userId) return;
-    if (slicePhaseId !== "remnant_reveal") return;
     if (remnantState?.unlocked?.length) return;
     if (remnantUnlockAttemptedRef.current) return;
     remnantUnlockAttemptedRef.current = true;
@@ -1150,48 +1069,11 @@ export default function PlayPage() {
     });
   }, [
     featureFlags.remnantSystemEnabled,
-    slicePhaseId,
     userId,
     dailyState,
     dayState,
     remnantState,
     dayIndex,
-  ]);
-
-  useEffect(() => {
-    if (!featureFlags.verticalSlice30Enabled) return;
-    if (!sessionStartAtRef.current) return;
-    if (!userId || loading) return;
-    const elapsedMinutes = (Date.now() - sessionStartAtRef.current) / 60000;
-    const phase = getSlicePhaseLocal({
-      elapsedMinutes,
-      allocationSaved,
-      storyletRuns: runs.length,
-      reflectionDone: stage === "complete" || stage === "reflection",
-    });
-    if (phaseRef.current !== phase) {
-      if (phaseRef.current) {
-        trackWithSeason({
-          event_type: "phase_completed",
-          day_index: dayIndex,
-          stage: phaseRef.current,
-        });
-      }
-      phaseRef.current = phase;
-      trackWithSeason({
-        event_type: "phase_entered",
-        day_index: dayIndex,
-        stage: phase,
-      });
-    }
-  }, [
-    featureFlags.verticalSlice30Enabled,
-    userId,
-    loading,
-    dayIndex,
-    allocationSaved,
-    runs.length,
-    stage,
   ]);
 
   useEffect(() => {
@@ -2367,13 +2249,6 @@ export default function PlayPage() {
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
                 </TesterOnly>
-                {testerMode && slicePhaseLabel ? (
-                  <TesterOnly>
-                    <p className="text-xs text-slate-500">
-                      Phase: {slicePhaseLabel}
-                    </p>
-                  </TesterOnly>
-                ) : null}
                 {testerMode &&
                 featureFlags.rookieCircleEnabled &&
                 cohortId ? (
@@ -3024,8 +2899,7 @@ export default function PlayPage() {
                     )}
 
 
-                  {featureFlags.remnantSystemEnabled &&
-                    slicePhaseId === "remnant_reveal" && (
+                  {featureFlags.remnantSystemEnabled && (
                     <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
                       <div>
                         <h2 className="text-xl font-semibold">Remnant reveal</h2>
