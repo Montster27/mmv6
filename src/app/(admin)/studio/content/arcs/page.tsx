@@ -161,11 +161,13 @@ export default function ArcsPage() {
     saveArcDefinition,
     saveArcStep,
     deleteArcStep,
+    deleteArcDefinition,
   } = useArcsAPI();
 
   const [selectedArc, setSelectedArc] = useState<ArcDefinitionRow | null>(null);
   const [arcDraft, setArcDraft] = useState<ArcDefinitionRow | null>(null);
   const [arcSaveState, setArcSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [arcSaveError, setArcSaveError] = useState<string | null>(null);
 
   const [selectedStep, setSelectedStep] = useState<ArcStepRow | null>(null);
   const [stepSaving, setStepSaving] = useState(false);
@@ -185,6 +187,7 @@ export default function ArcsPage() {
   async function handleSaveArc() {
     if (!arcDraft) return;
     setArcSaveState("saving");
+    setArcSaveError(null);
     const result = await saveArcDefinition(arcDraft);
     if (result.ok) {
       setArcSaveState("saved");
@@ -192,6 +195,21 @@ export default function ArcsPage() {
       await loadArcDefinitions();
     } else {
       setArcSaveState("idle");
+      setArcSaveError(result.error ?? "Save failed");
+    }
+  }
+
+  async function handleDeleteArc() {
+    if (!selectedArc) return;
+    if (!confirm(`Delete arc "${selectedArc.title}"? This cannot be undone.`)) return;
+    const result = await deleteArcDefinition(selectedArc.id);
+    if (result.ok) {
+      setSelectedArc(null);
+      setArcDraft(null);
+      setArcSaveError(null);
+      await loadArcDefinitions();
+    } else {
+      setArcSaveError(result.error ?? "Delete failed");
     }
   }
 
@@ -325,7 +343,19 @@ export default function ArcsPage() {
                       />
                       Enabled
                     </label>
-                    <div className="flex gap-2">
+                    {arcSaveError && (
+                      <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+                        {arcSaveError}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={handleDeleteArc}
+                        className="rounded-md border border-red-300 px-4 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        Delete arc
+                      </button>
                       <Button onClick={handleSaveArc} disabled={arcSaveState === "saving"}>
                         {arcSaveState === "saving"
                           ? "Saving…"

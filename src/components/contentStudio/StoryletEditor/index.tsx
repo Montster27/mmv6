@@ -15,6 +15,7 @@ interface StoryletEditorProps {
   allTags?: string[];
   storyletOptions?: { value: string; label?: string }[];
   onSave: (updated: Storylet) => Promise<void>;
+  onDelete?: () => Promise<void>;
   onCancel?: () => void;
   saving?: boolean;
   saveError?: string | null;
@@ -26,6 +27,7 @@ export function StoryletEditor({
   allTags = [],
   storyletOptions = [],
   onSave,
+  onDelete,
   onCancel,
   saving = false,
   saveError = null,
@@ -129,7 +131,24 @@ export function StoryletEditor({
             Save failed: {saveError}
           </p>
         )}
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            {onDelete && !isNew && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`Delete "${draft.title}"? This cannot be undone.`)) {
+                    onDelete();
+                  }
+                }}
+                disabled={saving}
+                className="rounded-md border border-red-300 px-4 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
           {onCancel && (
             <button
               type="button"
@@ -150,5 +169,6 @@ export function StoryletEditor({
         </div>
       </div>
     </div>
+  </div>
   );
 }

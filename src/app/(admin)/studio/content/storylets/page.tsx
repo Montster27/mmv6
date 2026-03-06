@@ -53,7 +53,7 @@ function StoryletsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const { storylets, loading, error, loadStorylets, saveStorylet, createStorylet, cloneStorylet } =
+  const { storylets, loading, error, loadStorylets, saveStorylet, createStorylet, cloneStorylet, deleteStorylet } =
     useStoryletsAPI();
 
   // Filters
@@ -143,6 +143,16 @@ function StoryletsContent() {
       await loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
     }
     setSaving(false);
+  }
+
+  async function handleDelete(storylet: Storylet) {
+    const result = await deleteStorylet(storylet.id);
+    if (result.ok) {
+      setSelectedId(null);
+      await loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
+    } else {
+      setSaveError(result.error ?? "Delete failed");
+    }
   }
 
   async function handleClone(storylet: Storylet, session: Session) {
@@ -308,6 +318,7 @@ function StoryletsContent() {
                 saving={saving}
                 saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
+                onDelete={() => handleDelete(selected)}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">

@@ -82,6 +82,16 @@ export function useStoryletsAPI() {
     []
   );
 
+  const deleteStorylet = useCallback(
+    async (id: string): Promise<{ ok: boolean; error?: string }> => {
+      const result = await apiRequest(`/api/admin/storylets/${id}`, {
+        method: "DELETE",
+      });
+      return { ok: result.ok, error: result.error };
+    },
+    []
+  );
+
   const cloneStorylet = useCallback(
     async (
       storylet: Storylet,
@@ -110,5 +120,6 @@ export function useStoryletsAPI() {
     saveStorylet,
     createStorylet,
     cloneStorylet,
+    deleteStorylet,
   };
 }

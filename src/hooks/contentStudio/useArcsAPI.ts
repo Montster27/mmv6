@@ -102,6 +102,16 @@ export function useArcsAPI() {
     []
   );
 
+  const deleteArcDefinition = useCallback(
+    async (id: string): Promise<{ ok: boolean; error?: string }> => {
+      const result = await apiRequest(`/api/admin/arc-definitions/${id}`, {
+        method: "DELETE",
+      });
+      return { ok: result.ok, error: result.error };
+    },
+    []
+  );
+
   return {
     arcDefinitions,
     arcDefinitionSteps,
@@ -111,5 +121,6 @@ export function useArcsAPI() {
     saveArcDefinition,
     saveArcStep,
     deleteArcStep,
+    deleteArcDefinition,
   };
 }

@@ -105,3 +105,25 @@ export async function PUT(
 
   return NextResponse.json({ ok: true });
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const resolvedParams = await params;
+  const user = await ensureContentStudioAccess(request);
+  if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from("storylets")
+    .delete()
+    .eq("id", resolvedParams.id);
+
+  if (error) {
+    console.error("Failed to delete storylet", error);
+    return NextResponse.json({ error: "Failed to delete storylet" }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
