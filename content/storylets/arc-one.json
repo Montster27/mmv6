@@ -594,7 +594,7 @@
         },
         {
           "id": "s2_gap_study_group",
-          "label": "Find the study group forming in the library",
+          "label": "Find the study group forming in the library — Miguel mentioned it",
           "time_cost": 1,
           "energy_cost": 1,
           "identity_tags": [
@@ -939,7 +939,7 @@
         "max_day_index": 1,
         "max_total_runs": 1
       },
-      "body": "The orientation fair is on the quad and it is exactly as much as it is.\n\nTwenty-three folding tables with hand-lettered signs. Pre-med study group. The Harwick Herald. Model UN. The nuclear freeze coalition — a card table with a petition and two earnest sophomores in army surplus jackets. Young Republicans. Young Democrats, three feet to the left.\n\nA neighbor from your floor is already halfway through the fair, talking to someone at the newspaper table like they've met before. He waves you over but doesn't push.\n\nYou have one afternoon slot. The fair closes at 4.",
+      "body": "The orientation fair is on the quad and it is exactly as much as it is.\n\nTwenty-three folding tables with hand-lettered signs. Pre-med study group. The Harwick Herald. Model UN. The nuclear freeze coalition — a card table with a petition and two earnest sophomores in army surplus jackets. Young Republicans. Young Democrats, three feet to the left.\n\nMiguel is already halfway through the fair, talking to someone at the newspaper table like they've met before. He waves you over but doesn't push.\n\nYou have one afternoon slot. The fair closes at 4.",
       "choices": [
         {
           "id": "s4_fair_newspaper",
@@ -1020,7 +1020,7 @@
         },
         {
           "id": "s4_fair_miguel",
-          "label": "Follow your floormate's lead — let him introduce you to people",
+          "label": "Follow Miguel's lead — let him introduce you to people",
           "time_cost": 1,
           "energy_cost": 1,
           "identity_tags": [
@@ -1069,7 +1069,7 @@
         "max_day_index": 1,
         "max_total_runs": 1
       },
-      "body": "Your RA Scott has organized a floor social in the common room.\n\nIt is: a bag of Doritos, two two-liters of Coke, and fourteen freshmen standing in a rectangle.\n\nThe TV in the corner is on but nobody's watching — the news, something about Beirut.\n\nDanny goes in ahead of you. A guy from the hall is already there on the arm of the couch, talking to a girl with a Talking Heads shirt who is laughing at something he said.",
+      "body": "Your RA Scott has organized a floor social in the common room.\n\nIt is: a bag of Doritos, two two-liters of Coke, and fourteen freshmen standing in a rectangle.\n\nThe TV in the corner is on but nobody's watching — the news, something about Beirut.\n\nDanny goes in ahead of you. Miguel is already there on the arm of the couch, talking to a girl with a Talking Heads shirt who is laughing at something he said.",
       "choices": [
         {
           "id": "s4_floor_one_person",
@@ -1466,8 +1466,7 @@
       "requirements": {
         "min_day_index": 3,
         "max_day_index": 5,
-        "max_total_runs": 1,
-        "requires_npc_met": ["npc_floor_miguel"]
+        "max_total_runs": 1
       },
       "body": "Dinner table in the dining hall.\n\nMiguel is telling a story about his cousin's quinceañera — the whole family from San Antonio and Laredo — and the table is laughing at the right parts.\n\nThe girl from Cincinnati mentions her boarding school. Carla talks about her dad's work at the Board of Trade. Someone mentions their family's lake house like it's a direction.\n\nYou grew up somewhere. You came from something. The version of that story you tell is forming in real time.",
       "choices": [

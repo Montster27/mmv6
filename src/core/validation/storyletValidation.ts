@@ -184,7 +184,7 @@ const RESOURCE_GATE_KEYS = new Set([
  * Format: [word-boundary regex, npc_id, display name for messages]
  */
 const GUARDED_NPC_NAMES: [RegExp, string, string][] = [
-  [/\bMiguel\b/, "npc_floor_miguel", "Miguel"],
+  [/\bMiguel\b/, "npc_connector_miguel", "Miguel"],
   [/\bMarsh\b/, "npc_prof_marsh", "Marsh"],
   [/\bPriya\b/, "npc_studious_priya", "Priya"],
   [/\bCal\b/, "npc_floor_cal", "Cal"],
