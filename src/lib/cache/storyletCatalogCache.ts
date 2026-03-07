@@ -37,7 +37,12 @@ export async function fetchStoryletCatalog<T>(
 ): Promise<T> {
   const cached = readCache<T>(seasonIndex);
   const now = Date.now();
-  if (cached && now - cached.fetched_at < CACHE_TTL_MS) {
+  // Only serve from cache if the cached result was non-empty. An empty array
+  // means the DB had no storylets when the cache was written (e.g. before a
+  // migration was applied). Never let an empty cache mask a populated DB.
+  const cachedIsNonEmpty =
+    cached && Array.isArray(cached.data) && cached.data.length > 0;
+  if (cachedIsNonEmpty && now - cached.fetched_at < CACHE_TTL_MS) {
     return cached.data;
   }
 
