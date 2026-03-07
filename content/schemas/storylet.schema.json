@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "../../content/schemas/storylet.schema.json",
+  "title": "Storylet Content File",
+  "description": "JSON format for authoring storylets. Run scripts/generate-migration.ts to convert to SQL.",
+  "type": "object",
+  "required": ["version", "storylets"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {
+      "const": "1",
+      "description": "Schema version. Must be '1'."
+    },
+    "_meta": {
+      "type": "object",
+      "description": "Optional authoring metadata — arc name, title, NPCs, locations. Ignored by the migration generator.",
+      "additionalProperties": true,
+      "properties": {
+        "arc": { "type": "string" },
+        "title": { "type": "string" },
+        "year": { "type": "number" },
+        "location": { "type": "string" },
+        "notes": { "type": "string" },
+        "npcs": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "locations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "storylets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/storylet" }
+    }
+  },
+
+  "$defs": {
+    "storylet": {
+      "type": "object",
+      "required": ["slug", "title", "body", "is_active", "choices"],
+      "additionalProperties": false,
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Unique snake_case identifier. Used as ON CONFLICT key in SQL."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display title shown in the content studio."
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000,
+          "description": "Narrative body text shown to the player."
+        },
+        "is_active": {
+          "type": "boolean",
+          "description": "Whether this storylet is eligible for selection."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Free-form tags for filtering and arc membership."
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 100,
+          "description": "Selection weight relative to other eligible storylets."
+        },
+        "requirements": { "$ref": "#/$defs/requirements" },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/choice" }
+        }
+      }
+    },
+
+    "requirements": {
+      "type": "object",
+      "description": "Selection gates. All fields are optional.",
+      "additionalProperties": false,
+      "properties": {
+        "min_day_index": { "type": "integer", "minimum": 1 },
+        "max_day_index": { "type": "integer", "minimum": 1 },
+        "max_total_runs": { "type": "integer", "minimum": 1, "description": "Max times this storylet can appear globally (across all players). Use 1 for one-shot events." },
+        "requires_npc_met": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "All listed NPC IDs must have been introduced to the player."
+        },
+        "requires_npc_not_met": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "None of the listed NPC IDs may have been introduced yet."
+        },
+        "requires_not_precluded": {
+          "type": "string",
+          "description": "This storylet slug must not be in the player's preclusion set."
+        },
+        "requires_cash_min": { "type": "number" },
+        "requires_knowledge_min": { "type": "number" },
+        "requires_social_leverage_min": { "type": "number" },
+        "requires_physical_resilience_min": { "type": "number" },
+        "requires_money_band": {
+          "type": "array",
+          "items": { "enum": ["tight", "okay", "comfortable"] },
+          "description": "Player's money band must match one of these values."
+        },
+        "requires_tags_any": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Player must have at least one of these tags."
+        },
+        "vectors_min": {
+          "type": "object",
+          "additionalProperties": { "type": "number" },
+          "description": "Minimum values for named vectors (e.g. confidence, social_capital)."
+        },
+        "seasons_any": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "min_season_index": { "type": "integer" },
+        "max_season_index": { "type": "integer" },
+        "trigger_phase": {
+          "type": "string",
+          "enum": ["morning", "afternoon", "evening", "night"]
+        },
+        "audience": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rollout_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "allow_admin": { "type": "boolean" },
+            "experiment": {
+              "type": "object",
+              "required": ["id"],
+              "properties": {
+                "id": { "type": "string" },
+                "variants_any": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "audit": { "type": "object", "additionalProperties": true }
+      }
+    },
+
+    "choice": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Unique within this storylet."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Player-facing choice text."
+        },
+        "time_cost": { "type": "integer", "minimum": 0 },
+        "energy_cost": { "type": "integer" },
+        "reaction_text": {
+          "type": "string",
+          "description": "Brief flavor text shown when this choice is selected."
+        },
+        "reaction_text_conditions": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        },
+        "identity_tags": {
+          "type": "array",
+          "items": { "enum": ["risk", "people", "achieve", "safety"] }
+        },
+        "skill_modifier": {
+          "type": "string",
+          "enum": ["focus", "memory", "networking", "grit"]
+        },
+        "targetStoryletId": {
+          "type": "string",
+          "description": "Slug of the next storylet to surface immediately after this choice."
+        },
+        "precludes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Storylet slugs permanently locked after choosing this option."
+        },
+        "requires_resource": { "$ref": "#/$defs/resourceGate" },
+        "costs_resource": { "$ref": "#/$defs/resourceCost" },
+        "costs": {
+          "type": "object",
+          "additionalProperties": { "type": "number" },
+          "description": "Resource amounts deducted when this choice is made."
+        },
+        "rewards": {
+          "type": "object",
+          "additionalProperties": { "type": "number" },
+          "description": "Resource amounts awarded when this choice is made."
+        },
+        "relational_effects": {
+          "type": "object",
+          "description": "NPC ID → { trust, reliability, emotionalLoad } deltas.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "trust": { "type": "number" },
+              "reliability": { "type": "number" },
+              "emotionalLoad": { "type": "number" }
+            }
+          }
+        },
+        "set_npc_memory": {
+          "type": "object",
+          "description": "NPC ID → { key: boolean } memory flags to set.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "boolean" }
+          }
+        },
+        "events_emitted": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["npc_id", "type"],
+            "additionalProperties": false,
+            "properties": {
+              "npc_id": { "type": "string" },
+              "type": { "type": "string" },
+              "magnitude": { "type": "number" }
+            }
+          }
+        },
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "outcomes": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/outcomeOption" },
+          "description": "Weighted probabilistic outcomes. Mutually exclusive with 'outcome'."
+        },
+        "check": { "$ref": "#/$defs/check" }
+      }
+    },
+
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string" },
+        "deltas": { "$ref": "#/$defs/deltas" },
+        "anomalies": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "outcomeOption": {
+      "type": "object",
+      "required": ["id", "weight"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "weight": { "type": "integer", "minimum": 1 },
+        "text": { "type": "string" },
+        "deltas": { "$ref": "#/$defs/deltas" },
+        "anomalies": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "modifiers": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "vector": { "type": "string" },
+            "per10": { "type": "number" }
+          }
+        }
+      }
+    },
+
+    "deltas": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "energy": { "type": "number" },
+        "stress": { "type": "number" },
+        "knowledge": { "type": "number" },
+        "morale": { "type": "number" },
+        "vectors": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": { "type": "number" },
+          "properties": {
+            "cashOnHand": { "type": "number" },
+            "knowledge": { "type": "number" },
+            "socialLeverage": { "type": "number" },
+            "physicalResilience": { "type": "number" },
+            "energy": { "type": "number" },
+            "stress": { "type": "number" }
+          }
+        }
+      }
+    },
+
+    "resourceGate": {
+      "type": "object",
+      "required": ["key", "min"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "enum": ["cashOnHand", "knowledge", "socialLeverage", "physicalResilience", "energy", "stress"]
+        },
+        "min": { "type": "number" }
+      }
+    },
+
+    "resourceCost": {
+      "type": "object",
+      "required": ["key", "amount"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "enum": ["cashOnHand", "knowledge", "socialLeverage", "physicalResilience", "energy", "stress"]
+        },
+        "amount": { "type": "number" }
+      }
+    },
+
+    "check": {
+      "type": "object",
+      "required": ["id", "baseChance"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "baseChance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "skillWeights": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "energyWeight": { "type": "number" },
+        "stressWeight": { "type": "number" }
+      }
+    }
+  }
+}

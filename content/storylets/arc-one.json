@@ -1,0 +1,1518 @@
+{
+  "$schema": "../../content/schemas/storylet.schema.json",
+  "version": "1",
+  "_meta": {
+    "arc": "arc_one",
+    "title": "College: First Week",
+    "year": 1983,
+    "location": "Harwick University, Midwest",
+    "notes": "Seven-day arc. Three time slots per day. Six simultaneous streams. Something always slips.",
+    "npcs": {
+      "npc_roommate_danny": "Danny Kowalski — roommate, from Parma, Ohio. Mechanical engineering. Quiet until he isn't. Has a copy of London Calling on his shelf.",
+      "npc_floor_miguel": "Miguel Reyes — down the hall, room 214. From San Antonio. Confident in a way that doesn't feel like performance. First person on the floor to learn everyone's name.",
+      "npc_prof_heller": "Professor Heller — Intro to Sociology. Late 40s, rumpled blazer, genuine. Mentions office hours like he means them.",
+      "npc_advisor_chen": "Dr. Chen — academic advisor, Whitmore Hall room 8. Efficient. Sees a hundred freshmen a week.",
+      "npc_newspaper_karen": "Karen Szymanski — editor, The Harwick Herald. Junior. Runs the Wednesday pitch meeting like she has somewhere to be afterward.",
+      "npc_highschool_pat": "Pat — best friend from home, now at Ohio State. Calls the floor phone every few days. Getting louder about how great it is there.",
+      "npc_student_union_rick": "Rick Dolan — student union job coordinator. Sophomore. Bored but fair."
+    },
+    "locations": {
+      "loc_room_212": "Room 212, Caldwell Hall — your room. Two desks, two dressers, one window facing the parking lot. Smells of industrial cleaner and someone else's life.",
+      "loc_caldwell_hallway": "Caldwell Hall, 2nd floor hallway — linoleum, fluorescent lights, a whiteboard by the phone with messages in three different handwriting styles.",
+      "loc_dining_hall": "Harwick Dining Commons — trays, plastic cups, steam tables. Loud before 8am in a way that feels aggressive.",
+      "loc_quad": "The Quad — central lawn, brick paths, a flagpole. Orientation fair tables set up Tuesday. Pigeons.",
+      "loc_bookstore": "Harwick Bookstore — line out the door first week. Boxed sets of textbooks behind the counter. One cashier.",
+      "loc_whitmore_hall": "Whitmore Hall — academic advising, registrar, financial aid. Smells like carpet and anxiety.",
+      "loc_student_union": "Student Union — job board, campus newspaper office upstairs, vending machines, one TV showing CNN.",
+      "loc_heller_classroom": "Whitmore 101 — Intro to Sociology, MWF 9am. Lecture hall. 80 seats, usually 75 filled.",
+      "loc_library": "Harwick Library — closes at 10pm weekdays. Quiet floors, loud floors. The carrels by the window are claimed by upperclassmen."
+    }
+  },
+  "storylets": [
+    {
+      "slug": "s1_room_212_wake",
+      "title": "Room 212",
+      "tags": [
+        "arc_one_core",
+        "roommate",
+        "onboarding"
+      ],
+      "weight": 200,
+      "requirements": {
+        "min_day_index": 1,
+        "max_day_index": 1,
+        "max_total_runs": 1
+      },
+      "body": "You wake up and it takes a second to remember where you are.\n\nThe ceiling is unfamiliar. The light coming through the curtains is wrong — facing the parking lot, not your backyard. Someone on the floor is already playing music. The Clash, maybe. Or a bad copy of it on a cassette that's been recorded too many times.\n\nDanny is already gone. His bed is made in the rough way of someone who learned to make beds and doesn't care about it. His desk has a row of textbooks, a cassette player, and a photograph you can't quite see from across the room.\n\nOn the whiteboard by the door: a phone message in someone else's handwriting. *Danny — Mom called. Call back when you can.*\n\nYou have three things to do today. You can only do two of them well.",
+      "choices": [
+        {
+          "id": "s1_wake_get_food",
+          "label": "Get to the dining hall before it gets crowded",
+          "time_cost": 1,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You fold your schedule into your back pocket and go. The hallway smells like industrial cleaner and someone's Aqua Net. You find the dining hall by following the noise.",
+          "outcome": {
+            "text": "The eggs are institutional. The orange juice is fine. You sit alone at the end of a long table and watch the room fill up. Miguel from 214 drops his tray across from you without asking. 'You're 212, right?' he says. You are.",
+            "deltas": {
+              "energy": 1,
+              "stress": -1,
+              "resources": {
+                "socialLeverage": 1
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_floor_miguel": {
+              "trust": 1,
+              "reliability": 0,
+              "emotionalLoad": 0
+            }
+          }
+        },
+        {
+          "id": "s1_wake_explore",
+          "label": "Walk the campus before everyone else is out",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk"
+          ],
+          "reaction_text": "You take the campus map from orientation and fold it badly. The brick paths all look the same. You find Whitmore Hall, the bookstore, and a shortcut behind the science building that might be useful.",
+          "outcome": {
+            "text": "You're back before 8. Danny still isn't. You know where your classrooms are now, which is more than most people can say. The anxiety is the same but it has fewer practical targets.",
+            "deltas": {
+              "stress": -1,
+              "resources": {
+                "knowledge": 2
+              }
+            }
+          }
+        },
+        {
+          "id": "s1_wake_wait",
+          "label": "Wait for Danny to come back — you don't want to navigate this alone",
+          "time_cost": 1,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety",
+            "people"
+          ],
+          "reaction_text": "You sit on your bed. You read the message on the whiteboard again. You look at the photograph on Danny's desk — a woman, maybe his mother, squinting into the sun.",
+          "outcome": {
+            "text": "Danny comes back at 8:15 with a dining hall cup of coffee he clearly didn't enjoy. He sees you on the bed. 'You haven't eaten yet?' There's no judgment in it. 'Come on,' he says. 'I'll show you where they keep the good cereal.'",
+            "deltas": {
+              "energy": 0,
+              "stress": 0,
+              "resources": {
+                "socialLeverage": 2
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 2,
+              "reliability": 1,
+              "emotionalLoad": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s1_danny_first_conversation",
+      "title": "The Better Desk",
+      "tags": [
+        "arc_one_core",
+        "roommate",
+        "social"
+      ],
+      "weight": 150,
+      "requirements": {
+        "min_day_index": 1,
+        "max_day_index": 2,
+        "max_total_runs": 1
+      },
+      "body": "It's evening. You're both in the room for the first time at the same time with nowhere to be.\n\nDanny is at his desk — the one by the window, the one that was already claimed when you arrived — flipping through what looks like a physics textbook. His cassette player is going. The Pretenders. Quiet enough to be background, loud enough to notice.\n\nHe got the better desk. You haven't mentioned it. You're not sure if you're going to.\n\nHe turns around. 'Where are you from?' he asks. Not unfriendly. Just starting somewhere.",
+      "choices": [
+        {
+          "id": "s1_danny_conv_surface",
+          "label": "Keep it surface — town, major, standard orientation answers",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You give him the version you've already rehearsed. He nods. He gives you his version back. You learn: Parma, Ohio. Mechanical engineering. Dad works at the Ford plant.",
+          "outcome": {
+            "text": "It's polite and accurate and tells you almost nothing useful about each other. He turns back to his textbook. You have a roommate you know how to avoid disappointing. That's something.",
+            "deltas": {
+              "stress": 0
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 0,
+              "reliability": 1,
+              "emotionalLoad": 0
+            }
+          },
+          "set_npc_memory": {
+            "npc_roommate_danny": {
+              "first_conv_depth": "surface"
+            }
+          }
+        },
+        {
+          "id": "s1_danny_conv_real",
+          "label": "Say something true — tell him you're not sure you picked the right major",
+          "time_cost": 0,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk",
+            "people"
+          ],
+          "reaction_text": "It comes out before you've decided to say it. He looks up from the textbook. A beat.",
+          "outcome": {
+            "text": "'Yeah,' Danny says. 'Me too.' He closes the physics book. 'I picked engineering because my dad picked it. I haven't told anyone that.' The Pretenders keep playing. You talk for an hour. You never address the desk.",
+            "deltas": {
+              "stress": -2,
+              "energy": -1,
+              "resources": {
+                "socialLeverage": 3
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 3,
+              "reliability": 0,
+              "emotionalLoad": 1
+            }
+          },
+          "set_npc_memory": {
+            "npc_roommate_danny": {
+              "first_conv_depth": "real",
+              "knows_your_doubt": true
+            }
+          }
+        },
+        {
+          "id": "s1_danny_conv_desk",
+          "label": "Mention the desk — calmly, not as a fight",
+          "time_cost": 0,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk"
+          ],
+          "reaction_text": "You say it like you're asking about the weather. 'Hey — how'd you end up with the window desk?' Danny blinks. He wasn't expecting it.",
+          "outcome": {
+            "text": "'I just... put my stuff there.' A pause. 'You want it?' You say no, not really, you just wanted to ask. He nods slowly. Something shifts — not badly. He knows you're someone who says things. That changes the room.",
+            "deltas": {
+              "stress": -1,
+              "resources": {
+                "socialLeverage": 1
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 1,
+              "reliability": 2,
+              "emotionalLoad": 1
+            }
+          },
+          "set_npc_memory": {
+            "npc_roommate_danny": {
+              "knows_you_speak_up": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s1_danny_music_friction",
+      "title": "The Volume",
+      "tags": [
+        "roommate",
+        "social"
+      ],
+      "weight": 120,
+      "requirements": {
+        "min_day_index": 2,
+        "max_day_index": 4,
+        "max_total_runs": 1,
+        "requires_npc_met": [
+          "npc_roommate_danny"
+        ]
+      },
+      "body": "11pm. You have a reading due for Heller's sociology class tomorrow morning.\n\nDanny is listening to London Calling at a volume that is not quite loud enough to complain about but loud enough that you've read the same paragraph four times.\n\nHe doesn't know you're trying to work. Or he does and assumes you'd say something. Or he doesn't care. You can't tell which.\n\nThere's no way to text him from across the room. You have to either say something or not say something.",
+      "choices": [
+        {
+          "id": "s1_friction_say_something",
+          "label": "Ask him to turn it down — direct, no drama",
+          "time_cost": 0,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk"
+          ],
+          "skill_modifier": "grit",
+          "reaction_text": "'Hey — any chance you can turn it down? I've got reading.' He looks up. A second of calibration.",
+          "outcome": {
+            "text": "He turns it down without making it weird. 'Sorry, didn't realize.' You get the reading done. Nothing is damaged. In fact something is slightly better — you've established that the room has negotiable terms.",
+            "deltas": {
+              "stress": -1,
+              "resources": {
+                "knowledge": 1
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 1,
+              "reliability": 1,
+              "emotionalLoad": 0
+            }
+          }
+        },
+        {
+          "id": "s1_friction_let_it_go",
+          "label": "Put up with it — not worth the friction",
+          "time_cost": 0,
+          "energy_cost": 1,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You reread the paragraph. You reread it again. You give up on the nuance and get the general shape of it.",
+          "outcome": {
+            "text": "You get through the reading. Sort of. The argument Heller is making about social structures has edges you'll have to find later. Danny turns it off at midnight and says goodnight like nothing happened. Because nothing did.",
+            "deltas": {
+              "stress": 1,
+              "resources": {
+                "knowledge": 0
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 0,
+              "reliability": 0,
+              "emotionalLoad": -1
+            }
+          }
+        },
+        {
+          "id": "s1_friction_leave",
+          "label": "Take your books to the library",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "achieve"
+          ],
+          "reaction_text": "You gather your stuff without explanation. Danny watches but doesn't ask.",
+          "outcome": {
+            "text": "The library is cold and quiet and closes at 10. You get more done in 45 minutes than you would have in two hours in the room. You get back at 10:15. Danny is asleep. The cassette player is off. Tomorrow you'll have to decide if this is your solution now.",
+            "deltas": {
+              "stress": 0,
+              "energy": -1,
+              "resources": {
+                "knowledge": 2
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s1_danny_revealing_moment",
+      "title": "The Letter",
+      "tags": [
+        "roommate",
+        "home",
+        "social"
+      ],
+      "weight": 100,
+      "requirements": {
+        "min_day_index": 4,
+        "max_day_index": 5,
+        "max_total_runs": 1,
+        "requires_npc_met": [
+          "npc_roommate_danny"
+        ]
+      },
+      "body": "You come back from your afternoon class to find Danny sitting on his bed with a letter open in his lap.\n\nHe doesn't hear you come in. He's just sitting there, reading something he's clearly already read twice. His posture is different — smaller, somehow, in a way that has nothing to do with the room.\n\nYou recognize this. Not the letter. The shape of what a letter from home can do to a person.\n\nHe looks up. 'Hey.' He folds it quickly. 'How was class?'",
+      "choices": [
+        {
+          "id": "s1_danny_letter_ask",
+          "label": "Ask if he's okay — directly",
+          "time_cost": 0,
+          "energy_cost": 1,
+          "identity_tags": [
+            "people"
+          ],
+          "reaction_text": "He looks at you for a second. Then: 'My dad's having some trouble at the plant. Nothing serious. Probably.' He says probably like he knows it means something.",
+          "outcome": {
+            "text": "You don't try to fix it. You just sit with it for a minute. He seems to appreciate that more than he'd appreciate advice. Something changes in the room — not fixed, just real.",
+            "deltas": {
+              "energy": -1,
+              "resources": {
+                "socialLeverage": 2
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 3,
+              "reliability": 0,
+              "emotionalLoad": 2
+            }
+          },
+          "set_npc_memory": {
+            "npc_roommate_danny": {
+              "shared_vulnerability": true
+            }
+          }
+        },
+        {
+          "id": "s1_danny_letter_ignore",
+          "label": "Let him have it — change the subject to something neutral",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You ask about the homework. He follows your lead. The letter goes in his desk drawer.",
+          "outcome": {
+            "text": "You gave him an out and he took it. That's a kind of consideration. But you also stayed on the surface when the room offered you something deeper. He'll remember both things.",
+            "deltas": {
+              "stress": -1
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 0,
+              "reliability": 1,
+              "emotionalLoad": -1
+            }
+          }
+        },
+        {
+          "id": "s1_danny_letter_share",
+          "label": "Tell him you got something from home too — make it mutual",
+          "time_cost": 0,
+          "energy_cost": 1,
+          "identity_tags": [
+            "people",
+            "risk"
+          ],
+          "reaction_text": "You pull out the postcard your mother sent — written before you left, arrived yesterday. You hand it to him. He reads it. Hands it back.",
+          "outcome": {
+            "text": "'She sounds like she misses you,' Danny says. 'Yeah,' you say. 'So does yours, I think.' He laughs — the first real one. You've found a way to be in the same situation instead of separate ones.",
+            "deltas": {
+              "stress": -2,
+              "energy": -1,
+              "resources": {
+                "socialLeverage": 3
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_roommate_danny": {
+              "trust": 4,
+              "reliability": 1,
+              "emotionalLoad": 1
+            }
+          },
+          "set_npc_memory": {
+            "npc_roommate_danny": {
+              "shared_vulnerability": true,
+              "knows_about_your_family": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s2_syllabus_moment",
+      "title": "Whitmore 101",
+      "tags": [
+        "arc_one_core",
+        "academic",
+        "study"
+      ],
+      "weight": 180,
+      "requirements": {
+        "min_day_index": 2,
+        "max_day_index": 2,
+        "max_total_runs": 1
+      },
+      "body": "Intro to Sociology. Whitmore 101. 9am.\n\nYou find a seat in the middle — not front row, not back. Professor Heller comes in without fanfare, sets a battered leather bag on the desk, and starts distributing a stapled packet before anyone is settled.\n\nThe syllabus is four pages. The reading list alone is a page and a half. There's a midterm worth 40% and a final paper requiring 'original fieldwork on a social institution of your choosing.' The first reading is due Friday.\n\nThe person next to you flips to the back of the packet and says, quietly, 'Oh god.' You don't know if that's better or worse than everyone else who said nothing.",
+      "choices": [
+        {
+          "id": "s2_syllabus_ask_neighbor",
+          "label": "Ask the person next to you if this load seems normal",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "people",
+            "risk"
+          ],
+          "reaction_text": "She looks up — dark hair, reading glasses pushed up on her head, a copy of the syllabus already annotated with a green pen. 'Normal for Heller, I've heard. I'm Diane.'",
+          "outcome": {
+            "text": "Diane is a sophomore who took Heller's class late because of a scheduling conflict. She knows how he runs things. She offers to share notes from a friend who took it last year. You have an asset before the class has technically started.",
+            "deltas": {
+              "stress": -1,
+              "resources": {
+                "knowledge": 2,
+                "socialLeverage": 1
+              }
+            }
+          }
+        },
+        {
+          "id": "s2_syllabus_alone",
+          "label": "Process it alone — make your own read of what's actually hard",
+          "time_cost": 0,
+          "energy_cost": 1,
+          "identity_tags": [
+            "achieve",
+            "safety"
+          ],
+          "skill_modifier": "focus",
+          "reaction_text": "You go through it carefully. The reading is dense but not impossible. The paper is the real challenge — fieldwork means planning ahead, not cramming.",
+          "outcome": {
+            "text": "By the time Heller starts talking, you have three asterisks and a question you actually want to ask. You don't ask it. But you have it.",
+            "deltas": {
+              "energy": -1,
+              "resources": {
+                "knowledge": 3
+              }
+            }
+          }
+        },
+        {
+          "id": "s2_syllabus_approach_heller",
+          "label": "Approach Heller after class — introduce yourself",
+          "time_cost": 1,
+          "energy_cost": 2,
+          "identity_tags": [
+            "risk",
+            "achieve"
+          ],
+          "reaction_text": "Most students file out. You wait. Heller is repacking his bag when you walk up. He looks at you over his glasses without impatience.",
+          "outcome": {
+            "text": "You say you have a question about the fieldwork component. He lights up — actually lights up. You spend ten minutes talking about what counts as a social institution. He says your idea isn't bad. He knows your name now. That changes things.",
+            "deltas": {
+              "energy": -2,
+              "stress": -1,
+              "resources": {
+                "knowledge": 4,
+                "socialLeverage": 2
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_prof_heller": {
+              "trust": 2,
+              "reliability": 2,
+              "emotionalLoad": 0
+            }
+          },
+          "set_npc_memory": {
+            "npc_prof_heller": {
+              "knows_your_name": true,
+              "first_impression": "curious"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s2_first_gap",
+      "title": "The Part You Didn't Follow",
+      "tags": [
+        "academic",
+        "study"
+      ],
+      "weight": 130,
+      "requirements": {
+        "min_day_index": 3,
+        "max_day_index": 4,
+        "max_total_runs": 1
+      },
+      "body": "Wednesday lecture. Heller is talking about Durkheim — anomie, social cohesion, the way systems hold people in place without them noticing.\n\nYou followed it for the first twenty minutes. Then he made a pivot and you lost the thread. You have 'anomie = normlessness?' in your notebook followed by two inches of blank space.\n\nThe student three seats over has a full page of notes.\n\nOffice hours are Thursday 2-4pm. Whitmore 318. You have that time slot. You were going to use it for something else.",
+      "choices": [
+        {
+          "id": "s2_gap_office_hours",
+          "label": "Go to office hours — find the sheet outside Whitmore 318 and show up",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "achieve",
+            "risk"
+          ],
+          "skill_modifier": "grit",
+          "reaction_text": "The sheet is there, taped at eye level. Two names already signed. You add yours. Thursday, 2:15.",
+          "outcome": {
+            "text": "Heller doesn't make you feel stupid for not following. He reframes Durkheim in a different order and it clicks. You're there for 25 minutes. You walk out understanding something instead of knowing something, which feels completely different.",
+            "deltas": {
+              "energy": -1,
+              "stress": -2,
+              "resources": {
+                "knowledge": 4
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_prof_heller": {
+              "trust": 1,
+              "reliability": 2,
+              "emotionalLoad": 0
+            }
+          }
+        },
+        {
+          "id": "s2_gap_study_group",
+          "label": "Find the study group forming in the library — Miguel mentioned it",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "people",
+            "achieve"
+          ],
+          "reaction_text": "Miguel said third floor, near the reference stacks, 7pm. You find four people around a table, including Diane from the first class.",
+          "outcome": {
+            "text": "It's less efficient than office hours and more useful than studying alone. Someone else had the same gap you did. You fill it together. You also learn that Diane has already started her fieldwork paper outline.",
+            "deltas": {
+              "energy": -1,
+              "resources": {
+                "knowledge": 2,
+                "socialLeverage": 2
+              }
+            }
+          }
+        },
+        {
+          "id": "s2_gap_push_through",
+          "label": "Push through alone — reread the chapter until it lands",
+          "time_cost": 1,
+          "energy_cost": 2,
+          "identity_tags": [
+            "achieve",
+            "safety"
+          ],
+          "skill_modifier": "focus",
+          "reaction_text": "You go back to the dorm with the textbook. Danny is out. You sit at your desk and read Durkheim three times.",
+          "outcome": {
+            "text": "By the third read, you have something. Not everything, but enough. What it cost: two hours, your afternoon slot, and the creeping feeling that this is how it's going to be.",
+            "deltas": {
+              "energy": -2,
+              "stress": 1,
+              "resources": {
+                "knowledge": 3
+              }
+            }
+          }
+        },
+        {
+          "id": "s2_gap_minimize",
+          "label": "Let it go — it's only the first week",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You close the notebook.",
+          "outcome": {
+            "text": "The gap stays. You won't know what it costs until the midterm shows you. For now you have your afternoon back.",
+            "deltas": {
+              "stress": -1,
+              "resources": {
+                "knowledge": -1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s3_bookstore_line",
+      "title": "The Bookstore",
+      "tags": [
+        "arc_one_core",
+        "money",
+        "study"
+      ],
+      "weight": 170,
+      "requirements": {
+        "min_day_index": 1,
+        "max_day_index": 2,
+        "max_total_runs": 1
+      },
+      "body": "The line at the Harwick Bookstore starts outside the door and wraps toward the student union.\n\nYou have your class list. You've done the math in your head twice and don't like the answer. The sociology text is $34. The chemistry lab manual is $18. The intro economics anthology — required, no substitutions — is $47.\n\nA hand-lettered sign on the door: *No checks over $75 without ID. No returns after 48 hours.*\n\nThe person ahead of you is writing in a notebook, comparing prices — figuring out which books they absolutely need versus which ones they might share or find at the library.",
+      "choices": [
+        {
+          "id": "s3_books_buy_all",
+          "label": "Buy everything on the list",
+          "time_cost": 1,
+          "energy_cost": 0,
+          "identity_tags": [
+            "achieve",
+            "safety"
+          ],
+          "requires_resource": {
+            "key": "cashOnHand",
+            "min": 120
+          },
+          "reaction_text": "You write the check. The cashier doesn't look up.",
+          "outcome": {
+            "text": "You have everything you need. The money is gone in a way that's hard to look at directly. Your stack of books on the desk looks like intention.",
+            "deltas": {
+              "stress": 1,
+              "resources": {
+                "cashOnHand": -130,
+                "knowledge": 2
+              }
+            }
+          }
+        },
+        {
+          "id": "s3_books_selective",
+          "label": "Buy only the first two weeks' worth — figure out the rest later",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk"
+          ],
+          "reaction_text": "You buy the sociology text and the lab manual. The economics anthology you'll try to find at the library.",
+          "outcome": {
+            "text": "The library has two copies on reserve — two-hour checkout limit. You write down the reserve desk hours on the back of your hand.",
+            "deltas": {
+              "stress": 0,
+              "resources": {
+                "cashOnHand": -52,
+                "knowledge": 1
+              }
+            }
+          }
+        },
+        {
+          "id": "s3_books_ask_around",
+          "label": "Ask the person ahead of you if they want to split books",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "people",
+            "risk"
+          ],
+          "reaction_text": "They look up from their notebook. 'Which classes are you in?'",
+          "outcome": {
+            "text": "His name is James. He's in two of the same courses. You split the economics anthology — he buys it, you Xerox the relevant chapters at 10 cents a page. You save $23 and have someone to sit next to in Econ.",
+            "deltas": {
+              "stress": -1,
+              "resources": {
+                "cashOnHand": -15,
+                "socialLeverage": 2,
+                "knowledge": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s3_pizza_social",
+      "title": "The Pizza Question",
+      "tags": [
+        "money",
+        "social",
+        "belonging"
+      ],
+      "weight": 120,
+      "requirements": {
+        "min_day_index": 2,
+        "max_day_index": 4,
+        "max_total_runs": 1,
+        "requires_npc_met": [
+          "npc_floor_miguel"
+        ]
+      },
+      "body": "Miguel knocks on your door at 7pm.\n\n'Group of us are going to Sal's — it's like a ten minute walk. You in?'\n\nYou check your wallet without obviously checking your wallet. You have seventeen dollars and change. Textbooks are paid for or not. The dining hall is covered.\n\nBut you've been doing quiet math all week and seventeen feels like it needs to last longer than the weekend.",
+      "choices": [
+        {
+          "id": "s3_pizza_go",
+          "label": "Go — $3 is worth it for the room",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "people",
+            "risk"
+          ],
+          "reaction_text": "Miguel's 'group of us' turns out to be five people, including Danny.",
+          "outcome": {
+            "text": "The pizza is fine. The conversation is better. You learn that Carla from the third floor knows someone you went to camp with at age eleven — the kind of coincidence that feels significant at 18. The $3.50 is gone and the evening feels like something.",
+            "deltas": {
+              "energy": -1,
+              "stress": -2,
+              "resources": {
+                "cashOnHand": -4,
+                "socialLeverage": 3
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_floor_miguel": {
+              "trust": 1,
+              "reliability": 1,
+              "emotionalLoad": 0
+            }
+          }
+        },
+        {
+          "id": "s3_pizza_excuse",
+          "label": "Make an excuse — say you have reading",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "Miguel says 'no worries, next time' genuinely. You close the door.",
+          "outcome": {
+            "text": "You hear them come back at 10, laughing about something you don't have the reference for. You tell yourself it doesn't matter.",
+            "deltas": {
+              "stress": 1,
+              "resources": {
+                "knowledge": 2
+              }
+            }
+          }
+        },
+        {
+          "id": "s3_pizza_honest",
+          "label": "Tell Miguel you're watching spending — ask if there's a cheaper option",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk",
+            "people"
+          ],
+          "reaction_text": "You say it plainly. Miguel doesn't blink. 'The dining hall's got a dessert thing — just come there first, we'll swing by after.'",
+          "outcome": {
+            "text": "You go. You eat in the dining hall, then walk to Sal's and split a Coke with Danny. Nobody tracks what anyone orders. The honesty cost nothing. That surprises you.",
+            "deltas": {
+              "stress": -2,
+              "energy": -1,
+              "resources": {
+                "cashOnHand": -1,
+                "socialLeverage": 2
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_floor_miguel": {
+              "trust": 2,
+              "reliability": 1,
+              "emotionalLoad": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s3_money_friction_event",
+      "title": "The Lab Fee",
+      "tags": [
+        "money",
+        "study"
+      ],
+      "weight": 110,
+      "requirements": {
+        "min_day_index": 3,
+        "max_day_index": 5,
+        "max_total_runs": 1
+      },
+      "body": "There's a yellow slip in your campus mailbox.\n\nChemistry department. A lab fee — $22, due by Friday. It wasn't listed in the tuition breakdown. It wasn't mentioned at orientation. It just appeared.\n\n$22 is not catastrophic. It is also not nothing.",
+      "choices": [
+        {
+          "id": "s3_fee_pay_now",
+          "label": "Pay it immediately — don't let it become a thing",
+          "time_cost": 1,
+          "energy_cost": 0,
+          "requires_resource": {
+            "key": "cashOnHand",
+            "min": 22
+          },
+          "identity_tags": [
+            "safety",
+            "achieve"
+          ],
+          "reaction_text": "You write a check. It clears. The yellow slip goes in the trash.",
+          "outcome": {
+            "text": "Done. The anxiety cost more than the money. You now have a cleaner number in your head.",
+            "deltas": {
+              "stress": -1,
+              "resources": {
+                "cashOnHand": -22
+              }
+            }
+          }
+        },
+        {
+          "id": "s3_fee_call_home",
+          "label": "Call home — ask if there are more surprise fees coming",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "people",
+            "safety"
+          ],
+          "reaction_text": "The floor phone. Your father answers. You explain. He's quiet for a moment — the specific quiet of someone doing math.",
+          "outcome": {
+            "text": "'I'll put something in the mail.' The money is coming. The conversation was shorter than you wanted. You hang up knowing something about what this costs them.",
+            "deltas": {
+              "stress": 1,
+              "energy": -1,
+              "resources": {
+                "cashOnHand": 30
+              }
+            }
+          }
+        },
+        {
+          "id": "s3_fee_delay",
+          "label": "Set it aside — Friday is still a few days away",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You put the slip back in your mailbox.",
+          "outcome": {
+            "text": "The slip lives in the back of your mind at a low hum. On Thursday you pay it. The hum stops. You spent three days carrying it when you could have spent twenty minutes.",
+            "deltas": {
+              "stress": 2,
+              "resources": {
+                "cashOnHand": -22
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s4_orientation_fair",
+      "title": "The Quad",
+      "tags": [
+        "arc_one_core",
+        "belonging",
+        "social",
+        "opportunity"
+      ],
+      "weight": 190,
+      "requirements": {
+        "min_day_index": 1,
+        "max_day_index": 1,
+        "max_total_runs": 1
+      },
+      "body": "The orientation fair is on the quad and it is exactly as much as it is.\n\nTwenty-three folding tables with hand-lettered signs. Pre-med study group. The Harwick Herald. Model UN. The nuclear freeze coalition — a card table with a petition and two earnest sophomores in army surplus jackets. Young Republicans. Young Democrats, three feet to the left.\n\nMiguel is already halfway through the fair, talking to someone at the newspaper table like they've met before. He waves you over but doesn't push.\n\nYou have one afternoon slot. The fair closes at 4.",
+      "choices": [
+        {
+          "id": "s4_fair_newspaper",
+          "label": "Stop at The Harwick Herald — you've always been a decent writer",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk",
+            "achieve"
+          ],
+          "reaction_text": "Karen — a junior, Herald press badge clipped to her flannel shirt — hands you a flyer. *First pitch meeting: Wednesday 7pm, Student Union 204.*",
+          "outcome": {
+            "text": "Karen makes eye contact for exactly one second. 'You'd need a story idea by Wednesday.' You have four days and no idea what you'd pitch. That's either a problem or a starting point.",
+            "deltas": {
+              "energy": -1,
+              "resources": {
+                "socialLeverage": 1
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_newspaper_karen": {
+              "trust": 0,
+              "reliability": 0,
+              "emotionalLoad": 0
+            }
+          },
+          "set_npc_memory": {
+            "npc_newspaper_karen": {
+              "has_your_interest": true
+            }
+          },
+          "precludes": [
+            "s5_opportunity_expired"
+          ]
+        },
+        {
+          "id": "s4_fair_freeze_coalition",
+          "label": "Stop at the nuclear freeze table — the anxiety is real",
+          "time_cost": 1,
+          "energy_cost": 0,
+          "identity_tags": [
+            "risk",
+            "people"
+          ],
+          "reaction_text": "Tom talks about the Pershing II missiles like someone who stayed up late reading about them.",
+          "outcome": {
+            "text": "You sign the petition. The pamphlet goes in your back pocket next to your class schedule. You might go to the meeting. The anxiety feels less abstract now that someone named it.",
+            "deltas": {
+              "stress": 1,
+              "resources": {
+                "knowledge": 1,
+                "socialLeverage": 1
+              }
+            }
+          }
+        },
+        {
+          "id": "s4_fair_browse_nothing",
+          "label": "Walk the whole fair without stopping — take it in first",
+          "time_cost": 1,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You make a full loop. You collect three flyers you didn't mean to take.",
+          "outcome": {
+            "text": "You haven't joined anything. You know what exists. By Thursday the newspaper pitch meeting will have happened without you. That was also a choice.",
+            "deltas": {
+              "stress": -1
+            }
+          },
+          "precludes": [
+            "s5_newspaper_pitch"
+          ]
+        },
+        {
+          "id": "s4_fair_miguel",
+          "label": "Follow Miguel's lead — let him introduce you to people",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "people",
+            "safety"
+          ],
+          "reaction_text": "Miguel makes introductions like he's doing both people a favor, which he usually is.",
+          "outcome": {
+            "text": "By the end of the hour you've talked to seven people. You remember four. Miguel says 'we should get food' and you realize you've been talking for ninety minutes.",
+            "deltas": {
+              "energy": -1,
+              "stress": -2,
+              "resources": {
+                "socialLeverage": 4
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_floor_miguel": {
+              "trust": 2,
+              "reliability": 1,
+              "emotionalLoad": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s4_floor_social",
+      "title": "Common Room, 8pm",
+      "tags": [
+        "arc_one_core",
+        "belonging",
+        "roommate",
+        "social"
+      ],
+      "weight": 160,
+      "requirements": {
+        "min_day_index": 1,
+        "max_day_index": 1,
+        "max_total_runs": 1
+      },
+      "body": "Your RA Scott has organized a floor social in the common room.\n\nIt is: a bag of Doritos, two two-liters of Coke, and fourteen freshmen standing in a rectangle.\n\nThe TV in the corner is on but nobody's watching — the news, something about Beirut.\n\nDanny goes in ahead of you. Miguel is already there on the arm of the couch, talking to a girl with a Talking Heads shirt who is laughing at something he said.",
+      "choices": [
+        {
+          "id": "s4_floor_one_person",
+          "label": "Find one person who looks as uncertain as you",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "people",
+            "safety"
+          ],
+          "reaction_text": "There's a guy near the window reading the Doritos bag with more attention than it deserves.",
+          "outcome": {
+            "text": "His name is Carl. From a small town in Indiana. He talks slowly and means what he says. You talk about whether college will be what you thought. Neither of you knows. By the time Scott wraps it up, you have one person you'd eat breakfast with tomorrow.",
+            "deltas": {
+              "energy": -1,
+              "stress": -1,
+              "resources": {
+                "socialLeverage": 2
+              }
+            }
+          }
+        },
+        {
+          "id": "s4_floor_circulate",
+          "label": "Work the room — brief with everyone, committed to no one",
+          "time_cost": 1,
+          "energy_cost": 2,
+          "identity_tags": [
+            "people",
+            "achieve"
+          ],
+          "skill_modifier": "networking",
+          "reaction_text": "You move. Names, hometowns, majors. You get good at the three-question loop.",
+          "outcome": {
+            "text": "You've talked to eleven of fourteen people. You remember six. You've identified who's interesting. You're also exhausted in a way that's hard to explain.",
+            "deltas": {
+              "energy": -2,
+              "stress": 0,
+              "resources": {
+                "socialLeverage": 3
+              }
+            }
+          }
+        },
+        {
+          "id": "s4_floor_leave_early",
+          "label": "Make an appearance and leave — twenty minutes, then back to the room",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "achieve",
+            "safety"
+          ],
+          "reaction_text": "You show up, take a Coke, nod at Scott, and go.",
+          "outcome": {
+            "text": "Scott notices. He doesn't say anything. You have your evening back. The hallway sounds louder from inside the room than you expected.",
+            "deltas": {
+              "stress": 0,
+              "energy": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s5_opportunity_noticed",
+      "title": "The Board Outside the Union",
+      "tags": [
+        "arc_one_core",
+        "opportunity",
+        "work"
+      ],
+      "weight": 140,
+      "requirements": {
+        "min_day_index": 1,
+        "max_day_index": 2,
+        "max_total_runs": 1
+      },
+      "body": "Passing the student union on the way from the bookstore. The job board is just inside the door.\n\nMost of it is standard — dining hall, library reshelving. But one index card near the top:\n\n*Herald looking for freshman contributors. No experience needed — curiosity required. See Karen S., Student Union 204.*\n\nBelow it:\n\n*Research Assistant — Prof. Heller, Sociology. Motivated freshman considered. Whitmore 318.*\n\nBoth cards have pull tabs. Two tabs remain on the Heller card. Five on the Herald card.",
+      "choices": [
+        {
+          "id": "s5_opp_take_both",
+          "label": "Take a tab from both — figure out which one later",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "risk"
+          ],
+          "reaction_text": "Both tabs go in your pocket.",
+          "outcome": {
+            "text": "You have two options now. Options have their own weight — the tabs make you think about what you actually want, which might be the point.",
+            "deltas": {
+              "stress": 1
+            }
+          },
+          "set_npc_memory": {
+            "npc_newspaper_karen": {
+              "has_your_interest": true
+            },
+            "npc_prof_heller": {
+              "you_noticed_posting": true
+            }
+          }
+        },
+        {
+          "id": "s5_opp_take_heller",
+          "label": "Take the Heller tab — research sounds more useful",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "achieve"
+          ],
+          "reaction_text": "One of only two tabs taken.",
+          "outcome": {
+            "text": "If you go, you'll be competing with maybe one other person. That's manageable.",
+            "deltas": {
+              "stress": 0
+            }
+          },
+          "set_npc_memory": {
+            "npc_prof_heller": {
+              "you_noticed_posting": true
+            }
+          },
+          "precludes": [
+            "s5_newspaper_pitch"
+          ]
+        },
+        {
+          "id": "s5_opp_walk_past",
+          "label": "Keep walking — you're not ready to take something on yet",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You glance and move on.",
+          "outcome": {
+            "text": "By Thursday the Heller tab will be gone. By next Tuesday the Herald card will be down. You'll pass the board again and it'll be different cards. You won't know what you walked past.",
+            "deltas": {
+              "stress": -1
+            }
+          },
+          "precludes": [
+            "s5_newspaper_pitch",
+            "s5_heller_ra_opportunity"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "s5_newspaper_pitch",
+      "title": "Student Union 204, Wednesday 7pm",
+      "tags": [
+        "opportunity",
+        "work",
+        "belonging",
+        "social"
+      ],
+      "weight": 130,
+      "requirements": {
+        "min_day_index": 3,
+        "max_day_index": 3,
+        "max_total_runs": 1,
+        "requires_not_precluded": "s5_newspaper_pitch",
+        "requires_npc_met": [
+          "npc_newspaper_karen"
+        ]
+      },
+      "body": "Student Union 204 has seven people when you arrive, including Karen, already at the front with a legal pad.\n\nShe looks up. 'You're from the fair?' You say yes. She nods and writes something.\n\nThe room has the feel of something running longer than any individual person in it. Stacks of back issues. A layout board. A police scanner in the corner nobody's turned on.\n\nKaren gives everyone three minutes to pitch. You're up.",
+      "choices": [
+        {
+          "id": "s5_pitch_real",
+          "label": "Pitch the Soviet studies professor — it's the interesting story",
+          "time_cost": 1,
+          "energy_cost": 2,
+          "identity_tags": [
+            "risk",
+            "achieve"
+          ],
+          "skill_modifier": "networking",
+          "reaction_text": "Karen looks up from her legal pad. Two others look up.",
+          "outcome": {
+            "text": "'That story's been pitched before. What's your angle?' You don't have one. You say something about what it means to study an enemy you can't visit. She writes on her pad. 'Come back Friday with three questions you'd ask him.' You're not in. But you're not out.",
+            "deltas": {
+              "energy": -2,
+              "stress": 1,
+              "resources": {
+                "socialLeverage": 2
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_newspaper_karen": {
+              "trust": 1,
+              "reliability": 1,
+              "emotionalLoad": 0
+            }
+          }
+        },
+        {
+          "id": "s5_pitch_safe",
+          "label": "Pitch something manageable — freshman orientation piece, first-person",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "safety",
+            "achieve"
+          ],
+          "reaction_text": "Karen nods once.",
+          "outcome": {
+            "text": "'Five hundred words by Sunday. We run first-person on the back page.' You have an assignment. It's not the front page. It's real.",
+            "deltas": {
+              "energy": -1,
+              "resources": {
+                "socialLeverage": 1
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_newspaper_karen": {
+              "trust": 0,
+              "reliability": 1,
+              "emotionalLoad": 0
+            }
+          }
+        },
+        {
+          "id": "s5_pitch_freeze",
+          "label": "Tell the truth — you don't have a pitch yet",
+          "time_cost": 1,
+          "energy_cost": 2,
+          "identity_tags": [
+            "risk",
+            "people"
+          ],
+          "reaction_text": "The room is quiet for a second.",
+          "outcome": {
+            "text": "Karen: 'More honest than most pitches in this room.' Dave needs a second reporter for the academic calendar story — student interviews. It's not your story. You're in.",
+            "deltas": {
+              "energy": -2,
+              "stress": 2,
+              "resources": {
+                "socialLeverage": 2
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_newspaper_karen": {
+              "trust": 2,
+              "reliability": 0,
+              "emotionalLoad": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s5_opportunity_expired",
+      "title": "The Card Is Gone",
+      "tags": [
+        "opportunity"
+      ],
+      "weight": 80,
+      "requirements": {
+        "min_day_index": 5,
+        "max_day_index": 5,
+        "max_total_runs": 1,
+        "requires_not_precluded": "s5_opportunity_expired"
+      },
+      "body": "You pass the student union job board on the way to the dining hall.\n\nThe Herald card is gone. The Heller research assistant card is gone — replaced by something about a lost bicycle.\n\nYou weren't ready. Or you were and didn't move. Same result.",
+      "choices": [
+        {
+          "id": "s5_expired_note",
+          "label": "Note it — next time you'll move faster",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "achieve"
+          ],
+          "reaction_text": "You file it. There will be other boards.",
+          "outcome": {
+            "text": "Probably true. The version of this week where you went to the pitch meeting exists somewhere. You didn't go there. You try to remember what you chose instead.",
+            "deltas": {
+              "stress": 1
+            }
+          }
+        },
+        {
+          "id": "s5_expired_accept",
+          "label": "Let it go — it wasn't the right time",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety"
+          ],
+          "reaction_text": "You move on.",
+          "outcome": {
+            "text": "Fine. The dining hall is serving something that smells like chicken. You get a tray.",
+            "deltas": {
+              "stress": -1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s6_first_contact_home",
+      "title": "The Floor Phone",
+      "tags": [
+        "arc_one_core",
+        "home",
+        "social"
+      ],
+      "weight": 150,
+      "requirements": {
+        "min_day_index": 2,
+        "max_day_index": 3,
+        "max_total_runs": 1
+      },
+      "body": "Someone knocks on your door at 7:30pm.\n\nThe girl from room 209. 'Phone for you. The floor phone.' You follow her to the hallway. The receiver is down, cord swinging.\n\nYour mother.\n\nShe says your name the way she says it when she's been waiting. Just checking in. Your father says hi. The dog has been looking for you. How is it?\n\nThe hallway is not private. Two doors are open. You can hear someone's TV.",
+      "choices": [
+        {
+          "id": "s6_home_honest",
+          "label": "Tell her the truth — overwhelming and good and not sure yet",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk",
+            "people"
+          ],
+          "reaction_text": "A pause on her end. 'That sounds right.' She doesn't try to fix it.",
+          "outcome": {
+            "text": "You talk for twenty minutes. The long-distance meter runs and neither of you mentions it. You hang up feeling more anchored and more aware of how far you are. The hallway is quieter.",
+            "deltas": {
+              "stress": -2,
+              "energy": -1,
+              "resources": {
+                "socialLeverage": 1
+              }
+            }
+          }
+        },
+        {
+          "id": "s6_home_cheerful",
+          "label": "Tell her it's great — edit out the parts that would worry her",
+          "time_cost": 1,
+          "energy_cost": 1,
+          "identity_tags": [
+            "safety",
+            "people"
+          ],
+          "reaction_text": "You perform fine. She sounds relieved.",
+          "outcome": {
+            "text": "Twelve minutes. She's glad. You hang up and stand in the hallway. You protected her from something. You're not sure if that was generous or lonely.",
+            "deltas": {
+              "stress": 1,
+              "energy": -1
+            }
+          }
+        },
+        {
+          "id": "s6_home_brief",
+          "label": "Keep it short — you'll call back when you have more to say",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "achieve",
+            "safety"
+          ],
+          "reaction_text": "Five minutes. Fine, busy, I'll call Sunday.",
+          "outcome": {
+            "text": "You're back in the room before Danny notices you left. You feel slightly like you've left something on the table but can't name what.",
+            "deltas": {
+              "stress": 0,
+              "energy": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "slug": "s6_home_contrast_moment",
+      "title": "The Part That Doesn't Translate",
+      "tags": [
+        "home",
+        "belonging",
+        "social"
+      ],
+      "weight": 100,
+      "requirements": {
+        "min_day_index": 3,
+        "max_day_index": 5,
+        "max_total_runs": 1
+      },
+      "body": "Dinner table in the dining hall.\n\nMiguel is telling a story about his cousin's quinceañera — the whole family from San Antonio and Laredo — and the table is laughing at the right parts.\n\nThe girl from Cincinnati mentions her boarding school. Carla talks about her dad's work at the Board of Trade. Someone mentions their family's lake house like it's a direction.\n\nYou grew up somewhere. You came from something. The version of that story you tell is forming in real time.",
+      "choices": [
+        {
+          "id": "s6_contrast_share",
+          "label": "Tell your story — let it be what it is",
+          "time_cost": 0,
+          "energy_cost": 1,
+          "identity_tags": [
+            "risk",
+            "people"
+          ],
+          "reaction_text": "You say where you're from and something true about it. The table receives it.",
+          "outcome": {
+            "text": "Miguel asks a follow-up. Carla says 'I've driven through there.' The boarding school girl says nothing, which is also information. You've planted a flag. This version of yourself is available to build on.",
+            "deltas": {
+              "stress": -1,
+              "energy": -1,
+              "resources": {
+                "socialLeverage": 2
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_floor_miguel": {
+              "trust": 1,
+              "reliability": 0,
+              "emotionalLoad": 0
+            }
+          }
+        },
+        {
+          "id": "s6_contrast_deflect",
+          "label": "Redirect — ask Miguel a question instead",
+          "time_cost": 0,
+          "energy_cost": 0,
+          "identity_tags": [
+            "safety",
+            "people"
+          ],
+          "reaction_text": "He answers happily. The moment passes.",
+          "outcome": {
+            "text": "You know more about everyone at this table. They know nothing new about you. You've been asking questions as a way of disappearing.",
+            "deltas": {
+              "stress": -1,
+              "resources": {
+                "socialLeverage": 1
+              }
+            }
+          }
+        },
+        {
+          "id": "s6_contrast_honest_gap",
+          "label": "Name the gap — say something feels different about where you came from",
+          "time_cost": 0,
+          "energy_cost": 2,
+          "identity_tags": [
+            "risk",
+            "people"
+          ],
+          "reaction_text": "'I feel like everyone here has a version of this story that's bigger than mine.' The table goes quiet.",
+          "outcome": {
+            "text": "Miguel: 'Mine's not bigger. It's just louder.' Carla says her boarding school story is the version her parents want her to tell. The girl from Cincinnati laughs and says she has no idea what she's doing here either. The most honest moment this table has had all week.",
+            "deltas": {
+              "stress": -3,
+              "energy": -2,
+              "resources": {
+                "socialLeverage": 4
+              }
+            }
+          },
+          "relational_effects": {
+            "npc_floor_miguel": {
+              "trust": 3,
+              "reliability": 0,
+              "emotionalLoad": 1
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
