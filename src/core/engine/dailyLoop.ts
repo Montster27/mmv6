@@ -271,7 +271,7 @@ export async function getOrCreateDailyRun(
     }),
   });
 
-  const entrySlug = "s1_dorm_wake_dislocation";
+  const entrySlug = "s1_room_212_wake";
   let storylets = storyletsSelected;
 
   const shouldForceEntry =

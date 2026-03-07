@@ -70,6 +70,12 @@
               "reliability": 0,
               "emotionalLoad": 0
             }
+          },
+          "set_npc_memory": {
+            "npc_floor_miguel": {
+              "met": true,
+              "knows_name": true
+            }
           }
         },
         {
@@ -84,6 +90,7 @@
           "outcome": {
             "text": "You're back before 8. Danny still isn't. You know where your classrooms are now, which is more than most people can say. The anxiety is the same but it has fewer practical targets.",
             "deltas": {
+              "energy": -1,
               "stress": -1,
               "resources": {
                 "knowledge": 2
@@ -161,6 +168,8 @@
           },
           "set_npc_memory": {
             "npc_roommate_danny": {
+              "met": true,
+              "knows_name": true,
               "first_conv_depth": "surface"
             }
           }
@@ -194,6 +203,8 @@
           },
           "set_npc_memory": {
             "npc_roommate_danny": {
+              "met": true,
+              "knows_name": true,
               "first_conv_depth": "real",
               "knows_your_doubt": true
             }
@@ -211,6 +222,7 @@
           "outcome": {
             "text": "'I just... put my stuff there.' A pause. 'You want it?' You say no, not really, you just wanted to ask. He nods slowly. Something shifts — not badly. He knows you're someone who says things. That changes the room.",
             "deltas": {
+              "energy": -1,
               "stress": -1,
               "resources": {
                 "socialLeverage": 1
@@ -226,6 +238,8 @@
           },
           "set_npc_memory": {
             "npc_roommate_danny": {
+              "met": true,
+              "knows_name": true,
               "knows_you_speak_up": true
             }
           }
@@ -236,6 +250,7 @@
       "slug": "s1_danny_music_friction",
       "title": "The Volume",
       "tags": [
+        "arc_one_core",
         "roommate",
         "social"
       ],
@@ -263,6 +278,7 @@
           "outcome": {
             "text": "He turns it down without making it weird. 'Sorry, didn't realize.' You get the reading done. Nothing is damaged. In fact something is slightly better — you've established that the room has negotiable terms.",
             "deltas": {
+              "energy": -1,
               "stress": -1,
               "resources": {
                 "knowledge": 1
@@ -289,6 +305,7 @@
           "outcome": {
             "text": "You get through the reading. Sort of. The argument Heller is making about social structures has edges you'll have to find later. Danny turns it off at midnight and says goodnight like nothing happened. Because nothing did.",
             "deltas": {
+              "energy": -1,
               "stress": 1,
               "resources": {
                 "knowledge": 0
@@ -329,6 +346,7 @@
       "slug": "s1_danny_revealing_moment",
       "title": "The Letter",
       "tags": [
+        "arc_one_core",
         "roommate",
         "home",
         "social"
@@ -533,6 +551,7 @@
       "slug": "s2_first_gap",
       "title": "The Part You Didn't Follow",
       "tags": [
+        "arc_one_core",
         "academic",
         "study"
       ],
@@ -690,6 +709,7 @@
           "outcome": {
             "text": "The library has two copies on reserve — two-hour checkout limit. You write down the reserve desk hours on the back of your hand.",
             "deltas": {
+              "energy": -1,
               "stress": 0,
               "resources": {
                 "cashOnHand": -52,
@@ -711,6 +731,7 @@
           "outcome": {
             "text": "His name is James. He's in two of the same courses. You split the economics anthology — he buys it, you Xerox the relevant chapters at 10 cents a page. You save $23 and have someone to sit next to in Econ.",
             "deltas": {
+              "energy": -1,
               "stress": -1,
               "resources": {
                 "cashOnHand": -15,
@@ -726,6 +747,7 @@
       "slug": "s3_pizza_social",
       "title": "The Pizza Question",
       "tags": [
+        "arc_one_core",
         "money",
         "social",
         "belonging"
@@ -824,6 +846,7 @@
       "slug": "s3_money_friction_event",
       "title": "The Lab Fee",
       "tags": [
+        "arc_one_core",
         "money",
         "study"
       ],
@@ -946,6 +969,8 @@
           },
           "set_npc_memory": {
             "npc_newspaper_karen": {
+              "met": true,
+              "knows_name": true,
               "has_your_interest": true
             }
           },
@@ -1018,6 +1043,12 @@
               "trust": 2,
               "reliability": 1,
               "emotionalLoad": 0
+            }
+          },
+          "set_npc_memory": {
+            "npc_floor_miguel": {
+              "met": true,
+              "knows_name": true
             }
           }
         }
@@ -1193,6 +1224,7 @@
       "slug": "s5_newspaper_pitch",
       "title": "Student Union 204, Wednesday 7pm",
       "tags": [
+        "arc_one_core",
         "opportunity",
         "work",
         "belonging",
@@ -1300,6 +1332,7 @@
       "slug": "s5_opportunity_expired",
       "title": "The Card Is Gone",
       "tags": [
+        "arc_one_core",
         "opportunity"
       ],
       "weight": 80,
@@ -1424,6 +1457,7 @@
       "slug": "s6_home_contrast_moment",
       "title": "The Part That Doesn't Translate",
       "tags": [
+        "arc_one_core",
         "home",
         "belonging",
         "social"
