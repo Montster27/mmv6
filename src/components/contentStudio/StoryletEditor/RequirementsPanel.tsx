@@ -236,6 +236,57 @@ export function RequirementsPanel({ storylet, onChange }: RequirementsPanelProps
         </label>
       </div>
 
+      <label className="block text-xs text-slate-600">
+        Requires NOT precluded (slug)
+        <input
+          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono text-xs"
+          value={(req.requires_not_precluded as string | undefined) ?? ""}
+          onChange={(e) =>
+            onChange(
+              setReq(storylet, "requires_not_precluded", e.target.value || undefined)
+            )
+          }
+          placeholder="e.g. s5_opportunity_expired"
+        />
+        <span className="text-slate-400 text-xs">
+          Hides this storylet permanently if the named slug is in the player&rsquo;s preclusion gates.
+        </span>
+      </label>
+
+      <div>
+        <p className="text-xs font-semibold text-slate-600 mb-2">
+          Requires money band
+        </p>
+        <div className="flex gap-3">
+          {(["tight", "okay", "comfortable"] as const).map((band) => {
+            const current = Array.isArray(req.requires_money_band)
+              ? (req.requires_money_band as string[])
+              : [];
+            const checked = current.includes(band);
+            return (
+              <label key={band} className="flex items-center gap-1 text-xs text-slate-600 capitalize">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    const next = checked
+                      ? current.filter((b) => b !== band)
+                      : [...current, band];
+                    onChange(
+                      setReq(storylet, "requires_money_band", next.length ? next : undefined)
+                    );
+                  }}
+                />
+                {band}
+              </label>
+            );
+          })}
+        </div>
+        <span className="text-slate-400 text-xs">
+          Leave all unchecked to show at any money band.
+        </span>
+      </div>
+
       <details className="text-xs text-slate-600">
         <summary className="cursor-pointer font-medium text-slate-500 hover:text-slate-700">
           Raw requirements JSON

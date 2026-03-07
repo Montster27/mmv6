@@ -31,6 +31,10 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
   const targetStoryletId = isString(obj.targetStoryletId)
     ? obj.targetStoryletId
     : undefined;
+  const timeCost =
+    typeof obj.time_cost === "number" ? obj.time_cost : undefined;
+  const energyCost =
+    typeof obj.energy_cost === "number" ? obj.energy_cost : undefined;
   const reactionText = isString(obj.reaction_text)
     ? obj.reaction_text
     : undefined;
@@ -40,6 +44,15 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
   const eventsEmitted = Array.isArray(obj.events_emitted)
     ? (obj.events_emitted as any)
     : undefined;
+  const identityTags = Array.isArray(obj.identity_tags)
+    ? (obj.identity_tags as string[])
+    : undefined;
+  const skillModifier = isString(obj.skill_modifier)
+    ? obj.skill_modifier
+    : undefined;
+  const precludes = Array.isArray(obj.precludes)
+    ? (obj.precludes as string[])
+    : undefined;
   const relationalEffects =
     obj.relational_effects && typeof obj.relational_effects === "object"
       ? (obj.relational_effects as Record<string, Record<string, number>>)
@@ -48,6 +61,18 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     obj.set_npc_memory && typeof obj.set_npc_memory === "object"
       ? (obj.set_npc_memory as Record<string, Record<string, boolean>>)
       : undefined;
+  const requiresResource =
+    obj.requires_resource &&
+    typeof obj.requires_resource === "object" &&
+    !Array.isArray(obj.requires_resource)
+      ? (obj.requires_resource as { key: any; min: number })
+      : undefined;
+  const costsResource =
+    obj.costs_resource &&
+    typeof obj.costs_resource === "object" &&
+    !Array.isArray(obj.costs_resource)
+      ? (obj.costs_resource as { key: any; amount: number })
+      : undefined;
   return {
     id: obj.id,
     label: obj.label,
@@ -55,11 +80,18 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     outcomes,
     check: checkRaw,
     targetStoryletId,
+    time_cost: timeCost,
+    energy_cost: energyCost,
     reaction_text: reactionText,
     reaction_text_conditions: reactionConditions,
     events_emitted: eventsEmitted,
+    identity_tags: identityTags,
+    skill_modifier: skillModifier,
+    precludes,
     relational_effects: relationalEffects,
     set_npc_memory: setNpcMemory,
+    requires_resource: requiresResource,
+    costs_resource: costsResource,
   };
 }
 

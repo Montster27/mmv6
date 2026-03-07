@@ -42,12 +42,42 @@ function parseChoices(raw: unknown): StoryletChoice[] {
             outcomes: (item as any).outcomes,
             check: (item as any).check,
             targetStoryletId: (item as any).targetStoryletId,
+            time_cost:
+              typeof (item as any).time_cost === "number"
+                ? (item as any).time_cost
+                : undefined,
+            energy_cost:
+              typeof (item as any).energy_cost === "number"
+                ? (item as any).energy_cost
+                : undefined,
             reaction_text: (item as any).reaction_text ?? null,
             reaction_text_conditions:
               (item as any).reaction_text_conditions ?? undefined,
             events_emitted: (item as any).events_emitted ?? undefined,
+            identity_tags: Array.isArray((item as any).identity_tags)
+              ? ((item as any).identity_tags as string[])
+              : undefined,
+            skill_modifier:
+              typeof (item as any).skill_modifier === "string"
+                ? (item as any).skill_modifier
+                : undefined,
+            precludes: Array.isArray((item as any).precludes)
+              ? ((item as any).precludes as string[])
+              : undefined,
             relational_effects: (item as any).relational_effects ?? undefined,
             set_npc_memory: (item as any).set_npc_memory ?? undefined,
+            requires_resource:
+              (item as any).requires_resource &&
+              typeof (item as any).requires_resource === "object" &&
+              !Array.isArray((item as any).requires_resource)
+                ? (item as any).requires_resource
+                : undefined,
+            costs_resource:
+              (item as any).costs_resource &&
+              typeof (item as any).costs_resource === "object" &&
+              !Array.isArray((item as any).costs_resource)
+                ? (item as any).costs_resource
+                : undefined,
           } as StoryletChoice;
         }
         return null;

@@ -51,6 +51,12 @@ type Requirements = {
    * Values: "tight" | "okay" | "comfortable"
    */
   requires_money_band?: Array<"tight" | "okay" | "comfortable">;
+  /**
+   * Narrative phase tag — informational grouping only; not filtered by the
+   * selector yet. Reserved for future phase-based scheduling.
+   * Values: "intro_hook" | "guided_core_loop" | "reflection_arc" | "community_purpose"
+   */
+  trigger_phase?: string | string[];
   [key: string]: unknown;
 };
 
