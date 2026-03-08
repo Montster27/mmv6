@@ -112,4 +112,3 @@ export async function applyResourceDelta(
   return next;
 }
 
-export { previewResourceDelta } from "@/core/resources/resourceDelta";

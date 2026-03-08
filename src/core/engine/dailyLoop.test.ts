@@ -39,9 +39,6 @@ describe("dailyLoop helpers", () => {
       true,
       true,
       false,
-      false,
-      false,
-      false,
       false
     );
     expect(stage).toBe("storylet_2");
@@ -54,9 +51,6 @@ describe("dailyLoop helpers", () => {
       false,
       true,
       true,
-      false,
-      false,
-      false,
       false,
       false
     );
@@ -71,11 +65,11 @@ describe("dailyLoop helpers", () => {
       true,
       true,
       false,
-      false,
-      false,
-      false,
       false
     );
     expect(stage).toBe("allocation");
   });
+
+  // storyletC declared above; suppress unused-variable warning by referencing it
+  void storyletC;
 });

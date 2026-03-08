@@ -226,7 +226,7 @@ describe("storyletValidation", () => {
     const guarded = {
       ...valid,
       body: "You find Miguel at the table.",
-      requirements: { requires_npc_met: ["npc_connector_miguel"] },
+      requirements: { requires_npc_met: ["npc_floor_miguel"] },
     };
     const res = validateStoryletIssues(guarded);
     expect(res.warnings.some((w) => w.path === "body" && w.message.includes("Miguel"))).toBe(false);
@@ -247,7 +247,7 @@ describe("storyletValidation", () => {
     const guarded = {
       ...valid,
       choices: [{ id: "a", label: "Ask Miguel about the club" }],
-      requirements: { requires_npc_met: ["npc_connector_miguel"] },
+      requirements: { requires_npc_met: ["npc_floor_miguel"] },
     };
     const res = validateStoryletIssues(guarded);
     expect(

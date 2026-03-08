@@ -231,7 +231,7 @@ export function RequirementsPanel({ storylet, onChange }: RequirementsPanelProps
                 )
               )
             }
-            placeholder="npc_connector_miguel, …"
+            placeholder="npc_floor_miguel, …"
           />
         </label>
       </div>

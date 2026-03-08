@@ -47,7 +47,7 @@ const DEFAULT_RELATIONSHIP = 5;
 
 const ROLE_TAGS: Record<string, string> = {
   npc_roommate_dana: "roommate",
-  npc_connector_miguel: "orientation",
+  npc_floor_miguel: "orientation",
   npc_prof_marsh: "professor",
   npc_studious_priya: "classmate",
   npc_floor_cal: "floormate",
@@ -58,7 +58,7 @@ const ROLE_TAGS: Record<string, string> = {
 
 export const ALL_YEAR_ONE_NPCS = [
   "npc_roommate_dana",
-  "npc_connector_miguel",
+  "npc_floor_miguel",
   "npc_prof_marsh",
   "npc_studious_priya",
   "npc_floor_cal",
@@ -151,7 +151,7 @@ export function ensureRelationshipDefaults(
     relationship: 6,
   });
   // All others start unmet — they are introduced through storylet events
-  ensure("npc_connector_miguel", {
+  ensure("npc_floor_miguel", {
     met: false,
     knows_name: false,
     knows_face: false,
@@ -345,7 +345,7 @@ export function applyRelationshipEvents(
 
 const NPC_DISPLAY_NAMES: Record<string, string> = {
   npc_roommate_dana: "Dana",
-  npc_connector_miguel: "Miguel",
+  npc_floor_miguel: "Miguel",
   npc_prof_marsh: "Prof. Marsh",
   npc_studious_priya: "Priya",
   npc_floor_cal: "Cal",

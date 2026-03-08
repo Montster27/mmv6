@@ -43,11 +43,6 @@ export function normalizeStreamStates(raw: unknown): StreamStates {
   };
 }
 
-/** Read the current FSM state for a single stream. */
-export function getStreamState(states: StreamStates, stream: StreamId): string {
-  return states[stream];
-}
-
 /** Return a new StreamStates with one stream updated to the given state. */
 export function setStreamState(
   states: StreamStates,

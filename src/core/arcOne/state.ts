@@ -218,9 +218,3 @@ export function shiftMoneyBand(band: MoneyBand, effect: "improve" | "worsen"): M
   return "tight";
 }
 
-export function withExpiredOpportunity(
-  current: ExpiredOpportunity[],
-  next: ExpiredOpportunity
-): ExpiredOpportunity[] {
-  return [...current, next];
-}

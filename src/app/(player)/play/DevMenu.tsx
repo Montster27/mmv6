@@ -13,7 +13,7 @@ import type { RelationshipState } from "@/lib/relationships";
 
 const NPC_LABELS: Record<string, string> = {
   npc_roommate_dana: "Dana",
-  npc_connector_miguel: "Miguel",
+  npc_floor_miguel: "Miguel",
   npc_prof_marsh: "Prof. Marsh",
   npc_studious_priya: "Priya",
   npc_floor_cal: "Cal",

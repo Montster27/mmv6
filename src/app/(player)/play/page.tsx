@@ -391,7 +391,7 @@ export default function PlayPage() {
   const relationshipDebugEnabled = Boolean(featureFlags.relationshipDebugEnabled);
   const npcNameForId = useCallback((npcId: string) => {
     if (npcId === "npc_roommate_dana") return "Dana";
-    if (npcId === "npc_connector_miguel") return "Miguel";
+    if (npcId === "npc_floor_miguel") return "Miguel";
     return npcId;
   }, []);
   const arcOneState = useMemo(
@@ -2330,7 +2330,7 @@ export default function PlayPage() {
                     <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                       <p className="font-semibold text-slate-700">People</p>
                       <div className="mt-2 space-y-2">
-                        {["npc_roommate_dana", "npc_connector_miguel"].map(
+                        {["npc_roommate_dana", "npc_floor_miguel"].map(
                           (npcId) => {
                             const entry = relationshipsState[npcId] ?? {};
                             const met = entry.met ? "✅" : "❌";
