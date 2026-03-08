@@ -2183,17 +2183,17 @@ export default function PlayPage() {
   }, [stage, alreadyCompletedToday, userId, dayIndex]);
 
   return (
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-4 min-h-screen bg-background">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold">Play</h1>
-              <p className="text-slate-700">
+              <h1 className="text-3xl font-bold tracking-tight text-primary font-heading">Play</h1>
+              <p className="font-stat text-sm tabular-nums text-foreground/70 tracking-wide">
                 Day {dayIndex} · Energy{" "}
                 {dayState?.energy ?? dailyState?.energy ?? "—"} · Stress{" "}
                 {dayState?.stress ?? dailyState?.stress ?? "—"}
               </p>
-              <div className="mt-2 text-sm text-slate-600">
-                <p className="font-medium text-slate-700">
+              <div className="mt-2 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground/80">
                   {getDailyStageCopy(stage).title}
                 </p>
                 <p>{getDailyStageCopy(stage).body}</p>
@@ -2206,7 +2206,7 @@ export default function PlayPage() {
                   />
                 </div>
               ) : null}
-              <p className="text-slate-600 text-sm">
+              <p className="text-muted-foreground text-xs font-stat">
                 Signed in as {session.user.email ?? "unknown user"}.
               </p>
               <div className="mt-3 space-y-2">
@@ -2422,11 +2422,11 @@ export default function PlayPage() {
           ) : null}
 
           {seasonResetPending ? (
-            <section className="rounded-md border border-slate-500/40 border-l-4 border-l-slate-300/70 bg-indigo-950 px-4 py-4 space-y-3 text-slate-100">
-              <h2 className="text-xl font-semibold tracking-wide">
+            <section className="rounded border-2 border-primary/40 bg-primary px-4 py-4 space-y-3 text-primary-foreground prep-stripe-top">
+              <h2 className="text-xl font-bold tracking-wide font-heading">
                 Season {seasonIndex ?? "?"} begins
               </h2>
-              <p className="text-slate-200">
+              <p className="text-primary-foreground/80">
                 You remember: anomalies and theories.
               </p>
               <TesterOnly>
@@ -2438,7 +2438,7 @@ export default function PlayPage() {
                 <MessageCard message={seasonResetGameNote} variant="inline" />
               </div>
               {seasonRecap ? (
-                <div className="rounded-md border border-slate-500/40 bg-slate-900/40 px-3 py-3 text-sm text-slate-200 space-y-1">
+                <div className="rounded border border-primary-foreground/20 bg-primary/80 px-3 py-3 text-sm text-primary-foreground/90 space-y-1">
                   <p>Last season recap:</p>
                   <p>· Anomalies found: {seasonRecap.anomaliesFoundCount}</p>
                   <p>· Hypotheses written: {seasonRecap.hypothesesCount}</p>
@@ -2462,8 +2462,8 @@ export default function PlayPage() {
               </Button>
             </section>
           ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr,1fr]">
-              <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr,1fr]">
+              <div className="space-y-5">
                 {error ? (
                   <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {error}
@@ -2474,11 +2474,11 @@ export default function PlayPage() {
                   <PlaySkeleton />
                 ) : showDailyComplete ? (
                   <>
-                    <section className="space-y-3 rounded-md border border-slate-200 bg-gradient-to-br from-slate-100 via-slate-50 to-blue-100/60 px-4 py-4">
-                      <h2 className="text-xl font-semibold text-slate-700">
-                        Daily complete ✅
+                    <section className="space-y-3 rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top">
+                      <h2 className="text-xl font-bold text-primary font-heading">
+                        Daily complete ✓
                       </h2>
-                      <p className="text-slate-600">Come back tomorrow.</p>
+                      <p className="text-foreground/70">Come back tomorrow.</p>
                       {devSettings.test_mode ? (
                         <div className="pt-2">
                           <Button
@@ -2541,7 +2541,7 @@ export default function PlayPage() {
                   ) : null}
 
                   {USE_DAILY_LOOP_ORCHESTRATOR && stage === "setup" && (
-                    <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                    <section className="space-y-3 rounded border-2 border-border bg-card px-4 py-4">
                       <DailySetupPanel
                         tensions={tensions}
                         skillBank={skillBank}
@@ -2579,30 +2579,30 @@ export default function PlayPage() {
                     (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
                     <section className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <h2 className="text-xl font-semibold">Storylets</h2>
-                          <span className="text-sm text-slate-600">
-                            Progress: {Math.min(runs.length, 3)}/3
+                          <h2 className="prep-label">Storylets</h2>
+                          <span className="font-stat text-xs text-muted-foreground tabular-nums">
+                            {Math.min(runs.length, 3)}/3
                           </span>
                         </div>
-                        <p className="text-base text-slate-700">
+                        <p className="text-sm text-foreground/70">
                           Pick one choice. You can do three today.
                         </p>
 
                         {!currentStorylet ? (
-                          <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
+                          <div className="rounded border-2 border-border bg-card px-3 py-3">
                             {storylets.length === 0 ? (
-                              <p className="text-slate-700">No more storylets today.</p>
+                              <p className="text-foreground/70">No more storylets today.</p>
                             ) : (
-                              <p className="text-slate-700">Daily complete ✅</p>
+                              <p className="text-foreground/70">Daily complete ✓</p>
                             )}
                             <Button className="mt-3" variant="secondary">
                               Back tomorrow
                             </Button>
                           </div>
                         ) : (
-                          <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+                          <div className="space-y-3 rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top">
                             <div>
-                              <p className="text-sm text-slate-600">
+                              <p className="prep-label mb-1">
                                 Storylet{" "}
                                 {stage === "storylet_3"
                                   ? 3
@@ -2611,10 +2611,10 @@ export default function PlayPage() {
                                   : 1}{" "}
                                 of 3
                               </p>
-                              <h3 className="text-lg font-semibold text-slate-900">
+                              <h3 className="text-xl font-bold text-primary font-heading">
                                 {currentStorylet.title}
                               </h3>
-                              <p className="text-slate-700 whitespace-pre-line">{displayBody}</p>
+                              <p className="text-foreground/85 whitespace-pre-line leading-relaxed mt-1">{displayBody}</p>
                             </div>
                             <div className="space-y-2">
                               {(() => {
@@ -2663,7 +2663,7 @@ export default function PlayPage() {
                                           ) : null}
                                         </Button>
                                         {!meetsGate && reqRes ? (
-                                          <p className="text-xs text-slate-500 pl-1">
+                                          <p className="text-xs text-muted-foreground pl-1">
                                             🔒 Requires {reqRes.min}{" "}
                                             {RESOURCE_LABELS[reqRes.key] ?? reqRes.key}
                                           </p>
@@ -2672,13 +2672,13 @@ export default function PlayPage() {
                                     );
                                   })
                                 ) : (
-                                  <p className="text-slate-600 text-sm">
+                                  <p className="text-muted-foreground text-sm">
                                     No choices available.
                                   </p>
                                 );
                               })()}
                               {beatBufferEnabled && pendingReactionText ? (
-                                <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800">
+                                <div className="rounded border-2 border-border bg-muted px-4 py-3 text-foreground">
                                   {pendingReactionText.split("\n\n").map((para, idx) => (
                                     <p key={idx} className="text-sm">
                                       {para}
@@ -2706,7 +2706,7 @@ export default function PlayPage() {
                               {(outcomeMessage || outcomeDeltas) &&
                                 !consequenceActive &&
                                 !pendingReactionText && (
-                                  <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                                  <div className="rounded border-2 border-border bg-muted px-3 py-2 text-sm text-foreground">
                                     {outcomeMessage ? <p>{outcomeMessage}</p> : null}
                                     {outcomeDeltas ? (
                                       <ul className="mt-1 space-y-0.5 text-slate-700">
@@ -2765,7 +2765,7 @@ export default function PlayPage() {
                                     ) : null}
                                     {featureFlags.afterActionCompareEnabled &&
                                     compareVisible ? (
-                                      <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">
+                                      <div className="mt-3 rounded border-2 border-border bg-card px-3 py-2 text-sm text-foreground">
                                         <div className="flex items-center justify-between">
                                           <p className="font-semibold">
                                             Cohort comparison
@@ -2813,7 +2813,7 @@ export default function PlayPage() {
                                             Share a short note (optional)
                                           </label>
                                           <input
-                                            className="w-full rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                            className="w-full rounded border-2 border-input bg-card px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                             value={compareNote}
                                             onChange={(e) =>
                                               setCompareNote(e.target.value)
@@ -2866,7 +2866,7 @@ export default function PlayPage() {
                     arcOneMode &&
                     arcBeats.filter((b) => !resolvedArcBeatIds.has(b.instance_id)).length > 0 && (
                     <section className="space-y-3">
-                      <h2 className="text-sm font-medium uppercase tracking-wider text-gray-500">
+                      <h2 className="prep-label">
                         Today&apos;s Moments
                       </h2>
                       {arcBeats
@@ -2915,7 +2915,7 @@ export default function PlayPage() {
               {USE_DAILY_LOOP_ORCHESTRATOR &&
                 featureFlags.funPulse &&
                 stage === "fun_pulse" && (
-                <section className="space-y-3 rounded-md border border-purple-200 bg-purple-50/70 px-4 py-4">
+                <section className="space-y-3 rounded border-2 border-accent-foreground/20 bg-accent px-4 py-4">
                   <FunPulse
                     onSelect={handleFunPulseSelect}
                     onSkip={handleFunPulseSkip}

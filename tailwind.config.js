@@ -7,6 +7,10 @@ module.exports = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			heading: ['var(--font-playfair)', 'Georgia', 'serif'],
+  			stat:    ['var(--font-space-mono)', '"Courier New"', 'monospace'],
+  		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',

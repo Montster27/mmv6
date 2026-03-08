@@ -4,19 +4,35 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border font-medium transition-colors",
+  "inline-flex items-center rounded border font-medium transition-colors",
   {
     variants: {
       variant: {
-        default: "border-slate-200 bg-white text-slate-700",
-        success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-        warning: "border-amber-200 bg-amber-50 text-amber-800",
-        info: "border-blue-200 bg-blue-50 text-blue-700",
-        destructive: "border-red-200 bg-red-50 text-red-700",
+        // Cream/border — neutral tag
+        default:
+          "border-border bg-card text-foreground",
+        // Prep navy — primary label
+        navy:
+          "border-primary/40 bg-primary text-primary-foreground",
+        // Coral blush — events, flags, warnings
+        coral:
+          "border-accent-foreground/20 bg-accent text-accent-foreground",
+        // Polo mint — secondary info, classes
+        mint:
+          "border-secondary-foreground/20 bg-secondary text-secondary-foreground",
+        success:
+          "border-emerald-300 bg-emerald-50 text-emerald-800",
+        warning:
+          "border-amber-300 bg-amber-50 text-amber-900",
+        info:
+          "border-primary/20 bg-primary/10 text-primary",
+        destructive:
+          "border-red-300 bg-red-50 text-red-800",
       },
       size: {
         default: "px-2 py-0.5 text-xs",
         lg: "px-3 py-1 text-xs",
+        label: "px-2 py-0.5 text-[0.6rem] tracking-wider uppercase font-bold",
       },
     },
     defaultVariants: {

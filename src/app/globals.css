@@ -11,6 +11,11 @@ body {
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-playfair, Georgia, "Times New Roman", serif);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair, Georgia, serif);
 }
 
 * {
@@ -28,81 +33,165 @@ html {
   color-scheme: light;
 }
 
+/* ── Stat highlight pulse ───────────────────────────────────────────── */
 @keyframes highlight-pulse {
-  0% {
-    opacity: 0;
-  }
-  40% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+  0%   { opacity: 0; }
+  40%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .stat-highlight {
   animation: highlight-pulse 250ms ease-out;
 }
 
+/* ── 80s Preppy Design System ───────────────────────────────────────── */
 
+/*
+ * Polo stripe — the three-color band (coral | navy | kelly green)
+ * Used as a top-accent on cards and section headers.
+ */
+.prep-stripe-top {
+  border-top: 4px solid transparent;
+  border-image: linear-gradient(
+    to right,
+    hsl(14 73% 61%)   33%,
+    hsl(214 55% 22%)  33% 66%,
+    hsl(145 52% 30%)  66%
+  ) 1;
+}
+
+/*
+ * Diagonal pinstripe — subtle background texture for muted panels.
+ */
+.prep-pinstripe {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent             0px,
+    transparent             5px,
+    rgba(27, 58, 92, 0.05)  5px,
+    rgba(27, 58, 92, 0.05)  6px
+  );
+}
+
+/*
+ * Argyle diamond — decorative divider between choice options.
+ */
+.prep-divider {
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    hsl(214 30% 78%)     0px,
+    hsl(214 30% 78%)     4px,
+    transparent          4px,
+    transparent          8px
+  );
+}
+
+/*
+ * Collegiate label — all-caps micro-label for section heads.
+ */
+.prep-label {
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: hsl(214 30% 48%);
+  font-family: var(--font-space-mono, "Courier New", monospace);
+}
+
+/*
+ * Heading font — serif display.
+ */
+.font-heading {
+  font-family: var(--font-playfair, Georgia, serif);
+}
+
+/*
+ * Monospace stat display — for numbers, energy, stress, day counter.
+ */
+.font-stat {
+  font-family: var(--font-space-mono, "Courier New", monospace);
+}
+
+/*
+ * Pennant banner — left-pointing arrow shape for section flags.
+ * Usage: add to a flex container with a colored bg.
+ */
+.prep-pennant {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+  padding-right: 1.5rem;
+}
+
+/* ── CSS custom properties ──────────────────────────────────────────── */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    /* ── 80s Preppy Palette ──────────────────────────────────────── */
+    --background:              42 47% 97%;   /* warm Polo cream           */
+    --foreground:             214 55% 15%;   /* deep Harwick navy         */
+
+    --card:                    42 47% 97%;   /* cream card surface        */
+    --card-foreground:        214 55% 15%;
+
+    --popover:                 42 40% 99%;
+    --popover-foreground:     214 55% 15%;
+
+    --primary:                214 55% 22%;   /* prep navy                 */
+    --primary-foreground:      42 47% 96%;   /* cream text on navy        */
+
+    --secondary:              155 28% 87%;   /* polo mint                 */
+    --secondary-foreground:   155 52% 20%;   /* forest green on mint      */
+
+    --muted:                   42 30% 92%;   /* warm cream muted          */
+    --muted-foreground:       214 20% 48%;   /* dusty navy                */
+
+    --accent:                  14 65% 91%;   /* blush coral               */
+    --accent-foreground:       14 73% 35%;   /* dark coral text           */
+
+    --destructive:              0 72% 51%;
+    --destructive-foreground:   0  0% 98%;
+
+    --border:                 214 28% 78%;   /* soft navy border          */
+    --input:                  214 20% 85%;
+    --ring:                   214 55% 22%;
+
+    /* ── Chart colors (preppy palette) ─────────────────────────── */
+    --chart-1:  14 73% 61%;                  /* coral                     */
+    --chart-2: 145 52% 30%;                  /* kelly green               */
+    --chart-3: 214 55% 22%;                  /* navy                      */
+    --chart-4:  43 70% 48%;                  /* prep gold                 */
+    --chart-5: 336 52% 56%;                  /* blush pink                */
+
+    --radius: 0.25rem;                       /* sharper corners = more prep */
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --background:             214 55% 10%;
+    --foreground:              42 47% 96%;
+    --card:                   214 45% 13%;
+    --card-foreground:         42 47% 96%;
+    --popover:                214 45% 13%;
+    --popover-foreground:      42 47% 96%;
+    --primary:                 42 47% 84%;
+    --primary-foreground:     214 55% 15%;
+    --secondary:              214 30% 20%;
+    --secondary-foreground:    42 40% 90%;
+    --muted:                  214 30% 17%;
+    --muted-foreground:       214 15% 60%;
+    --accent:                  14 50% 25%;
+    --accent-foreground:       14 65% 75%;
+    --destructive:              0 62.8% 30.6%;
+    --destructive-foreground:   0  0% 98%;
+    --border:                 214 30% 22%;
+    --input:                  214 30% 22%;
+    --ring:                    42 47% 70%;
+    --chart-1:  14 73% 61%;
+    --chart-2: 145 52% 45%;
+    --chart-3:  42 60% 70%;
+    --chart-4:  43 70% 60%;
+    --chart-5: 336 52% 65%;
   }
 }
-
-
 
 @layer base {
   * {
