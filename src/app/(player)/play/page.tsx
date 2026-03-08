@@ -67,7 +67,9 @@ import {
   mapLegacyRelationalEffects,
   migrateLegacyNpcMemory,
   renderNpcName,
+  type RelationshipEvent,
 } from "@/lib/relationships";
+import { getDisplayBody } from "@/domain/npcs/registry";
 import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
 import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
@@ -1398,6 +1400,15 @@ export default function PlayPage() {
       : stage === "storylet_3"
       ? storylets[2]
       : storylets[currentIndex];
+
+  const displayBody = currentStorylet
+    ? getDisplayBody(
+        currentStorylet.body,
+        (currentStorylet as any).introduces_npc as string[] | undefined,
+        relationshipsState
+      )
+    : "";
+
   const choiceLabelMap = useMemo(() => {
     if (!currentStorylet) return new Map<string, string>();
     return new Map(toChoices(currentStorylet).map((choice) => [choice.id, choice.label]));
@@ -1747,7 +1758,14 @@ export default function PlayPage() {
         if (next) next();
       }
 
+      // Auto-mark NPCs declared in introduces_npc as met on first encounter.
+      const introducedNpcs = (currentStorylet as any).introduces_npc as string[] | undefined;
+      const introEvents: RelationshipEvent[] = (introducedNpcs ?? [])
+        .filter((npcId: string) => !relationshipsState[npcId]?.met)
+        .map((npcId: string) => ({ npc_id: npcId, type: "INTRODUCED_SELF" as const }));
+
       const relationshipEvents = [
+        ...introEvents,
         ...((selectedChoice?.events_emitted ?? []) as any),
         ...mapLegacyRelationalEffects(selectedChoice?.relational_effects),
         ...mapLegacyNpcKnowledge(selectedChoice?.set_npc_memory),
@@ -2596,7 +2614,7 @@ export default function PlayPage() {
                               <h3 className="text-lg font-semibold text-slate-900">
                                 {currentStorylet.title}
                               </h3>
-                              <p className="text-slate-700">{currentStorylet.body}</p>
+                              <p className="text-slate-700 whitespace-pre-line">{displayBody}</p>
                             </div>
                             <div className="space-y-2">
                               {(() => {

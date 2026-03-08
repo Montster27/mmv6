@@ -556,6 +556,7 @@
         "study"
       ],
       "weight": 130,
+      "introduces_npc": ["npc_floor_miguel"],
       "requirements": {
         "min_day_index": 3,
         "max_day_index": 4,
@@ -753,13 +754,11 @@
         "belonging"
       ],
       "weight": 120,
+      "introduces_npc": ["npc_floor_miguel"],
       "requirements": {
         "min_day_index": 2,
         "max_day_index": 4,
-        "max_total_runs": 1,
-        "requires_npc_met": [
-          "npc_floor_miguel"
-        ]
+        "max_total_runs": 1
       },
       "body": "Miguel knocks on your door at 7pm.\n\n'Group of us are going to Sal's — it's like a ten minute walk. You in?'\n\nYou check your wallet without obviously checking your wallet. You have seventeen dollars and change. Textbooks are paid for or not. The dining hall is covered.\n\nBut you've been doing quiet math all week and seventeen feels like it needs to last longer than the weekend.",
       "choices": [
@@ -934,6 +933,7 @@
         "opportunity"
       ],
       "weight": 190,
+      "introduces_npc": ["npc_floor_miguel"],
       "requirements": {
         "min_day_index": 1,
         "max_day_index": 1,
@@ -1064,6 +1064,7 @@
         "social"
       ],
       "weight": 160,
+      "introduces_npc": ["npc_floor_miguel"],
       "requirements": {
         "min_day_index": 1,
         "max_day_index": 1,
@@ -1463,6 +1464,7 @@
         "social"
       ],
       "weight": 100,
+      "introduces_npc": ["npc_floor_miguel"],
       "requirements": {
         "min_day_index": 3,
         "max_day_index": 5,

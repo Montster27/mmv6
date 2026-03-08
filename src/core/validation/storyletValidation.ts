@@ -126,6 +126,9 @@ export function coerceStoryletRow(row: any): Storylet {
         ? (row.requirements as Record<string, unknown>)
         : {},
     weight: typeof row?.weight === "number" ? row.weight : 100,
+    introduces_npc: Array.isArray(row?.introduces_npc)
+      ? (row.introduces_npc as unknown[]).filter((v) => typeof v === "string") as string[]
+      : undefined,
   };
 }
 
@@ -184,7 +187,7 @@ const RESOURCE_GATE_KEYS = new Set([
  * Format: [word-boundary regex, npc_id, display name for messages]
  */
 const GUARDED_NPC_NAMES: [RegExp, string, string][] = [
-  [/\bMiguel\b/, "npc_connector_miguel", "Miguel"],
+  [/\bMiguel\b/, "npc_floor_miguel", "Miguel"],
   [/\bMarsh\b/, "npc_prof_marsh", "Marsh"],
   [/\bPriya\b/, "npc_studious_priya", "Priya"],
   [/\bCal\b/, "npc_floor_cal", "Cal"],
@@ -737,9 +740,10 @@ export function validateStoryletIssues(
   //   (b) use reaction_text_conditions in choices so the name is conditional.
   {
     const req = (storylet.requirements ?? {}) as Record<string, unknown>;
-    const metNpcs = Array.isArray(req.requires_npc_met)
-      ? (req.requires_npc_met as string[])
-      : [];
+    const metNpcs = [
+      ...(Array.isArray(req.requires_npc_met) ? (req.requires_npc_met as string[]) : []),
+      ...(Array.isArray((storylet as any).introduces_npc) ? ((storylet as any).introduces_npc as string[]) : []),
+    ];
 
     if (isString(storylet.body)) {
       for (const [pattern, npcId, displayName] of GUARDED_NPC_NAMES) {

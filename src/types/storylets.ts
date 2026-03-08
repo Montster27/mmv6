@@ -69,6 +69,12 @@ export type Storylet = {
   tags?: string[];
   requirements?: Record<string, unknown>;
   weight?: number;
+  /**
+   * NPC ids this storylet can introduce. On first encounter (NPC not yet met),
+   * a brief intro blurb is prepended to the body. All listed NPCs are
+   * auto-marked met after any choice is taken. No requires_npc_met gate needed.
+   */
+  introduces_npc?: string[];
 };
 
 export type StoryletRun = {
