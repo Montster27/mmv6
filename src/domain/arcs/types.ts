@@ -55,6 +55,8 @@ export type ArcStepOption = {
    * Mark the named opportunity type as expired when this option is chosen.
    */
   sets_expired_opportunity?: "academic" | "social" | "financial";
+  /** Narrative follow-up text shown to the player after this option is chosen. */
+  reaction_text?: string | null;
 };
 
 export type ArcStep = {
