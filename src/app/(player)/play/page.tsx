@@ -2020,10 +2020,23 @@ export default function PlayPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as { error?: string }).error ?? "Request failed");
       }
-      setResolvedArcBeatIds((prev) => new Set([...prev, beat.instance_id]));
+
+      const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
+      setResolvedArcBeatIds(newResolved);
+
+      // arcOneMode: mark day complete once all beats are resolved
+      if (arcOneMode && userId && arcBeats.every((b) => newResolved.has(b.instance_id))) {
+        try {
+          await markDailyComplete(userId, dayIndex);
+          incrementGroupObjective(2, "daily_complete").catch(() => {});
+        } catch (e) {
+          console.error("Failed to mark daily complete after arc beats", e);
+        }
+      }
+
       setRefreshTick((t) => t + 1);
     },
-    [dayIndex]
+    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId]
   );
 
   const handleAllocateSkillPoint = async (skillKey: string) => {
@@ -2181,6 +2194,22 @@ export default function PlayPage() {
       markCompleteIfNeeded();
     }
   }, [stage, alreadyCompletedToday, userId, dayIndex]);
+
+  // arcOneMode edge case: player returns to page after resolving all beats in a
+  // previous session. Server returns arcBeats=[] but markDailyComplete was never
+  // called. Auto-complete so the player sees "Daily complete ✓".
+  useEffect(() => {
+    if (!USE_DAILY_LOOP_ORCHESTRATOR) return;
+    if (!arcOneMode) return;
+    if (!userId) return;
+    if (loading) return;
+    if (alreadyCompletedToday) return;
+    if (!dailyRunQuery.data) return; // wait for data to load
+    if (arcBeats.length > 0) return; // beats still pending
+    markDailyComplete(userId, dayIndex).catch(console.error);
+    incrementGroupObjective(2, "daily_complete").catch(() => {});
+    setRefreshTick((t) => t + 1);
+  }, [arcOneMode, arcBeats.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunQuery.data]);
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
@@ -2573,10 +2602,10 @@ export default function PlayPage() {
                     />
                   )}
 
-                  {(stage === "storylet_1" ||
+                  {((stage === "storylet_1" ||
                     stage === "storylet_2" ||
                     stage === "storylet_3" ||
-                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && (
+                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && !arcOneMode) && (
                     <section className="space-y-3">
                         <div className="flex items-center justify-between">
                           <h2 className="prep-label">Storylets</h2>
