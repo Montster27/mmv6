@@ -79,7 +79,7 @@ SELECT
     '[]'::jsonb
   ) AS choices,
   TRUE AS is_active,
-  '[]'::jsonb AS tags,
+  ARRAY[]::text[] AS tags,
   '{}'::jsonb AS requirements,
   1 AS weight,
   s.arc_id,
