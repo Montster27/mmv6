@@ -402,11 +402,12 @@ export async function getOrCreateDailyRun(
   let arcBeats: ArcBeat[] = [];
   if (arcOneMode) {
     try {
-      // 1. Load the six Arc One arc definitions
+      // 1. Load Arc One arc definitions (opening arc + six streams)
+      const allArcOneKeys = ["arc_opening", ...ARC_ONE_STREAM_KEYS];
       const { data: arcDefs } = await supabase
         .from("arc_definitions")
         .select("id,key,title,description,tags,is_enabled")
-        .in("key", ARC_ONE_STREAM_KEYS)
+        .in("key", allArcOneKeys)
         .eq("is_enabled", true);
 
       const streamArcs: ArcDefinition[] = (arcDefs ?? []).map((r) => ({
