@@ -271,27 +271,7 @@ export async function getOrCreateDailyRun(
     }),
   });
 
-  const entrySlug = "s1_room_212_wake";
   let storylets = storyletsSelected;
-
-  const shouldForceEntry =
-    featureFlags.arcOneScarcityEnabled &&
-    dayIndex === 1 &&
-    seasonContext.currentSeason?.season_index >= 0;
-
-  if (shouldForceEntry) {
-    const entryStorylet = storyletsRaw.find(
-      (storylet) => storylet.slug === entrySlug
-    );
-    if (entryStorylet) {
-      storylets = [
-        entryStorylet,
-        ...storylets.filter((storylet) => storylet.id !== entryStorylet!.id),
-      ].slice(0, 3);
-    } else {
-      console.warn("Arc One entry storylet not found in candidates.");
-    }
-  }
 
   let initiatives = null as DailyRun["initiatives"];
 
