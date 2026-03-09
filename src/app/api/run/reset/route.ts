@@ -43,25 +43,29 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle();
 
-  await supabaseServer.from("storylet_runs").delete().eq("user_id", userId);
-  await supabaseServer.from("reflections").delete().eq("user_id", userId);
-  await supabaseServer.from("time_allocations").delete().eq("user_id", userId);
-  await supabaseServer.from("daily_tensions").delete().eq("user_id", userId);
-  await supabaseServer.from("skill_bank").delete().eq("user_id", userId);
-  await supabaseServer.from("daily_posture").delete().eq("user_id", userId);
-  await supabaseServer.from("skill_point_allocations").delete().eq("user_id", userId);
-  await supabaseServer.from("arc_instances").delete().eq("user_id", userId);
-  await supabaseServer.from("arc_offers").delete().eq("user_id", userId);
-  await supabaseServer.from("player_dispositions").delete().eq("user_id", userId);
-  await supabaseServer.from("choice_log").delete().eq("user_id", userId);
-  await supabaseServer.from("chapter_summaries").delete().eq("user_id", userId);
-  await supabaseServer.from("player_day_state").delete().eq("user_id", userId);
-  await supabaseServer.from("events").delete().eq("user_id", userId);
-  await supabaseServer.from("user_anomalies").delete().eq("user_id", userId);
-  await supabaseServer
-    .from("social_actions")
-    .delete()
-    .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`);
+  // Run all deletes in parallel — no FK CASCADE DELETE between these tables.
+  // (choice_log.arc_instance_id has ON DELETE SET NULL, so both can run in parallel.)
+  await Promise.all([
+    supabaseServer.from("storylet_runs").delete().eq("user_id", userId),
+    supabaseServer.from("reflections").delete().eq("user_id", userId),
+    supabaseServer.from("time_allocations").delete().eq("user_id", userId),
+    supabaseServer.from("daily_tensions").delete().eq("user_id", userId),
+    supabaseServer.from("skill_bank").delete().eq("user_id", userId),
+    supabaseServer.from("daily_posture").delete().eq("user_id", userId),
+    supabaseServer.from("skill_point_allocations").delete().eq("user_id", userId),
+    supabaseServer.from("arc_instances").delete().eq("user_id", userId),
+    supabaseServer.from("arc_offers").delete().eq("user_id", userId),
+    supabaseServer.from("player_dispositions").delete().eq("user_id", userId),
+    supabaseServer.from("choice_log").delete().eq("user_id", userId),
+    supabaseServer.from("chapter_summaries").delete().eq("user_id", userId),
+    supabaseServer.from("player_day_state").delete().eq("user_id", userId),
+    supabaseServer.from("events").delete().eq("user_id", userId),
+    supabaseServer.from("user_anomalies").delete().eq("user_id", userId),
+    supabaseServer
+      .from("social_actions")
+      .delete()
+      .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`),
+  ]);
 
   await supabaseServer
     .from("daily_states")

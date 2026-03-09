@@ -2193,18 +2193,21 @@ export default function PlayPage() {
   // arcOneMode edge case: player returns to page after resolving all beats in a
   // previous session. Server returns arcBeats=[] but markDailyComplete was never
   // called. Auto-complete so the player sees "Daily complete ✓".
+  // Use !!dailyRunQuery.data (stable boolean) instead of the raw object to avoid
+  // re-firing every time a re-fetch returns a new object reference.
+  const dailyRunDataLoaded = !!dailyRunQuery.data;
   useEffect(() => {
     if (!USE_DAILY_LOOP_ORCHESTRATOR) return;
     if (!arcOneMode) return;
     if (!userId) return;
     if (loading) return;
     if (alreadyCompletedToday) return;
-    if (!dailyRunQuery.data) return; // wait for data to load
+    if (!dailyRunDataLoaded) return; // wait for data to load
     if (arcBeats.length > 0) return; // beats still pending
     markDailyComplete(userId, dayIndex).catch(console.error);
     incrementGroupObjective(2, "daily_complete").catch(() => {});
     setRefreshTick((t) => t + 1);
-  }, [arcOneMode, arcBeats.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunQuery.data]);
+  }, [arcOneMode, arcBeats.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded]);
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
