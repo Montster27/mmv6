@@ -53,7 +53,7 @@ function pgArrayLiteral(arr: string[]): string {
 // Only these fields are written to the database. Everything else in the JSON
 // (including _meta, reaction_text, relational_effects, etc.) is stored inside
 // the choices JSONB column and passed through as-is.
-const SQL_COLUMNS = ["slug", "title", "body", "choices", "tags", "requirements", "weight", "is_active"] as const;
+const SQL_COLUMNS = ["slug", "title", "body", "choices", "tags", "requirements", "weight", "is_active", "arc_id", "order_index"] as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +66,8 @@ interface StoryletEntry {
   weight?: number;
   requirements?: Record<string, unknown>;
   choices: unknown[];
+  arc_key?: string;
+  order_index?: number;
   [key: string]: unknown;
 }
 
@@ -167,17 +169,32 @@ function buildInsertStatement(entry: StoryletEntry): string {
     typeof entry.weight === "number" ? entry.weight : 100;
   const isActive = entry.is_active !== false ? "true" : "false";
 
+  // Optional arc assignment — use a subquery to look up arc_id by key
+  const hasArc = typeof entry.arc_key === "string" && entry.arc_key.length > 0;
+  const arcIdExpr = hasArc
+    ? `(SELECT id FROM public.arc_definitions WHERE key = ${sqlLiteral(entry.arc_key!)} LIMIT 1)`
+    : "NULL";
+  const orderIndexExpr =
+    hasArc && typeof entry.order_index === "number"
+      ? String(entry.order_index)
+      : "NULL";
+
+  const colList = hasArc
+    ? "slug, title, body, choices, tags, requirements, weight, is_active, arc_id, order_index"
+    : "slug, title, body, choices, tags, requirements, weight, is_active";
+
+  const valList = hasArc
+    ? `  ${slug},\n  ${title},\n  ${body},\n  ${choices},\n  ${tags},\n  ${requirements},\n  ${weight},\n  ${isActive},\n  ${arcIdExpr},\n  ${orderIndexExpr}`
+    : `  ${slug},\n  ${title},\n  ${body},\n  ${choices},\n  ${tags},\n  ${requirements},\n  ${weight},\n  ${isActive}`;
+
+  const arcUpdateClause = hasArc
+    ? `  arc_id       = EXCLUDED.arc_id,\n  order_index  = EXCLUDED.order_index,\n`
+    : "";
+
   return `
-INSERT INTO public.storylets (slug, title, body, choices, tags, requirements, weight, is_active)
+INSERT INTO public.storylets (${colList})
 VALUES (
-  ${slug},
-  ${title},
-  ${body},
-  ${choices},
-  ${tags},
-  ${requirements},
-  ${weight},
-  ${isActive}
+${valList}
 )
 ON CONFLICT (slug) DO UPDATE SET
   title        = EXCLUDED.title,
@@ -187,7 +204,7 @@ ON CONFLICT (slug) DO UPDATE SET
   requirements = EXCLUDED.requirements,
   weight       = EXCLUDED.weight,
   is_active    = EXCLUDED.is_active,
-  updated_at   = now();`.trim();
+${arcUpdateClause}  updated_at   = now();`.trim();
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
