@@ -142,13 +142,13 @@ export function ensureRelationshipDefaults(
     next[npcId] = merged;
   };
 
-  // Dana: already present when you wake up on Day 1
+  // Dana: introduced through the opening arc (arc_opening beat 3)
   ensure("npc_roommate_dana", {
-    met: true,
-    knows_name: true,
-    knows_face: true,
+    met: false,
+    knows_name: false,
+    knows_face: false,
     role_tag: "roommate",
-    relationship: 6,
+    relationship: 5,
   });
   // All others start unmet — they are introduced through storylet events
   ensure("npc_floor_miguel", {
