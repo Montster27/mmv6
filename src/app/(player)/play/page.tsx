@@ -403,6 +403,10 @@ export default function PlayPage() {
     () => dailyRunQuery.data?.arcBeats ?? [],
     [dailyRunQuery.data?.arcBeats]
   );
+  // Clear resolved IDs when fresh arc beat data arrives so advanced steps can render
+  useEffect(() => {
+    setResolvedArcBeatIds(new Set());
+  }, [dailyRunQuery.data?.arcBeats]);
   const relationshipsState = useMemo(
     () => arcOneState?.relationships ?? {},
     [arcOneState?.relationships]
@@ -2017,13 +2021,21 @@ export default function PlayPage() {
         throw new Error((body as { error?: string }).error ?? "Request failed");
       }
 
+      const resBody = await res.json().catch(() => ({ next_step_key: null }));
+
       const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
       setResolvedArcBeatIds(newResolved);
       // Keep this beat visible until the user dismisses it via the Continue button
       setPendingDismissalBeats((prev) => [...prev, beat]);
 
-      // arcOneMode: mark day complete once all beats are resolved
-      if (arcOneMode && userId && arcBeats.every((b) => newResolved.has(b.instance_id))) {
+      // Only mark day complete when all beats are resolved AND no more steps are queued
+      const hasMoreSteps = resBody.next_step_key != null;
+      if (
+        arcOneMode &&
+        userId &&
+        !hasMoreSteps &&
+        arcBeats.every((b) => newResolved.has(b.instance_id))
+      ) {
         try {
           await markDailyComplete(userId, dayIndex);
           incrementGroupObjective(2, "daily_complete").catch(() => {});
@@ -2031,14 +2043,14 @@ export default function PlayPage() {
           console.error("Failed to mark daily complete after arc beats", e);
         }
       }
-
-      setRefreshTick((t) => t + 1);
     },
     [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId]
   );
 
   const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
     setPendingDismissalBeats((prev) => prev.filter((b) => b.instance_id !== beat.instance_id));
+    // Keep resolved ID to prevent flash of old beat; cleared when fresh data arrives
+    setRefreshTick((t) => t + 1);
   }, []);
 
   const handleAllocateSkillPoint = async (skillKey: string) => {
