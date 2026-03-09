@@ -489,7 +489,7 @@ export default function PlayPage() {
     });
   }, [relDebugEvents, relDebugFilter]);
   const showDailyComplete =
-    (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete") ||
+    (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete" && arcBeats.length === 0) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
