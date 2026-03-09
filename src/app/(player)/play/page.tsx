@@ -2910,19 +2910,18 @@ export default function PlayPage() {
 
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     arcOneMode &&
-                    arcBeats.filter((b) => !resolvedArcBeatIds.has(b.instance_id)).length > 0 && (
+                    arcBeats.length > 0 && (
                     <section className="space-y-3">
                       <h2 className="prep-label">
                         Today&apos;s Moments
                       </h2>
-                      {arcBeats
-                        .filter((b) => !resolvedArcBeatIds.has(b.instance_id))
-                        .map((beat) => (
+                      {arcBeats.map((beat) => (
                           <ArcBeatCard
                             key={beat.instance_id}
                             beat={beat}
                             dayIndex={dayIndex}
                             onChoice={handleArcBeatChoice}
+                            disabled={resolvedArcBeatIds.has(beat.instance_id)}
                           />
                         ))}
                     </section>

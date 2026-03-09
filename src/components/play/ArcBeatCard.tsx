@@ -55,10 +55,11 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled }: ArcBeatCardP
     if (choosing || chosenOption) return;
     setChoosing(true);
     setError(null);
+    setChosenOption(option); // optimistic — show reaction text immediately
     try {
       await onChoice(beat, option);
-      setChosenOption(option);
     } catch (err) {
+      setChosenOption(null); // revert on error
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setChoosing(false);
