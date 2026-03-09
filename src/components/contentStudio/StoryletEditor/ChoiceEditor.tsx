@@ -132,27 +132,113 @@ export function ChoiceEditor({
         />
       </label>
 
-      <label className="block text-xs text-slate-600">
-        Target storylet ID
-        <input
-          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
-          list={dataListId}
-          value={(choice as unknown as Record<string, unknown>).targetStoryletId as string ?? ""}
-          onChange={(e) =>
-            onChange({
-              targetStoryletId: e.target.value || undefined,
-            } as unknown as Partial<StoryletChoice>)
-          }
-          placeholder="storylet id or slug"
-        />
-        <datalist id={dataListId}>
-          {storyletOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label ?? opt.value}
-            </option>
-          ))}
-        </datalist>
-      </label>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="block text-xs text-slate-600">
+          Target storylet ID{" "}
+          <span className="text-slate-400">(cross-arc jump)</span>
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
+            list={dataListId}
+            value={(choice as unknown as Record<string, unknown>).targetStoryletId as string ?? ""}
+            onChange={(e) =>
+              onChange({
+                targetStoryletId: e.target.value || undefined,
+              } as unknown as Partial<StoryletChoice>)
+            }
+            placeholder="storylet id or slug"
+          />
+          <datalist id={dataListId}>
+            {storyletOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label ?? opt.value}
+              </option>
+            ))}
+          </datalist>
+        </label>
+        <label className="block text-xs text-slate-600">
+          Next step key{" "}
+          <span className="text-slate-400">(within same arc)</span>
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
+            value={choice.next_step_key ?? ""}
+            placeholder="e.g. roommate_follow_up"
+            onChange={(e) =>
+              onChange({ next_step_key: e.target.value || null })
+            }
+          />
+        </label>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="block text-xs text-slate-600">
+          Sets stream state — stream
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
+            value={choice.sets_stream_state?.stream ?? ""}
+            placeholder="e.g. roommate"
+            onChange={(e) => {
+              const stream = e.target.value;
+              onChange({
+                sets_stream_state: stream
+                  ? { stream, state: choice.sets_stream_state?.state ?? "" }
+                  : undefined,
+              });
+            }}
+          />
+        </label>
+        <label className="block text-xs text-slate-600">
+          Sets stream state — state
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
+            value={choice.sets_stream_state?.state ?? ""}
+            placeholder="e.g. genuine_connection"
+            onChange={(e) => {
+              const state = e.target.value;
+              onChange({
+                sets_stream_state: state
+                  ? { stream: choice.sets_stream_state?.stream ?? "", state }
+                  : undefined,
+              });
+            }}
+          />
+        </label>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="block text-xs text-slate-600">
+          Money effect
+          <select
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            value={choice.money_effect ?? ""}
+            onChange={(e) =>
+              onChange({
+                money_effect: (e.target.value as "improve" | "worsen") || undefined,
+              })
+            }
+          >
+            <option value="">None</option>
+            <option value="improve">Improve</option>
+            <option value="worsen">Worsen</option>
+          </select>
+        </label>
+        <label className="block text-xs text-slate-600">
+          Outcome type
+          <select
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            value={choice.outcome_type ?? ""}
+            onChange={(e) =>
+              onChange({
+                outcome_type: (e.target.value as "success" | "fail" | "neutral") || undefined,
+              })
+            }
+          >
+            <option value="">None</option>
+            <option value="success">Success</option>
+            <option value="neutral">Neutral</option>
+            <option value="fail">Fail</option>
+          </select>
+        </label>
+      </div>
 
       <div>
         <p className="text-xs font-medium text-slate-600 mb-2">

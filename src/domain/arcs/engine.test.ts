@@ -52,12 +52,14 @@ describe("arc engine helpers", () => {
   it("computes due and expire days", () => {
     const step: ArcStep = {
       id: "s",
+      slug: "step1",
+      is_active: true,
       arc_id: "a",
       step_key: "step1",
       order_index: 0,
       title: "Title",
       body: "Body",
-      options: [],
+      choices: [],
       default_next_step_key: null,
       due_offset_days: 2,
       expires_after_days: 3,

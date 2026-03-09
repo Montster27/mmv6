@@ -5,15 +5,18 @@ import type { Storylet } from "@/types/storylets";
 import { BasicFields } from "./BasicFields";
 import { RequirementsPanel } from "./RequirementsPanel";
 import { ChoiceList } from "./ChoiceList";
+import { ArcPanel } from "./ArcPanel";
 import { ValidationPanel } from "../ValidationPanel";
 
-type Tab = "basic" | "requirements" | "choices" | "raw";
+type Tab = "basic" | "requirements" | "choices" | "arc" | "raw";
 
 interface StoryletEditorProps {
   storylet: Storylet;
   isNew?: boolean;
   allTags?: string[];
   storyletOptions?: { value: string; label?: string }[];
+  /** Available arc definitions for the Arc tab dropdown. */
+  arcOptions?: { id: string; key: string; title: string }[];
   onSave: (updated: Storylet) => Promise<void>;
   onDelete?: () => Promise<void>;
   onCancel?: () => void;
@@ -26,6 +29,7 @@ export function StoryletEditor({
   isNew = false,
   allTags = [],
   storyletOptions = [],
+  arcOptions = [],
   onSave,
   onDelete,
   onCancel,
@@ -48,6 +52,7 @@ export function StoryletEditor({
     { id: "basic", label: "Basic" },
     { id: "requirements", label: "Requirements" },
     { id: "choices", label: `Choices (${draft.choices?.length ?? 0})` },
+    { id: "arc", label: draft.arc_id ? "Arc ●" : "Arc" },
     { id: "raw", label: "Raw JSON" },
   ];
 
@@ -94,6 +99,14 @@ export function StoryletEditor({
             choices={draft.choices ?? []}
             storyletOptions={storyletOptions}
             onChange={(choices) => patch({ choices })}
+          />
+        )}
+
+        {tab === "arc" && (
+          <ArcPanel
+            storylet={draft}
+            arcOptions={arcOptions}
+            onChange={patch}
           />
         )}
 

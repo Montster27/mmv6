@@ -1,3 +1,12 @@
+import type { Storylet, StoryletChoice } from "@/types/storylets";
+import type { ResourceKey } from "@/core/resources/resourceKeys";
+
+/** Represents a change in player resources, used by arc engine helpers. */
+export type ResourceDelta = {
+  resources?: Partial<Record<ResourceKey, number>>;
+  skill_points?: number;
+};
+
 export type OfferState = "ACTIVE" | "ACCEPTED" | "EXPIRED" | "DISMISSED";
 export type ArcInstanceState = "ACTIVE" | "COMPLETED" | "FAILED" | "ABANDONED";
 export type LogEventType =
@@ -11,10 +20,10 @@ export type LogEventType =
   | "ARC_COMPLETED"
   | "OFFER_EXPIRED";
 
-export type ResourceDelta = {
-  resources?: Record<string, number>;
-  skill_points?: number;
-  dispositions?: Record<string, number>;
+/** @deprecated Use StoryletChoice instead — all choice fields are now unified. */
+export type ArcStepOption = StoryletChoice & {
+  /** Arc-style option key — same as StoryletChoice.id in unified model. */
+  option_key: string;
 };
 
 export type ArcDefinition = {
@@ -26,48 +35,18 @@ export type ArcDefinition = {
   is_enabled: boolean;
 };
 
-export type ArcStepOption = {
-  option_key: string;
-  label: string;
-  time_cost?: number;
-  energy_cost?: number;
-  money_requirement?: "tight" | "okay" | "comfortable";
-  money_effect?: "improve" | "worsen";
-  skill_requirement?: string;
-  skill_modifier?: string;
-  identity_tags?: string[];
-  relational_effects?: {
-    npc_key?: string;
-    trust_delta?: number;
-    reliability_delta?: number;
-    emotionalLoad_delta?: number;
-  };
-  costs?: ResourceDelta;
-  rewards?: ResourceDelta;
-  next_step_key?: string | null;
-  outcome_type?: "success" | "fail" | "neutral";
-  /**
-   * Transition the named stream to a new FSM state when this option is chosen.
-   * Example: { stream: "roommate", state: "genuine_connection" }
-   */
-  sets_stream_state?: { stream: string; state: string };
-  /**
-   * Mark the named opportunity type as expired when this option is chosen.
-   */
-  sets_expired_opportunity?: "academic" | "social" | "financial";
-};
-
-export type ArcStep = {
-  id: string;
+/**
+ * An arc step is now just a Storylet with arc membership fields set.
+ * arc_id, step_key, order_index, due_offset_days, expires_after_days are required.
+ */
+export type ArcStep = Storylet & {
   arc_id: string;
   step_key: string;
   order_index: number;
-  title: string;
-  body: string;
-  options: ArcStepOption[];
-  default_next_step_key?: string | null;
   due_offset_days: number;
   expires_after_days: number;
+  /** Choices on an arc step — same type as any storylet. */
+  choices: StoryletChoice[];
 };
 
 export type ArcOffer = {
