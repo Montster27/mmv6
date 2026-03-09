@@ -4,8 +4,15 @@ import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/events";
 import type { Storylet, StoryletChoice } from "@/types/storylets";
 
+export type ArcDefinitionSummary = {
+  id: string;
+  key: string;
+  title: string;
+};
+
 export type GraphViewProps = {
   storylets: Storylet[];
+  arcDefinitions?: ArcDefinitionSummary[];
   selectedStorylet: Storylet | null;
   onSelectStorylet: (storylet: Storylet) => void;
   onRetargetChoice: (choiceId: string, targetId: string) => void;
@@ -52,6 +59,17 @@ const GROUP_COLORS: Record<string, string> = {
   unphased:          "bg-slate-50 border-slate-200 text-slate-600",
 };
 
+/** Rotating palette for arc groups */
+const ARC_PALETTE = [
+  "bg-violet-100 border-violet-400 text-violet-900",
+  "bg-cyan-100 border-cyan-400 text-cyan-900",
+  "bg-teal-100 border-teal-400 text-teal-900",
+  "bg-pink-100 border-pink-400 text-pink-900",
+  "bg-lime-100 border-lime-400 text-lime-900",
+  "bg-indigo-100 border-indigo-400 text-indigo-900",
+  "bg-fuchsia-100 border-fuchsia-400 text-fuchsia-900",
+];
+
 const STREAM_SET = new Set(STREAM_ORDER);
 
 const NODE_WIDTH = 220;
@@ -61,8 +79,14 @@ const ROW_GAP = 32;
 
 // ── Helper functions ──────────────────────────────────────────────────────────
 
-/** Returns the group key for a storylet (stream tag first, then phase: tag, then "unphased"). */
-function getGroupTag(storylet: Storylet): string {
+/** Returns the group key for a storylet (arc first, then stream tag, then phase: tag, then "unphased"). */
+function getGroupTag(
+  storylet: Storylet,
+  arcIdToKey?: Map<string, string>
+): string {
+  if (storylet.arc_id && arcIdToKey?.has(storylet.arc_id)) {
+    return `arc:${arcIdToKey.get(storylet.arc_id)!}`;
+  }
   const tags = storylet.tags ?? [];
   const streamTag = tags.find((t) => STREAM_SET.has(t));
   if (streamTag) return streamTag;
@@ -86,6 +110,7 @@ function getMinDay(storylet: Storylet): number {
 
 export function GraphView({
   storylets,
+  arcDefinitions = [],
   selectedStorylet,
   onSelectStorylet,
   onRetargetChoice,
@@ -102,6 +127,22 @@ export function GraphView({
   const [connectChoiceId, setConnectChoiceId] = useState("");
   const [connectTargetId, setConnectTargetId] = useState("");
 
+  /** arc id → arc key (for getGroupTag) */
+  const arcIdToKey = useMemo(() => {
+    const m = new Map<string, string>();
+    arcDefinitions.forEach((a) => m.set(a.id, a.key));
+    return m;
+  }, [arcDefinitions]);
+
+  /** arc key → color class (cycles through ARC_PALETTE) */
+  const arcKeyToColor = useMemo(() => {
+    const m = new Map<string, string>();
+    arcDefinitions.forEach((a, i) => {
+      m.set(a.key, ARC_PALETTE[i % ARC_PALETTE.length]);
+    });
+    return m;
+  }, [arcDefinitions]);
+
   useEffect(() => {
     trackEvent({ event_type: "graph_opened" });
   }, []);
@@ -116,22 +157,33 @@ export function GraphView({
   const nodePositions = useMemo(() => {
     const grouped: Record<string, Storylet[]> = {};
     storylets.forEach((storylet) => {
-      const group = getGroupTag(storylet);
+      const group = getGroupTag(storylet, arcIdToKey);
       if (!grouped[group]) grouped[group] = [];
       grouped[group].push(storylet);
     });
 
-    // Sort each group by min_day_index for a natural timeline order
+    // Sort each group by min_day_index / order_index for a natural timeline order
     Object.values(grouped).forEach((list) =>
-      list.sort((a, b) => getMinDay(a) - getMinDay(b))
+      list.sort((a, b) => {
+        // Arc steps sort by order_index first
+        const aOrder = typeof a.order_index === "number" ? a.order_index : 999;
+        const bOrder = typeof b.order_index === "number" ? b.order_index : 999;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        return getMinDay(a) - getMinDay(b);
+      })
     );
 
-    // Build ordered column list: streams first, then legacy phases, then unphased
+    // Build ordered column list: arcs first, then streams, then legacy phases, then unphased
+    const arcGroups = arcDefinitions
+      .map((a) => `arc:${a.key}`)
+      .filter((g) => grouped[g]);
     const allGroups = [
+      ...arcGroups,
       ...STREAM_ORDER.filter((g) => grouped[g]),
       ...PHASE_ORDER.filter((g) => grouped[g] && !STREAM_SET.has(g)),
       ...Object.keys(grouped).filter(
         (g) =>
+          !g.startsWith("arc:") &&
           !STREAM_SET.has(g) &&
           !PHASE_ORDER.includes(g) &&
           g !== "unphased"
@@ -265,8 +317,16 @@ export function GraphView({
         </div>
       </div>
 
-      {/* Stream colour legend */}
+      {/* Colour legend */}
       <div className="flex flex-wrap gap-2 text-xs">
+        {arcDefinitions.map((arc, i) => (
+          <span
+            key={arc.id}
+            className={`rounded-full border px-2 py-0.5 ${ARC_PALETTE[i % ARC_PALETTE.length]}`}
+          >
+            {arc.title}
+          </span>
+        ))}
         {STREAM_ORDER.map((s) => (
           <span
             key={s}
@@ -380,8 +440,11 @@ export function GraphView({
             {storylets.map((storylet) => {
               const pos = nodePositions[storylet.id];
               if (!pos) return null;
-              const group = getGroupTag(storylet);
-              const color = GROUP_COLORS[group] ?? GROUP_COLORS.unphased;
+              const group = getGroupTag(storylet, arcIdToKey);
+              const isArcGroup = group.startsWith("arc:");
+              const color = isArcGroup
+                ? (arcKeyToColor.get(group.slice(4)) ?? GROUP_COLORS.unphased)
+                : (GROUP_COLORS[group] ?? GROUP_COLORS.unphased);
               const orphan = !incomingCounts[storylet.id];
               const deadEnd = outgoingCounts[storylet.id] === 0;
               const isEntry = entrySet.has(storylet.id);
@@ -417,7 +480,11 @@ export function GraphView({
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-wide capitalize">{group}</div>
+                    <div className="text-xs uppercase tracking-wide capitalize">
+                      {isArcGroup
+                        ? (arcDefinitions.find((a) => `arc:${a.key}` === group)?.title ?? group.slice(4))
+                        : group}
+                    </div>
                     {dayLabel && <div className="text-[10px] opacity-60">{dayLabel}</div>}
                   </div>
                   <div className="mt-0.5 text-sm font-semibold text-slate-900 truncate">

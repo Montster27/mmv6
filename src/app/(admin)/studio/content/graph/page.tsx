@@ -95,6 +95,7 @@ export default function GraphPage() {
           {viewMode === "storylets" ? (
             <GraphView
               storylets={storylets}
+              arcDefinitions={arcDefinitions}
               selectedStorylet={selected}
               onSelectStorylet={setSelected}
               onRetargetChoice={(choiceId, targetId) =>

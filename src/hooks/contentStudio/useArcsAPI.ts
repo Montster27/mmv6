@@ -102,6 +102,22 @@ export function useArcsAPI() {
     []
   );
 
+  const createArcDefinition = useCallback(
+    async (
+      data: Omit<ArcDefinitionRow, "id" | "created_at">
+    ): Promise<{ ok: boolean; error?: string; arc?: ArcDefinitionRow }> => {
+      const result = await apiRequest<{ arc: ArcDefinitionRow }>(
+        "/api/admin/arc-definitions",
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        }
+      );
+      return { ok: result.ok, error: result.error, arc: result.data?.arc };
+    },
+    []
+  );
+
   const deleteArcDefinition = useCallback(
     async (id: string): Promise<{ ok: boolean; error?: string }> => {
       const result = await apiRequest(`/api/admin/arc-definitions/${id}`, {
@@ -121,6 +137,7 @@ export function useArcsAPI() {
     saveArcDefinition,
     saveArcStep,
     deleteArcStep,
+    createArcDefinition,
     deleteArcDefinition,
   };
 }

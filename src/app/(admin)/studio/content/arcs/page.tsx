@@ -9,6 +9,14 @@ import {
   type ArcDefinitionRow,
 } from "@/hooks/contentStudio/useArcsAPI";
 
+const EMPTY_CREATE: Omit<ArcDefinitionRow, "id" | "created_at"> = {
+  key: "",
+  title: "",
+  description: "",
+  tags: [],
+  is_enabled: true,
+};
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ArcsPage() {
@@ -19,6 +27,7 @@ export default function ArcsPage() {
     error,
     loadArcDefinitions,
     saveArcDefinition,
+    createArcDefinition,
     deleteArcDefinition,
   } = useArcsAPI();
 
@@ -26,6 +35,11 @@ export default function ArcsPage() {
   const [arcDraft, setArcDraft] = useState<ArcDefinitionRow | null>(null);
   const [arcSaveState, setArcSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [arcSaveError, setArcSaveError] = useState<string | null>(null);
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [createDraft, setCreateDraft] = useState<Omit<ArcDefinitionRow, "id" | "created_at">>(EMPTY_CREATE);
+  const [createSaveState, setCreateSaveState] = useState<"idle" | "saving">("idle");
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     loadArcDefinitions();
@@ -67,6 +81,29 @@ export default function ArcsPage() {
     }
   }
 
+  async function handleCreateArc() {
+    if (!createDraft.key.trim()) {
+      setCreateError("Key is required");
+      return;
+    }
+    if (!createDraft.title.trim()) {
+      setCreateError("Title is required");
+      return;
+    }
+    setCreateSaveState("saving");
+    setCreateError(null);
+    const result = await createArcDefinition(createDraft);
+    setCreateSaveState("idle");
+    if (result.ok && result.arc) {
+      setIsCreating(false);
+      setCreateDraft(EMPTY_CREATE);
+      await loadArcDefinitions();
+      selectArc(result.arc);
+    } else {
+      setCreateError(result.error ?? "Create failed");
+    }
+  }
+
   const stepsForArc = arcDefinitionSteps
     .filter((s) => s.arc_id === selectedArc?.id)
     .sort((a, b) => a.order_index - b.order_index);
@@ -86,10 +123,85 @@ export default function ArcsPage() {
                 — any storylet with an arc assigned is an arc step.
               </p>
             </div>
-            <Button variant="outline" onClick={loadArcDefinitions}>
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={loadArcDefinitions}>
+                Refresh
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsCreating(true);
+                  setSelectedArc(null);
+                  setArcDraft(null);
+                  setCreateDraft(EMPTY_CREATE);
+                  setCreateError(null);
+                }}
+              >
+                + New Arc
+              </Button>
+            </div>
           </div>
+
+          {/* Create arc inline form */}
+          {isCreating && (
+            <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-indigo-900">New Arc</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm text-slate-700">
+                  Key <span className="text-red-500">*</span>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono"
+                    placeholder="arc-one"
+                    value={createDraft.key}
+                    onChange={(e) => setCreateDraft({ ...createDraft, key: e.target.value })}
+                  />
+                </label>
+                <label className="block text-sm text-slate-700">
+                  Title <span className="text-red-500">*</span>
+                  <input
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                    placeholder="Arc One"
+                    value={createDraft.title}
+                    onChange={(e) => setCreateDraft({ ...createDraft, title: e.target.value })}
+                  />
+                </label>
+              </div>
+              <label className="block text-sm text-slate-700">
+                Description
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+                  rows={2}
+                  value={createDraft.description}
+                  onChange={(e) => setCreateDraft({ ...createDraft, description: e.target.value })}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={createDraft.is_enabled}
+                  onChange={(e) => setCreateDraft({ ...createDraft, is_enabled: e.target.checked })}
+                />
+                Enabled
+              </label>
+              {createError && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+                  {createError}
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setIsCreating(false); setCreateError(null); }}
+                  className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <Button onClick={handleCreateArc} disabled={createSaveState === "saving"}>
+                  {createSaveState === "saving" ? "Creating…" : "Create arc"}
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
             {/* Arc list */}

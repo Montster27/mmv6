@@ -47,3 +47,35 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ arcs: data ?? [] });
 }
+
+export async function POST(request: Request) {
+  const user = await ensureContentStudioAccess(request);
+  if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+
+  const payload = await request.json();
+  const key = (payload.key ?? "").trim();
+  const title = (payload.title ?? "").trim();
+
+  if (!key) return NextResponse.json({ error: "key is required" }, { status: 400 });
+  if (!title) return NextResponse.json({ error: "title is required" }, { status: 400 });
+
+  const admin = getAdminClient();
+  const { data, error } = await admin
+    .from("arc_definitions")
+    .insert({
+      key,
+      title,
+      description: payload.description ?? "",
+      tags: payload.tags ?? [],
+      is_enabled: payload.is_enabled ?? true,
+    })
+    .select("id,key,title,description,tags,is_enabled,created_at")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to create arc definition", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ arc: data });
+}
