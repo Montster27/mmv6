@@ -96,7 +96,7 @@ import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { ArcBeatCard } from "@/components/play/ArcBeatCard";
 import type { ArcBeat } from "@/types/dailyRun";
-import type { ArcStepOption } from "@/domain/arcs/types";
+import type { StoryletChoice } from "@/types/storylets";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -1994,7 +1994,7 @@ export default function PlayPage() {
   };
 
   const handleArcBeatChoice = useCallback(
-    async (beat: ArcBeat, option: ArcStepOption) => {
+    async (beat: ArcBeat, option: StoryletChoice) => {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("No session");
@@ -2007,7 +2007,7 @@ export default function PlayPage() {
         },
         body: JSON.stringify({
           instance_id: beat.instance_id,
-          option_key: option.option_key,
+          option_key: option.id,
           day_index: dayIndex,
         }),
       });

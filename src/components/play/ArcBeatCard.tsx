@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import type { ArcBeat } from "@/types/dailyRun";
-import type { ArcStepOption } from "@/domain/arcs/types";
+import type { StoryletChoice } from "@/types/storylets";
 import { STREAM_LABELS } from "@/types/arcOneStreams";
 
 type ArcBeatCardProps = {
   beat: ArcBeat;
   dayIndex: number;
-  onChoice: (beat: ArcBeat, option: ArcStepOption) => Promise<void>;
+  onChoice: (beat: ArcBeat, option: StoryletChoice) => Promise<void>;
   disabled?: boolean;
 };
 
@@ -21,7 +21,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   stress: "stress",
 };
 
-function computeDeltas(option: ArcStepOption): Array<{ label: string; delta: number }> {
+function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: number }> {
   const totals: Record<string, number> = {};
 
   if (option.energy_cost) {
@@ -45,13 +45,13 @@ function computeDeltas(option: ArcStepOption): Array<{ label: string; delta: num
 
 export function ArcBeatCard({ beat, dayIndex, onChoice, disabled }: ArcBeatCardProps) {
   const [choosing, setChoosing] = useState(false);
-  const [chosenOption, setChosenOption] = useState<ArcStepOption | null>(null);
+  const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const streamLabel = STREAM_LABELS[beat.stream_id as keyof typeof STREAM_LABELS] ?? beat.stream_id;
   const daysLeft = beat.expires_on_day - dayIndex;
 
-  async function handleChoice(option: ArcStepOption) {
+  async function handleChoice(option: StoryletChoice) {
     if (choosing || chosenOption) return;
     setChoosing(true);
     setError(null);
@@ -109,7 +109,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled }: ArcBeatCardP
         <div className="flex flex-col gap-2">
           {beat.options.map((option) => (
             <button
-              key={option.option_key}
+              key={option.id}
               onClick={() => handleChoice(option)}
               disabled={choosing || disabled}
               className="rounded border-2 border-primary/30 bg-card px-4 py-2.5 text-left text-sm text-foreground transition hover:border-primary hover:bg-primary/5 active:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"

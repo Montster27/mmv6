@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
 import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
+import { useArcsAPI, type ArcDefinitionRow } from "@/hooks/contentStudio/useArcsAPI";
 import { StoryletEditor } from "@/components/contentStudio/StoryletEditor";
 import { validateStorylet } from "@/core/validation/storyletValidation";
 import type { Storylet } from "@/types/storylets";
@@ -56,6 +57,13 @@ function StoryletsContent() {
   const { storylets, loading, error, loadStorylets, saveStorylet, createStorylet, cloneStorylet, deleteStorylet } =
     useStoryletsAPI();
 
+  const { arcDefinitions, loadArcDefinitions } = useArcsAPI();
+  const arcOptions = arcDefinitions.map((a: ArcDefinitionRow) => ({
+    id: a.id,
+    key: a.key,
+    title: a.title,
+  }));
+
   // Filters
   const [search, setSearch] = useState("");
   const [phaseFilter, setPhaseFilter] = useState("");
@@ -72,6 +80,7 @@ function StoryletsContent() {
 
   useEffect(() => {
     loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
+    loadArcDefinitions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilter]);
 
@@ -304,6 +313,7 @@ function StoryletsContent() {
                 isNew
                 allTags={allTags}
                 storyletOptions={storyletOptions}
+                arcOptions={arcOptions}
                 saving={saving}
                 saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
@@ -315,6 +325,7 @@ function StoryletsContent() {
                 storylet={selected}
                 allTags={allTags}
                 storyletOptions={storyletOptions}
+                arcOptions={arcOptions}
                 saving={saving}
                 saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}

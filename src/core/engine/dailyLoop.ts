@@ -421,24 +421,30 @@ export async function getOrCreateDailyRun(
       if (streamArcs.length > 0) {
         const arcIds = streamArcs.map((a) => a.id);
 
-        // 2. Load steps for these arcs
+        // 2. Load steps for these arcs from unified storylets table
         const { data: stepRows } = await supabase
-          .from("arc_steps")
-          .select("id,arc_id,step_key,order_index,title,body,options,default_next_step_key,due_offset_days,expires_after_days")
+          .from("storylets")
+          .select("id,slug,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc")
           .in("arc_id", arcIds)
           .order("order_index");
 
         const streamSteps: ArcStep[] = (stepRows ?? []).map((r) => ({
           id: r.id,
+          slug: r.slug,
           arc_id: r.arc_id,
           step_key: r.step_key,
-          order_index: r.order_index,
+          order_index: r.order_index ?? 0,
           title: r.title,
           body: r.body,
-          options: Array.isArray(r.options) ? r.options : [],
+          choices: Array.isArray(r.choices) ? r.choices : [],
           default_next_step_key: r.default_next_step_key ?? null,
-          due_offset_days: r.due_offset_days,
-          expires_after_days: r.expires_after_days,
+          due_offset_days: r.due_offset_days ?? 0,
+          expires_after_days: r.expires_after_days ?? 0,
+          is_active: Boolean(r.is_active),
+          tags: Array.isArray(r.tags) ? r.tags : [],
+          requirements: r.requirements ?? {},
+          weight: r.weight ?? 1,
+          introduces_npc: r.introduces_npc ?? undefined,
         }));
 
         // 3. Load or create arc instances for this user
@@ -496,7 +502,7 @@ export async function getOrCreateDailyRun(
           stream_id: ARC_KEY_TO_STREAM_ID[due.arc.key] ?? due.arc.key.replace("arc_", ""),
           title: due.step.title,
           body: due.step.body,
-          options: due.step.options,
+          options: due.step.choices,
           expires_on_day: due.expires_on_day,
         }));
       }

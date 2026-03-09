@@ -21,7 +21,7 @@ async function getUserFromToken(token?: string) {
  *
  * Resolves an arc beat for the current user:
  * 1. Verifies the instance belongs to the authenticated user
- * 2. Finds the chosen option on the current step
+ * 2. Finds the chosen option on the current step (from unified storylets table)
  * 3. Applies resource costs/rewards to today's day_state
  * 4. Applies stream state transitions to daily_states.stream_states
  * 5. Advances arc_instance to next step (or marks COMPLETED)
@@ -68,10 +68,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Instance is not active" }, { status: 409 });
   }
 
-  // --- 2. Load the current step ---
+  // --- 2. Load the current step from the unified storylets table ---
   const { data: stepRow, error: stepErr } = await supabaseServer
-    .from("arc_steps")
-    .select("*")
+    .from("storylets")
+    .select("id,arc_id,step_key,choices,default_next_step_key,due_offset_days,expires_after_days")
     .eq("arc_id", instanceRow.arc_id)
     .eq("step_key", instanceRow.current_step_key)
     .single();
@@ -80,10 +80,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Step not found" }, { status: 404 });
   }
 
-  const options: Array<Record<string, unknown>> = Array.isArray(stepRow.options)
-    ? stepRow.options
+  // choices is a jsonb array of StoryletChoice; option_key matches choice.id
+  const choices: Array<Record<string, unknown>> = Array.isArray(stepRow.choices)
+    ? stepRow.choices
     : [];
-  const chosenOption = options.find((o) => o.option_key === option_key);
+  // Support both new unified model (choice.id) and legacy arc model (choice.option_key)
+  const chosenOption = choices.find(
+    (c) => c.id === option_key || c.option_key === option_key
+  );
   if (!chosenOption) {
     return NextResponse.json({ error: "Option not found" }, { status: 400 });
   }
@@ -110,7 +114,6 @@ export async function POST(request: Request) {
 
   // Apply deltas to day_state row for this user + day
   if (Object.keys(resourceDeltas).length > 0) {
-    // Fetch current day state
     const { data: dayStateRow } = await supabaseServer
       .from("day_states")
       .select("*")
@@ -142,7 +145,6 @@ export async function POST(request: Request) {
     | undefined;
 
   if (setsStreamState?.stream && setsStreamState?.state) {
-    // Load current stream_states from daily_states
     const { data: dailyRow } = await supabaseServer
       .from("daily_states")
       .select("stream_states,money_band")
@@ -163,7 +165,6 @@ export async function POST(request: Request) {
       .eq("user_id", user.id)
       .eq("day_index", day_index);
 
-    // Also update branch_key on the instance for denormalized reads
     await supabaseServer
       .from("arc_instances")
       .update({ branch_key: setsStreamState.state, updated_day: day_index })
@@ -190,22 +191,25 @@ export async function POST(request: Request) {
   }
 
   // --- 5. Advance arc instance ---
-  const nextStepKey =
+  // next_step_key comes from the chosen option (or step's default)
+  const nextStepKey: string | null =
     typeof chosenOption.next_step_key === "string"
       ? chosenOption.next_step_key
-      : (typeof stepRow.default_next_step_key === "string" ? stepRow.default_next_step_key : null);
+      : (typeof stepRow.default_next_step_key === "string"
+          ? stepRow.default_next_step_key
+          : null);
 
   if (nextStepKey) {
-    // Load next step to get its due_offset_days
+    // Load next step from unified storylets to get its due_offset_days
     const { data: nextStepRow } = await supabaseServer
-      .from("arc_steps")
+      .from("storylets")
       .select("step_key,due_offset_days")
       .eq("arc_id", instanceRow.arc_id)
       .eq("step_key", nextStepKey)
       .maybeSingle();
 
     const nextDueDay = nextStepRow
-      ? instanceRow.started_day + nextStepRow.due_offset_days
+      ? instanceRow.started_day + (nextStepRow.due_offset_days ?? 1)
       : day_index + 1;
 
     await supabaseServer

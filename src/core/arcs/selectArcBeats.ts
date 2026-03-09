@@ -8,6 +8,10 @@ import type {
 type SelectArcBeatsArgs = {
   dayIndex: number;
   instances: ArcInstance[];
+  /**
+   * Arc steps sourced from the unified storylets table.
+   * Each step must have arc_id, step_key, due_offset_days, expires_after_days set.
+   */
   steps: ArcStep[];
   arcs: ArcDefinition[];
   /** Maximum number of beats to return per day. Default: 2. */

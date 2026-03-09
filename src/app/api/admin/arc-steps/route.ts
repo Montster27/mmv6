@@ -1,3 +1,9 @@
+/**
+ * GET /api/admin/arc-steps
+ *
+ * Reads arc steps from the unified storylets table (arc_id IS NOT NULL).
+ * Kept for backward compatibility with Content Studio hooks.
+ */
 import { NextResponse } from "next/server";
 
 import { getAdminClient } from "@/lib/supabaseAdmin";
@@ -20,13 +26,9 @@ async function ensureContentStudioAccess(request: Request) {
     ? authHeader.slice("Bearer ".length)
     : undefined;
   const user = await getUserFromToken(token);
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
   const ok = await canAccessContentStudio(user);
-  if (!ok) {
-    return null;
-  }
+  if (!ok) return null;
   return user;
 }
 
@@ -39,10 +41,11 @@ export async function GET(request: Request) {
 
   const admin = getAdminClient();
   let query = admin
-    .from("arc_steps")
+    .from("storylets")
     .select(
-      "id,arc_id,step_key,order_index,title,body,options,due_offset_days,expires_after_days"
-    );
+      "id,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days"
+    )
+    .not("arc_id", "is", null);
 
   if (arcId) {
     query = query.eq("arc_id", arcId);
@@ -50,9 +53,25 @@ export async function GET(request: Request) {
 
   const { data, error } = await query.order("order_index", { ascending: true });
   if (error) {
-    console.error("Failed to list arc steps", error);
+    console.error("Failed to list arc steps from storylets", error);
     return NextResponse.json({ error: "Failed to list arc steps" }, { status: 500 });
   }
 
-  return NextResponse.json({ steps: data ?? [] });
+  // Shape the response to match the old arc_steps format for backward compat
+  const steps = (data ?? []).map((row) => ({
+    id: row.id,
+    arc_id: row.arc_id,
+    step_key: row.step_key,
+    order_index: row.order_index,
+    title: row.title,
+    body: row.body,
+    // choices in the unified model; expose as both names
+    options: row.choices ?? [],
+    choices: row.choices ?? [],
+    default_next_step_key: row.default_next_step_key,
+    due_offset_days: row.due_offset_days,
+    expires_after_days: row.expires_after_days,
+  }));
+
+  return NextResponse.json({ steps });
 }
