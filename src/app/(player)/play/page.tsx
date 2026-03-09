@@ -2607,15 +2607,7 @@ export default function PlayPage() {
                     stage === "storylet_3" ||
                     (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && !arcOneMode) && (
                     <section className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h2 className="prep-label">Storylets</h2>
-                          <span className="font-stat text-xs text-muted-foreground tabular-nums">
-                            {Math.min(runs.length, 3)}/3
-                          </span>
-                        </div>
-                        <p className="text-sm text-foreground/70">
-                          Pick one choice. You can do three today.
-                        </p>
+                        <h2 className="prep-label">Today&apos;s Choices</h2>
 
                         {!currentStorylet ? (
                           <div className="rounded border-2 border-border bg-card px-3 py-3">
@@ -2629,27 +2621,52 @@ export default function PlayPage() {
                             </Button>
                           </div>
                         ) : (
-                          <div key={currentStorylet.id} className="animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-3 rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top">
-                            <div>
-                              <p className="prep-label mb-1">
-                                Storylet{" "}
-                                {stage === "storylet_3"
-                                  ? 3
-                                  : stage === "storylet_2"
-                                  ? 2
-                                  : 1}{" "}
-                                of 3
-                              </p>
-                              <h3 className="text-xl font-bold text-primary font-heading">
-                                {currentStorylet.title}
-                              </h3>
-                              <p className="text-foreground/85 whitespace-pre-line leading-relaxed mt-1">{displayBody}</p>
+                          <div
+                            key={currentStorylet.id}
+                            className="animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-hidden rounded-lg border-2 border-primary/20 bg-card shadow-sm"
+                          >
+                            {/* Progress bar */}
+                            <div className="h-1 bg-border/40">
+                              <div
+                                className="h-full bg-primary/60 transition-all duration-500"
+                                style={{
+                                  width: `${((stage === "storylet_3" ? 3 : stage === "storylet_2" ? 2 : 1) - 1) * 33.33}%`,
+                                }}
+                              />
                             </div>
-                            <div className="space-y-2">
-                              {/* Choices — hidden once a choice has been saved */}
+
+                            <div className="space-y-5 px-5 py-5">
+                              {/* Step dots */}
+                              <div className="flex items-center gap-1.5">
+                                {([1, 2, 3] as const).map((n) => {
+                                  const cur = stage === "storylet_3" ? 3 : stage === "storylet_2" ? 2 : 1;
+                                  return (
+                                    <div
+                                      key={n}
+                                      className={`h-1.5 w-6 rounded-full transition-colors duration-300 ${
+                                        n <= cur ? "bg-primary" : "bg-border"
+                                      }`}
+                                    />
+                                  );
+                                })}
+                                <span className="ml-auto font-stat text-xs text-muted-foreground tabular-nums">
+                                  {stage === "storylet_3" ? 3 : stage === "storylet_2" ? 2 : 1} of 3
+                                </span>
+                              </div>
+
+                              {/* Story content */}
+                              <div>
+                                <h3 className="font-heading text-xl font-bold leading-snug text-primary">
+                                  {currentStorylet.title}
+                                </h3>
+                                <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">
+                                  {displayBody}
+                                </p>
+                              </div>
+
+                              {/* Choices */}
                               {(!selectedChoiceId || savingChoice) && (() => {
                                 const choices = toChoices(currentStorylet);
-
                                 const RESOURCE_LABELS: Record<string, string> = {
                                   cashOnHand: "cash",
                                   knowledge: "knowledge",
@@ -2657,74 +2674,86 @@ export default function PlayPage() {
                                   physicalResilience: "resilience",
                                 };
                                 return choices.length > 0 ? (
-                                  choices.map((choice) => {
-                                    const typedChoice = choice as {
-                                      id: string;
-                                      label: string;
-                                      requires_resource?: { key: string; min: number };
-                                      costs_resource?: { key: string; amount: number };
-                                    };
-                                    const reqRes = featureFlags.resources
-                                      ? typedChoice.requires_resource
-                                      : undefined;
-                                    const costRes = featureFlags.resources
-                                      ? typedChoice.costs_resource
-                                      : undefined;
-                                    const meetsGate =
-                                      !reqRes || !dayState
-                                        ? true
-                                        : ((dayState as Record<string, number>)[reqRes.key] ?? 0) >= reqRes.min;
-                                    const isDisabled = savingChoice || !meetsGate;
-
-                                    return (
-                                      <div key={typedChoice.id} className="space-y-0.5">
-                                        <Button
-                                          variant="secondary"
-                                          disabled={isDisabled}
-                                          onClick={() => handleChoice(typedChoice.id)}
-                                          className="w-full justify-start"
-                                        >
-                                          <span>{typedChoice.label}</span>
-                                          {costRes ? (
-                                            <span className="ml-auto pl-2 text-amber-600 text-xs font-normal shrink-0">
-                                              −{costRes.amount}{" "}
-                                              {RESOURCE_LABELS[costRes.key] ?? costRes.key}
-                                            </span>
+                                  <div className="space-y-2">
+                                    {choices.map((choice) => {
+                                      const typedChoice = choice as {
+                                        id: string;
+                                        label: string;
+                                        requires_resource?: { key: string; min: number };
+                                        costs_resource?: { key: string; amount: number };
+                                      };
+                                      const reqRes = featureFlags.resources
+                                        ? typedChoice.requires_resource
+                                        : undefined;
+                                      const costRes = featureFlags.resources
+                                        ? typedChoice.costs_resource
+                                        : undefined;
+                                      const meetsGate =
+                                        !reqRes || !dayState
+                                          ? true
+                                          : ((dayState as Record<string, number>)[reqRes.key] ?? 0) >= reqRes.min;
+                                      const isDisabled = savingChoice || !meetsGate;
+                                      return (
+                                        <div key={typedChoice.id}>
+                                          <button
+                                            disabled={isDisabled}
+                                            onClick={() => handleChoice(typedChoice.id)}
+                                            className="w-full rounded-lg border-2 border-primary/25 bg-card px-4 py-3 text-left text-sm font-medium text-foreground transition-all hover:border-primary hover:bg-primary/5 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                                          >
+                                            <span>{typedChoice.label}</span>
+                                            {costRes ? (
+                                              <span className="ml-2 text-xs font-normal text-amber-600">
+                                                −{costRes.amount}{" "}
+                                                {RESOURCE_LABELS[costRes.key] ?? costRes.key}
+                                              </span>
+                                            ) : null}
+                                          </button>
+                                          {!meetsGate && reqRes ? (
+                                            <p className="mt-0.5 pl-1 text-xs text-muted-foreground">
+                                              🔒 Requires {reqRes.min}{" "}
+                                              {RESOURCE_LABELS[reqRes.key] ?? reqRes.key}
+                                            </p>
                                           ) : null}
-                                        </Button>
-                                        {!meetsGate && reqRes ? (
-                                          <p className="text-xs text-muted-foreground pl-1">
-                                            🔒 Requires {reqRes.min}{" "}
-                                            {RESOURCE_LABELS[reqRes.key] ?? reqRes.key}
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                    );
-                                  })
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 ) : (
-                                  <p className="text-muted-foreground text-sm">
-                                    No choices available.
-                                  </p>
+                                  <p className="text-sm text-muted-foreground">No choices available.</p>
                                 );
                               })()}
+
+                              {/* Saving spinner */}
                               {savingChoice && (
-                                <p className="text-xs text-muted-foreground animate-pulse">Saving…</p>
+                                <div className="flex items-center gap-2 py-1">
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                  <span className="text-sm text-muted-foreground">Saving…</span>
+                                </div>
                               )}
-                              {/* Result block — shown in-place after choice saved */}
+
+                              {/* Result phase */}
                               {selectedChoiceId && !savingChoice && (
-                                <div className="animate-in fade-in duration-200 rounded border border-border/60 bg-muted px-3 py-3 space-y-2">
-                                  <p className="text-sm font-medium text-primary">
-                                    ✓ {choiceLabelMap.get(selectedChoiceId) ?? "Choice recorded"}
-                                  </p>
+                                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-4">
+                                  {/* Chosen label */}
+                                  <div className="flex items-start gap-2.5">
+                                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                                      ✓
+                                    </span>
+                                    <p className="text-sm font-semibold leading-snug text-primary">
+                                      {choiceLabelMap.get(selectedChoiceId) ?? "Choice recorded"}
+                                    </p>
+                                  </div>
+
+                                  {/* Reaction text */}
                                   {pendingReactionText && (
-                                    <div className="space-y-1.5">
+                                    <div className="space-y-2 pl-7">
                                       {pendingReactionText.split("\n\n").map((para, idx) => (
-                                        <p key={idx} className="text-sm text-foreground/80 leading-relaxed">
+                                        <p key={idx} className="text-sm leading-relaxed text-foreground/80">
                                           {para}
                                         </p>
                                       ))}
                                       {relationshipDebugEnabled && lastRelSummary.length > 0 ? (
-                                        <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                                        <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                                           {lastRelSummary.map((line, idx) => (
                                             <p key={idx}>{line}</p>
                                           ))}
@@ -2732,54 +2761,63 @@ export default function PlayPage() {
                                       ) : null}
                                     </div>
                                   )}
-                                  {outcomeDeltas && (
-                                    <ul className="space-y-0.5 font-stat text-xs text-foreground/60">
-                                      {typeof outcomeDeltas.energy === "number" ? (
-                                        <li>Energy {outcomeDeltas.energy >= 0 ? "+" : ""}{outcomeDeltas.energy}</li>
-                                      ) : null}
-                                      {typeof outcomeDeltas.stress === "number" ? (
-                                        <li>Stress {outcomeDeltas.stress >= 0 ? "+" : ""}{outcomeDeltas.stress}</li>
-                                      ) : null}
-                                      {featureFlags.resources && outcomeDeltas.vectors
-                                        ? Object.entries(outcomeDeltas.vectors).map(
-                                            ([key, delta]) => (
-                                              <li key={key}>
-                                                {key}: {delta >= 0 ? "+" : ""}{delta}
-                                              </li>
-                                            )
-                                          )
-                                        : null}
-                                      {featureFlags.resources && outcomeDeltas.resources
-                                        ? Object.entries(outcomeDeltas.resources)
-                                            .filter(([, delta]) => typeof delta === "number" && delta !== 0)
-                                            .map(([key, delta]) => {
-                                              const LABELS: Record<string, string> = {
-                                                cashOnHand: "cash",
-                                                knowledge: "knowledge",
-                                                socialLeverage: "social leverage",
-                                                physicalResilience: "resilience",
-                                              };
-                                              return (
-                                                <li key={key}>
-                                                  {LABELS[key] ?? key}{" "}
-                                                  {(delta as number) >= 0 ? "+" : ""}
-                                                  {delta}
-                                                </li>
-                                              );
-                                            })
-                                        : null}
-                                    </ul>
-                                  )}
+
+                                  {/* Delta chips */}
+                                  {outcomeDeltas && (() => {
+                                    const chips: Array<{ label: string; delta: number }> = [];
+                                    if (typeof outcomeDeltas.energy === "number")
+                                      chips.push({ label: "Energy", delta: outcomeDeltas.energy });
+                                    if (typeof outcomeDeltas.stress === "number")
+                                      chips.push({ label: "Stress", delta: outcomeDeltas.stress });
+                                    if (featureFlags.resources && outcomeDeltas.vectors) {
+                                      Object.entries(outcomeDeltas.vectors).forEach(([k, v]) =>
+                                        chips.push({ label: k, delta: v as number })
+                                      );
+                                    }
+                                    if (featureFlags.resources && outcomeDeltas.resources) {
+                                      const LABELS: Record<string, string> = {
+                                        cashOnHand: "cash",
+                                        knowledge: "knowledge",
+                                        socialLeverage: "social leverage",
+                                        physicalResilience: "resilience",
+                                      };
+                                      Object.entries(outcomeDeltas.resources).forEach(([k, v]) => {
+                                        if (typeof v === "number" && v !== 0)
+                                          chips.push({ label: LABELS[k] ?? k, delta: v });
+                                      });
+                                    }
+                                    if (chips.length === 0) return null;
+                                    return (
+                                      <div className="flex flex-wrap gap-1.5 pl-7">
+                                        {chips.map(({ label, delta }) => (
+                                          <span
+                                            key={label}
+                                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                              delta > 0
+                                                ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                                                : "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
+                                            }`}
+                                          >
+                                            {label} {delta > 0 ? "+" : ""}{delta}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
+
                                   {outcomeMessage && !outcomeDeltas && (
-                                    <p className="text-xs text-muted-foreground">{outcomeMessage}</p>
+                                    <p className="pl-7 text-xs text-muted-foreground">{outcomeMessage}</p>
                                   )}
+
                                   {lastCheck ? (
                                     <TesterOnly>
                                       <OutcomeExplain check={lastCheck} />
                                     </TesterOnly>
                                   ) : null}
+
+                                  {/* Cohort compare */}
                                   {featureFlags.afterActionCompareEnabled && compareVisible ? (
-                                    <div className="mt-2 rounded border-2 border-border bg-card px-3 py-2 text-sm text-foreground">
+                                    <div className="rounded-lg border-2 border-border bg-card px-4 py-3 text-sm text-foreground">
                                       <div className="flex items-center justify-between">
                                         <p className="font-semibold">Cohort comparison</p>
                                         <Button variant="ghost" onClick={handleCompareDismiss}>
@@ -2829,9 +2867,10 @@ export default function PlayPage() {
                                       </div>
                                     </div>
                                   ) : null}
+
+                                  {/* Continue button */}
                                   {(pendingReactionText || consequenceActive) && (
-                                    <Button
-                                      size="sm"
+                                    <button
                                       onClick={() => {
                                         setSelectedChoiceId(null);
                                         if (pendingReactionText) {
@@ -2840,9 +2879,10 @@ export default function PlayPage() {
                                           finishConsequence();
                                         }
                                       }}
+                                      className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.99]"
                                     >
-                                      Next →
-                                    </Button>
+                                      Continue →
+                                    </button>
                                   )}
                                 </div>
                               )}
