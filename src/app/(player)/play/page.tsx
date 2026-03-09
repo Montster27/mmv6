@@ -2629,7 +2629,7 @@ export default function PlayPage() {
                             </Button>
                           </div>
                         ) : (
-                          <div className="space-y-3 rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top">
+                          <div key={currentStorylet.id} className="animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-3 rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top">
                             <div>
                               <p className="prep-label mb-1">
                                 Storylet{" "}
@@ -2646,7 +2646,8 @@ export default function PlayPage() {
                               <p className="text-foreground/85 whitespace-pre-line leading-relaxed mt-1">{displayBody}</p>
                             </div>
                             <div className="space-y-2">
-                              {(() => {
+                              {/* Choices — hidden once a choice has been saved */}
+                              {(!selectedChoiceId || savingChoice) && (() => {
                                 const choices = toChoices(currentStorylet);
 
                                 const RESOURCE_LABELS: Record<string, string> = {
@@ -2673,7 +2674,7 @@ export default function PlayPage() {
                                       !reqRes || !dayState
                                         ? true
                                         : ((dayState as Record<string, number>)[reqRes.key] ?? 0) >= reqRes.min;
-                                    const isDisabled = choicesDisabled || !meetsGate;
+                                    const isDisabled = savingChoice || !meetsGate;
 
                                     return (
                                       <div key={typedChoice.id} className="space-y-0.5">
@@ -2706,166 +2707,144 @@ export default function PlayPage() {
                                   </p>
                                 );
                               })()}
-                              {beatBufferEnabled && pendingReactionText ? (
-                                <div className="rounded border-2 border-border bg-muted px-4 py-3 text-foreground">
-                                  {pendingReactionText.split("\n\n").map((para, idx) => (
-                                    <p key={idx} className="text-sm">
-                                      {para}
-                                    </p>
-                                  ))}
-                                  {relationshipDebugEnabled &&
-                                  lastRelSummary.length > 0 ? (
-                                    <div className="mt-2 text-xs text-slate-600 space-y-1">
-                                      <p className="font-semibold text-slate-700">
-                                        Relationship changes
-                                      </p>
-                                      {lastRelSummary.map((line, idx) => (
-                                        <p key={idx}>{line}</p>
+                              {savingChoice && (
+                                <p className="text-xs text-muted-foreground animate-pulse">Saving…</p>
+                              )}
+                              {/* Result block — shown in-place after choice saved */}
+                              {selectedChoiceId && !savingChoice && (
+                                <div className="animate-in fade-in duration-200 rounded border border-border/60 bg-muted px-3 py-3 space-y-2">
+                                  <p className="text-sm font-medium text-primary">
+                                    ✓ {choiceLabelMap.get(selectedChoiceId) ?? "Choice recorded"}
+                                  </p>
+                                  {pendingReactionText && (
+                                    <div className="space-y-1.5">
+                                      {pendingReactionText.split("\n\n").map((para, idx) => (
+                                        <p key={idx} className="text-sm text-foreground/80 leading-relaxed">
+                                          {para}
+                                        </p>
                                       ))}
+                                      {relationshipDebugEnabled && lastRelSummary.length > 0 ? (
+                                        <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                                          {lastRelSummary.map((line, idx) => (
+                                            <p key={idx}>{line}</p>
+                                          ))}
+                                        </div>
+                                      ) : null}
                                     </div>
-                                  ) : null}
-                                  <Button
-                                    className="mt-3"
-                                    onClick={handleReactionContinue}
-                                  >
-                                    Continue
-                                  </Button>
-                                </div>
-                              ) : null}
-                              {(outcomeMessage || outcomeDeltas) &&
-                                !consequenceActive &&
-                                !pendingReactionText && (
-                                  <div className="rounded border-2 border-border bg-muted px-3 py-2 text-sm text-foreground">
-                                    {outcomeMessage ? <p>{outcomeMessage}</p> : null}
-                                    {outcomeDeltas ? (
-                                      <ul className="mt-1 space-y-0.5 text-slate-700">
-                                        {typeof outcomeDeltas.energy === "number" ? (
-                                          <li>
-                                            Energy{" "}
-                                            {outcomeDeltas.energy >= 0 ? "+" : ""}
-                                            {outcomeDeltas.energy}
-                                          </li>
-                                        ) : null}
-                                        {typeof outcomeDeltas.stress === "number" ? (
-                                          <li>
-                                            Stress{" "}
-                                            {outcomeDeltas.stress >= 0 ? "+" : ""}
-                                            {outcomeDeltas.stress}
-                                          </li>
-                                        ) : null}
-                                        {featureFlags.resources && outcomeDeltas.vectors
-                                          ? Object.entries(outcomeDeltas.vectors).map(
-                                              ([key, delta]) => (
+                                  )}
+                                  {outcomeDeltas && (
+                                    <ul className="space-y-0.5 font-stat text-xs text-foreground/60">
+                                      {typeof outcomeDeltas.energy === "number" ? (
+                                        <li>Energy {outcomeDeltas.energy >= 0 ? "+" : ""}{outcomeDeltas.energy}</li>
+                                      ) : null}
+                                      {typeof outcomeDeltas.stress === "number" ? (
+                                        <li>Stress {outcomeDeltas.stress >= 0 ? "+" : ""}{outcomeDeltas.stress}</li>
+                                      ) : null}
+                                      {featureFlags.resources && outcomeDeltas.vectors
+                                        ? Object.entries(outcomeDeltas.vectors).map(
+                                            ([key, delta]) => (
+                                              <li key={key}>
+                                                {key}: {delta >= 0 ? "+" : ""}{delta}
+                                              </li>
+                                            )
+                                          )
+                                        : null}
+                                      {featureFlags.resources && outcomeDeltas.resources
+                                        ? Object.entries(outcomeDeltas.resources)
+                                            .filter(([, delta]) => typeof delta === "number" && delta !== 0)
+                                            .map(([key, delta]) => {
+                                              const LABELS: Record<string, string> = {
+                                                cashOnHand: "cash",
+                                                knowledge: "knowledge",
+                                                socialLeverage: "social leverage",
+                                                physicalResilience: "resilience",
+                                              };
+                                              return (
                                                 <li key={key}>
-                                                  {key}: {delta >= 0 ? "+" : ""}
+                                                  {LABELS[key] ?? key}{" "}
+                                                  {(delta as number) >= 0 ? "+" : ""}
                                                   {delta}
                                                 </li>
-                                              )
-                                            )
-                                          : null}
-                                        {featureFlags.resources && outcomeDeltas.resources
-                                          ? Object.entries(outcomeDeltas.resources)
-                                              .filter(
-                                                ([, delta]) =>
-                                                  typeof delta === "number" && delta !== 0
-                                              )
-                                              .map(([key, delta]) => {
-                                                const LABELS: Record<string, string> = {
-                                                  cashOnHand: "cash",
-                                                  knowledge: "knowledge",
-                                                  socialLeverage: "social leverage",
-                                                  physicalResilience: "resilience",
-                                                };
-                                                return (
-                                                  <li key={key}>
-                                                    {LABELS[key] ?? key}{" "}
-                                                    {(delta as number) >= 0 ? "+" : ""}
-                                                    {delta}
-                                                  </li>
-                                                );
-                                              })
-                                          : null}
-                                      </ul>
-                                    ) : null}
-                                    {lastCheck ? (
-                                      <TesterOnly>
-                                        <OutcomeExplain check={lastCheck} />
-                                      </TesterOnly>
-                                    ) : null}
-                                    {featureFlags.afterActionCompareEnabled &&
-                                    compareVisible ? (
-                                      <div className="mt-3 rounded border-2 border-border bg-card px-3 py-2 text-sm text-foreground">
-                                        <div className="flex items-center justify-between">
-                                          <p className="font-semibold">
-                                            Cohort comparison
-                                          </p>
-                                          <Button
-                                            variant="ghost"
-                                            onClick={handleCompareDismiss}
-                                          >
-                                            Dismiss
-                                          </Button>
-                                        </div>
-                                        {compareLoading ? (
-                                          <p className="text-sm text-slate-600">
-                                            Loading…
-                                          </p>
-                                        ) : compareSnapshot ? (
-                                          <div className="space-y-2">
-                                            <ul className="space-y-1">
-                                              {compareSnapshot.options.map((opt) => (
-                                                <li key={opt.choice_id}>
-                                                  {choiceLabelMap.get(opt.choice_id) ??
-                                                    opt.choice_id}
-                                                  : {opt.percent}%
-                                                </li>
-                                              ))}
-                                            </ul>
-                                            {compareSnapshot.rationale ? (
-                                              <p className="text-xs text-slate-600">
-                                                {compareSnapshot.rationale.handle}:{" "}
-                                                {compareSnapshot.rationale.text}
-                                              </p>
-                                            ) : (
-                                              <p className="text-xs text-slate-500">
-                                                Not enough data yet.
-                                              </p>
-                                            )}
-                                          </div>
-                                        ) : compareError ? (
-                                          <p className="text-xs text-slate-500">
-                                            {compareError}
-                                          </p>
-                                        ) : null}
-                                        <div className="mt-3 space-y-2">
-                                          <label className="block text-xs text-slate-500">
-                                            Share a short note (optional)
-                                          </label>
-                                          <input
-                                            className="w-full rounded border-2 border-input bg-card px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                            value={compareNote}
-                                            onChange={(e) =>
-                                              setCompareNote(e.target.value)
-                                            }
-                                          />
-                                          <Button
-                                            variant="outline"
-                                            onClick={handleCompareSubmit}
-                                            disabled={compareSending}
-                                          >
-                                            {compareSending ? "Saving..." : "Share note"}
-                                          </Button>
-                                        </div>
+                                              );
+                                            })
+                                        : null}
+                                    </ul>
+                                  )}
+                                  {outcomeMessage && !outcomeDeltas && (
+                                    <p className="text-xs text-muted-foreground">{outcomeMessage}</p>
+                                  )}
+                                  {lastCheck ? (
+                                    <TesterOnly>
+                                      <OutcomeExplain check={lastCheck} />
+                                    </TesterOnly>
+                                  ) : null}
+                                  {featureFlags.afterActionCompareEnabled && compareVisible ? (
+                                    <div className="mt-2 rounded border-2 border-border bg-card px-3 py-2 text-sm text-foreground">
+                                      <div className="flex items-center justify-between">
+                                        <p className="font-semibold">Cohort comparison</p>
+                                        <Button variant="ghost" onClick={handleCompareDismiss}>
+                                          Dismiss
+                                        </Button>
                                       </div>
-                                    ) : null}
-                                  </div>
-                                )}
-                              {consequenceActive && (
-                                <ConsequenceMoment
-                                  message={outcomeMessage}
-                                  deltas={outcomeDeltas}
-                                  onDone={finishConsequence}
-                                />
+                                      {compareLoading ? (
+                                        <p className="text-sm text-slate-600">Loading…</p>
+                                      ) : compareSnapshot ? (
+                                        <div className="space-y-2">
+                                          <ul className="space-y-1">
+                                            {compareSnapshot.options.map((opt) => (
+                                              <li key={opt.choice_id}>
+                                                {choiceLabelMap.get(opt.choice_id) ?? opt.choice_id}
+                                                : {opt.percent}%
+                                              </li>
+                                            ))}
+                                          </ul>
+                                          {compareSnapshot.rationale ? (
+                                            <p className="text-xs text-slate-600">
+                                              {compareSnapshot.rationale.handle}:{" "}
+                                              {compareSnapshot.rationale.text}
+                                            </p>
+                                          ) : (
+                                            <p className="text-xs text-slate-500">Not enough data yet.</p>
+                                          )}
+                                        </div>
+                                      ) : compareError ? (
+                                        <p className="text-xs text-slate-500">{compareError}</p>
+                                      ) : null}
+                                      <div className="mt-3 space-y-2">
+                                        <label className="block text-xs text-slate-500">
+                                          Share a short note (optional)
+                                        </label>
+                                        <input
+                                          className="w-full rounded border-2 border-input bg-card px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                          value={compareNote}
+                                          onChange={(e) => setCompareNote(e.target.value)}
+                                        />
+                                        <Button
+                                          variant="outline"
+                                          onClick={handleCompareSubmit}
+                                          disabled={compareSending}
+                                        >
+                                          {compareSending ? "Saving..." : "Share note"}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                  {(pendingReactionText || consequenceActive) && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedChoiceId(null);
+                                        if (pendingReactionText) {
+                                          handleReactionContinue();
+                                        } else {
+                                          finishConsequence();
+                                        }
+                                      }}
+                                    >
+                                      Next →
+                                    </Button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
