@@ -272,6 +272,7 @@ export default function PlayPage() {
   const [resolvedArcBeatIds, setResolvedArcBeatIds] = useState<Set<string>>(
     new Set()
   );
+  const [pendingDismissalBeats, setPendingDismissalBeats] = useState<ArcBeat[]>([]);
 
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
@@ -2018,6 +2019,8 @@ export default function PlayPage() {
 
       const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
       setResolvedArcBeatIds(newResolved);
+      // Keep this beat visible until the user dismisses it via the Continue button
+      setPendingDismissalBeats((prev) => [...prev, beat]);
 
       // arcOneMode: mark day complete once all beats are resolved
       if (arcOneMode && userId && arcBeats.every((b) => newResolved.has(b.instance_id))) {
@@ -2033,6 +2036,10 @@ export default function PlayPage() {
     },
     [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId]
   );
+
+  const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
+    setPendingDismissalBeats((prev) => prev.filter((b) => b.instance_id !== beat.instance_id));
+  }, []);
 
   const handleAllocateSkillPoint = async (skillKey: string) => {
     if (!userId) return;
@@ -2910,18 +2917,31 @@ export default function PlayPage() {
 
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     arcOneMode &&
-                    arcBeats.length > 0 && (
+                    (arcBeats.length > 0 || pendingDismissalBeats.length > 0) && (
                     <section className="space-y-3">
                       <h2 className="prep-label">
                         Today&apos;s Moments
                       </h2>
-                      {arcBeats.map((beat) => (
+                      {/* Resolved beats awaiting user dismissal (shown first so reaction text is prominent) */}
+                      {pendingDismissalBeats.map((beat) => (
+                        <ArcBeatCard
+                          key={beat.instance_id}
+                          beat={beat}
+                          dayIndex={dayIndex}
+                          onChoice={handleArcBeatChoice}
+                          disabled
+                          onDismiss={() => handleDismissArcBeat(beat)}
+                        />
+                      ))}
+                      {/* Unresolved beats */}
+                      {arcBeats
+                        .filter((b) => !resolvedArcBeatIds.has(b.instance_id))
+                        .map((beat) => (
                           <ArcBeatCard
                             key={beat.instance_id}
                             beat={beat}
                             dayIndex={dayIndex}
                             onChoice={handleArcBeatChoice}
-                            disabled={resolvedArcBeatIds.has(beat.instance_id)}
                           />
                         ))}
                     </section>

@@ -10,6 +10,7 @@ type ArcBeatCardProps = {
   dayIndex: number;
   onChoice: (beat: ArcBeat, option: StoryletChoice) => Promise<void>;
   disabled?: boolean;
+  onDismiss?: () => void;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -43,7 +44,7 @@ function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: nu
     .map(([k, v]) => ({ label: RESOURCE_LABELS[k] ?? k, delta: v }));
 }
 
-export function ArcBeatCard({ beat, dayIndex, onChoice, disabled }: ArcBeatCardProps) {
+export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss }: ArcBeatCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +89,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled }: ArcBeatCardP
 
       {/* Post-choice result */}
       {chosenOption && (
-        <div className="rounded border border-border/60 bg-muted px-3 py-2 text-sm space-y-1.5">
+        <div className="rounded border border-border/60 bg-muted px-3 py-3 text-sm space-y-2">
           <p className="font-medium text-primary">✓ {chosenOption.label}</p>
           {chosenOption.reaction_text && (
             <p className="text-foreground/80 leading-relaxed">{chosenOption.reaction_text}</p>
@@ -101,6 +102,16 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled }: ArcBeatCardP
                 </li>
               ))}
             </ul>
+          )}
+          {onDismiss && (
+            <div className="pt-1">
+              <button
+                onClick={onDismiss}
+                className="rounded border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5 active:bg-primary/10 transition"
+              >
+                Continue
+              </button>
+            </div>
           )}
         </div>
       )}
