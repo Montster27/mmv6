@@ -272,7 +272,9 @@ export default function PlayPage() {
   const [resolvedArcBeatIds, setResolvedArcBeatIds] = useState<Set<string>>(
     new Set()
   );
-  const [pendingDismissalBeats, setPendingDismissalBeats] = useState<ArcBeat[]>([]);
+  const [pendingDismissalBeats, setPendingDismissalBeats] = useState<
+    Array<{ beat: ArcBeat; chosenOption: StoryletChoice }>
+  >([]);
 
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
@@ -2026,7 +2028,7 @@ export default function PlayPage() {
       const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
       setResolvedArcBeatIds(newResolved);
       // Keep this beat visible until the user dismisses it via the Continue button
-      setPendingDismissalBeats((prev) => [...prev, beat]);
+      setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: option }]);
 
       // Only mark day complete when all beats are resolved AND no more steps are queued
       const hasMoreSteps = resBody.next_step_key != null;
@@ -2048,7 +2050,7 @@ export default function PlayPage() {
   );
 
   const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
-    setPendingDismissalBeats((prev) => prev.filter((b) => b.instance_id !== beat.instance_id));
+    setPendingDismissalBeats((prev) => prev.filter((entry) => entry.beat.instance_id !== beat.instance_id));
     // Keep resolved ID to prevent flash of old beat; cleared when fresh data arrives
     setRefreshTick((t) => t + 1);
   }, []);
@@ -2935,13 +2937,14 @@ export default function PlayPage() {
                         Today&apos;s Moments
                       </h2>
                       {/* Resolved beats awaiting user dismissal (shown first so reaction text is prominent) */}
-                      {pendingDismissalBeats.map((beat) => (
+                      {pendingDismissalBeats.map(({ beat, chosenOption }) => (
                         <ArcBeatCard
                           key={beat.instance_id}
                           beat={beat}
                           dayIndex={dayIndex}
                           onChoice={handleArcBeatChoice}
                           disabled
+                          resolvedOption={chosenOption}
                           onDismiss={() => handleDismissArcBeat(beat)}
                         />
                       ))}

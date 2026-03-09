@@ -11,6 +11,8 @@ type ArcBeatCardProps = {
   onChoice: (beat: ArcBeat, option: StoryletChoice) => Promise<void>;
   disabled?: boolean;
   onDismiss?: () => void;
+  /** When provided, the card renders in "resolved" mode showing this option's reaction text + Continue. */
+  resolvedOption?: StoryletChoice;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -44,16 +46,19 @@ function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: nu
     .map(([k, v]) => ({ label: RESOURCE_LABELS[k] ?? k, delta: v }));
 }
 
-export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss }: ArcBeatCardProps) {
+export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, resolvedOption }: ArcBeatCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Use resolvedOption (from parent) if provided, otherwise fall back to internal state
+  const displayedOption = resolvedOption ?? chosenOption;
 
   const streamLabel = STREAM_LABELS[beat.stream_id as keyof typeof STREAM_LABELS] ?? beat.stream_id;
   const daysLeft = beat.expires_on_day - dayIndex;
 
   async function handleChoice(option: StoryletChoice) {
-    if (choosing || chosenOption) return;
+    if (choosing || displayedOption) return;
     setChoosing(true);
     setError(null);
     setChosenOption(option); // optimistic — show reaction text immediately
@@ -67,7 +72,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss }: A
     }
   }
 
-  const deltas = chosenOption ? computeDeltas(chosenOption) : [];
+  const deltas = displayedOption ? computeDeltas(displayedOption) : [];
 
   return (
     <div className="rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top shadow-sm">
@@ -88,11 +93,11 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss }: A
       <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{beat.body}</p>
 
       {/* Post-choice result */}
-      {chosenOption && (
+      {displayedOption && (
         <div className="rounded border border-border/60 bg-muted px-3 py-3 text-sm space-y-2">
-          <p className="font-medium text-primary">✓ {chosenOption.label}</p>
-          {chosenOption.reaction_text && (
-            <p className="text-foreground/80 leading-relaxed">{chosenOption.reaction_text}</p>
+          <p className="font-medium text-primary">✓ {displayedOption.label}</p>
+          {displayedOption.reaction_text && (
+            <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{displayedOption.reaction_text}</p>
           )}
           {deltas.length > 0 && (
             <ul className="space-y-0.5 text-foreground/60 font-stat text-xs">
@@ -117,7 +122,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss }: A
       )}
 
       {/* Options */}
-      {!chosenOption && (
+      {!displayedOption && (
         <div className="flex flex-col gap-2">
           {beat.options.map((option) => (
             <button
