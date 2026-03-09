@@ -1714,7 +1714,7 @@ export default function PlayPage() {
       const beatText =
         reactionText ??
         (beatBufferEnabled && beatFallbackMessage ? beatFallbackMessage : null);
-      if (beatBufferEnabled && beatText) {
+      if (beatText) {
         setPendingReactionText(beatText);
         supabase.from("choice_log").insert({
           user_id: userId,
@@ -1743,19 +1743,14 @@ export default function PlayPage() {
           nextStage = "reflection";
         }
         pendingTransitionRef.current = () => setStage(nextStage);
-        if (!reactionText || !beatBufferEnabled) {
+        if (!reactionText) {
           setConsequenceActive(true);
         }
       } else {
         pendingTransitionRef.current = () => setCurrentIndex((i) => i + 1);
-        if (!reactionText || !beatBufferEnabled) {
+        if (!reactionText) {
           setConsequenceActive(true);
         }
-      }
-      if (reactionText && !beatBufferEnabled) {
-        const next = pendingTransitionRef.current;
-        pendingTransitionRef.current = null;
-        if (next) next();
       }
 
       // Auto-mark NPCs declared in introduces_npc as met on first encounter.
@@ -1878,17 +1873,17 @@ export default function PlayPage() {
   };
 
   useEffect(() => {
-    if (!beatBufferEnabled || !pendingReactionText) return;
+    if (!pendingReactionText) return;
     if (!BEAT_AUTO_ADVANCE_MS) return;
     const timer = window.setTimeout(
       () => handleReactionContinue(),
       BEAT_AUTO_ADVANCE_MS
     );
     return () => window.clearTimeout(timer);
-  }, [beatBufferEnabled, pendingReactionText]);
+  }, [pendingReactionText]);
 
   useEffect(() => {
-    if (!beatBufferEnabled || !pendingReactionText) return;
+    if (!pendingReactionText) return;
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -1897,7 +1892,7 @@ export default function PlayPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [beatBufferEnabled, pendingReactionText]);
+  }, [pendingReactionText]);
 
   const handleCompareDismiss = () => {
     setCompareVisible(false);
@@ -2805,8 +2800,8 @@ export default function PlayPage() {
                                     );
                                   })()}
 
-                                  {outcomeMessage && !outcomeDeltas && (
-                                    <p className="pl-7 text-xs text-muted-foreground">{outcomeMessage}</p>
+                                  {outcomeMessage && outcomeMessage !== pendingReactionText && (
+                                    <p className="pl-7 text-sm leading-relaxed text-foreground/80">{outcomeMessage}</p>
                                   )}
 
                                   {lastCheck ? (
