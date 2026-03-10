@@ -485,6 +485,7 @@ export async function getOrCreateDailyRun(
           body: due.step.body,
           options: due.step.choices,
           expires_on_day: due.expires_on_day,
+          introduces_npc: due.step.introduces_npc,
         }));
       }
     } catch (err) {

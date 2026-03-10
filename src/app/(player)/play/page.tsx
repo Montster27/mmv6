@@ -2025,6 +2025,61 @@ export default function PlayPage() {
 
       const resBody = await res.json().catch(() => ({ next_step_key: null }));
 
+      // --- Apply relationship events from the arc beat choice ---
+      if (userId) {
+        const introEvents = (beat.introduces_npc ?? [])
+          .filter((npcId: string) => !relationshipsState[npcId]?.met)
+          .map((npcId: string) => ({ npc_id: npcId, type: "INTRODUCED_SELF" as const }));
+
+        const relationshipEvents = [
+          ...introEvents,
+          ...((option.events_emitted ?? []) as any),
+          ...mapLegacyRelationalEffects(option.relational_effects),
+          ...mapLegacyNpcKnowledge(option.set_npc_memory),
+        ] as any;
+
+        if (relationshipEvents.length > 0) {
+          const { next: nextRelationships, logs } = applyRelationshipEvents(
+            relationshipsState,
+            relationshipEvents,
+            { storylet_slug: beat.arc_key, choice_id: option.id }
+          );
+          await updateRelationships(userId, nextRelationships, dayIndex);
+          if (dailyState) {
+            setDailyState({ ...dailyState, relationships: nextRelationships });
+          }
+          // Log each relationship change
+          logs.forEach((entry) => {
+            const flagChanged =
+              typeof entry.delta.met === "boolean" ||
+              typeof entry.delta.knows_name === "boolean" ||
+              typeof entry.delta.knows_face === "boolean";
+            const payload = {
+              user_id: userId,
+              day: dayIndex,
+              event_type: "REL_DELTA",
+              arc_id: null,
+              arc_instance_id: beat.instance_id,
+              step_key: null,
+              option_key: option.id,
+              delta: entry.delta,
+              meta: {
+                storylet_slug: beat.arc_key,
+                choice_id: option.id,
+                npc_id: entry.npc_id,
+                kind: flagChanged ? "npc_memory" : "relational",
+                before: entry.before,
+                after: entry.after,
+              },
+            };
+            supabase.from("choice_log").insert(payload);
+            if (relationshipDebugEnabled) {
+              setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
+            }
+          });
+        }
+      }
+
       const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
       setResolvedArcBeatIds(newResolved);
       // Keep this beat visible until the user dismisses it via the Continue button
@@ -2046,7 +2101,7 @@ export default function PlayPage() {
         }
       }
     },
-    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId]
+    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled]
   );
 
   const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
