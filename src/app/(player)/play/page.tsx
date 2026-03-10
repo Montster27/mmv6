@@ -2336,17 +2336,6 @@ export default function PlayPage() {
                 </p>
                 <p>{getDailyStageCopy(stage).body}</p>
               </div>
-              {seasonContext ? (
-                <div className="mt-2">
-                  <SeasonBadge
-                    seasonIndex={seasonContext.currentSeason.season_index}
-                    daysRemaining={seasonContext.daysRemaining}
-                  />
-                </div>
-              ) : null}
-              <p className="text-muted-foreground text-xs font-stat">
-                Signed in as {session.user.email ?? "unknown user"}.
-              </p>
               <div className="mt-3 space-y-2">
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
