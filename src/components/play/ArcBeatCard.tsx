@@ -81,7 +81,7 @@ function meetsMoneyRequirement(
   playerBand: MoneyBand | null | undefined,
   required: string | undefined
 ): boolean {
-  if (!required) return true; // no requirement
+  if (!required) return true;
   const playerRank = MONEY_BAND_RANK[playerBand ?? "okay"] ?? 1;
   const requiredRank = MONEY_BAND_RANK[required] ?? 0;
   return playerRank >= requiredRank;
@@ -92,7 +92,6 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Use resolvedOption (from parent) if provided, otherwise fall back to internal state
   const displayedOption = resolvedOption ?? chosenOption;
 
   const streamLabel = STREAM_LABELS[beat.stream_id as keyof typeof STREAM_LABELS] ?? beat.stream_id;
@@ -102,18 +101,18 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
     if (choosing || displayedOption) return;
     setChoosing(true);
     setError(null);
-    setChosenOption(option); // optimistic — show reaction text immediately
+    setChosenOption(option);
     try {
       await onChoice(beat, option);
     } catch (err) {
-      setChosenOption(null); // revert on error
+      setChosenOption(null);
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setChoosing(false);
     }
   }
 
-  const deltas = displayedOption ? computeDeltas(displayedOption) : [];
+  const resolvedDeltas = displayedOption ? computeDeltas(displayedOption) : [];
 
   return (
     <div className="rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top shadow-sm">
@@ -140,11 +139,17 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
           {displayedOption.reaction_text && (
             <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{displayedOption.reaction_text}</p>
           )}
-          {deltas.length > 0 && (
-            <ul className="space-y-0.5 text-foreground/60 font-stat text-xs">
-              {deltas.map(({ label, delta }) => (
-                <li key={label}>
-                  {label} {delta >= 0 ? "+" : ""}{delta}
+          {resolvedDeltas.length > 0 && (
+            <ul className="flex flex-wrap gap-2 text-xs font-stat">
+              {resolvedDeltas.map(({ label, delta }) => (
+                <li
+                  key={label}
+                  className={`rounded px-1.5 py-0.5 ${
+                    delta > 0 ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                    "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  }`}
+                >
+                  {delta > 0 ? "+" : ""}{delta} {label}
                 </li>
               ))}
             </ul>
@@ -167,6 +172,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
         <div className="flex flex-col gap-2">
           {beat.options.map((option) => {
             const locked = !meetsMoneyRequirement(moneyBand, option.money_requirement);
+            const previewDeltas = computeDeltas(option);
             return (
               <button
                 key={option.id}
@@ -178,12 +184,25 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
                     : "border-primary/30 bg-card text-foreground hover:border-primary hover:bg-primary/5 active:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                   }`}
               >
-                {option.label}
-                {option.energy_cost ? (
-                  <span className="ml-2 text-xs text-foreground/40">−{option.energy_cost} energy</span>
-                ) : null}
-                {locked && (
-                  <span className="ml-2 text-xs text-foreground/30">(not enough money)</span>
+                <span className="block">{option.label}</span>
+                {(previewDeltas.length > 0 || locked) && (
+                  <span className="mt-1 flex flex-wrap gap-1.5">
+                    {previewDeltas.map(({ label, delta }) => (
+                      <span
+                        key={label}
+                        className={`text-xs font-stat ${
+                          locked ? "text-foreground/30" :
+                          delta > 0 ? "text-green-600 dark:text-green-400" :
+                          "text-red-500 dark:text-red-400"
+                        }`}
+                      >
+                        {delta > 0 ? "+" : ""}{delta} {label}
+                      </span>
+                    ))}
+                    {locked && (
+                      <span className="text-xs text-foreground/30">(not enough money)</span>
+                    )}
+                  </span>
                 )}
               </button>
             );

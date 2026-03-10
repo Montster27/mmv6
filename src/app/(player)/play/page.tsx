@@ -275,6 +275,9 @@ export default function PlayPage() {
   const [pendingDismissalBeats, setPendingDismissalBeats] = useState<
     Array<{ beat: ArcBeat; chosenOption: StoryletChoice }>
   >([]);
+  // Set when all arc beats are resolved but allocation hasn't been saved yet.
+  // Holds up markDailyComplete until after the player sets their time allocation.
+  const [awaitingAllocation, setAwaitingAllocation] = useState(false);
 
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
@@ -405,10 +408,12 @@ export default function PlayPage() {
     () => dailyRunQuery.data?.arcBeats ?? [],
     [dailyRunQuery.data?.arcBeats]
   );
-  // Clear resolved IDs when fresh arc beat data arrives so advanced steps can render
+  // Clear resolved IDs (and allocation gate) when fresh arc beat data arrives
   useEffect(() => {
     setResolvedArcBeatIds(new Set());
-  }, [dailyRunQuery.data?.arcBeats]);
+    // If allocation is now saved (e.g. day advanced), clear the gate
+    if (allocationSaved) setAwaitingAllocation(false);
+  }, [dailyRunQuery.data?.arcBeats, allocationSaved]);
   const relationshipsState = useMemo(
     () => arcOneState?.relationships ?? {},
     [arcOneState?.relationships]
@@ -495,7 +500,7 @@ export default function PlayPage() {
     });
   }, [relDebugEvents, relDebugFilter]);
   const showDailyComplete =
-    (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete" && arcBeats.length === 0) ||
+    (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete" && arcBeats.length === 0 && !awaitingAllocation) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
@@ -1364,7 +1369,20 @@ export default function PlayPage() {
       setAllocationSaved(true);
       setAllocationSummary(allocation);
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
-        setStage("storylet_1");
+        if (awaitingAllocation) {
+          // Allocation was deferred to end-of-day — now mark the day complete
+          setAwaitingAllocation(false);
+          if (userId) {
+            try {
+              await markDailyComplete(userId, dayIndex);
+              incrementGroupObjective(2, "daily_complete").catch(() => {});
+            } catch (e) {
+              console.error("Failed to mark daily complete after end-of-day allocation", e);
+            }
+          }
+        } else {
+          setStage("storylet_1");
+        }
       }
     } catch (e) {
       console.error(e);
@@ -2128,15 +2146,20 @@ export default function PlayPage() {
         !hasMoreSteps &&
         arcBeats.every((b) => newResolved.has(b.instance_id))
       ) {
-        try {
-          await markDailyComplete(userId, dayIndex);
-          incrementGroupObjective(2, "daily_complete").catch(() => {});
-        } catch (e) {
-          console.error("Failed to mark daily complete after arc beats", e);
+        if (!allocationSaved) {
+          // Gate daily-complete behind allocation — show it after beats are dismissed
+          setAwaitingAllocation(true);
+        } else {
+          try {
+            await markDailyComplete(userId, dayIndex);
+            incrementGroupObjective(2, "daily_complete").catch(() => {});
+          } catch (e) {
+            console.error("Failed to mark daily complete after arc beats", e);
+          }
         }
       }
     },
-    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState]
+    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState, allocationSaved]
   );
 
   const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
@@ -3039,6 +3062,25 @@ export default function PlayPage() {
                             moneyBand={arcOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
                           />
                         ))}
+                    </section>
+                  )}
+
+                  {/* End-of-day allocation — shown after all beats are resolved and dismissed */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR &&
+                    arcOneMode &&
+                    awaitingAllocation &&
+                    pendingDismissalBeats.length === 0 && (
+                    <section className="space-y-3">
+                      <h2 className="prep-label">Plan Your Day</h2>
+                      <AllocationSection
+                        allocation={allocation}
+                        totalAllocation={totalAllocation}
+                        allocationValid={allocationValid}
+                        savingAllocation={savingAllocation}
+                        onAllocationChange={handleAllocationChange}
+                        onSave={handleSaveAllocation}
+                        resourcesEnabled={featureFlags.resources}
+                      />
                     </section>
                   )}
 
