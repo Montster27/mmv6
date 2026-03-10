@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { normalizeStreamStates, setStreamState } from "@/core/arcOne/streamState";
 import { shiftMoneyBand } from "@/core/arcOne/state";
 import type { StreamId } from "@/types/arcOneStreams";
+import { STREAM_ALIASES } from "@/types/arcOneStreams";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -92,12 +93,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Option not found" }, { status: 400 });
   }
 
-  // --- 3. Apply resource effects (costs & rewards) ---
+  // --- 3. Apply resource effects (costs & rewards + outcome.deltas) ---
   const costs = chosenOption.costs as Record<string, Record<string, number>> | undefined;
   const rewards = chosenOption.rewards as Record<string, Record<string, number>> | undefined;
   const energyCost = typeof chosenOption.energy_cost === "number" ? chosenOption.energy_cost : 0;
 
   const resourceDeltas: Record<string, number> = {};
+
+  // Legacy costs/rewards format
   if (costs?.resources) {
     for (const [k, v] of Object.entries(costs.resources)) {
       resourceDeltas[k] = (resourceDeltas[k] ?? 0) - v;
@@ -110,6 +113,27 @@ export async function POST(request: Request) {
   }
   if (energyCost > 0) {
     resourceDeltas["energy"] = (resourceDeltas["energy"] ?? 0) - energyCost;
+  }
+
+  // Content format: outcome.deltas.{ energy, stress, resources: { cashOnHand, ... } }
+  const outcome = chosenOption.outcome as
+    | { deltas?: { energy?: number; stress?: number; resources?: Record<string, number> } }
+    | undefined;
+  if (outcome?.deltas) {
+    const d = outcome.deltas;
+    if (typeof d.energy === "number" && d.energy !== 0) {
+      resourceDeltas["energy"] = (resourceDeltas["energy"] ?? 0) + d.energy;
+    }
+    if (typeof d.stress === "number" && d.stress !== 0) {
+      resourceDeltas["stress"] = (resourceDeltas["stress"] ?? 0) + d.stress;
+    }
+    if (d.resources) {
+      for (const [k, v] of Object.entries(d.resources)) {
+        if (typeof v === "number" && v !== 0) {
+          resourceDeltas[k] = (resourceDeltas[k] ?? 0) + v;
+        }
+      }
+    }
   }
 
   // Apply deltas to day_state row for this user + day
@@ -141,10 +165,14 @@ export async function POST(request: Request) {
 
   // --- 4. Apply stream state transition ---
   const setsStreamState = chosenOption.sets_stream_state as
-    | { stream: string; state: string }
+    | { stream: string; state: string | null }
     | undefined;
 
+  // Only apply if both stream and state are present (state=null means "don't overwrite")
   if (setsStreamState?.stream && setsStreamState?.state) {
+    // Resolve stream aliases (e.g., "people" → "belonging")
+    const canonicalStream = (STREAM_ALIASES[setsStreamState.stream] ?? setsStreamState.stream) as StreamId;
+
     const { data: dailyRow } = await supabaseServer
       .from("daily_states")
       .select("stream_states,money_band")
@@ -155,7 +183,7 @@ export async function POST(request: Request) {
     const currentStates = normalizeStreamStates(dailyRow?.stream_states);
     const nextStates = setStreamState(
       currentStates,
-      setsStreamState.stream as StreamId,
+      canonicalStream,
       setsStreamState.state
     );
 
@@ -232,7 +260,62 @@ export async function POST(request: Request) {
       .eq("id", instance_id);
   }
 
-  // --- 6. Record to choice_log ---
+  // --- 6. Activate a new arc if the choice triggers one ---
+  const arcActivated = chosenOption._arc_activated as string | undefined;
+  let activatedArcKey: string | null = null;
+
+  if (typeof arcActivated === "string" && arcActivated.length > 0) {
+    try {
+      // Look up the target arc definition
+      const { data: targetArc } = await supabaseServer
+        .from("arc_definitions")
+        .select("id,key")
+        .eq("key", arcActivated)
+        .eq("is_enabled", true)
+        .maybeSingle();
+
+      if (targetArc) {
+        // Check for existing instance (prevent duplicates)
+        const { data: existingInstance } = await supabaseServer
+          .from("arc_instances")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("arc_id", targetArc.id)
+          .maybeSingle();
+
+        if (!existingInstance) {
+          // Find the first step for this arc (lowest order_index)
+          const { data: firstStep } = await supabaseServer
+            .from("storylets")
+            .select("step_key,due_offset_days")
+            .eq("arc_id", targetArc.id)
+            .order("order_index", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (firstStep) {
+            const stepDueDay = day_index + (firstStep.due_offset_days ?? 0);
+            await supabaseServer.from("arc_instances").insert({
+              user_id: user.id,
+              arc_id: targetArc.id,
+              state: "ACTIVE",
+              current_step_key: firstStep.step_key,
+              step_due_day: stepDueDay,
+              step_defer_count: 0,
+              started_day: day_index,
+              updated_day: day_index,
+            });
+            activatedArcKey = targetArc.key;
+            console.log(`[arc-beat] Activated arc ${targetArc.key} for user ${user.id}, first step: ${firstStep.step_key}, due day: ${stepDueDay}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[arc-beat] Failed to activate arc", arcActivated, err);
+    }
+  }
+
+  // --- 7. Record to choice_log ---
   await supabaseServer.from("choice_log").insert({
     user_id: user.id,
     day: day_index,
@@ -241,8 +324,15 @@ export async function POST(request: Request) {
     arc_instance_id: instance_id,
     step_key: instanceRow.current_step_key,
     option_key,
-    meta: { next_step_key: nextStepKey ?? null },
+    meta: {
+      next_step_key: nextStepKey ?? null,
+      ...(activatedArcKey ? { activated_arc: activatedArcKey } : {}),
+    },
   });
 
-  return NextResponse.json({ ok: true, next_step_key: nextStepKey ?? null });
+  return NextResponse.json({
+    ok: true,
+    next_step_key: nextStepKey ?? null,
+    activated_arc: activatedArcKey,
+  });
 }

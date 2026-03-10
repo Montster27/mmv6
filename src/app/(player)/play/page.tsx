@@ -2080,10 +2080,45 @@ export default function PlayPage() {
         }
       }
 
+      // --- Resolve conditional reaction text (e.g. money_band conditions) ---
+      let resolvedOption = option;
+      const conditions = option.reaction_text_conditions;
+      if (
+        conditions &&
+        conditions.length > 0 &&
+        (!option.reaction_text || option.reaction_text.trim() === "")
+      ) {
+        const npcMemForCond = Object.fromEntries(
+          Object.entries(relationshipsState).map(([npcId, entry]) => {
+            const rec = entry as Record<string, unknown>;
+            return [
+              npcId,
+              {
+                met: rec.met === true,
+                knows_name: rec.knows_name === true,
+                knows_face: rec.knows_face === true,
+              },
+            ];
+          })
+        );
+        const condContext: Record<string, unknown> = {
+          npc_memory: npcMemForCond,
+        };
+        if (arcOneState?.moneyBand) {
+          condContext.money_band = arcOneState.moneyBand;
+        }
+        for (const cond of conditions) {
+          if (matchesRequirement(cond.if, condContext)) {
+            resolvedOption = { ...option, reaction_text: cond.text };
+            break;
+          }
+        }
+      }
+
       const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
       setResolvedArcBeatIds(newResolved);
       // Keep this beat visible until the user dismisses it via the Continue button
-      setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: option }]);
+      setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: resolvedOption }]);
 
       // Only mark day complete when all beats are resolved AND no more steps are queued
       const hasMoreSteps = resBody.next_step_key != null;
@@ -2101,7 +2136,7 @@ export default function PlayPage() {
         }
       }
     },
-    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled]
+    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState]
   );
 
   const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
@@ -3012,6 +3047,7 @@ export default function PlayPage() {
                             beat={beat}
                             dayIndex={dayIndex}
                             onChoice={handleArcBeatChoice}
+                            moneyBand={arcOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
                           />
                         ))}
                     </section>

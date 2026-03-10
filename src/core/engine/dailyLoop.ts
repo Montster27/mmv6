@@ -450,28 +450,67 @@ export async function getOrCreateDailyRun(
           branch_key: r.branch_key ?? null,
         }));
 
-        // 4. On day 1 (or whenever there are no instances yet), create them
-        if (instances.length === 0 && streamSteps.length > 0) {
-          const toInsert = buildInitialArcInstances(userId, streamArcs, streamSteps, dayIndex);
+        // 4. Ensure the opening arc instance exists.
+        //    Content arcs (arc_people, arc_money, arc_opportunity) are activated by
+        //    player choices in the opening arc's Beat 5 — the beat route handles that.
+        const openingArc = streamArcs.find((a) => a.key === "arc_opening");
+        const hasOpeningInstance = instances.some(
+          (i) => openingArc && i.arc_id === openingArc.id
+        );
+
+        if (!hasOpeningInstance && openingArc && streamSteps.length > 0) {
+          const toInsert = buildInitialArcInstances(userId, [openingArc], streamSteps, dayIndex);
           if (toInsert.length > 0) {
             const { data: inserted } = await supabase
               .from("arc_instances")
               .insert(toInsert)
               .select("id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key");
-            instances = (inserted ?? []).map((r) => ({
-              id: r.id,
-              user_id: r.user_id,
-              arc_id: r.arc_id,
-              state: r.state as ArcInstance["state"],
-              current_step_key: r.current_step_key,
-              step_due_day: r.step_due_day,
-              step_defer_count: r.step_defer_count,
-              started_day: r.started_day,
-              updated_day: r.updated_day,
-              completed_day: r.completed_day ?? null,
-              failure_reason: r.failure_reason ?? null,
-              branch_key: r.branch_key ?? null,
-            }));
+            instances = [
+              ...instances,
+              ...(inserted ?? []).map((r) => ({
+                id: r.id,
+                user_id: r.user_id,
+                arc_id: r.arc_id,
+                state: r.state as ArcInstance["state"],
+                current_step_key: r.current_step_key,
+                step_due_day: r.step_due_day,
+                step_defer_count: r.step_defer_count,
+                started_day: r.started_day,
+                updated_day: r.updated_day,
+                completed_day: r.completed_day ?? null,
+                failure_reason: r.failure_reason ?? null,
+                branch_key: r.branch_key ?? null,
+              })),
+            ];
+          }
+        }
+
+        // 4b. Cleanup: remove premature content arc instances.
+        //     Content arcs should only exist once the opening arc completes Beat 5
+        //     (which triggers _arc_activated). If the opening arc is still active
+        //     and hasn't passed Beat 5, any content arc instances are stale leftovers.
+        if (openingArc) {
+          const CONTENT_ARC_KEYS = ["arc_people", "arc_money", "arc_opportunity"];
+          const contentArcIds = streamArcs
+            .filter((a) => CONTENT_ARC_KEYS.includes(a.key))
+            .map((a) => a.id);
+          const openingInstance = instances.find((i) => i.arc_id === openingArc.id);
+          const openingCompleted = openingInstance?.state === "COMPLETED";
+          // Beat 5 key — once the opening arc is on this step or completed, content arcs are legit
+          const openingOnBeat5 = openingInstance?.current_step_key === "opening_s5_afternoon";
+          const contentArcsAllowed = openingCompleted || openingOnBeat5;
+
+          if (!contentArcsAllowed && contentArcIds.length > 0) {
+            const premature = instances.filter((i) => contentArcIds.includes(i.arc_id));
+            if (premature.length > 0) {
+              const prematureIds = premature.map((i) => i.id);
+              await supabase
+                .from("arc_instances")
+                .delete()
+                .in("id", prematureIds);
+              instances = instances.filter((i) => !contentArcIds.includes(i.arc_id));
+              console.log("[daily-run] Cleaned up", premature.length, "premature content arc instances");
+            }
           }
         }
 

@@ -1,0 +1,257 @@
+-- narrative_3: Update opening arc — fix text, update beat 3 chaining, add beats 4 & 5
+-- Source: docs/new content/opening.json
+-- Beat 3 (Dana) now chains to beat 4 (The Floor) instead of completing
+-- Beat 4 (The Floor) introduces Sandra, chains to beat 5
+-- Beat 5 (The First Afternoon) is the branch point activating one of 3 arcs
+
+BEGIN;
+
+-- 1. Beat 1 text fix: "someone is playing a song" → "someone's boom box is playing a song"
+UPDATE public.storylets
+SET body = replace(body, 'someone is playing a song', E'someone''s boom box is playing a song')
+WHERE slug = 'arc_opening_hallway';
+
+-- 2. Beat 2 text fix: "cassette player" → "tape deck"
+UPDATE public.storylets
+SET body = replace(body, 'cassette player', 'tape deck')
+WHERE slug = 'arc_opening_room';
+
+-- 3. Beat 3 (Dana): update default_next_step_key and choices
+UPDATE public.storylets
+SET
+  default_next_step_key = 'opening_s4_floor',
+  choices = '[
+    {
+      "id": "volunteer_real",
+      "label": "Tell him where you''re from — and what it was like to leave",
+      "energy_cost": 1,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": -1, "stress": -3, "resources": {} }
+      },
+      "reaction_text": "You tell him. Not the rehearsed version — the real one. The town, the size of it, what your street looked like from the back seat as you pulled away. You didn''t plan to say that last part.\n\nSomething in his posture changed when you did. He leaned back against the wall and told you about his drive up — eleven hours, his dad''s truck, a gas station in Pennsylvania where they didn''t talk for forty miles after. He laughed about it but his eyes went somewhere else.\n\nNeither of you is performing anymore. For now. The greasy bag sits untouched on his desk. He offers you half of whatever''s in it. You haven''t eaten since the car.\n\nThe room is still small. But the silence between sentences has a different quality now — not empty, just easy. Like the first draft of something that might work.",
+      "identity_tags": ["people", "risk"],
+      "sets_stream_state": { "stream": "roommate", "state": "genuine_connection" },
+      "relational_effects": {
+        "npc_roommate_dana": { "trust": 1, "relationship": 1 }
+      },
+      "set_npc_memory": {
+        "npc_roommate_dana": { "knows_hometown": true, "shared_first_meal": true }
+      },
+      "events_emitted": [
+        { "npc_id": "npc_roommate_dana", "type": "INTRODUCED_SELF", "magnitude": 1 },
+        { "npc_id": "npc_roommate_dana", "type": "SHARED_MEAL", "magnitude": 1 }
+      ],
+      "next_step_key": "opening_s4_floor"
+    },
+    {
+      "id": "keep_surface",
+      "label": "Answer the question, keep it light, ask him one back",
+      "energy_cost": 0,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 0, "stress": 0, "resources": {} }
+      },
+      "reaction_text": "You give him the easy version. State, town, size of your high school. He nods like he''s filing it. He gives you the same back — a place you''ve heard of but couldn''t find on a map, a high school with a name that sounds like every other high school.\n\nYou ask about his major. He asks about yours. You both hedge in the same way — \"I''m thinking about\" instead of \"I am.\" That''s a small thing to have in common but you both notice it.\n\nHe pulls a sandwich out of the bag and says the dining hall isn''t as bad as it looks. You''re not sure if that''s true but you appreciate the data point.\n\nThe conversation finds its natural end. He turns on his tape deck — low, not inconsiderate — and you go back to unpacking. The room has a rhythm now. Surface, functional, fine. There''s time.",
+      "identity_tags": ["safety"],
+      "sets_stream_state": { "stream": "roommate", "state": "neutral_start" },
+      "relational_effects": {
+        "npc_roommate_dana": { "relationship": 1 }
+      },
+      "set_npc_memory": {
+        "npc_roommate_dana": { "knows_hometown": true }
+      },
+      "events_emitted": [
+        { "npc_id": "npc_roommate_dana", "type": "INTRODUCED_SELF", "magnitude": 1 }
+      ],
+      "next_step_key": "opening_s4_floor"
+    },
+    {
+      "id": "stay_busy",
+      "label": "Give a short answer and keep unpacking — you''ll talk when you''re settled",
+      "energy_cost": 0,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 0, "stress": -2, "resources": {} }
+      },
+      "reaction_text": "You tell him the name of your town. He nods. You turn back to the box you were unpacking and start putting shirts in the small dresser that smells like someone else''s year.\n\nHe got the message. Not rude, just — occupied. He sits there for a moment longer than feels natural, then turns on his tape deck. Quieter than before. A consideration, or an adjustment. You can''t tell which.\n\nYou unpack methodically. Books on the shelf, shoes under the bed, alarm clock on the nightstand. Each thing you place makes the room slightly more yours and slightly less his. He eats his sandwich without offering you half.\n\nThe two of you exist in the same small room without quite being in it together. It''s manageable. It''s controlled. It''s the thing you know how to do when you don''t know what else to do.\n\nOutside the door, the hallway is getting louder. Someone is organizing something. You''ll get to it. Just — not yet.",
+      "identity_tags": ["avoid", "achievement"],
+      "sets_stream_state": { "stream": "roommate", "state": "avoidance_start" },
+      "relational_effects": {
+        "npc_roommate_dana": { "reliability": -1 }
+      },
+      "set_npc_memory": {},
+      "events_emitted": [
+        { "npc_id": "npc_roommate_dana", "type": "INTRODUCED_SELF", "magnitude": 0 }
+      ],
+      "next_step_key": null
+    }
+  ]'::jsonb
+WHERE slug = 'arc_opening_dana';
+
+-- 4. Insert Beat 4: The Floor (introduces Sandra)
+INSERT INTO public.storylets (
+  slug, title, body, choices, tags, requirements, weight, is_active,
+  introduces_npc, arc_id, step_key, order_index, due_offset_days,
+  expires_after_days, default_next_step_key
+)
+VALUES (
+  'arc_opening_floor',
+  'The Floor',
+  E'The hallway is louder now. Doors that were closed when you arrived have started to open, and the ones that were already open are propped wider — sneakers, textbooks, a rolled-up towel. Someone has a radio on. Someone else is arguing cheerfully about which bed is better.\n\nA woman with a clipboard and a stack of photocopied schedules stops at your door. She''s maybe a year or two older than you, wearing a polo shirt with the college logo and a name tag that says SANDRA in block letters she clearly wrote herself.\n\n"Hey — you''re in 214, right? I''m Sandra, I''m your RA." She says it like she''s said it fifteen times already today, which she probably has. But she looks at you when she says it, and that part isn''t rehearsed.\n\nShe hands you a schedule. "Floor meeting tonight, seven, common room. Orientation fair is on the quad right now if you want to check it out. And the bookstore closes at five — if you need books for tomorrow, today''s the day."\n\nShe glances past you into the room, clocks that you''re settling in, and nods like that''s enough.',
+  '[
+    {
+      "id": "ask_sandra",
+      "label": "Ask her something practical — laundry, dining hall, where to find a campus map",
+      "energy_cost": 0,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 0, "stress": -2, "resources": {} }
+      },
+      "reaction_text": "She doesn''t rush you. The laundry is basement level, quarters only, and somebody always leaves their clothes in the dryer so bring a book. The dining hall is fine for breakfast, questionable for dinner, and the trick is to go at 11:30 before the rush hits.\n\nShe''s good at this — the practical stuff, delivered without condescension. You can tell she remembers being new here.\n\nA guy down the hall leans out of his doorway while you''re talking. Dark hair, open face, the kind of person who enters a conversation by already being in it. \"Is it true they have a waffle iron at breakfast?\" he asks Sandra, and she laughs and says yes, and for a second the three of you are just standing in a hallway talking about waffles, and nothing about it feels like orientation.\n\nSandra moves on to the next door. The guy — you didn''t catch his name — gives you a nod before ducking back into his room. You file his face away. You''ll see him again.",
+      "identity_tags": ["people", "confront"],
+      "relational_effects": {
+        "npc_ra_sandra": { "trust": 1 }
+      },
+      "set_npc_memory": {
+        "npc_ra_sandra": { "gave_practical_advice": true }
+      },
+      "events_emitted": [
+        { "npc_id": "npc_ra_sandra", "type": "INTRODUCED_SELF", "magnitude": 1 }
+      ],
+      "next_step_key": "opening_s5_afternoon"
+    },
+    {
+      "id": "take_schedule",
+      "label": "Take the schedule, say thanks, head back in",
+      "energy_cost": 0,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 0, "stress": 0, "resources": {} }
+      },
+      "reaction_text": "\"Thanks.\" You take the schedule. She smiles — not disappointed, just moving on. She''s got twenty more doors.\n\nYou sit on your bed and unfold the paper. It''s a photocopy of a photocopy — the text is slightly crooked and the edges are soft. Orientation Fair, 1–4 PM, Main Quad. Floor Meeting, 7 PM, Common Room. Bookstore Hours: 9 AM – 5 PM.\n\nThree things. One afternoon. You read it again like the answer to a question you haven''t figured out how to ask yet.\n\nDana''s tape deck is still going. He''s reading something on his bed — a paperback, the cover bent back. Neither of you says anything. The room is starting to feel like a room and not a mistake.",
+      "identity_tags": ["safety"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "events_emitted": [
+        { "npc_id": "npc_ra_sandra", "type": "INTRODUCED_SELF", "magnitude": 1 }
+      ],
+      "next_step_key": "opening_s5_afternoon"
+    },
+    {
+      "id": "linger_hall",
+      "label": "Stay in the hallway for a minute — take it in",
+      "energy_cost": 0,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 0, "stress": -1, "resources": {} }
+      },
+      "reaction_text": "Sandra moves on. You don''t go back inside. Not yet.\n\nThe hallway has its own weather now. Someone three doors down is playing something you''re pretty sure is Talking Heads. Two guys across the hall are comparing class schedules and discovering they''re in the same intro psych. Another guy is sitting on the floor outside his room, back against the wall, eating an apple and watching the same hallway you''re watching.\n\nHe catches your eye and raises the apple in a gesture that''s either a greeting or a toast. You''re not sure which. It doesn''t matter. It''s the first moment since you arrived that feels unscripted.\n\nYou stand there for another minute. The light coming through the window at the end of the hall is warm and angled and makes the linoleum look almost good. You can hear the orientation fair from outside — music, a megaphone, the distant hum of people gathering on the quad.\n\nThe floor meeting schedule Sandra gave you says seven o''clock. The words feel familiar before you''ve finished reading them — common room, bring your room key, don''t be late. You''ve never been to a floor meeting in your life. But the cadence of it lands like something rehearsed. Like you''ve heard this before.\n\nYou''re going to have to choose what to do with the afternoon. But for this one minute, you''re just here.",
+      "identity_tags": ["people"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "events_emitted": [
+        { "npc_id": "npc_ra_sandra", "type": "INTRODUCED_SELF", "magnitude": 1 }
+      ],
+      "next_step_key": "opening_s5_afternoon"
+    }
+  ]'::jsonb,
+  ARRAY['arc_one', 'opening', 'social', 'deja_vu'],
+  '{}'::jsonb,
+  1,
+  true,
+  ARRAY['npc_ra_sandra'],
+  (SELECT id FROM public.arc_definitions WHERE key = 'arc_opening'),
+  'opening_s4_floor',
+  4,
+  0,
+  NULL,
+  'opening_s5_afternoon'
+);
+
+-- 5. Insert Beat 5: The First Afternoon (branch point → activates arcs)
+INSERT INTO public.storylets (
+  slug, title, body, choices, tags, requirements, weight, is_active,
+  introduces_npc, arc_id, step_key, order_index, due_offset_days,
+  expires_after_days, default_next_step_key
+)
+VALUES (
+  'arc_opening_afternoon',
+  'The First Afternoon',
+  E'It''s the middle of the afternoon and the campus is in motion. Through the window at the end of the hall you can hear the orientation fair — a PA system, music that carries across the quad, voices layered on voices. Your class schedule says you need three textbooks by tomorrow morning. The bookstore closes in two hours.\n\nThere''s also a part of you that just wants to walk. See the buildings. Find the library. Learn the edges of this place before it starts demanding things from you.\n\nSandra''s photocopied schedule is on your desk. Three things. One afternoon. Something is going to have to wait.',
+  '[
+    {
+      "id": "go_to_fair",
+      "label": "Head to the orientation fair on the quad",
+      "energy_cost": 1,
+      "time_cost": 1,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": -1, "stress": 2, "resources": {} }
+      },
+      "reaction_text": "You walk toward the sound.\n\nThe quad is bigger than you expected — a rectangle of grass bordered by brick buildings and old trees, and today it''s covered in folding tables. Hand-lettered signs. Student newspaper. Debate team. Pre-med study group. Young Republicans and Young Democrats three feet apart, both handing out buttons. A religious group with free donuts and a sign that says ASK ME ANYTHING in marker.\n\nEveryone working the tables is performing confidence. Everyone walking past them is performing indifference. You''re somewhere in between.\n\nYou slow down near a table with a sign you can''t quite read from here. Someone makes eye contact and waves you over. You''re not sure if you wanted to stop, but you''re stopping.\n\nThe bookstore closes at five. You''ll deal with that tomorrow.\n\nBehind you, a few people are walking back toward the dorms with plastic bags full of textbooks, the weight pulling at their arms. You watch them for a moment — the practical ones, the ones who went to the bookstore first. You''re not one of them today.",
+      "identity_tags": ["people", "risk"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "sets_stream_state": { "stream": "people", "state": "open_scanning" },
+      "events_emitted": [],
+      "next_step_key": null,
+      "_arc_activated": "arc_people"
+    },
+    {
+      "id": "go_to_bookstore",
+      "label": "Go to the bookstore before it closes",
+      "energy_cost": 0,
+      "time_cost": 1,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 0, "stress": 3, "resources": {} }
+      },
+      "reaction_text": "You walk across campus with the book list folded in your hand. The route takes you past the quad, where the orientation fair is in full swing — you can see the tables from the path, hear someone with a megaphone welcoming the class of ''87, catch a glimpse of people milling and signing up and becoming part of things.\n\nYou keep walking.\n\nThe bookstore is a low brick building with a line that spills out the front door. You take your place behind a guy holding a list longer than yours. The woman in front of him is already doing math on the back of an envelope.\n\nInside, the shelves are organized by course number. You find your section and pull the first book. The sticker says $38. You hold it like you''re weighing it, which in a way you are.\n\nThrough the propped-open door, the fair music drifts in — thinner now, or maybe just further away. Someone out there is signing their name on a sheet of paper. Someone out there is meeting someone they''ll know for years. You''re in here, holding a textbook, doing the math.",
+      "identity_tags": ["achievement", "safety"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "sets_stream_state": { "stream": "money", "state": null },
+      "events_emitted": [],
+      "next_step_key": null,
+      "_arc_activated": "arc_money"
+    },
+    {
+      "id": "walk_campus",
+      "label": "Walk the campus — find where things are before you need to find them",
+      "energy_cost": 0,
+      "time_cost": 1,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 0, "stress": -3, "resources": {} }
+      },
+      "reaction_text": "You walk without a destination. Or rather, your destination is the whole thing — the paths between buildings, the names on the signs, the distance between your dorm and the science building where your 8 AM class meets tomorrow.\n\nThe campus unrolls as you move through it. The library is bigger than you expected — stone facade, heavy doors, the kind of building that wants you to take it seriously. The student union is smaller, more human, with a cork bulletin board outside that''s layered three flyers deep.\n\nYou stop there. One flyer catches you. Not because it''s louder than the others — it''s a quarter-sheet, typed on a typewriter with one crooked letter. A posting. A short window. Something you weren''t looking for but now you''ve seen it and you can''t quite unsee it.\n\nYou stand in front of the bulletin board long enough that someone walking by asks if you need directions. You don''t. You need a minute.\n\nFrom across the quad, you can hear the orientation fair wrapping up — tables being folded, the megaphone clicking off mid-sentence. The sign-up sheets are being collected. Whatever names are on them, yours isn''t.\n\nYour book list is still in your pocket, folded and unaddressed. That''s a tomorrow problem now.",
+      "identity_tags": ["risk", "achievement"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "sets_stream_state": { "stream": "opportunity", "state": "discovered" },
+      "events_emitted": [],
+      "next_step_key": null,
+      "_arc_activated": "arc_opportunity"
+    }
+  ]'::jsonb,
+  ARRAY['arc_one', 'opening', 'branch_point'],
+  '{}'::jsonb,
+  1,
+  true,
+  ARRAY[]::text[],
+  (SELECT id FROM public.arc_definitions WHERE key = 'arc_opening'),
+  'opening_s5_afternoon',
+  5,
+  0,
+  NULL,
+  NULL
+);
+
+COMMIT;

@@ -5,6 +5,15 @@ import type { ArcBeat } from "@/types/dailyRun";
 import type { StoryletChoice } from "@/types/storylets";
 import { STREAM_LABELS } from "@/types/arcOneStreams";
 
+type MoneyBand = "tight" | "okay" | "comfortable";
+
+/** Money band hierarchy — higher index = more money. */
+const MONEY_BAND_RANK: Record<string, number> = {
+  tight: 0,
+  okay: 1,
+  comfortable: 2,
+};
+
 type ArcBeatCardProps = {
   beat: ArcBeat;
   dayIndex: number;
@@ -13,6 +22,8 @@ type ArcBeatCardProps = {
   onDismiss?: () => void;
   /** When provided, the card renders in "resolved" mode showing this option's reaction text + Continue. */
   resolvedOption?: StoryletChoice;
+  /** Current player money band — used to gate choices with money_requirement. */
+  moneyBand?: MoneyBand | null;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -27,6 +38,7 @@ const RESOURCE_LABELS: Record<string, string> = {
 function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: number }> {
   const totals: Record<string, number> = {};
 
+  // Legacy format
   if (option.energy_cost) {
     totals.energy = (totals.energy ?? 0) - option.energy_cost;
   }
@@ -41,12 +53,41 @@ function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: nu
     }
   }
 
+  // Content format: outcome.deltas
+  const deltas = option.outcome?.deltas;
+  if (deltas) {
+    if (typeof deltas.energy === "number" && deltas.energy !== 0) {
+      totals.energy = (totals.energy ?? 0) + deltas.energy;
+    }
+    if (typeof deltas.stress === "number" && deltas.stress !== 0) {
+      totals.stress = (totals.stress ?? 0) + deltas.stress;
+    }
+    if (deltas.resources) {
+      for (const [k, v] of Object.entries(deltas.resources)) {
+        if (typeof v === "number" && v !== 0) {
+          totals[k] = (totals[k] ?? 0) + v;
+        }
+      }
+    }
+  }
+
   return Object.entries(totals)
     .filter(([, v]) => v !== 0)
     .map(([k, v]) => ({ label: RESOURCE_LABELS[k] ?? k, delta: v }));
 }
 
-export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, resolvedOption }: ArcBeatCardProps) {
+/** Returns true if the player's money band meets or exceeds the requirement. */
+function meetsMoneyRequirement(
+  playerBand: MoneyBand | null | undefined,
+  required: string | undefined
+): boolean {
+  if (!required) return true; // no requirement
+  const playerRank = MONEY_BAND_RANK[playerBand ?? "okay"] ?? 1;
+  const requiredRank = MONEY_BAND_RANK[required] ?? 0;
+  return playerRank >= requiredRank;
+}
+
+export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand }: ArcBeatCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -124,19 +165,29 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
       {/* Options */}
       {!displayedOption && (
         <div className="flex flex-col gap-2">
-          {beat.options.map((option) => (
-            <button
-              key={option.id}
-              onClick={() => handleChoice(option)}
-              disabled={choosing || disabled}
-              className="rounded border-2 border-primary/30 bg-card px-4 py-2.5 text-left text-sm text-foreground transition hover:border-primary hover:bg-primary/5 active:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {option.label}
-              {option.energy_cost ? (
-                <span className="ml-2 text-xs text-foreground/40">−{option.energy_cost} energy</span>
-              ) : null}
-            </button>
-          ))}
+          {beat.options.map((option) => {
+            const locked = !meetsMoneyRequirement(moneyBand, option.money_requirement);
+            return (
+              <button
+                key={option.id}
+                onClick={() => !locked && handleChoice(option)}
+                disabled={choosing || disabled || locked}
+                className={`rounded border-2 px-4 py-2.5 text-left text-sm transition
+                  ${locked
+                    ? "border-border/40 bg-muted text-foreground/40 cursor-not-allowed"
+                    : "border-primary/30 bg-card text-foreground hover:border-primary hover:bg-primary/5 active:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  }`}
+              >
+                {option.label}
+                {option.energy_cost ? (
+                  <span className="ml-2 text-xs text-foreground/40">−{option.energy_cost} energy</span>
+                ) : null}
+                {locked && (
+                  <span className="ml-2 text-xs text-foreground/30">(not enough money)</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
