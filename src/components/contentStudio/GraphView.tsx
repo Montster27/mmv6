@@ -154,6 +154,17 @@ export function GraphView({
     return map;
   }, [storylets]);
 
+  // Build (arc_id:step_key) → storylet id map for arc FSM edge lookups
+  const stepKeyToId = useMemo(() => {
+    const map = new Map<string, string>();
+    storylets.forEach((s) => {
+      if (s.arc_id && s.step_key) {
+        map.set(`${s.arc_id}:${s.step_key}`, s.id);
+      }
+    });
+    return map;
+  }, [storylets]);
+
   const nodePositions = useMemo(() => {
     const grouped: Record<string, Storylet[]> = {};
     storylets.forEach((storylet) => {
@@ -202,24 +213,41 @@ export function GraphView({
       });
     });
     return positions;
-  }, [storylets]);
+  }, [storylets, arcIdToKey, arcDefinitions]);
 
-  /** Directed edges: targetStoryletId (solid) + precludes (dashed red) */
+  /** Directed edges: targetStoryletId (solid) + precludes (dashed red) + arc step (dotted indigo) + arc default (dotted teal) */
   const edges = useMemo(() => {
     const list: Array<{
       from: string;
       to: string;
       invalid: boolean;
-      kind: "target" | "precludes";
+      kind: "target" | "precludes" | "arc_step" | "arc_default";
     }> = [];
     const ids = new Set(storylets.map((s) => s.id));
+    const seen = new Set<string>(); // deduplicate from:to:kind
 
     storylets.forEach((storylet) => {
       storylet.choices.forEach((choice) => {
         // targetStoryletId edges
         const target = getChoiceTarget(choice);
         if (target) {
-          list.push({ from: storylet.id, to: target, invalid: !ids.has(target), kind: "target" });
+          const key = `${storylet.id}:${target}:target`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            list.push({ from: storylet.id, to: target, invalid: !ids.has(target), kind: "target" });
+          }
+        }
+
+        // next_step_key edges (arc FSM advance via choice)
+        if (choice.next_step_key && storylet.arc_id) {
+          const toId = stepKeyToId.get(`${storylet.arc_id}:${choice.next_step_key}`);
+          if (toId && toId !== storylet.id && toId !== target) {
+            const key = `${storylet.id}:${toId}:arc_step`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              list.push({ from: storylet.id, to: toId, invalid: !ids.has(toId), kind: "arc_step" });
+            }
+          }
         }
 
         // precludes edges — choice blocks a future storylet
@@ -227,13 +255,29 @@ export function GraphView({
         precludes.forEach((slug) => {
           const toId = slugToId[slug];
           if (toId && toId !== storylet.id) {
-            list.push({ from: storylet.id, to: toId, invalid: false, kind: "precludes" });
+            const key = `${storylet.id}:${toId}:precludes`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              list.push({ from: storylet.id, to: toId, invalid: false, kind: "precludes" });
+            }
           }
         });
       });
+
+      // default_next_step_key edges (storylet-level fallback advance)
+      if (storylet.default_next_step_key && storylet.arc_id) {
+        const toId = stepKeyToId.get(`${storylet.arc_id}:${storylet.default_next_step_key}`);
+        if (toId && toId !== storylet.id) {
+          const key = `${storylet.id}:${toId}:arc_default`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            list.push({ from: storylet.id, to: toId, invalid: !ids.has(toId), kind: "arc_default" });
+          }
+        }
+      }
     });
     return list;
-  }, [storylets, slugToId]);
+  }, [storylets, slugToId, stepKeyToId]);
 
   const incomingCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -338,6 +382,12 @@ export function GraphView({
         <span className="ml-3 flex items-center gap-1 text-slate-500">
           <span className="inline-block h-0.5 w-6 bg-slate-400" /> target link
         </span>
+        <span className="flex items-center gap-1 text-indigo-500">
+          <span className="inline-block h-0.5 w-6 border-t-2 border-dotted border-indigo-400" /> arc step
+        </span>
+        <span className="flex items-center gap-1 text-teal-500">
+          <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-teal-400" /> arc default
+        </span>
         <span className="flex items-center gap-1 text-red-500">
           <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-red-400" /> precludes
         </span>
@@ -379,6 +429,12 @@ export function GraphView({
                 <marker id="arrow-precludes" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                   <path d="M0,0 L6,3 L0,6 Z" fill="#dc2626" />
                 </marker>
+                <marker id="arrow-arc-step" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#6366f1" />
+                </marker>
+                <marker id="arrow-arc-default" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#14b8a6" />
+                </marker>
               </defs>
               {edges.map((edge, idx) => {
                 const fromPos = nodePositions[edge.from];
@@ -400,7 +456,17 @@ export function GraphView({
                 let dashArray: string;
                 let strokeWidth: number;
 
-                if (isPrecludes) {
+                if (edge.kind === "arc_step") {
+                  stroke = isActive ? "#4f46e5" : "#6366f1";
+                  marker = "url(#arrow-arc-step)";
+                  dashArray = "3 3";
+                  strokeWidth = isActive ? 2.5 : 1.5;
+                } else if (edge.kind === "arc_default") {
+                  stroke = isActive ? "#0d9488" : "#14b8a6";
+                  marker = "url(#arrow-arc-default)";
+                  dashArray = "6 3";
+                  strokeWidth = isActive ? 2.5 : 1.5;
+                } else if (isPrecludes) {
                   stroke = "#dc2626";
                   marker = "url(#arrow-precludes)";
                   dashArray = "4 3";
