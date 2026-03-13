@@ -15,6 +15,7 @@ import { AllocationSection } from "@/components/play/AllocationSection";
 import { ReflectionSection } from "@/components/play/ReflectionSection";
 import { ArcOneReflection } from "@/components/play/ArcOneReflection";
 import { TesterFeedback } from "@/components/play/TesterFeedback";
+import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import { supabase } from "@/lib/supabase/browser";
@@ -2988,6 +2989,16 @@ export default function PlayPage() {
                                       </div>
                                     </div>
                                   ) : null}
+
+                                  {/* Narrative feedback (tester only) */}
+                                  {currentStorylet && (
+                                    <TesterOnly>
+                                      <NarrativeFeedback
+                                        storyletId={currentStorylet.id}
+                                        dayIndex={dayIndex}
+                                      />
+                                    </TesterOnly>
+                                  )}
 
                                   {/* Continue button */}
                                   {(pendingReactionText || consequenceActive) && (

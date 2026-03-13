@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { ArcBeat } from "@/types/dailyRun";
 import type { StoryletChoice } from "@/types/storylets";
 import { STREAM_LABELS } from "@/types/arcOneStreams";
+import { TesterOnly } from "@/components/ux/TesterOnly";
+import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 
 type MoneyBand = "tight" | "okay" | "comfortable";
 
@@ -154,6 +156,12 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
               ))}
             </ul>
           )}
+          <TesterOnly>
+            <NarrativeFeedback
+              storyletId={beat.instance_id}
+              dayIndex={dayIndex}
+            />
+          </TesterOnly>
           {onDismiss && (
             <div className="pt-1">
               <button
