@@ -685,7 +685,7 @@
         "max_day_index": 2,
         "max_total_runs": 1
       },
-      "body": "The line at the Harwick Bookstore starts outside the door and wraps toward the student union.\n\nYou have your class list. You've done the math in your head twice and don't like the answer. The sociology text is $34. The chemistry lab manual is $18. The intro economics anthology — required, no substitutions — is $47.\n\nA hand-lettered sign on the door: *No checks over $75 without ID. No returns after 48 hours.*\n\nThe person ahead of you is writing in a notebook, comparing prices — figuring out which books they absolutely need versus which ones they might share or find at the library.",
+      "body": "The line at the Harwick Bookstore starts outside the door and wraps toward the student union.\n\nYou have your class list. You've done the math in your head twice and don't like the answer. The sociology text is $135. The chemistry lab manual is $72. The intro economics anthology — required, no substitutions — is $190.\n\nA hand-lettered sign on the door: *No checks over $300 without ID. No returns after 48 hours.*\n\nThe person ahead of you is writing in a notebook, comparing prices — figuring out which books they absolutely need versus which ones they might share or find at the library.",
       "choices": [
         {
           "id": "s3_books_buy_all",
@@ -698,7 +698,7 @@
           ],
           "requires_resource": {
             "key": "cashOnHand",
-            "min": 120
+            "min": 500
           },
           "reaction_text": "You write the check. The cashier doesn't look up.",
           "outcome": {
@@ -706,7 +706,7 @@
             "deltas": {
               "stress": 1,
               "resources": {
-                "cashOnHand": -130,
+                "cashOnHand": -500,
                 "knowledge": 2
               }
             }
@@ -727,7 +727,7 @@
               "energy": -1,
               "stress": 0,
               "resources": {
-                "cashOnHand": -52,
+                "cashOnHand": -200,
                 "knowledge": 1
               }
             }
@@ -744,12 +744,12 @@
           ],
           "reaction_text": "They look up from their notebook. 'Which classes are you in?'",
           "outcome": {
-            "text": "His name is James. He's in two of the same courses. You split the economics anthology — he buys it, you Xerox the relevant chapters at 10 cents a page. You save $23 and have someone to sit next to in Econ.",
+            "text": "His name is James. He's in two of the same courses. You split the economics anthology — he buys it, you Xerox the relevant chapters at 40 cents a page. You save $90 and have someone to sit next to in Econ.",
             "deltas": {
               "energy": -1,
               "stress": -1,
               "resources": {
-                "cashOnHand": -15,
+                "cashOnHand": -60,
                 "socialLeverage": 2,
                 "knowledge": 1
               }
@@ -778,11 +778,11 @@
         "max_day_index": 4,
         "max_total_runs": 1
       },
-      "body": "Miguel knocks on your door at 7pm.\n\n'Group of us are going to Sal's — it's like a ten minute walk. You in?'\n\nYou check your wallet without obviously checking your wallet. You have seventeen dollars and change. Textbooks are paid for or not. The dining hall is covered.\n\nBut you've been doing quiet math all week and seventeen feels like it needs to last longer than the weekend.",
+      "body": "Miguel knocks on your door at 7pm.\n\n'Group of us are going to Sal's — it's like a ten minute walk. You in?'\n\nYou check your wallet without obviously checking your wallet. You have sixty-five dollars and change. Textbooks are paid for or not. The dining hall is covered.\n\nBut you've been doing quiet math all week and sixty-five feels like it needs to last longer than the weekend.",
       "choices": [
         {
           "id": "s3_pizza_go",
-          "label": "Go — $3 is worth it for the room",
+          "label": "Go — $12 is worth it for the room",
           "time_cost": 1,
           "energy_cost": 1,
           "identity_tags": [
@@ -791,12 +791,12 @@
           ],
           "reaction_text": "Miguel's 'group of us' turns out to be five people, including Danny.",
           "outcome": {
-            "text": "The pizza is fine. The conversation is better. You learn that Carla from the third floor knows someone you went to camp with at age eleven — the kind of coincidence that feels significant at 18. The $3.50 is gone and the evening feels like something.",
+            "text": "The pizza is fine. The conversation is better. You learn that Carla from the third floor knows someone you went to camp with at age eleven — the kind of coincidence that feels significant at 18. The $14 is gone and the evening feels like something.",
             "deltas": {
               "energy": -1,
               "stress": -2,
               "resources": {
-                "cashOnHand": -4,
+                "cashOnHand": -15,
                 "socialLeverage": 3
               }
             }
@@ -844,7 +844,7 @@
               "stress": -2,
               "energy": -1,
               "resources": {
-                "cashOnHand": -1,
+                "cashOnHand": -4,
                 "socialLeverage": 2
               }
             }
@@ -875,7 +875,7 @@
         "max_day_index": 5,
         "max_total_runs": 1
       },
-      "body": "There's a yellow slip in your campus mailbox.\n\nChemistry department. A lab fee — $22, due by Friday. It wasn't listed in the tuition breakdown. It wasn't mentioned at orientation. It just appeared.\n\n$22 is not catastrophic. It is also not nothing.",
+      "body": "There's a yellow slip in your campus mailbox.\n\nChemistry department. A lab fee — $85, due by Friday. It wasn't listed in the tuition breakdown. It wasn't mentioned at orientation. It just appeared.\n\n$85 is not catastrophic. It is also not nothing.",
       "choices": [
         {
           "id": "s3_fee_pay_now",
@@ -884,7 +884,7 @@
           "energy_cost": 0,
           "requires_resource": {
             "key": "cashOnHand",
-            "min": 22
+            "min": 85
           },
           "identity_tags": [
             "safety",
@@ -896,7 +896,7 @@
             "deltas": {
               "stress": -1,
               "resources": {
-                "cashOnHand": -22
+                "cashOnHand": -85
               }
             }
           }
@@ -917,7 +917,7 @@
               "stress": 1,
               "energy": -1,
               "resources": {
-                "cashOnHand": 30
+                "cashOnHand": 120
               }
             }
           }
@@ -936,7 +936,7 @@
             "deltas": {
               "stress": 2,
               "resources": {
-                "cashOnHand": -22
+                "cashOnHand": -85
               }
             }
           }

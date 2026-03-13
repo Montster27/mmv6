@@ -94,7 +94,10 @@ export async function createDayStateFromPrevious(
   const nextState = {
     energy: clamp(baseEnergy, 0, 100),
     stress: clamp(baseStress, 0, 100),
-    cashOnHand: source?.cashOnHand ?? DEFAULT_STATE.cashOnHand,
+    cashOnHand:
+      source?.cashOnHand ??
+      // Day-0 starting cash: random $200–$600
+      (200 + Math.floor(Math.random() * 401)),
     knowledge: source?.knowledge ?? DEFAULT_STATE.knowledge,
     socialLeverage: source?.socialLeverage ?? DEFAULT_STATE.socialLeverage,
     physicalResilience:
