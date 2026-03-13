@@ -28,6 +28,14 @@ function getNonPhaseTags(tags?: string[]): string[] {
   );
 }
 
+function FieldHint({ text }: { text: string }) {
+  return (
+    <span className="ml-1 text-slate-400 cursor-help" title={text}>
+      [?]
+    </span>
+  );
+}
+
 interface BasicFieldsProps {
   storylet: Storylet;
   isNew: boolean;
@@ -88,6 +96,7 @@ export function BasicFields({
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="text-xs text-slate-600">
           Weight
+          <FieldHint text="Higher weight = more likely selected from the daily pool. Default 100. Set to 0 to effectively disable." />
           <input
             type="number"
             className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -97,6 +106,7 @@ export function BasicFields({
         </label>
         <label className="text-xs text-slate-600">
           Phase
+          <FieldHint text="Controls storylet availability by game phase. Storylets tagged with a phase only appear during that phase. Blank = all phases." />
           <select
             className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
             value={getPhase(storylet.tags)}
@@ -111,6 +121,9 @@ export function BasicFields({
               </option>
             ))}
           </select>
+          <p className="text-xs text-slate-400 mt-1">
+            Phase is stored as a tag ({getPhase(storylet.tags) || "none"}) and controls when this storylet can appear.
+          </p>
         </label>
         <label className="flex items-center gap-2 text-xs text-slate-600 pt-4">
           <input

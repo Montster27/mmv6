@@ -1,6 +1,8 @@
 "use client";
 
 import type { Storylet } from "@/types/storylets";
+import { TagEditor } from "../TagEditor";
+import { NPC_REGISTRY } from "@/domain/npcs/registry";
 
 const PHASE_OPTIONS = [
   "intro_hook",
@@ -182,58 +184,28 @@ export function RequirementsPanel({ storylet, onChange }: RequirementsPanelProps
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs text-slate-600">
-          Requires NPC met (comma-separated)
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono text-xs"
-            value={
-              Array.isArray(req.requires_npc_met)
-                ? (req.requires_npc_met as string[]).join(", ")
-                : ""
+        <div>
+          <p className="text-xs text-slate-600 mb-1">Requires NPC met</p>
+          <TagEditor
+            tags={Array.isArray(req.requires_npc_met) ? (req.requires_npc_met as string[]) : []}
+            onChange={(next) =>
+              onChange(setReq(storylet, "requires_npc_met", next.length ? next : undefined))
             }
-            onChange={(e) =>
-              onChange(
-                setReq(
-                  storylet,
-                  "requires_npc_met",
-                  e.target.value
-                    ? e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                    : undefined
-                )
-              )
-            }
-            placeholder="npc_roommate_dana, …"
+            suggestions={NPC_REGISTRY.map((n) => n.id)}
+            placeholder="Add NPC requirement..."
           />
-        </label>
-        <label className="block text-xs text-slate-600">
-          Requires NPC NOT met (comma-separated)
-          <input
-            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono text-xs"
-            value={
-              Array.isArray(req.requires_npc_not_met)
-                ? (req.requires_npc_not_met as string[]).join(", ")
-                : ""
+        </div>
+        <div>
+          <p className="text-xs text-slate-600 mb-1">Requires NPC NOT met</p>
+          <TagEditor
+            tags={Array.isArray(req.requires_npc_not_met) ? (req.requires_npc_not_met as string[]) : []}
+            onChange={(next) =>
+              onChange(setReq(storylet, "requires_npc_not_met", next.length ? next : undefined))
             }
-            onChange={(e) =>
-              onChange(
-                setReq(
-                  storylet,
-                  "requires_npc_not_met",
-                  e.target.value
-                    ? e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                    : undefined
-                )
-              )
-            }
-            placeholder="npc_floor_miguel, …"
+            suggestions={NPC_REGISTRY.map((n) => n.id)}
+            placeholder="Add NPC exclusion..."
           />
-        </label>
+        </div>
       </div>
 
       <label className="block text-xs text-slate-600">
@@ -255,7 +227,8 @@ export function RequirementsPanel({ storylet, onChange }: RequirementsPanelProps
 
       <div>
         <p className="text-xs font-semibold text-slate-600 mb-2">
-          Requires money band
+          Requires money band{" "}
+          <span className="ml-1 text-slate-400 cursor-help font-normal" title="Player's financial tier: 'tight' = struggling, 'okay' = managing, 'comfortable' = stable. Leave all unchecked to show at any money band.">[?]</span>
         </p>
         <div className="flex gap-3">
           {(["tight", "okay", "comfortable"] as const).map((band) => {

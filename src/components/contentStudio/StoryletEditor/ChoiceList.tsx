@@ -7,6 +7,7 @@ import { ChoiceEditor } from "./ChoiceEditor";
 interface ChoiceListProps {
   choices: StoryletChoice[];
   storyletOptions: { value: string; label?: string }[];
+  stepKeyOptions?: { value: string; label?: string }[];
   onChange: (choices: StoryletChoice[]) => void;
 }
 
@@ -17,7 +18,7 @@ function makeNewChoice(): StoryletChoice {
   };
 }
 
-export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListProps) {
+export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onChange }: ChoiceListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(
     choices.length === 1 ? choices[0].id : null
   );
@@ -31,6 +32,18 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
     const c = makeNewChoice();
     onChange([...choices, c]);
     setExpandedId(c.id);
+  }
+
+  function duplicateChoice(index: number) {
+    const source = choices[index];
+    const copy: StoryletChoice = {
+      ...structuredClone(source),
+      id: `${source.id}_copy`,
+    };
+    const next = [...choices];
+    next.splice(index + 1, 0, copy);
+    onChange(next);
+    setExpandedId(copy.id);
   }
 
   function removeChoice(index: number) {
@@ -51,6 +64,7 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
     <div className="space-y-2">
       {choices.map((choice, i) => {
         const isOpen = expandedId === choice.id;
+        const targetId = (choice as unknown as Record<string, unknown>).targetStoryletId as string | undefined;
         return (
           <div key={choice.id} className="border border-slate-200 rounded-lg overflow-hidden">
             {/* Header row */}
@@ -77,7 +91,7 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
                 </button>
               </div>
 
-              {/* Expand/collapse */}
+              {/* Expand/collapse + summary badges */}
               <button
                 type="button"
                 className="flex-1 text-left text-sm font-medium text-slate-700 truncate"
@@ -95,10 +109,36 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
                     req {choice.requires_resource.min}+ {choice.requires_resource.key}
                   </span>
                 )}
+                {(choice.next_step_key || targetId) && (
+                  <span className="ml-2 text-xs text-emerald-600 font-normal truncate">
+                    &rarr; {choice.next_step_key || targetId}
+                  </span>
+                )}
+                {choice.outcome_type && (
+                  <span className={`ml-2 text-xs font-normal ${
+                    choice.outcome_type === "success" ? "text-green-600" :
+                    choice.outcome_type === "fail" ? "text-red-500" : "text-slate-500"
+                  }`}>
+                    {choice.outcome_type}
+                  </span>
+                )}
+                {choice.sets_stream_state?.stream && (
+                  <span className="ml-2 text-xs text-purple-500 font-normal">
+                    {choice.sets_stream_state.stream}
+                  </span>
+                )}
               </button>
 
-              <span className="text-slate-400 text-xs mr-2">{isOpen ? "▾" : "▸"}</span>
+              <span className="text-slate-400 text-xs mr-1">{isOpen ? "▾" : "▸"}</span>
 
+              <button
+                type="button"
+                onClick={() => duplicateChoice(i)}
+                className="text-xs text-slate-400 hover:text-indigo-600 px-1"
+                title="Duplicate this choice"
+              >
+                Dup
+              </button>
               <button
                 type="button"
                 onClick={() => removeChoice(i)}
@@ -115,6 +155,7 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
                 <ChoiceEditor
                   choice={choice}
                   storyletOptions={storyletOptions}
+                  stepKeyOptions={stepKeyOptions}
                   onChange={(updates) => updateChoice(i, updates)}
                 />
               </div>

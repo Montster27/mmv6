@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,10 @@ import {
   useArcsAPI,
   type ArcDefinitionRow,
 } from "@/hooks/contentStudio/useArcsAPI";
+import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
+import { StoryletEditor } from "@/components/contentStudio/StoryletEditor";
+import type { Storylet } from "@/types/storylets";
+import type { Session } from "@supabase/supabase-js";
 
 const EMPTY_CREATE: Omit<ArcDefinitionRow, "id" | "created_at"> = {
   key: "",
@@ -31,6 +35,12 @@ export default function ArcsPage() {
     deleteArcDefinition,
   } = useArcsAPI();
 
+  const {
+    storylets,
+    loadStorylets,
+    saveStorylet,
+  } = useStoryletsAPI();
+
   const [selectedArc, setSelectedArc] = useState<ArcDefinitionRow | null>(null);
   const [arcDraft, setArcDraft] = useState<ArcDefinitionRow | null>(null);
   const [arcSaveState, setArcSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -41,8 +51,14 @@ export default function ArcsPage() {
   const [createSaveState, setCreateSaveState] = useState<"idle" | "saving">("idle");
   const [createError, setCreateError] = useState<string | null>(null);
 
+  // Inline step editing
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+  const [stepSaving, setStepSaving] = useState(false);
+  const [stepSaveError, setStepSaveError] = useState<string | null>(null);
+
   useEffect(() => {
     loadArcDefinitions();
+    loadStorylets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -50,6 +66,7 @@ export default function ArcsPage() {
     setSelectedArc(arc);
     setArcDraft({ ...arc });
     setArcSaveState("idle");
+    setExpandedStepId(null);
   }
 
   async function handleSaveArc() {
@@ -104,27 +121,65 @@ export default function ArcsPage() {
     }
   }
 
+  async function handleSaveStep(updated: Storylet, session: Session) {
+    setStepSaving(true);
+    setStepSaveError(null);
+    const result = await saveStorylet(updated, session.user.email ?? null);
+    if (!result.ok) {
+      setStepSaveError(result.error ?? "Save failed");
+    } else {
+      await loadStorylets();
+      await loadArcDefinitions();
+    }
+    setStepSaving(false);
+  }
+
   const stepsForArc = arcDefinitionSteps
     .filter((s) => s.arc_id === selectedArc?.id)
     .sort((a, b) => a.order_index - b.order_index);
 
+  // Derive arc options and step key options for the inline editor
+  const arcOptions = arcDefinitions.map((a) => ({
+    id: a.id,
+    key: a.key,
+    title: a.title,
+  }));
+
+  const stepKeyOptions = useMemo(() => {
+    if (!selectedArc) return [];
+    return storylets
+      .filter((s) => s.step_key && s.arc_id === selectedArc.id)
+      .map((s) => ({ value: s.step_key!, label: `${s.step_key} (${s.title})` }));
+  }, [storylets, selectedArc]);
+
+  const storyletOptions = useMemo(
+    () => storylets.map((s) => ({ value: s.id, label: s.title })),
+    [storylets]
+  );
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    storylets.forEach((s) => (s.tags ?? []).forEach((t) => set.add(t)));
+    return [...set].sort();
+  }, [storylets]);
+
   return (
     <AuthGate>
-      {() => (
+      {(session) => (
         <div className="h-full overflow-auto p-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-semibold text-slate-900">Narrative Arcs</h2>
               <p className="text-sm text-slate-600">
-                Arc definitions (metadata only). Edit arc steps in the{" "}
+                Arc definitions and steps. Expand a step to edit it inline, or use the{" "}
                 <Link href="/studio/content/storylets" className="text-indigo-600 underline">
                   Storylets editor
                 </Link>{" "}
-                — any storylet with an arc assigned is an arc step.
+                for the full view.
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={loadArcDefinitions}>
+              <Button variant="outline" onClick={() => { loadArcDefinitions(); loadStorylets(); }}>
                 Refresh
               </Button>
               <Button
@@ -197,7 +252,7 @@ export default function ArcsPage() {
                   Cancel
                 </button>
                 <Button onClick={handleCreateArc} disabled={createSaveState === "saving"}>
-                  {createSaveState === "saving" ? "Creating…" : "Create arc"}
+                  {createSaveState === "saving" ? "Creating\u2026" : "Create arc"}
                 </Button>
               </div>
             </div>
@@ -207,7 +262,7 @@ export default function ArcsPage() {
             {/* Arc list */}
             <div className="space-y-2">
               {loading ? (
-                <p className="text-sm text-slate-600">Loading…</p>
+                <p className="text-sm text-slate-600">Loading\u2026</p>
               ) : arcDefinitions.length === 0 ? (
                 <p className="text-sm text-slate-600">No arc definitions found.</p>
               ) : (
@@ -310,15 +365,15 @@ export default function ArcsPage() {
                       </button>
                       <Button onClick={handleSaveArc} disabled={arcSaveState === "saving"}>
                         {arcSaveState === "saving"
-                          ? "Saving…"
+                          ? "Saving\u2026"
                           : arcSaveState === "saved"
-                            ? "Saved ✓"
+                            ? "Saved \u2713"
                             : "Save arc"}
                       </Button>
                     </div>
                   </div>
 
-                  {/* Steps list — read only, link to storylet editor */}
+                  {/* Steps list with inline editing */}
                   <div className="rounded-md border border-slate-200 bg-white p-4">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-sm font-semibold text-slate-700">
@@ -328,7 +383,7 @@ export default function ArcsPage() {
                         href={`/studio/content/storylets?arc_id=${selectedArc?.id}`}
                         className="text-xs text-indigo-600 hover:underline"
                       >
-                        Edit steps in Storylets →
+                        Full storylets view \u2192
                       </Link>
                     </div>
                     {stepsForArc.length === 0 ? (
@@ -343,26 +398,53 @@ export default function ArcsPage() {
                       </p>
                     ) : (
                       <div className="space-y-1">
-                        {stepsForArc.map((step) => (
-                          <Link
-                            key={step.id}
-                            href={`/studio/content/storylets?id=${step.id}`}
-                            className="flex items-start gap-3 rounded-md border border-slate-200 px-3 py-2 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50 transition"
-                          >
-                            <span className="text-xs text-slate-400 shrink-0 mt-0.5">
-                              #{step.order_index}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium text-slate-700 truncate">
-                                {step.title || "untitled"}
-                              </div>
-                              <div className="text-xs text-slate-500 font-mono">
-                                {step.step_key}
-                              </div>
+                        {stepsForArc.map((step) => {
+                          const isExpanded = expandedStepId === step.id;
+                          const fullStorylet = storylets.find((s) => s.id === step.id);
+                          return (
+                            <div key={step.id}>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedStepId(isExpanded ? null : step.id)}
+                                className={`w-full flex items-start gap-3 rounded-md border px-3 py-2 text-left text-sm transition ${
+                                  isExpanded
+                                    ? "border-indigo-300 bg-indigo-50"
+                                    : "border-slate-200 hover:border-indigo-300 hover:bg-indigo-50"
+                                }`}
+                              >
+                                <span className="text-xs text-slate-400 shrink-0 mt-0.5">
+                                  #{step.order_index}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-slate-700 truncate">
+                                    {step.title || "untitled"}
+                                  </div>
+                                  <div className="text-xs text-slate-500 font-mono">
+                                    {step.step_key}
+                                  </div>
+                                </div>
+                                <span className="text-xs text-slate-400 shrink-0">
+                                  {isExpanded ? "\u25be Collapse" : "\u25b8 Edit inline"}
+                                </span>
+                              </button>
+                              {isExpanded && fullStorylet && (
+                                <div className="border border-t-0 border-indigo-200 rounded-b-md bg-white" style={{ minHeight: 400 }}>
+                                  <StoryletEditor
+                                    key={fullStorylet.id}
+                                    storylet={fullStorylet}
+                                    allTags={allTags}
+                                    storyletOptions={storyletOptions}
+                                    stepKeyOptions={stepKeyOptions}
+                                    arcOptions={arcOptions}
+                                    saving={stepSaving}
+                                    saveError={stepSaveError}
+                                    onSave={(updated) => handleSaveStep(updated, session)}
+                                  />
+                                </div>
+                              )}
                             </div>
-                            <span className="text-xs text-indigo-400 shrink-0">Edit →</span>
-                          </Link>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
