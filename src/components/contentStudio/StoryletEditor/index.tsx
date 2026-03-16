@@ -22,6 +22,8 @@ interface StoryletEditorProps {
   onDelete?: () => Promise<void>;
   onCancel?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
+  /** Called when user wants to create a new storylet linked by next_step_key. */
+  onCreateLinkedStorylet?: (stepKey: string) => void;
   saving?: boolean;
   saveError?: string | null;
 }
@@ -37,6 +39,7 @@ export function StoryletEditor({
   onDelete,
   onCancel,
   onDirtyChange,
+  onCreateLinkedStorylet,
   saving = false,
   saveError = null,
 }: StoryletEditorProps) {
@@ -71,6 +74,9 @@ export function StoryletEditor({
   const handleSave = useCallback(async () => {
     if (saving || rawError) return;
     await onSave(draft);
+    // Reset the dirty baseline immediately so the guard doesn't fire
+    // on subsequent navigation even if the parent hasn't reloaded yet.
+    initialRef.current = JSON.stringify(draft);
   }, [draft, onSave, saving, rawError]);
 
   // Cmd+S / Ctrl+S keyboard shortcut
@@ -143,6 +149,7 @@ export function StoryletEditor({
             storyletOptions={storyletOptions}
             stepKeyOptions={stepKeyOptions}
             onChange={(choices) => patch({ choices })}
+            onCreateLinkedStorylet={onCreateLinkedStorylet}
           />
         )}
 

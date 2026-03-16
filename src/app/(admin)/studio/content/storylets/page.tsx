@@ -37,16 +37,18 @@ function matchesSearch(storylet: Storylet, search: string): boolean {
   );
 }
 
-function makeNewStorylet(): Omit<Storylet, "id"> {
+function makeNewStorylet(seed?: { arcId?: string | null; stepKey?: string } | null): Omit<Storylet, "id"> {
   return {
-    slug: `draft_${Date.now()}`,
-    title: "New storylet",
+    slug: seed?.stepKey ?? `draft_${Date.now()}`,
+    title: seed?.stepKey ? seed.stepKey.replace(/_/g, " ") : "New storylet",
     body: "",
     choices: [],
     is_active: false,
     tags: [],
     requirements: {},
-    weight: 1,
+    weight: 100,
+    arc_id: seed?.arcId ?? null,
+    step_key: seed?.stepKey ?? null,
   };
 }
 
@@ -80,6 +82,12 @@ function StoryletsContent() {
 
   // Dirty state tracking from editor
   const editorDirtyRef = useRef(false);
+
+  // Seed for new storylet created from a next_step_key link
+  const [linkedSeed, setLinkedSeed] = useState<{
+    arcId: string | null;
+    stepKey: string;
+  } | null>(null);
 
   useEffect(() => {
     loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
@@ -141,6 +149,14 @@ function StoryletsContent() {
 
   function handleNewStorylet() {
     if (editorDirtyRef.current && !confirm("You have unsaved changes. Discard?")) return;
+    setLinkedSeed(null);
+    setSelectedId(null);
+    setIsNew(true);
+  }
+
+  function handleCreateLinkedStorylet(stepKey: string) {
+    if (editorDirtyRef.current && !confirm("You have unsaved changes. Discard?")) return;
+    setLinkedSeed({ arcId: selected?.arc_id ?? null, stepKey });
     setSelectedId(null);
     setIsNew(true);
   }
@@ -152,6 +168,7 @@ function StoryletsContent() {
       const result = await createStorylet(updated, session.user.email ?? null);
       if (result.ok) {
         setIsNew(false);
+        setLinkedSeed(null);
         setSelectedId(result.id);
         await loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
       } else {
@@ -319,19 +336,23 @@ function StoryletsContent() {
           <div className="overflow-hidden">
             {isNew ? (
               <StoryletEditor
-                key="new"
+                key={`new-${linkedSeed?.stepKey ?? "blank"}`}
                 storylet={
-                  { ...makeNewStorylet(), id: `draft_${Date.now()}` } as Storylet
+                  { ...makeNewStorylet(linkedSeed), id: `draft_${Date.now()}` } as Storylet
                 }
                 isNew
                 allTags={allTags}
                 storyletOptions={storyletOptions}
-                stepKeyOptions={[]}
+                stepKeyOptions={linkedSeed?.arcId
+                  ? storylets
+                      .filter((s) => s.step_key && s.arc_id === linkedSeed.arcId)
+                      .map((s) => ({ value: s.step_key!, label: `${s.step_key} (${s.title})` }))
+                  : []}
                 arcOptions={arcOptions}
                 saving={saving}
                 saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
-                onCancel={() => setIsNew(false)}
+                onCancel={() => { setIsNew(false); setLinkedSeed(null); }}
                 onDirtyChange={(dirty) => { editorDirtyRef.current = dirty; }}
               />
             ) : selected ? (
@@ -347,6 +368,7 @@ function StoryletsContent() {
                 onSave={(updated) => handleSave(updated, session)}
                 onDelete={() => handleDelete(selected)}
                 onDirtyChange={(dirty) => { editorDirtyRef.current = dirty; }}
+                onCreateLinkedStorylet={handleCreateLinkedStorylet}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">

@@ -9,6 +9,7 @@ interface ChoiceListProps {
   storyletOptions: { value: string; label?: string }[];
   stepKeyOptions?: { value: string; label?: string }[];
   onChange: (choices: StoryletChoice[]) => void;
+  onCreateLinkedStorylet?: (stepKey: string) => void;
 }
 
 function makeNewChoice(): StoryletChoice {
@@ -18,7 +19,7 @@ function makeNewChoice(): StoryletChoice {
   };
 }
 
-export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onChange }: ChoiceListProps) {
+export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onChange, onCreateLinkedStorylet }: ChoiceListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(
     choices.length === 1 ? choices[0].id : null
   );
@@ -157,6 +158,7 @@ export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onCh
                   storyletOptions={storyletOptions}
                   stepKeyOptions={stepKeyOptions}
                   onChange={(updates) => updateChoice(i, updates)}
+                  onCreateLinkedStorylet={onCreateLinkedStorylet}
                 />
               </div>
             )}

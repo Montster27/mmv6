@@ -10,6 +10,8 @@ interface ChoiceEditorProps {
   storyletOptions: { value: string; label?: string }[];
   stepKeyOptions?: { value: string; label?: string }[];
   onChange: (updates: Partial<StoryletChoice>) => void;
+  /** Called when the user wants to create a new storylet linked to this next_step_key. */
+  onCreateLinkedStorylet?: (stepKey: string) => void;
 }
 
 function countSet(...values: unknown[]): number {
@@ -21,6 +23,7 @@ export function ChoiceEditor({
   storyletOptions,
   stepKeyOptions = [],
   onChange,
+  onCreateLinkedStorylet,
 }: ChoiceEditorProps) {
   const dataListId = `storylet-opts-${choice.id}`;
   const stepKeyListId = `step-key-opts-${choice.id}`;
@@ -190,28 +193,42 @@ export function ChoiceEditor({
                 ))}
               </datalist>
             </label>
-            <label className="block text-xs text-slate-600">
-              Next step key{" "}
-              <span className="text-slate-400">(within same arc)</span>
-              <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
-                list={stepKeyListId}
-                value={choice.next_step_key ?? ""}
-                placeholder="e.g. roommate_follow_up"
-                onChange={(e) =>
-                  onChange({ next_step_key: e.target.value || null })
-                }
-              />
-              {stepKeyOptions.length > 0 && (
-                <datalist id={stepKeyListId}>
-                  {stepKeyOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label ?? opt.value}
-                    </option>
-                  ))}
-                </datalist>
-              )}
-            </label>
+            <div>
+              <label className="block text-xs text-slate-600">
+                Next step key{" "}
+                <span className="text-slate-400">(within same arc)</span>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
+                  list={stepKeyListId}
+                  value={choice.next_step_key ?? ""}
+                  placeholder="e.g. roommate_follow_up"
+                  onChange={(e) =>
+                    onChange({ next_step_key: e.target.value || null })
+                  }
+                />
+                {stepKeyOptions.length > 0 && (
+                  <datalist id={stepKeyListId}>
+                    {stepKeyOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label ?? opt.value}
+                      </option>
+                    ))}
+                  </datalist>
+                )}
+              </label>
+              {/* Show "create linked" button when the step key is new (not in existing options) */}
+              {onCreateLinkedStorylet &&
+                choice.next_step_key &&
+                !stepKeyOptions.some((o) => o.value === choice.next_step_key) && (
+                  <button
+                    type="button"
+                    className="mt-1.5 text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+                    onClick={() => onCreateLinkedStorylet(choice.next_step_key!)}
+                  >
+                    ↳ Create &ldquo;{choice.next_step_key}&rdquo; storylet in this arc
+                  </button>
+                )}
+            </div>
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
