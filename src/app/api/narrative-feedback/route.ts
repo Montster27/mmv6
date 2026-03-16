@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
+import { VALID_RATING_VALUES } from "@/lib/narrativeFeedbackConfig";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -11,21 +12,6 @@ async function getUserFromToken(token?: string) {
   }
   return data.user;
 }
-
-const VALID_ACCURACY = new Set([
-  "very_accurate",
-  "mostly_accurate",
-  "somewhat_inaccurate",
-  "not_accurate",
-]);
-const VALID_ENGAGEMENT = new Set([
-  "very_engaging",
-  "engaging",
-  "neutral",
-  "boring",
-]);
-const VALID_RESONANCE = new Set(["strong", "moderate", "weak", "none"]);
-const VALID_CHOICE_QUALITY = new Set(["excellent", "good", "fair", "poor"]);
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -63,41 +49,14 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (
-    typeof historicallyAccurate !== "string" ||
-    !VALID_ACCURACY.has(historicallyAccurate)
-  ) {
-    return NextResponse.json(
-      { error: "Invalid historicallyAccurate" },
-      { status: 400 }
-    );
-  }
-  if (
-    typeof engagement !== "string" ||
-    !VALID_ENGAGEMENT.has(engagement)
-  ) {
-    return NextResponse.json(
-      { error: "Invalid engagement" },
-      { status: 400 }
-    );
-  }
-  if (
-    typeof emotionalResonance !== "string" ||
-    !VALID_RESONANCE.has(emotionalResonance)
-  ) {
-    return NextResponse.json(
-      { error: "Invalid emotionalResonance" },
-      { status: 400 }
-    );
-  }
-  if (
-    typeof choiceQuality !== "string" ||
-    !VALID_CHOICE_QUALITY.has(choiceQuality)
-  ) {
-    return NextResponse.json(
-      { error: "Invalid choiceQuality" },
-      { status: 400 }
-    );
+
+  // Validate all rating fields against shared config
+  const ratings = { historicallyAccurate, engagement, emotionalResonance, choiceQuality };
+  for (const [key, validSet] of Object.entries(VALID_RATING_VALUES)) {
+    const val = ratings[key as keyof typeof ratings];
+    if (typeof val !== "string" || !validSet.has(val)) {
+      return NextResponse.json({ error: `Invalid ${key}` }, { status: 400 });
+    }
   }
 
   const { error } = await supabaseServer.from("narrative_feedback").insert({

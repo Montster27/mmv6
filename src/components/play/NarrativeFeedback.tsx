@@ -1,76 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { sendNarrativeFeedback } from "@/lib/feedback";
+import { FEEDBACK_DROPDOWNS, type RatingKey } from "@/lib/narrativeFeedbackConfig";
 
 type Props = {
   storyletId: string;
   dayIndex: number;
 };
 
-const DROPDOWNS = [
-  {
-    key: "historicallyAccurate" as const,
-    label: "Historical Accuracy",
-    options: [
-      { value: "very_accurate", label: "Very Accurate" },
-      { value: "mostly_accurate", label: "Mostly Accurate" },
-      { value: "somewhat_inaccurate", label: "Somewhat Inaccurate" },
-      { value: "not_accurate", label: "Not Accurate" },
-    ],
-  },
-  {
-    key: "engagement" as const,
-    label: "Engagement",
-    options: [
-      { value: "very_engaging", label: "Very Engaging" },
-      { value: "engaging", label: "Engaging" },
-      { value: "neutral", label: "Neutral" },
-      { value: "boring", label: "Boring" },
-    ],
-  },
-  {
-    key: "emotionalResonance" as const,
-    label: "Emotional Resonance",
-    options: [
-      { value: "strong", label: "Strong" },
-      { value: "moderate", label: "Moderate" },
-      { value: "weak", label: "Weak" },
-      { value: "none", label: "None" },
-    ],
-  },
-  {
-    key: "choiceQuality" as const,
-    label: "Choice Quality",
-    options: [
-      { value: "excellent", label: "Excellent" },
-      { value: "good", label: "Good" },
-      { value: "fair", label: "Fair" },
-      { value: "poor", label: "Poor" },
-    ],
-  },
-] as const;
-
-type RatingKeys =
-  | "historicallyAccurate"
-  | "engagement"
-  | "emotionalResonance"
-  | "choiceQuality";
+const EMPTY_RATINGS = Object.fromEntries(
+  FEEDBACK_DROPDOWNS.map((d) => [d.key, ""])
+) as Record<RatingKey, string>;
 
 export function NarrativeFeedback({ storyletId, dayIndex }: Props) {
   const [open, setOpen] = useState(false);
-  const [ratings, setRatings] = useState<Record<RatingKeys, string>>({
-    historicallyAccurate: "",
-    engagement: "",
-    emotionalResonance: "",
-    choiceQuality: "",
-  });
+  const [ratings, setRatings] = useState<Record<RatingKey, string>>(EMPTY_RATINGS);
   const [comment, setComment] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
-  const allRated = DROPDOWNS.every((d) => ratings[d.key] !== "");
+  // Reset when the storylet changes (e.g. player advances to the next beat)
+  useEffect(() => {
+    setOpen(false);
+    setRatings(EMPTY_RATINGS);
+    setComment("");
+    setSent(false);
+  }, [storyletId]);
+
+  const allRated = FEEDBACK_DROPDOWNS.every((d) => ratings[d.key] !== "");
 
   const handleSubmit = async () => {
     if (!allRated) return;
@@ -109,7 +68,7 @@ export function NarrativeFeedback({ storyletId, dayIndex }: Props) {
       {open && (
         <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div className="grid gap-3 sm:grid-cols-2">
-            {DROPDOWNS.map((dropdown) => (
+            {FEEDBACK_DROPDOWNS.map((dropdown) => (
               <div key={dropdown.key}>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
                   {dropdown.label}

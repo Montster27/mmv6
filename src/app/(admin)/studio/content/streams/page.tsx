@@ -10,6 +10,7 @@ import {
   STREAM_ALIASES,
   type StreamId,
 } from "@/types/arcOneStreams";
+import { Stat } from "@/components/contentStudio/Stat";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -457,7 +458,7 @@ export default function StreamsPage() {
           {!loading && (
             <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-600">
               <Stat label="Total storylets" value={entries.length} />
-              <Stat label="Multi-stream" value={collisionCount} highlight />
+              <Stat label="Multi-stream" value={collisionCount} highlight highlightClass="text-amber-600" />
               <Stat
                 label="With transitions"
                 value={entries.filter((e) => e.transitions.length > 0).length}
@@ -516,23 +517,3 @@ function FilterPill({
   );
 }
 
-function Stat({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: number;
-  highlight?: boolean;
-}) {
-  return (
-    <div>
-      <p className="text-slate-400">{label}</p>
-      <p
-        className={`text-lg font-semibold ${highlight ? "text-amber-600" : "text-slate-800"}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}

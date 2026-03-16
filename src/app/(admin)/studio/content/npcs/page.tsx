@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
 import type { Storylet } from "@/types/storylets";
+import { Stat } from "@/components/contentStudio/Stat";
 
 // ── NPC extraction ────────────────────────────────────────────────────────────
 
@@ -32,6 +33,8 @@ type NpcEntry = {
 
 function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
   const map = new Map<string, NpcEntry>();
+  // Secondary index: npcId → Map<storyletId, NpcRef> — enables O(1) ref lookup
+  const refIndex = new Map<string, Map<string, NpcRef>>();
 
   function ensure(npcId: string): NpcEntry {
     if (!map.has(npcId)) {
@@ -43,8 +46,21 @@ function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
         allEventTypes: new Set(),
         introduced: false,
       });
+      refIndex.set(npcId, new Map());
     }
     return map.get(npcId)!;
+  }
+
+  function ensureRef(npcId: string, storyletId: string, storyletTitle: string): NpcRef {
+    const entry = ensure(npcId);
+    const innerMap = refIndex.get(npcId)!;
+    let ref = innerMap.get(storyletId);
+    if (!ref) {
+      ref = { storyletId, storyletTitle, sources: [] };
+      innerMap.set(storyletId, ref);
+      entry.refs.push(ref);
+    }
+    return ref;
   }
 
   for (const s of storylets) {
@@ -52,11 +68,7 @@ function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
     for (const npcId of s.introduces_npc ?? []) {
       const entry = ensure(npcId);
       entry.introduced = true;
-      let ref = entry.refs.find((r) => r.storyletId === s.id);
-      if (!ref) {
-        ref = { storyletId: s.id, storyletTitle: s.title, sources: [] };
-        entry.refs.push(ref);
-      }
+      const ref = ensureRef(npcId, s.id, s.title);
       ref.sources.push({ kind: "introduces_npc" });
     }
 
@@ -65,11 +77,7 @@ function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
       if (c.relational_effects) {
         for (const [npcId, dims] of Object.entries(c.relational_effects)) {
           const entry = ensure(npcId);
-          let ref = entry.refs.find((r) => r.storyletId === s.id);
-          if (!ref) {
-            ref = { storyletId: s.id, storyletTitle: s.title, sources: [] };
-            entry.refs.push(ref);
-          }
+          const ref = ensureRef(npcId, s.id, s.title);
           const dimKeys = Object.keys(dims);
           const existing = ref.sources.find((x) => x.kind === "relational_effect") as
             | { kind: "relational_effect"; dimensions: string[] }
@@ -87,11 +95,7 @@ function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
       if (c.set_npc_memory) {
         for (const [npcId, flags] of Object.entries(c.set_npc_memory)) {
           const entry = ensure(npcId);
-          let ref = entry.refs.find((r) => r.storyletId === s.id);
-          if (!ref) {
-            ref = { storyletId: s.id, storyletTitle: s.title, sources: [] };
-            entry.refs.push(ref);
-          }
+          const ref = ensureRef(npcId, s.id, s.title);
           const flagKeys = Object.keys(flags);
           const existing = ref.sources.find((x) => x.kind === "npc_memory") as
             | { kind: "npc_memory"; flags: string[] }
@@ -108,11 +112,7 @@ function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
       // 4. events_emitted
       for (const ev of c.events_emitted ?? []) {
         const entry = ensure(ev.npc_id);
-        let ref = entry.refs.find((r) => r.storyletId === s.id);
-        if (!ref) {
-          ref = { storyletId: s.id, storyletTitle: s.title, sources: [] };
-          entry.refs.push(ref);
-        }
+        const ref = ensureRef(ev.npc_id, s.id, s.title);
         const existing = ref.sources.find((x) => x.kind === "events_emitted") as
           | { kind: "events_emitted"; types: string[] }
           | undefined;
@@ -129,11 +129,7 @@ function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
         if (cond.relational_effects) {
           for (const [npcId, dims] of Object.entries(cond.relational_effects)) {
             const entry = ensure(npcId);
-            let ref = entry.refs.find((r) => r.storyletId === s.id);
-            if (!ref) {
-              ref = { storyletId: s.id, storyletTitle: s.title, sources: [] };
-              entry.refs.push(ref);
-            }
+            ensureRef(npcId, s.id, s.title);
             const dimKeys = Object.keys(dims);
             dimKeys.forEach((d) => entry.allRelationalDimensions.add(d));
           }
@@ -141,13 +137,9 @@ function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
         if (cond.set_npc_memory) {
           for (const [npcId, flags] of Object.entries(cond.set_npc_memory)) {
             const entry = ensure(npcId);
-            let ref = entry.refs.find((r) => r.storyletId === s.id);
-            if (!ref) {
-              ref = { storyletId: s.id, storyletTitle: s.title, sources: [] };
-              entry.refs.push(ref);
-            }
+            const ref = ensureRef(npcId, s.id, s.title);
             const flagKeys = Object.keys(flags);
-            let existing = ref.sources.find((x) => x.kind === "reaction_text_conditions") as
+            const existing = ref.sources.find((x) => x.kind === "reaction_text_conditions") as
               | { kind: "reaction_text_conditions"; flags: string[] }
               | undefined;
             if (existing) {
@@ -499,25 +491,3 @@ function getSourceInlineDetail(src: NpcSource): string | null {
   }
 }
 
-function Stat({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: number;
-  highlight?: boolean;
-}) {
-  return (
-    <div>
-      <p className="text-slate-400">{label}</p>
-      <p
-        className={`text-lg font-semibold ${
-          highlight ? "text-indigo-600" : "text-slate-800"
-        }`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}

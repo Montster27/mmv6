@@ -126,13 +126,14 @@ function StoryletsContent() {
     [storylets]
   );
 
-  // Step key options for autocomplete — filtered to the selected storylet's arc
+  // Step key options for autocomplete — filtered to the active arc (selected or new)
   const stepKeyOptions = useMemo(() => {
-    if (!selected?.arc_id) return [];
+    const arcId = isNew ? (linkedSeed?.arcId ?? null) : (selected?.arc_id ?? null);
+    if (!arcId) return [];
     return storylets
-      .filter((s) => s.step_key && s.arc_id === selected.arc_id)
+      .filter((s) => s.step_key && s.arc_id === arcId)
       .map((s) => ({ value: s.step_key!, label: `${s.step_key} (${s.title})` }));
-  }, [storylets, selected]);
+  }, [storylets, isNew, linkedSeed, selected]);
 
   // Validation summary counts for list
   function getIssueCount(storylet: Storylet) {
@@ -343,11 +344,7 @@ function StoryletsContent() {
                 isNew
                 allTags={allTags}
                 storyletOptions={storyletOptions}
-                stepKeyOptions={linkedSeed?.arcId
-                  ? storylets
-                      .filter((s) => s.step_key && s.arc_id === linkedSeed.arcId)
-                      .map((s) => ({ value: s.step_key!, label: `${s.step_key} (${s.title})` }))
-                  : []}
+                stepKeyOptions={stepKeyOptions}
                 arcOptions={arcOptions}
                 saving={saving}
                 saveError={saveError}
