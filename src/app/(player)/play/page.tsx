@@ -2380,12 +2380,14 @@ export default function PlayPage() {
                 {dayState?.energy ?? dailyState?.energy ?? "—"} · Stress{" "}
                 {dayState?.stress ?? dailyState?.stress ?? "—"}
               </p>
-              <div className="mt-2 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground/80">
-                  {getDailyStageCopy(stage).title}
-                </p>
-                <p>{getDailyStageCopy(stage).body}</p>
-              </div>
+              {(!arcOneMode || (arcBeats.length === 0 && pendingDismissalBeats.length === 0)) && (
+                <div className="mt-2 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground/80">
+                    {getDailyStageCopy(stage).title}
+                  </p>
+                  <p>{getDailyStageCopy(stage).body}</p>
+                </div>
+              )}
               <div className="mt-3 space-y-2">
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
