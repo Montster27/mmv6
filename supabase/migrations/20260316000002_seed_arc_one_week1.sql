@@ -63,7 +63,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_roommate'),
   'room_212_morning', 1, 0, NULL, 'roommate_moment'
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -123,7 +123,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_roommate'),
   'roommate_moment', 2, 3, 4, NULL
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -185,7 +185,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_money'),
   'bookstore_line', 1, 0, 2, 'money_reality_check'
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -247,7 +247,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_money'),
   'money_reality_check', 2, 4, 3, NULL
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -306,7 +306,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_belonging'),
   'dining_first_dinner', 1, 0, 2, 'floor_meeting'
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -371,7 +371,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_belonging'),
   'floor_meeting', 2, 0, 1, 'orientation_fair'
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -432,7 +432,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_belonging'),
   'orientation_fair', 3, 1, 3, 'cal_midnight_knock'
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -492,7 +492,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_belonging'),
   'cal_midnight_knock', 4, 2, 4, 'miguel_floor_invite'
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -552,7 +552,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_belonging'),
   'miguel_floor_invite', 5, 4, 3, NULL
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -623,7 +623,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_academic'),
   'first_class', 1, 1, 1, 'library_afternoon'
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -683,7 +683,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_academic'),
   'library_afternoon', 2, 2, 4, NULL
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -756,7 +756,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_opportunity'),
   'opportunity_board', 1, 1, 4, NULL
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
@@ -818,7 +818,7 @@ VALUES (
   (SELECT id FROM public.arc_definitions WHERE key = 'arc_home'),
   'parent_dorm_phone', 1, 2, 3, NULL
 )
-ON CONFLICT (arc_id, step_key) DO UPDATE SET
+ON CONFLICT ON CONSTRAINT storylets_arc_id_step_key_unique DO UPDATE SET
   title = EXCLUDED.title, body = EXCLUDED.body,
   choices = EXCLUDED.choices, is_active = EXCLUDED.is_active;
 
