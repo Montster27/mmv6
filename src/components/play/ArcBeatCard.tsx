@@ -150,17 +150,22 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
           )}
           {resolvedDeltas.length > 0 && (
             <ul className="flex flex-wrap gap-2 text-xs font-stat">
-              {resolvedDeltas.map(({ label, delta }) => (
-                <li
-                  key={label}
-                  className={`rounded px-1.5 py-0.5 ${
-                    delta > 0 ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                    "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                  }`}
-                >
-                  {delta > 0 ? "+" : ""}{delta} {label}
-                </li>
-              ))}
+              {resolvedDeltas.map(({ label, delta }) => {
+                // Stress is inverted: going up is bad (red), going down is good (green)
+                const isGood = label === "stress" ? delta < 0 : delta > 0;
+                return (
+                  <li
+                    key={label}
+                    className={`rounded px-1.5 py-0.5 ${
+                      isGood
+                        ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    }`}
+                  >
+                    {delta > 0 ? "+" : ""}{delta} {label}
+                  </li>
+                );
+              })}
             </ul>
           )}
           <TesterOnly>
@@ -202,18 +207,22 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
                 <span className="block">{resolve(option.label)}</span>
                 {(previewDeltas.length > 0 || locked) && (
                   <span className="mt-1 flex flex-wrap gap-1.5">
-                    {previewDeltas.map(({ label, delta }) => (
-                      <span
-                        key={label}
-                        className={`text-xs font-stat ${
-                          locked ? "text-foreground/30" :
-                          delta > 0 ? "text-green-600 dark:text-green-400" :
-                          "text-red-500 dark:text-red-400"
-                        }`}
-                      >
-                        {delta > 0 ? "+" : ""}{delta} {label}
-                      </span>
-                    ))}
+                    {previewDeltas.map(({ label, delta }) => {
+                      // Stress is inverted: going up is bad (red), going down is good (green)
+                      const isGood = label === "stress" ? delta < 0 : delta > 0;
+                      return (
+                        <span
+                          key={label}
+                          className={`text-xs font-stat ${
+                            locked ? "text-foreground/30" :
+                            isGood ? "text-green-600 dark:text-green-400" :
+                            "text-red-500 dark:text-red-400"
+                          }`}
+                        >
+                          {delta > 0 ? "+" : ""}{delta} {label}
+                        </span>
+                      );
+                    })}
                     {locked && (
                       <span className="text-xs text-foreground/30">(not enough money)</span>
                     )}
