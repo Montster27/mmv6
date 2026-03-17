@@ -16,6 +16,7 @@ function makeNewChoice(): StoryletChoice {
   return {
     id: `choice_${Date.now()}`,
     label: "New choice",
+    identity_tags: [],
   };
 }
 
@@ -66,6 +67,10 @@ export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onCh
       {choices.map((choice, i) => {
         const isOpen = expandedId === choice.id;
         const targetId = (choice as unknown as Record<string, unknown>).targetStoryletId as string | undefined;
+        const hasNpcEffects = (choice.events_emitted?.length ?? 0) > 0 ||
+          (choice.relational_effects && Object.keys(choice.relational_effects).length > 0);
+        const identityTags = choice.identity_tags ?? [];
+
         return (
           <div key={choice.id} className="border border-slate-200 rounded-lg overflow-hidden">
             {/* Header row */}
@@ -100,35 +105,44 @@ export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onCh
               >
                 <span className="text-slate-400 mr-2">{i + 1}.</span>
                 {choice.label || <span className="italic text-slate-400">unlabelled</span>}
-                {choice.costs_resource && (
-                  <span className="ml-2 text-xs text-orange-500 font-normal">
-                    costs {choice.costs_resource.amount} {choice.costs_resource.key}
+              </button>
+
+              {/* Summary badges — compact row */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {identityTags.length > 0 && (
+                  <span className="text-xs bg-indigo-50 text-indigo-600 rounded-full px-1.5" title={`Identity: ${identityTags.join(", ")}`}>
+                    {identityTags.join("·")}
                   </span>
                 )}
-                {choice.requires_resource && (
-                  <span className="ml-2 text-xs text-blue-500 font-normal">
-                    req {choice.requires_resource.min}+ {choice.requires_resource.key}
+                {hasNpcEffects && (
+                  <span className="text-xs bg-purple-50 text-purple-600 rounded-full px-1.5" title="Has NPC effects">
+                    NPC
                   </span>
                 )}
+                {choice.sets_stream_state?.stream && (
+                  <span className="text-xs bg-emerald-50 text-emerald-600 rounded-full px-1.5">
+                    {choice.sets_stream_state.stream}
+                  </span>
+                )}
+                {choice.precludes?.length ? (
+                  <span className="text-xs bg-red-50 text-red-500 rounded-full px-1.5" title={`Precludes: ${choice.precludes.join(", ")}`}>
+                    ✕{choice.precludes.length}
+                  </span>
+                ) : null}
                 {(choice.next_step_key || targetId) && (
-                  <span className="ml-2 text-xs text-emerald-600 font-normal truncate">
-                    &rarr; {choice.next_step_key || targetId}
+                  <span className="text-xs text-emerald-600">
+                    &rarr;
                   </span>
                 )}
                 {choice.outcome_type && (
-                  <span className={`ml-2 text-xs font-normal ${
+                  <span className={`text-xs ${
                     choice.outcome_type === "success" ? "text-green-600" :
                     choice.outcome_type === "fail" ? "text-red-500" : "text-slate-500"
                   }`}>
                     {choice.outcome_type}
                   </span>
                 )}
-                {choice.sets_stream_state?.stream && (
-                  <span className="ml-2 text-xs text-purple-500 font-normal">
-                    {choice.sets_stream_state.stream}
-                  </span>
-                )}
-              </button>
+              </div>
 
               <span className="text-slate-400 text-xs mr-1">{isOpen ? "▾" : "▸"}</span>
 

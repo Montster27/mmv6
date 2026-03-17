@@ -36,6 +36,17 @@ function FieldHint({ text }: { text: string }) {
   );
 }
 
+const NPC_ID_SUGGESTIONS = [
+  "npc_roommate_dana",
+  "npc_floor_miguel",
+  "npc_floor_cal",
+  "npc_prof_marsh",
+  "npc_studious_priya",
+  "npc_ambiguous_jordan",
+  "npc_ra_sandra",
+  "npc_parent_voice",
+];
+
 interface BasicFieldsProps {
   storylet: Storylet;
   isNew: boolean;
@@ -87,11 +98,25 @@ export function BasicFields({
         Body
         <textarea
           className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-          rows={4}
+          rows={6}
           value={storylet.body}
           onChange={(e) => onChange({ body: e.target.value })}
         />
       </label>
+
+      {/* Introduces NPC — NEW */}
+      <div>
+        <p className="text-xs text-slate-600 mb-1">
+          Introduces NPC
+          <FieldHint text="NPC IDs whose short_intro is prepended to body text if not yet met. After any choice, these NPCs are auto-marked met." />
+        </p>
+        <TagEditor
+          tags={storylet.introduces_npc ?? []}
+          onChange={(npcs) => onChange({ introduces_npc: npcs.length ? npcs : undefined })}
+          suggestions={NPC_ID_SUGGESTIONS}
+          placeholder="Add NPC ID…"
+        />
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="text-xs text-slate-600">
