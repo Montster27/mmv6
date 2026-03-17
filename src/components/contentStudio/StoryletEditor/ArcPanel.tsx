@@ -6,6 +6,7 @@ interface ArcPanelProps {
   storylet: Storylet;
   /** Available arc definitions for the dropdown */
   arcOptions: { id: string; key: string; title: string }[];
+  stepKeyOptions?: { value: string; label?: string }[];
   onChange: (updates: Partial<Storylet>) => void;
 }
 
@@ -14,7 +15,7 @@ interface ArcPanelProps {
  * Lets you attach any storylet to an arc (making it an arc step)
  * or detach it (making it standalone).
  */
-export function ArcPanel({ storylet, arcOptions, onChange }: ArcPanelProps) {
+export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }: ArcPanelProps) {
   const isArcStep = Boolean(storylet.arc_id);
 
   return (
@@ -134,12 +135,22 @@ export function ArcPanel({ storylet, arcOptions, onChange }: ArcPanelProps) {
             </span>
             <input
               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm font-mono"
+              list="arc-panel-step-keys"
               value={storylet.default_next_step_key ?? ""}
               placeholder="e.g. roommate_follow_up"
               onChange={(e) =>
                 onChange({ default_next_step_key: e.target.value || null })
               }
             />
+            {stepKeyOptions.length > 0 && (
+              <datalist id="arc-panel-step-keys">
+                {stepKeyOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label ?? opt.value}
+                  </option>
+                ))}
+              </datalist>
+            )}
           </label>
 
           <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">

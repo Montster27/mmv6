@@ -91,7 +91,7 @@ SELECT
   s.created_at
 FROM public.arc_steps s
 LEFT JOIN public.arc_definitions d ON d.id = s.arc_id
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- ── 3. Update arc_instances to reference storylets (no schema change needed) ──
 -- arc_instances.current_step_key already stores the step_key string.

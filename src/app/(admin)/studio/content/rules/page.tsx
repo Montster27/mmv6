@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
 import { useConsequencesAPI } from "@/hooks/contentStudio/useConsequencesAPI";
+import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
+import { StudioDatalist } from "@/components/contentStudio/StudioDatalist";
 import type { DelayedConsequenceRule } from "@/types/consequences";
 
 type RuleDraft = DelayedConsequenceRule & {
@@ -51,16 +53,185 @@ function makeNewRule(): RuleDraft {
   return ruleToDraft(empty);
 }
 
+/** Helper to safely read a string field from a Record<string, unknown> */
+function getStr(obj: Record<string, unknown>, key: string): string {
+  const v = obj[key];
+  return typeof v === "string" ? v : "";
+}
+
+/** Helper to safely read a number field from a Record<string, unknown> */
+function getNum(obj: Record<string, unknown>, key: string): number | null {
+  const v = obj[key];
+  return typeof v === "number" ? v : null;
+}
+
+/** Structured trigger fields editor — syncs back to triggerText JSON */
+function TriggerFields({
+  draft,
+  storyletOptions,
+  onChange,
+}: {
+  draft: RuleDraft;
+  storyletOptions: { value: string; label?: string }[];
+  onChange: (updates: Partial<RuleDraft>) => void;
+}) {
+  const trigger = draft.trigger as Record<string, unknown>;
+  const eventType = getStr(trigger, "event_type");
+  const storyletSlug = getStr(trigger, "storylet_slug");
+  const choiceId = getStr(trigger, "choice_id");
+
+  function patchTrigger(updates: Record<string, unknown>) {
+    const next = { ...trigger, ...updates };
+    // Remove empty string fields to keep JSON clean
+    for (const k of Object.keys(updates)) {
+      if (next[k] === "") delete next[k];
+    }
+    onChange({
+      trigger: next,
+      triggerText: JSON.stringify(next, null, 2),
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="block text-xs text-slate-600">
+          Event type
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            value={eventType}
+            placeholder="e.g. choice_made"
+            onChange={(e) => patchTrigger({ event_type: e.target.value })}
+          />
+        </label>
+        <label className="block text-xs text-slate-600">
+          Storylet slug
+          <StudioDatalist
+            id="rule-trigger-slug"
+            options={storyletOptions}
+            value={storyletSlug}
+            placeholder="e.g. roommate_intro"
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            onChange={(v) => patchTrigger({ storylet_slug: v })}
+          />
+        </label>
+        <label className="block text-xs text-slate-600">
+          Choice ID
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            value={choiceId}
+            placeholder="e.g. choice_accept"
+            onChange={(e) => patchTrigger({ choice_id: e.target.value })}
+          />
+        </label>
+      </div>
+      <details className="text-xs">
+        <summary className="cursor-pointer text-slate-400 hover:text-slate-600">
+          Raw trigger JSON
+        </summary>
+        <textarea
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+          rows={4}
+          value={draft.triggerText}
+          onChange={(e) => {
+            try {
+              const parsed = JSON.parse(e.target.value);
+              onChange({ trigger: parsed, triggerText: e.target.value });
+            } catch {
+              onChange({ triggerText: e.target.value });
+            }
+          }}
+        />
+      </details>
+    </div>
+  );
+}
+
+/** Structured timing fields editor — syncs back to timingText JSON */
+function TimingFields({
+  draft,
+  onChange,
+}: {
+  draft: RuleDraft;
+  onChange: (updates: Partial<RuleDraft>) => void;
+}) {
+  const timing = draft.timing as Record<string, unknown>;
+  const delayDays = getNum(timing, "delay_days");
+
+  function patchTiming(updates: Record<string, unknown>) {
+    const next = { ...timing, ...updates };
+    // Remove null fields
+    for (const k of Object.keys(updates)) {
+      if (next[k] === null || next[k] === undefined) delete next[k];
+    }
+    onChange({
+      timing: next,
+      timingText: JSON.stringify(next, null, 2),
+    });
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="block text-xs text-slate-600">
+          Delay (days)
+          <input
+            type="number"
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+            value={delayDays ?? ""}
+            placeholder="0"
+            onChange={(e) =>
+              patchTiming({
+                delay_days: e.target.value ? Number(e.target.value) : null,
+              })
+            }
+          />
+        </label>
+      </div>
+      <details className="text-xs">
+        <summary className="cursor-pointer text-slate-400 hover:text-slate-600">
+          Raw timing JSON
+        </summary>
+        <textarea
+          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+          rows={4}
+          value={draft.timingText}
+          onChange={(e) => {
+            try {
+              const parsed = JSON.parse(e.target.value);
+              onChange({ timing: parsed, timingText: e.target.value });
+            } catch {
+              onChange({ timingText: e.target.value });
+            }
+          }}
+        />
+      </details>
+    </div>
+  );
+}
+
 export default function RulesPage() {
   const { rules, loading, error, loadRules, saveRule, deleteRule } =
     useConsequencesAPI();
+  const { storylets, loadStorylets } = useStoryletsAPI();
   const [draft, setDraft] = useState<RuleDraft | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   useEffect(() => {
     loadRules();
+    loadStorylets({});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const storyletSlugOptions = useMemo(
+    () => storylets.map((s) => ({ value: s.slug, label: `${s.slug} (${s.title})` })),
+    [storylets]
+  );
+
+  function patchDraft(updates: Partial<RuleDraft>) {
+    if (!draft) return;
+    setDraft({ ...draft, ...updates });
+  }
 
   async function handleSave() {
     if (!draft) return;
@@ -140,7 +311,7 @@ export default function RulesPage() {
                   Select a rule to edit, or create a new one.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <label className="block text-sm text-slate-700">
                     Key
                     <input
@@ -151,28 +322,57 @@ export default function RulesPage() {
                       }
                     />
                   </label>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {(
-                      [
-                        ["triggerText", "Trigger (JSON)"],
-                        ["resolveText", "Resolve (JSON)"],
-                        ["timingText", "Timing (JSON)"],
-                        ["payloadText", "Payload (JSON)"],
-                      ] as const
-                    ).map(([field, label]) => (
-                      <label key={field} className="block text-sm text-slate-700">
-                        {label}
-                        <textarea
-                          className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
-                          rows={4}
-                          value={draft[field]}
-                          onChange={(e) =>
-                            setDraft({ ...draft, [field]: e.target.value })
-                          }
-                        />
-                      </label>
-                    ))}
-                  </div>
+
+                  {/* Trigger — structured fields + raw JSON fallback */}
+                  <fieldset className="rounded-md border border-slate-200 p-3 space-y-2">
+                    <legend className="text-sm font-medium text-slate-700 px-1">
+                      Trigger
+                    </legend>
+                    <TriggerFields
+                      draft={draft}
+                      storyletOptions={storyletSlugOptions}
+                      onChange={patchDraft}
+                    />
+                  </fieldset>
+
+                  {/* Timing — structured fields + raw JSON fallback */}
+                  <fieldset className="rounded-md border border-slate-200 p-3 space-y-2">
+                    <legend className="text-sm font-medium text-slate-700 px-1">
+                      Timing
+                    </legend>
+                    <TimingFields draft={draft} onChange={patchDraft} />
+                  </fieldset>
+
+                  {/* Resolve — raw JSON only */}
+                  <fieldset className="rounded-md border border-slate-200 p-3 space-y-2">
+                    <legend className="text-sm font-medium text-slate-700 px-1">
+                      Resolve
+                    </legend>
+                    <textarea
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+                      rows={4}
+                      value={draft.resolveText}
+                      onChange={(e) =>
+                        setDraft({ ...draft, resolveText: e.target.value })
+                      }
+                    />
+                  </fieldset>
+
+                  {/* Payload — raw JSON only */}
+                  <fieldset className="rounded-md border border-slate-200 p-3 space-y-2">
+                    <legend className="text-sm font-medium text-slate-700 px-1">
+                      Payload
+                    </legend>
+                    <textarea
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-xs"
+                      rows={4}
+                      value={draft.payloadText}
+                      onChange={(e) =>
+                        setDraft({ ...draft, payloadText: e.target.value })
+                      }
+                    />
+                  </fieldset>
+
                   <div className="flex flex-wrap gap-2">
                     <Button
                       onClick={handleSave}

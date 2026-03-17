@@ -4,6 +4,17 @@ import { useState } from "react";
 import type { ArcBeat } from "@/types/dailyRun";
 import type { StoryletChoice } from "@/types/storylets";
 import { STREAM_LABELS } from "@/types/arcOneStreams";
+import { TesterOnly } from "@/components/ux/TesterOnly";
+import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
+
+type MoneyBand = "tight" | "okay" | "comfortable";
+
+/** Money band hierarchy — higher index = more money. */
+const MONEY_BAND_RANK: Record<string, number> = {
+  tight: 0,
+  okay: 1,
+  comfortable: 2,
+};
 
 type ArcBeatCardProps = {
   beat: ArcBeat;
@@ -11,6 +22,10 @@ type ArcBeatCardProps = {
   onChoice: (beat: ArcBeat, option: StoryletChoice) => Promise<void>;
   disabled?: boolean;
   onDismiss?: () => void;
+  /** When provided, the card renders in "resolved" mode showing this option's reaction text + Continue. */
+  resolvedOption?: StoryletChoice;
+  /** Current player money band — used to gate choices with money_requirement. */
+  moneyBand?: MoneyBand | null;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -25,6 +40,7 @@ const RESOURCE_LABELS: Record<string, string> = {
 function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: number }> {
   const totals: Record<string, number> = {};
 
+  // Legacy format
   if (option.energy_cost) {
     totals.energy = (totals.energy ?? 0) - option.energy_cost;
   }
@@ -39,35 +55,66 @@ function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: nu
     }
   }
 
+  // Content format: outcome.deltas
+  const deltas = option.outcome?.deltas;
+  if (deltas) {
+    if (typeof deltas.energy === "number" && deltas.energy !== 0) {
+      totals.energy = (totals.energy ?? 0) + deltas.energy;
+    }
+    if (typeof deltas.stress === "number" && deltas.stress !== 0) {
+      totals.stress = (totals.stress ?? 0) + deltas.stress;
+    }
+    if (deltas.resources) {
+      for (const [k, v] of Object.entries(deltas.resources)) {
+        if (typeof v === "number" && v !== 0) {
+          totals[k] = (totals[k] ?? 0) + v;
+        }
+      }
+    }
+  }
+
   return Object.entries(totals)
     .filter(([, v]) => v !== 0)
     .map(([k, v]) => ({ label: RESOURCE_LABELS[k] ?? k, delta: v }));
 }
 
-export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss }: ArcBeatCardProps) {
+/** Returns true if the player's money band meets or exceeds the requirement. */
+function meetsMoneyRequirement(
+  playerBand: MoneyBand | null | undefined,
+  required: string | undefined
+): boolean {
+  if (!required) return true;
+  const playerRank = MONEY_BAND_RANK[playerBand ?? "okay"] ?? 1;
+  const requiredRank = MONEY_BAND_RANK[required] ?? 0;
+  return playerRank >= requiredRank;
+}
+
+export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand }: ArcBeatCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const displayedOption = resolvedOption ?? chosenOption;
 
   const streamLabel = STREAM_LABELS[beat.stream_id as keyof typeof STREAM_LABELS] ?? beat.stream_id;
   const daysLeft = beat.expires_on_day - dayIndex;
 
   async function handleChoice(option: StoryletChoice) {
-    if (choosing || chosenOption) return;
+    if (choosing || displayedOption) return;
     setChoosing(true);
     setError(null);
-    setChosenOption(option); // optimistic — show reaction text immediately
+    setChosenOption(option);
     try {
       await onChoice(beat, option);
     } catch (err) {
-      setChosenOption(null); // revert on error
+      setChosenOption(null);
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setChoosing(false);
     }
   }
 
-  const deltas = chosenOption ? computeDeltas(chosenOption) : [];
+  const resolvedDeltas = displayedOption ? computeDeltas(displayedOption) : [];
 
   return (
     <div className="rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top shadow-sm">
@@ -88,21 +135,33 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss }: A
       <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{beat.body}</p>
 
       {/* Post-choice result */}
-      {chosenOption && (
+      {displayedOption && (
         <div className="rounded border border-border/60 bg-muted px-3 py-3 text-sm space-y-2">
-          <p className="font-medium text-primary">✓ {chosenOption.label}</p>
-          {chosenOption.reaction_text && (
-            <p className="text-foreground/80 leading-relaxed">{chosenOption.reaction_text}</p>
+          <p className="font-medium text-primary">✓ {displayedOption.label}</p>
+          {displayedOption.reaction_text && (
+            <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{displayedOption.reaction_text}</p>
           )}
-          {deltas.length > 0 && (
-            <ul className="space-y-0.5 text-foreground/60 font-stat text-xs">
-              {deltas.map(({ label, delta }) => (
-                <li key={label}>
-                  {label} {delta >= 0 ? "+" : ""}{delta}
+          {resolvedDeltas.length > 0 && (
+            <ul className="flex flex-wrap gap-2 text-xs font-stat">
+              {resolvedDeltas.map(({ label, delta }) => (
+                <li
+                  key={label}
+                  className={`rounded px-1.5 py-0.5 ${
+                    delta > 0 ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                    "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  }`}
+                >
+                  {delta > 0 ? "+" : ""}{delta} {label}
                 </li>
               ))}
             </ul>
           )}
+          <TesterOnly>
+            <NarrativeFeedback
+              storyletId={beat.instance_id}
+              dayIndex={dayIndex}
+            />
+          </TesterOnly>
           {onDismiss && (
             <div className="pt-1">
               <button
@@ -117,21 +176,45 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss }: A
       )}
 
       {/* Options */}
-      {!chosenOption && (
+      {!displayedOption && (
         <div className="flex flex-col gap-2">
-          {beat.options.map((option) => (
-            <button
-              key={option.id}
-              onClick={() => handleChoice(option)}
-              disabled={choosing || disabled}
-              className="rounded border-2 border-primary/30 bg-card px-4 py-2.5 text-left text-sm text-foreground transition hover:border-primary hover:bg-primary/5 active:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {option.label}
-              {option.energy_cost ? (
-                <span className="ml-2 text-xs text-foreground/40">−{option.energy_cost} energy</span>
-              ) : null}
-            </button>
-          ))}
+          {beat.options.map((option) => {
+            const locked = !meetsMoneyRequirement(moneyBand, option.money_requirement);
+            const previewDeltas = computeDeltas(option);
+            return (
+              <button
+                key={option.id}
+                onClick={() => !locked && handleChoice(option)}
+                disabled={choosing || disabled || locked}
+                className={`rounded border-2 px-4 py-2.5 text-left text-sm transition
+                  ${locked
+                    ? "border-border/40 bg-muted text-foreground/40 cursor-not-allowed"
+                    : "border-primary/30 bg-card text-foreground hover:border-primary hover:bg-primary/5 active:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  }`}
+              >
+                <span className="block">{option.label}</span>
+                {(previewDeltas.length > 0 || locked) && (
+                  <span className="mt-1 flex flex-wrap gap-1.5">
+                    {previewDeltas.map(({ label, delta }) => (
+                      <span
+                        key={label}
+                        className={`text-xs font-stat ${
+                          locked ? "text-foreground/30" :
+                          delta > 0 ? "text-green-600 dark:text-green-400" :
+                          "text-red-500 dark:text-red-400"
+                        }`}
+                      >
+                        {delta > 0 ? "+" : ""}{delta} {label}
+                      </span>
+                    ))}
+                    {locked && (
+                      <span className="text-xs text-foreground/30">(not enough money)</span>
+                    )}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 

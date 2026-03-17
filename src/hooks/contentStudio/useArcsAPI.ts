@@ -22,6 +22,7 @@ export type ArcStepRow = {
   options: unknown[];
   due_offset_days: number;
   expires_after_days: number;
+  default_next_step_key?: string | null;
 };
 
 export function useArcsAPI() {

@@ -22,7 +22,9 @@ export type RoommateState =
   | "genuine_connection"
   | "surface_tension"
   | "open_conflict"
-  | "avoidance_pattern";
+  | "avoidance_pattern"
+  | "neutral_start"
+  | "avoidance_start";
 
 // ---------------------------------------------------------------------------
 // Stream 2: Academic Footing
@@ -42,7 +44,10 @@ export type MoneyStreamState =
   | "background_hum"
   | "friction_visible"
   | "active_stress"
-  | "resolved";
+  | "resolved"
+  | "tight"
+  | "okay"
+  | "comfortable";
 
 // ---------------------------------------------------------------------------
 // Stream 4: Finding Your People
@@ -59,7 +64,10 @@ export type BelongingState =
 // ---------------------------------------------------------------------------
 export type OpportunityState =
   | "undiscovered"
+  | "discovered"
   | "noticed"
+  | "considering"
+  | "deferred"
   | "pursuing"
   | "committed"
   | "expired";
@@ -102,8 +110,17 @@ export const ARC_KEY_TO_STREAM_ID: Record<string, StreamId> = {
   arc_academic: "academic",
   arc_money: "money",
   arc_belonging: "belonging",
+  arc_people: "belonging",
   arc_opportunity: "opportunity",
   arc_home: "home",
+};
+
+/**
+ * Content JSON may reference streams by alternative names.
+ * This maps those aliases to the canonical StreamId.
+ */
+export const STREAM_ALIASES: Record<string, StreamId> = {
+  people: "belonging",
 };
 
 /** Human-readable label for each stream. */
@@ -122,6 +139,7 @@ export const ARC_ONE_STREAM_KEYS: string[] = [
   "arc_academic",
   "arc_money",
   "arc_belonging",
+  "arc_people",
   "arc_opportunity",
   "arc_home",
 ];

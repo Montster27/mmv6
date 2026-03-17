@@ -52,5 +52,20 @@ export function matchesRequirement(
   if ("path" in req && "equals" in req) {
     return getPathValue(data, req.path) === req.equals;
   }
+
+  // Fallback: simple key-value matching (e.g., { money_band: "okay" }).
+  // Any top-level keys that aren't known combinators are treated as
+  // data[key] === value checks.
+  const KNOWN_KEYS = new Set([
+    "all", "any", "not", "path", "equals",
+    "requires_npc_known", "requires_npc_met",
+  ]);
+  const simpleEntries = Object.entries(requirement).filter(
+    ([k]) => !KNOWN_KEYS.has(k)
+  );
+  if (simpleEntries.length > 0) {
+    return simpleEntries.every(([k, v]) => getPathValue(data, k) === v);
+  }
+
   return false;
 }

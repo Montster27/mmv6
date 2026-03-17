@@ -25,6 +25,8 @@ export type ArcBeat = {
   /** Unified choices — use choice.id as option_key when resolving beats. */
   options: StoryletChoice[];
   expires_on_day: number;
+  /** NPC ids this beat can introduce (auto-marked met on choice). */
+  introduces_npc?: string[];
 };
 
 export type DailyRunStage =

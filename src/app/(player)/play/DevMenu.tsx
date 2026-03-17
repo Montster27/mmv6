@@ -101,7 +101,6 @@ function writeOverrides(overrides: Partial<FeatureFlags>, userId?: string | null
 }
 
 const FLAG_LABELS: Array<[keyof FeatureFlags, string]> = [
-  ["arcOneScarcityEnabled", "Arc One Scarcity"],
   ["beatBufferEnabled", "Beat Buffer"],
   ["relationshipDebugEnabled", "Relationship Debug"],
   ["resources", "Resources"],
@@ -343,12 +342,15 @@ export default function DevMenu({
                     const rel = (relationships as any)?.[npcId] as RelationshipState | undefined;
                     const legacy = (npcMemory as any)?.[npcId] ?? {};
                     return {
-                      met:       rel ? rel.met       : legacy.met === true,
-                      knowsName: rel ? rel.knows_name : legacy.knows_name === true,
-                      knowsFace: rel ? rel.knows_face : legacy.knows_face === true,
-                      relScore:  rel ? rel.relationship : typeof legacy.trust === "number" ? legacy.trust : null,
-                      roleTag:   rel?.role_tag ?? null,
-                      isNew:     !canonicalSet.has(npcId),
+                      met:           rel ? rel.met            : legacy.met === true,
+                      knowsName:     rel ? rel.knows_name     : legacy.knows_name === true,
+                      knowsFace:     rel ? rel.knows_face     : legacy.knows_face === true,
+                      relScore:      rel ? rel.relationship   : typeof legacy.trust === "number" ? legacy.trust : null,
+                      trust:         rel?.trust ?? 0,
+                      reliability:   rel?.reliability ?? 0,
+                      emotionalLoad: rel?.emotionalLoad ?? 0,
+                      roleTag:       rel?.role_tag ?? null,
+                      isNew:         !canonicalSet.has(npcId),
                     };
                   };
 
@@ -362,11 +364,13 @@ export default function DevMenu({
                   return (
                     <div className="mt-2 space-y-2">
                       {sorted.map((npcId) => {
-                        const { met, knowsName, knowsFace, relScore, roleTag, isNew } = resolveNpc(npcId);
+                        const { met, knowsName, knowsFace, relScore, roleTag, isNew, trust, reliability, emotionalLoad } = resolveNpc(npcId);
                         const label = NPC_LABELS[npcId] ?? npcId;
                         const metIcon   = met       ? "✅" : "❌";
                         const nameIcon  = knowsName ? "🏷" : "";
                         const faceIcon  = knowsFace && !knowsName ? "👁" : "";
+                        const trustColor = trust > 0 ? "text-green-600" : trust < 0 ? "text-red-600" : "text-slate-400";
+                        const relColor = reliability > 0 ? "text-green-600" : reliability < 0 ? "text-red-600" : "text-slate-400";
                         return (
                           <div
                             key={npcId}
@@ -387,12 +391,17 @@ export default function DevMenu({
                                 met {metIcon}{relScore != null ? ` · ${relScore}/10` : ""}
                               </span>
                             </div>
-                            {(roleTag || met) ? (
-                              <div className="mt-0.5 text-[10px] text-slate-500">
-                                {roleTag ? `role: ${roleTag}` : ""}
-                                {knowsName && !knowsFace ? " · name only" : ""}
-                                {knowsFace && !knowsName ? " · face only" : ""}
+                            {met ? (
+                              <div className="mt-0.5 flex items-center gap-2 text-[10px]">
+                                {roleTag ? <span className="text-slate-500">role: {roleTag}</span> : null}
+                                <span className={trustColor}>trust {trust > 0 ? "+" : ""}{trust}</span>
+                                <span className={relColor}>rel {reliability > 0 ? "+" : ""}{reliability}</span>
+                                {emotionalLoad > 0 ? <span className="text-amber-600">emo {emotionalLoad}</span> : null}
+                                {knowsName && !knowsFace ? <span className="text-slate-500">· name only</span> : null}
+                                {knowsFace && !knowsName ? <span className="text-slate-500">· face only</span> : null}
                               </div>
+                            ) : roleTag ? (
+                              <div className="mt-0.5 text-[10px] text-slate-500">role: {roleTag}</div>
                             ) : null}
                           </div>
                         );
@@ -410,6 +419,7 @@ export default function DevMenu({
                   filteredRelEvents.map((event, idx) => {
                     const meta = (event.meta ?? {}) as Record<string, any>;
                     const npcId = meta.npc_id ?? "unknown";
+                    const npcLabel = NPC_LABELS[npcId] ?? npcId;
                     const deltaEntries = Object.entries(event.delta ?? {})
                       .map(([key, value]) => {
                         if (typeof value === "number") {
@@ -419,6 +429,18 @@ export default function DevMenu({
                         return `${key}:${String(value)}`;
                       })
                       .join(", ");
+                    // Show trust/reliability/emotionalLoad changes from before→after
+                    const before = meta.before as RelationshipState | undefined;
+                    const after = meta.after as RelationshipState | undefined;
+                    const memoryDeltas: string[] = [];
+                    if (before && after) {
+                      const tD = (after.trust ?? 0) - (before.trust ?? 0);
+                      const rD = (after.reliability ?? 0) - (before.reliability ?? 0);
+                      const eD = (after.emotionalLoad ?? 0) - (before.emotionalLoad ?? 0);
+                      if (tD !== 0) memoryDeltas.push(`trust:${tD > 0 ? "+" : ""}${tD}`);
+                      if (rD !== 0) memoryDeltas.push(`rel:${rD > 0 ? "+" : ""}${rD}`);
+                      if (eD !== 0) memoryDeltas.push(`emo:${eD > 0 ? "+" : ""}${eD}`);
+                    }
                     return (
                       <div
                         key={`${event.created_at ?? "event"}-${idx}`}
@@ -426,7 +448,7 @@ export default function DevMenu({
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-slate-700">
-                            {npcId}
+                            {npcLabel}
                           </span>
                           <span className="text-[10px] text-slate-400">
                             {event.created_at
@@ -441,6 +463,11 @@ export default function DevMenu({
                         <div className="mt-1 text-[11px] text-slate-700">
                           {deltaEntries || "{}"}
                         </div>
+                        {memoryDeltas.length > 0 && (
+                          <div className="text-[10px] text-slate-500">
+                            {memoryDeltas.join(", ")}
+                          </div>
+                        )}
                       </div>
                     );
                   })

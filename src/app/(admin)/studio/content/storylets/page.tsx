@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { Button } from "@/components/ui/button";
@@ -37,16 +37,18 @@ function matchesSearch(storylet: Storylet, search: string): boolean {
   );
 }
 
-function makeNewStorylet(): Omit<Storylet, "id"> {
+function makeNewStorylet(seed?: { arcId?: string | null; stepKey?: string } | null): Omit<Storylet, "id"> {
   return {
-    slug: `draft_${Date.now()}`,
-    title: "New storylet",
+    slug: seed?.stepKey ?? `draft_${Date.now()}`,
+    title: seed?.stepKey ? seed.stepKey.replace(/_/g, " ") : "New storylet",
     body: "",
     choices: [],
     is_active: false,
     tags: [],
     requirements: {},
-    weight: 1,
+    weight: 100,
+    arc_id: seed?.arcId ?? null,
+    step_key: seed?.stepKey ?? null,
   };
 }
 
@@ -77,6 +79,15 @@ function StoryletsContent() {
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Dirty state tracking from editor
+  const editorDirtyRef = useRef(false);
+
+  // Seed for new storylet created from a next_step_key link
+  const [linkedSeed, setLinkedSeed] = useState<{
+    arcId: string | null;
+    stepKey: string;
+  } | null>(null);
 
   useEffect(() => {
     loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
@@ -115,6 +126,15 @@ function StoryletsContent() {
     [storylets]
   );
 
+  // Step key options for autocomplete — filtered to the active arc (selected or new)
+  const stepKeyOptions = useMemo(() => {
+    const arcId = isNew ? (linkedSeed?.arcId ?? null) : (selected?.arc_id ?? null);
+    if (!arcId) return [];
+    return storylets
+      .filter((s) => s.step_key && s.arc_id === arcId)
+      .map((s) => ({ value: s.step_key!, label: `${s.step_key} (${s.title})` }));
+  }, [storylets, isNew, linkedSeed, selected]);
+
   // Validation summary counts for list
   function getIssueCount(storylet: Storylet) {
     const result = validateStorylet(storylet);
@@ -122,12 +142,22 @@ function StoryletsContent() {
   }
 
   function handleSelect(id: string) {
+    if (editorDirtyRef.current && !confirm("You have unsaved changes. Discard?")) return;
     setSelectedId(id);
     setIsNew(false);
     router.replace(`/studio/content/storylets?id=${id}`, { scroll: false });
   }
 
   function handleNewStorylet() {
+    if (editorDirtyRef.current && !confirm("You have unsaved changes. Discard?")) return;
+    setLinkedSeed(null);
+    setSelectedId(null);
+    setIsNew(true);
+  }
+
+  function handleCreateLinkedStorylet(stepKey: string) {
+    if (editorDirtyRef.current && !confirm("You have unsaved changes. Discard?")) return;
+    setLinkedSeed({ arcId: selected?.arc_id ?? null, stepKey });
     setSelectedId(null);
     setIsNew(true);
   }
@@ -139,6 +169,7 @@ function StoryletsContent() {
       const result = await createStorylet(updated, session.user.email ?? null);
       if (result.ok) {
         setIsNew(false);
+        setLinkedSeed(null);
         setSelectedId(result.id);
         await loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
       } else {
@@ -182,7 +213,7 @@ function StoryletsContent() {
             <div className="p-3 space-y-2 border-b border-slate-200 bg-white shrink-0">
               <input
                 className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-                placeholder="Search by title, slug, tag…"
+                placeholder="Search by title, slug, tag\u2026"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -221,7 +252,7 @@ function StoryletsContent() {
             {/* List */}
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <p className="p-3 text-sm text-slate-600">Loading…</p>
+                <p className="p-3 text-sm text-slate-600">Loading\u2026</p>
               ) : error ? (
                 <p className="p-3 text-sm text-red-600">{error}</p>
               ) : paginated.length === 0 ? (
@@ -261,14 +292,14 @@ function StoryletsContent() {
                       </div>
                       <button
                         type="button"
-                        className="opacity-0 group-hover:opacity-100 text-xs text-slate-400 hover:text-slate-700 shrink-0 mt-1"
+                        className="text-xs text-slate-400 hover:text-indigo-600 shrink-0 mt-1"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleClone(s, session);
                         }}
-                        title="Clone"
+                        title="Clone this storylet"
                       >
-                        ⧉
+                        Clone
                       </button>
                     </div>
                   );
@@ -285,7 +316,7 @@ function StoryletsContent() {
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                 >
-                  ← Prev
+                  \u2190 Prev
                 </button>
                 <span className="text-xs text-slate-500">
                   {page} / {totalPages}
@@ -296,7 +327,7 @@ function StoryletsContent() {
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                 >
-                  Next →
+                  Next \u2192
                 </button>
               </div>
             )}
@@ -306,18 +337,20 @@ function StoryletsContent() {
           <div className="overflow-hidden">
             {isNew ? (
               <StoryletEditor
-                key="new"
+                key={`new-${linkedSeed?.stepKey ?? "blank"}`}
                 storylet={
-                  { ...makeNewStorylet(), id: `draft_${Date.now()}` } as Storylet
+                  { ...makeNewStorylet(linkedSeed), id: `draft_${Date.now()}` } as Storylet
                 }
                 isNew
                 allTags={allTags}
                 storyletOptions={storyletOptions}
+                stepKeyOptions={stepKeyOptions}
                 arcOptions={arcOptions}
                 saving={saving}
                 saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
-                onCancel={() => setIsNew(false)}
+                onCancel={() => { setIsNew(false); setLinkedSeed(null); }}
+                onDirtyChange={(dirty) => { editorDirtyRef.current = dirty; }}
               />
             ) : selected ? (
               <StoryletEditor
@@ -325,11 +358,14 @@ function StoryletsContent() {
                 storylet={selected}
                 allTags={allTags}
                 storyletOptions={storyletOptions}
+                stepKeyOptions={stepKeyOptions}
                 arcOptions={arcOptions}
                 saving={saving}
                 saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
                 onDelete={() => handleDelete(selected)}
+                onDirtyChange={(dirty) => { editorDirtyRef.current = dirty; }}
+                onCreateLinkedStorylet={handleCreateLinkedStorylet}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">

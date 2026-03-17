@@ -1,0 +1,184 @@
+-- narrative_3: Seed Finding Your People arc (arc_people) — Stream 4 (belonging)
+-- Source: docs/new content/people.json
+-- Activated by choosing "go to fair" in opening Beat 5
+-- Beats: The Tables → The Floor Social
+
+BEGIN;
+
+-- 1. Insert arc definition
+INSERT INTO public.arc_definitions (key, title, description, tags, is_enabled)
+VALUES (
+  'arc_people',
+  'Finding Your People',
+  'Who are you when nobody from home is watching?',
+  '["belonging", "identity", "arc_one"]'::jsonb,
+  true
+);
+
+-- 2. Beat 1: The Tables (orientation fair)
+INSERT INTO public.storylets (
+  slug, title, body, choices, tags, requirements, weight, is_active,
+  introduces_npc, arc_id, step_key, order_index, due_offset_days,
+  expires_after_days, default_next_step_key
+)
+VALUES (
+  'arc_people_fair_tables',
+  'The Tables',
+  E'The quad is a grid of folding tables and hand-lettered signs, and everyone is selling something — a club, a cause, a version of college that starts with signing your name on a carbon-copy sheet.\n\nYou''ve been circulating for ten minutes. Long enough to take a flyer from the campus newspaper table, avoid eye contact with the Young Republicans, and accept a free donut from the Christian fellowship without committing to anything.\n\nThree tables have caught your attention. Not because they''re the loudest — the loudest ones are Greek life and the pep band — but because something about each one made you slow down.\n\nA debate team table with a hand-drawn poster that says ARGUE BETTER. Two students behind it, one talking fast, the other watching the crowd with the patience of someone who picks their moments.\n\nA student newspaper table with back issues fanned across the surface and a cardboard sign: WRITERS NEEDED. NO EXPERIENCE REQUIRED. The woman running it has a pen behind her ear and hasn''t looked up from her notebook.\n\nA table for the campus radio station — WKCR FM, 89.1 — with a boom box playing something you''ve never heard but immediately want to hear again. The guy behind the table is wearing headphones around his neck and nodding to nobody in particular.\n\nYou can stop at one. The fair is already thinning out.',
+  '[
+    {
+      "id": "debate_table",
+      "label": "Stop at the debate team table — the poster caught you",
+      "energy_cost": 1,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": -1, "stress": 2, "resources": { "socialLeverage": 1 } }
+      },
+      "reaction_text": "The fast talker spots you first. \"You look like someone who has opinions,\" he says, and before you can decide if that''s a compliment he''s already explaining the tournament schedule, the practice format, the road trips to other schools.\n\nThe quiet one — a woman with short hair and a direct gaze — waits until he pauses for breath. \"You don''t have to be good at arguing,\" she says. \"You have to be willing to be wrong in front of people.\"\n\nThat lands harder than she probably meant it to.\n\nYou write your name on the sheet. The next meeting is Thursday, 7 PM, room 204 in the humanities building. You fold the flyer into your back pocket with the growing collection of paper that is apparently how college communicates.\n\nWalking back across the quad, you pass the newspaper table. The woman with the pen behind her ear glances up, meets your eyes for a second, then goes back to her notebook. You wonder what she''s writing.",
+      "identity_tags": ["confront", "people"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "sets_stream_state": { "stream": "people", "state": "first_anchor" },
+      "events_emitted": [],
+      "next_step_key": "people_s2_floor_social"
+    },
+    {
+      "id": "newspaper_table",
+      "label": "Approach the newspaper table — WRITERS NEEDED",
+      "energy_cost": 1,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": -1, "stress": 3, "resources": { "knowledge": 1 } }
+      },
+      "reaction_text": "She doesn''t look up right away. You stand there for a beat longer than is comfortable, reading the back issues spread across the table — a feature on the dining hall renovation, an opinion piece about the nuclear freeze, a review of a Talking Heads concert at the student union.\n\n\"You write?\" she says, still looking at her notebook.\n\n\"I don''t know. Maybe.\"\n\nShe looks up. Pen still behind her ear. \"That''s the only honest answer anyone''s given me all day.\" She slides a half-sheet across the table. \"Pitch meeting is Wednesday. Bring an idea. Doesn''t have to be good. Just has to be yours.\"\n\nYou take the paper. Her handwriting is small and certain. The meeting is at 6 PM in the basement of the student union. You''ve already been to the student union in your head — or maybe you haven''t. The d\\u00e9j\\u00e0 vu is faint this time, more like a shadow than a flash.\n\nYou walk back across the quad with the half-sheet folded carefully, differently from the other flyers. This one you don''t want to lose.",
+      "identity_tags": ["risk", "achievement"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "sets_stream_state": { "stream": "people", "state": "first_anchor" },
+      "events_emitted": [],
+      "next_step_key": "people_s2_floor_social"
+    },
+    {
+      "id": "radio_table",
+      "label": "Drift toward the radio station table — the music pulled you",
+      "energy_cost": 0,
+      "time_cost": 0,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 0, "stress": -2, "resources": { "socialLeverage": 1 } }
+      },
+      "reaction_text": "You don''t decide to stop. Your feet just slow down near the boom box and the rest of you follows.\n\nThe guy behind the table notices but doesn''t pounce. He lets the song finish — something with a bassline that sounds like it was recorded in someone''s garage, urgent and unpolished and alive.\n\n\"You know this?\" he asks.\n\n\"No. What is it?\"\n\nHe grins like you''ve given him a gift. \"R.E.M. It''s not even out yet — my friend in Athens sent me a tape.\" He slides a sign-up sheet toward you with the easy confidence of someone who knows his table is the best one on the quad. \"We do two-hour shifts. You pick the music. Nobody listens at 2 AM but that''s sort of the point.\"\n\nYou write your name. He writes his underneath it — just a first name, Cal, with a dorm room number next to it. \"Come by the station sometime. Basement of the arts building. The door sticks so just push hard.\"\n\nYou walk away with R.E.M. still in your head. The song has no business being that good. Neither does this afternoon.",
+      "identity_tags": ["people"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "sets_stream_state": { "stream": "people", "state": "first_anchor" },
+      "events_emitted": [],
+      "next_step_key": "people_s2_floor_social"
+    }
+  ]'::jsonb,
+  ARRAY['arc_one', 'belonging', 'social', 'orientation'],
+  '{}'::jsonb,
+  1,
+  true,
+  ARRAY[]::text[],
+  (SELECT id FROM public.arc_definitions WHERE key = 'arc_people'),
+  'people_s1_fair_tables',
+  1,
+  0,
+  1,
+  'people_s2_floor_social'
+);
+
+-- 3. Beat 2: The Floor Social
+INSERT INTO public.storylets (
+  slug, title, body, choices, tags, requirements, weight, is_active,
+  introduces_npc, arc_id, step_key, order_index, due_offset_days,
+  expires_after_days, default_next_step_key
+)
+VALUES (
+  'arc_people_floor_social',
+  'The Floor Social',
+  E'Seven o''clock. The common room at the end of the hall. Sandra has arranged folding chairs in a circle that nobody sits in correctly — half the guys are on the floor, two are leaning against the wall, someone has brought his own beanbag from home and is clearly going to be That Guy.\n\nSandra runs through the rules. Quiet hours, bathroom schedule, the phone in the hallway is shared and messages go on the whiteboard — if someone calls for you and you''re not here, she''ll write it down but she''s not a secretary. A few guys laugh. She doesn''t.\n\nThe formal part ends in ten minutes. Then Sandra produces a two-liter of Coke and a bag of chips and says, "Okay. Now you have to talk to each other."\n\nThe room reshuffles. People who were strangers twenty minutes ago are now standing in clusters of two and three, performing casual conversation with varying degrees of success.\n\nDana is here. He''s talking to someone near the window. You catch the guy from the hallway earlier — dark hair, open face. He''s already in the middle of a group, gesturing with a chip.',
+  '[
+    {
+      "id": "one_deep",
+      "label": "Find one person and have a real conversation",
+      "energy_cost": 2,
+      "time_cost": 1,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": -2, "stress": -2, "resources": { "socialLeverage": 2 } }
+      },
+      "reaction_text": "You end up next to the dark-haired guy. Up close he''s less polished than he seemed in the hallway — there''s a nervousness under the ease, a way he checks if you''re still listening that suggests the confidence is newer than it looks.\n\nHis name is Miguel. He''s from New Jersey, he thinks he wants to study history, and he drove up alone because his parents both had to work. He says that last part fast, like he''s practiced making it sound like nothing.\n\nYou talk for forty minutes. You learn he''s read more books than anyone you knew in high school. You learn he''s terrified of the cafeteria. You learn that when he laughs, it''s sudden and real and slightly too loud for the room.\n\nBy the time Sandra starts collecting the empty chip bags, you and Miguel have established something. Not friendship exactly — it''s too new for that word. But a frequency. You''re on the same one.\n\nDana catches your eye from across the room. He''s been talking to a tall guy near the door. He gives you a look that might be \"ready to go?\" or might be \"who''s that?\" Either way, the floor social is ending, and you''ve done something with it.",
+      "identity_tags": ["people", "risk"],
+      "relational_effects": {
+        "npc_floor_miguel": { "trust": 1, "relationship": 2 }
+      },
+      "set_npc_memory": {
+        "npc_floor_miguel": { "knows_hometown": true, "knows_major": true, "met_at_floor_social": true }
+      },
+      "events_emitted": [
+        { "npc_id": "npc_floor_miguel", "type": "INTRODUCED_SELF", "magnitude": 1 },
+        { "npc_id": "npc_floor_miguel", "type": "SHARED_MEAL", "magnitude": 1 }
+      ],
+      "next_step_key": null
+    },
+    {
+      "id": "circulate",
+      "label": "Work the room — meet as many people as you can",
+      "energy_cost": 2,
+      "time_cost": 1,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": -2, "stress": 3, "resources": { "socialLeverage": 3 } }
+      },
+      "reaction_text": "You move. Three minutes here, five minutes there. Names and hometowns and majors, stacking up like cards you''re not sure you''ll remember.\n\nThe dark-haired guy is Miguel. He''s funny and talks with his hands. The tall one by the door is Cal — quiet, watchful, with a dry comment for everything that lands about two seconds after you expect it. There''s a guy named Travis who''s already talking about pledge week like it''s the only thing happening this semester. Someone named David who asks what music you listen to and visibly judges the answer.\n\nYou learn the geography of your floor in forty minutes. Who clusters with whom, who hangs back, who''s already performing a version of themselves they''re going to have to maintain.\n\nBy the end your energy is gone but your map of this place has names on it now. You know who waves in the hallway. You know who you''d eat with if the dining hall felt too big. That''s not nothing.\n\nDana walks back to the room with you. He says Cal seems cool. You say something about Miguel. Neither of you says much else. It''s the comfortable quiet of two people heading in the same direction.",
+      "identity_tags": ["people", "achievement"],
+      "relational_effects": {
+        "npc_floor_miguel": { "relationship": 1 },
+        "npc_floor_cal": { "relationship": 1 }
+      },
+      "set_npc_memory": {
+        "npc_floor_miguel": { "met_at_floor_social": true },
+        "npc_floor_cal": { "met_at_floor_social": true }
+      },
+      "events_emitted": [
+        { "npc_id": "npc_floor_miguel", "type": "INTRODUCED_SELF", "magnitude": 1 },
+        { "npc_id": "npc_floor_cal", "type": "NOTICED_FACE", "magnitude": 1 }
+      ],
+      "next_step_key": null
+    },
+    {
+      "id": "leave_early",
+      "label": "Stay for Sandra''s part, then slip out when the socializing starts",
+      "energy_cost": 0,
+      "time_cost": 1,
+      "outcome": {
+        "text": "",
+        "deltas": { "energy": 2, "stress": -1, "resources": {} }
+      },
+      "reaction_text": "You stay for the rules. You stay for the Coke and chips. You do not stay for the part where twenty strangers pretend they''re comfortable.\n\nIt''s not that you don''t want to — or maybe it is. You''re not sure. What you know is that the energy it would take to walk up to someone and say the right thing and mean it, or at least perform meaning it, is more than you have right now. You used it on Dana. You used it on Sandra. The tank is where it is.\n\nYou slip out during the transition. Nobody notices, which is both the point and the problem.\n\nThe hallway is quiet. Everyone is in the common room becoming a floor, and you''re walking back to your room alone, and the distance between those two things is something you can feel in your chest.\n\nYou hear Miguel''s laugh from down the hall — sudden, real, slightly too loud. You know it''s him even though you don''t know his name yet. You heard it earlier, when he asked Sandra about the waffle iron.\n\nYou close your door. Dana''s tape deck is off. His bed is empty. He''s still in there, being social. You sit on your bed in the quiet room and tell yourself this is fine. It mostly is.",
+      "identity_tags": ["avoid", "safety"],
+      "relational_effects": {},
+      "set_npc_memory": {},
+      "sets_stream_state": { "stream": "people", "state": "withdrawal" },
+      "events_emitted": [],
+      "next_step_key": null
+    }
+  ]'::jsonb,
+  ARRAY['arc_one', 'belonging', 'social', 'floor'],
+  '{}'::jsonb,
+  1,
+  true,
+  ARRAY['npc_floor_miguel'],
+  (SELECT id FROM public.arc_definitions WHERE key = 'arc_people'),
+  'people_s2_floor_social',
+  2,
+  0,
+  1,
+  NULL
+);
+
+COMMIT;

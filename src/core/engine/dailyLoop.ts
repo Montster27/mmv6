@@ -271,27 +271,7 @@ export async function getOrCreateDailyRun(
     }),
   });
 
-  const entrySlug = "s1_room_212_wake";
   let storylets = storyletsSelected;
-
-  const shouldForceEntry =
-    featureFlags.arcOneScarcityEnabled &&
-    dayIndex === 1 &&
-    seasonContext.currentSeason?.season_index >= 0;
-
-  if (shouldForceEntry) {
-    const entryStorylet = storyletsRaw.find(
-      (storylet) => storylet.slug === entrySlug
-    );
-    if (entryStorylet) {
-      storylets = [
-        entryStorylet,
-        ...storylets.filter((storylet) => storylet.id !== entryStorylet!.id),
-      ].slice(0, 3);
-    } else {
-      console.warn("Arc One entry storylet not found in candidates.");
-    }
-  }
 
   let initiatives = null as DailyRun["initiatives"];
 
@@ -402,11 +382,13 @@ export async function getOrCreateDailyRun(
   let arcBeats: ArcBeat[] = [];
   if (arcOneMode) {
     try {
-      // 1. Load the six Arc One arc definitions
+      // 1. Load Arc One arc definitions (six narrative streams)
+      // arc_opening is the legacy intro arc; Week 1 stream content replaces it.
+      const allArcOneKeys = [...ARC_ONE_STREAM_KEYS];
       const { data: arcDefs } = await supabase
         .from("arc_definitions")
         .select("id,key,title,description,tags,is_enabled")
-        .in("key", ARC_ONE_STREAM_KEYS)
+        .in("key", allArcOneKeys)
         .eq("is_enabled", true);
 
       const streamArcs: ArcDefinition[] = (arcDefs ?? []).map((r) => ({
@@ -469,28 +451,39 @@ export async function getOrCreateDailyRun(
           branch_key: r.branch_key ?? null,
         }));
 
-        // 4. On day 1 (or whenever there are no instances yet), create them
-        if (instances.length === 0 && streamSteps.length > 0) {
-          const toInsert = buildInitialArcInstances(userId, streamArcs, streamSteps, dayIndex);
+        // 4. Ensure instances exist for every arc that has steps but no instance yet.
+        //    All stream arcs initialize from Day 1 — no opening-arc gate required.
+        const arcIdsWithInstances = new Set(instances.map((i) => i.arc_id));
+        const arcsNeedingInstances = streamArcs.filter(
+          (a) =>
+            !arcIdsWithInstances.has(a.id) &&
+            streamSteps.some((s) => s.arc_id === a.id)
+        );
+
+        if (arcsNeedingInstances.length > 0) {
+          const toInsert = buildInitialArcInstances(userId, arcsNeedingInstances, streamSteps, dayIndex);
           if (toInsert.length > 0) {
             const { data: inserted } = await supabase
               .from("arc_instances")
               .insert(toInsert)
               .select("id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key");
-            instances = (inserted ?? []).map((r) => ({
-              id: r.id,
-              user_id: r.user_id,
-              arc_id: r.arc_id,
-              state: r.state as ArcInstance["state"],
-              current_step_key: r.current_step_key,
-              step_due_day: r.step_due_day,
-              step_defer_count: r.step_defer_count,
-              started_day: r.started_day,
-              updated_day: r.updated_day,
-              completed_day: r.completed_day ?? null,
-              failure_reason: r.failure_reason ?? null,
-              branch_key: r.branch_key ?? null,
-            }));
+            instances = [
+              ...instances,
+              ...(inserted ?? []).map((r) => ({
+                id: r.id,
+                user_id: r.user_id,
+                arc_id: r.arc_id,
+                state: r.state as ArcInstance["state"],
+                current_step_key: r.current_step_key,
+                step_due_day: r.step_due_day,
+                step_defer_count: r.step_defer_count,
+                started_day: r.started_day,
+                updated_day: r.updated_day,
+                completed_day: r.completed_day ?? null,
+                failure_reason: r.failure_reason ?? null,
+                branch_key: r.branch_key ?? null,
+              })),
+            ];
           }
         }
 
@@ -504,6 +497,7 @@ export async function getOrCreateDailyRun(
           body: due.step.body,
           options: due.step.choices,
           expires_on_day: due.expires_on_day,
+          introduces_npc: due.step.introduces_npc,
         }));
       }
     } catch (err) {

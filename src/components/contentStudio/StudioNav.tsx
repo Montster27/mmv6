@@ -7,6 +7,8 @@ const TABS = [
   { label: "Storylets", href: "/studio/content/storylets" },
   { label: "Arcs", href: "/studio/content/arcs" },
   { label: "Graph", href: "/studio/content/graph" },
+  { label: "Streams", href: "/studio/content/streams" },
+  { label: "NPCs", href: "/studio/content/npcs" },
   { label: "Preview", href: "/studio/content/preview" },
   { label: "Rules", href: "/studio/content/rules" },
   { label: "History", href: "/studio/content/history" },
@@ -17,7 +19,7 @@ export function StudioNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-1 border-b border-slate-200 bg-white px-4 shrink-0">
+    <nav className="flex gap-1 border-b border-slate-200 bg-white px-4 shrink-0 overflow-x-auto">
       {TABS.map((tab) => {
         const isActive = pathname.startsWith(tab.href);
         return (

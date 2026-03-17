@@ -7,17 +7,20 @@ import { ChoiceEditor } from "./ChoiceEditor";
 interface ChoiceListProps {
   choices: StoryletChoice[];
   storyletOptions: { value: string; label?: string }[];
+  stepKeyOptions?: { value: string; label?: string }[];
   onChange: (choices: StoryletChoice[]) => void;
+  onCreateLinkedStorylet?: (stepKey: string) => void;
 }
 
 function makeNewChoice(): StoryletChoice {
   return {
     id: `choice_${Date.now()}`,
     label: "New choice",
+    identity_tags: [],
   };
 }
 
-export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListProps) {
+export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onChange, onCreateLinkedStorylet }: ChoiceListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(
     choices.length === 1 ? choices[0].id : null
   );
@@ -31,6 +34,18 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
     const c = makeNewChoice();
     onChange([...choices, c]);
     setExpandedId(c.id);
+  }
+
+  function duplicateChoice(index: number) {
+    const source = choices[index];
+    const copy: StoryletChoice = {
+      ...structuredClone(source),
+      id: `${source.id}_copy`,
+    };
+    const next = [...choices];
+    next.splice(index + 1, 0, copy);
+    onChange(next);
+    setExpandedId(copy.id);
   }
 
   function removeChoice(index: number) {
@@ -51,6 +66,11 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
     <div className="space-y-2">
       {choices.map((choice, i) => {
         const isOpen = expandedId === choice.id;
+        const targetId = (choice as unknown as Record<string, unknown>).targetStoryletId as string | undefined;
+        const hasNpcEffects = (choice.events_emitted?.length ?? 0) > 0 ||
+          (choice.relational_effects && Object.keys(choice.relational_effects).length > 0);
+        const identityTags = choice.identity_tags ?? [];
+
         return (
           <div key={choice.id} className="border border-slate-200 rounded-lg overflow-hidden">
             {/* Header row */}
@@ -77,7 +97,7 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
                 </button>
               </div>
 
-              {/* Expand/collapse */}
+              {/* Expand/collapse + summary badges */}
               <button
                 type="button"
                 className="flex-1 text-left text-sm font-medium text-slate-700 truncate"
@@ -85,20 +105,55 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
               >
                 <span className="text-slate-400 mr-2">{i + 1}.</span>
                 {choice.label || <span className="italic text-slate-400">unlabelled</span>}
-                {choice.costs_resource && (
-                  <span className="ml-2 text-xs text-orange-500 font-normal">
-                    costs {choice.costs_resource.amount} {choice.costs_resource.key}
-                  </span>
-                )}
-                {choice.requires_resource && (
-                  <span className="ml-2 text-xs text-blue-500 font-normal">
-                    req {choice.requires_resource.min}+ {choice.requires_resource.key}
-                  </span>
-                )}
               </button>
 
-              <span className="text-slate-400 text-xs mr-2">{isOpen ? "▾" : "▸"}</span>
+              {/* Summary badges — compact row */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {identityTags.length > 0 && (
+                  <span className="text-xs bg-indigo-50 text-indigo-600 rounded-full px-1.5" title={`Identity: ${identityTags.join(", ")}`}>
+                    {identityTags.join("·")}
+                  </span>
+                )}
+                {hasNpcEffects && (
+                  <span className="text-xs bg-purple-50 text-purple-600 rounded-full px-1.5" title="Has NPC effects">
+                    NPC
+                  </span>
+                )}
+                {choice.sets_stream_state?.stream && (
+                  <span className="text-xs bg-emerald-50 text-emerald-600 rounded-full px-1.5">
+                    {choice.sets_stream_state.stream}
+                  </span>
+                )}
+                {choice.precludes?.length ? (
+                  <span className="text-xs bg-red-50 text-red-500 rounded-full px-1.5" title={`Precludes: ${choice.precludes.join(", ")}`}>
+                    ✕{choice.precludes.length}
+                  </span>
+                ) : null}
+                {(choice.next_step_key || targetId) && (
+                  <span className="text-xs text-emerald-600">
+                    &rarr;
+                  </span>
+                )}
+                {choice.outcome_type && (
+                  <span className={`text-xs ${
+                    choice.outcome_type === "success" ? "text-green-600" :
+                    choice.outcome_type === "fail" ? "text-red-500" : "text-slate-500"
+                  }`}>
+                    {choice.outcome_type}
+                  </span>
+                )}
+              </div>
 
+              <span className="text-slate-400 text-xs mr-1">{isOpen ? "▾" : "▸"}</span>
+
+              <button
+                type="button"
+                onClick={() => duplicateChoice(i)}
+                className="text-xs text-slate-400 hover:text-indigo-600 px-1"
+                title="Duplicate this choice"
+              >
+                Dup
+              </button>
               <button
                 type="button"
                 onClick={() => removeChoice(i)}
@@ -115,7 +170,9 @@ export function ChoiceList({ choices, storyletOptions, onChange }: ChoiceListPro
                 <ChoiceEditor
                   choice={choice}
                   storyletOptions={storyletOptions}
+                  stepKeyOptions={stepKeyOptions}
                   onChange={(updates) => updateChoice(i, updates)}
+                  onCreateLinkedStorylet={onCreateLinkedStorylet}
                 />
               </div>
             )}
