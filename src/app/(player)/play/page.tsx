@@ -3099,6 +3099,7 @@ export default function PlayPage() {
                           disabled
                           resolvedOption={chosenOption}
                           onDismiss={() => handleDismissArcBeat(beat)}
+                          relationships={relationshipsState}
                         />
                       ))}
                       {/* Unresolved beats */}
@@ -3111,6 +3112,7 @@ export default function PlayPage() {
                             dayIndex={dayIndex}
                             onChoice={handleArcBeatChoice}
                             moneyBand={arcOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
+                            relationships={relationshipsState}
                           />
                         ))}
                     </section>
