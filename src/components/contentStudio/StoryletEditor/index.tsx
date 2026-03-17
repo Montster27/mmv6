@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Storylet } from "@/types/storylets";
 import { BasicFields } from "./BasicFields";
 import { RequirementsPanel } from "./RequirementsPanel";
@@ -15,11 +15,15 @@ interface StoryletEditorProps {
   isNew?: boolean;
   allTags?: string[];
   storyletOptions?: { value: string; label?: string }[];
+  stepKeyOptions?: { value: string; label?: string }[];
   /** Available arc definitions for the Arc tab dropdown. */
   arcOptions?: { id: string; key: string; title: string }[];
   onSave: (updated: Storylet) => Promise<void>;
   onDelete?: () => Promise<void>;
   onCancel?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  /** Called when user wants to create a new storylet linked by next_step_key. */
+  onCreateLinkedStorylet?: (stepKey: string) => void;
   saving?: boolean;
   saveError?: string | null;
 }
@@ -29,10 +33,13 @@ export function StoryletEditor({
   isNew = false,
   allTags = [],
   storyletOptions = [],
+  stepKeyOptions = [],
   arcOptions = [],
   onSave,
   onDelete,
   onCancel,
+  onDirtyChange,
+  onCreateLinkedStorylet,
   saving = false,
   saveError = null,
 }: StoryletEditorProps) {
@@ -40,19 +47,55 @@ export function StoryletEditor({
   const [draft, setDraft] = useState<Storylet>(initial);
   const [rawError, setRawError] = useState<string | null>(null);
 
+  const initialRef = useRef(JSON.stringify(initial));
+  const isDirty = useMemo(
+    () => JSON.stringify(draft) !== initialRef.current,
+    [draft]
+  );
+
+  // Notify parent of dirty state changes
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  // Warn on browser close/refresh with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
   function patch(updates: Partial<Storylet>) {
     setDraft((prev) => ({ ...prev, ...updates }));
   }
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
+    if (saving || rawError) return;
     await onSave(draft);
-  }
+    // Reset the dirty baseline immediately so the guard doesn't fire
+    // on subsequent navigation even if the parent hasn't reloaded yet.
+    initialRef.current = JSON.stringify(draft);
+  }, [draft, onSave, saving, rawError]);
+
+  // Cmd+S / Ctrl+S keyboard shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [handleSave]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "basic", label: "Basic" },
     { id: "requirements", label: "Requirements" },
     { id: "choices", label: `Choices (${draft.choices?.length ?? 0})` },
-    { id: "arc", label: draft.arc_id ? "Arc ●" : "Arc" },
+    { id: "arc", label: draft.arc_id ? "Arc \u25cf" : "Arc" },
     { id: "raw", label: "Raw JSON" },
   ];
 
@@ -74,6 +117,12 @@ export function StoryletEditor({
             {t.label}
           </button>
         ))}
+        {/* Dirty indicator in tab bar */}
+        {isDirty && !isNew && (
+          <span className="ml-auto flex items-center text-xs text-amber-600 px-3">
+            Unsaved changes
+          </span>
+        )}
       </div>
 
       {/* Tab content */}
@@ -98,7 +147,9 @@ export function StoryletEditor({
           <ChoiceList
             choices={draft.choices ?? []}
             storyletOptions={storyletOptions}
+            stepKeyOptions={stepKeyOptions}
             onChange={(choices) => patch({ choices })}
+            onCreateLinkedStorylet={onCreateLinkedStorylet}
           />
         )}
 
@@ -106,6 +157,7 @@ export function StoryletEditor({
           <ArcPanel
             storylet={draft}
             arcOptions={arcOptions}
+            stepKeyOptions={stepKeyOptions}
             onChange={patch}
           />
         )}
@@ -128,7 +180,7 @@ export function StoryletEditor({
                   setDraft(parsed);
                   setRawError(null);
                 } catch {
-                  setRawError("Invalid JSON — fix before saving.");
+                  setRawError("Invalid JSON \u2014 fix before saving.");
                 }
               }}
             />
@@ -171,14 +223,17 @@ export function StoryletEditor({
               Cancel
             </button>
           )}
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !!rawError}
-            className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {saving ? "Saving…" : isNew ? "Create storylet" : "Save changes"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || !!rawError}
+              className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {saving ? "Saving\u2026" : isNew ? "Create storylet" : "Save changes"}
+            </button>
+            <span className="text-xs text-slate-400">\u2318S</span>
+          </div>
         </div>
       </div>
     </div>

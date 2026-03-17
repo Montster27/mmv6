@@ -8,6 +8,18 @@ export type ArcFlowViewProps = {
   arcSteps: ArcStepRow[];
 };
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type ArcOption = {
+  id?: string;
+  option_key?: string;
+  label?: string;
+  next_step_key?: string;
+  energy_cost?: number;
+  sets_stream_state?: { stream: string; state: string };
+  money_effect?: string;
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ARC_COLORS: Record<string, { header: string; node: string }> = {
@@ -29,6 +41,7 @@ const NODE_HEIGHT = 90;
 const STEP_GAP = 48;   // horizontal space between steps (for the arrow)
 const COL_WIDTH = NODE_WIDTH + STEP_GAP;
 const ARC_ROW_GAP = 40; // vertical space between arc rows
+const LABEL_WIDTH = 80; // space reserved for arc row labels on the left
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -78,15 +91,68 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
     return rows;
   }, [arcDefinitions, stepsByArc]);
 
+  // Build step_key → column index within each arc for branching edge lookup
+  const stepKeyToIndex = useMemo(() => {
+    const map = new Map<string, { arcId: string; idx: number }>();
+    layout.forEach(({ arc, steps }) => {
+      steps.forEach((step, idx) => {
+        map.set(`${arc.id}:${step.step_key}`, { arcId: arc.id, idx });
+      });
+    });
+    return map;
+  }, [layout]);
+
+  // Compute non-sequential (branching) edges from choices' next_step_key and default_next_step_key
+  const branchEdges = useMemo(() => {
+    const edges: Array<{
+      arcId: string;
+      fromIdx: number;
+      toIdx: number;
+      y: number;
+      kind: "choice" | "default";
+    }> = [];
+    const seen = new Set<string>();
+
+    layout.forEach(({ arc, steps, y }) => {
+      steps.forEach((step, idx) => {
+        // Check each option for next_step_key
+        const options = step.options as ArcOption[];
+        options.forEach((opt) => {
+          if (!opt.next_step_key) return;
+          const target = stepKeyToIndex.get(`${arc.id}:${opt.next_step_key}`);
+          if (!target || target.idx === idx + 1) return; // sequential = already drawn
+          const key = `${arc.id}:${idx}:${target.idx}:choice`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          edges.push({ arcId: arc.id, fromIdx: idx, toIdx: target.idx, y, kind: "choice" });
+        });
+
+        // Check default_next_step_key
+        if (step.default_next_step_key) {
+          const target = stepKeyToIndex.get(`${arc.id}:${step.default_next_step_key}`);
+          if (target && target.idx !== idx + 1) {
+            const key = `${arc.id}:${idx}:${target.idx}:default`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              edges.push({ arcId: arc.id, fromIdx: idx, toIdx: target.idx, y, kind: "default" });
+            }
+          }
+        }
+      });
+    });
+
+    return edges;
+  }, [layout, stepKeyToIndex]);
+
   const canvasWidth = useMemo(() => {
     const maxSteps = Math.max(...layout.map((r) => r.steps.length), 0);
-    return Math.max(800, maxSteps * COL_WIDTH + 80);
+    return Math.max(800, LABEL_WIDTH + maxSteps * COL_WIDTH + 80);
   }, [layout]);
 
   const canvasHeight = useMemo(() => {
     const lastRow = layout[layout.length - 1];
     if (!lastRow) return 400;
-    return lastRow.y + NODE_HEIGHT + ARC_ROW_GAP;
+    return lastRow.y + NODE_HEIGHT + ARC_ROW_GAP + 40; // extra space for branch curves below
   }, [layout]);
 
   // Interaction
@@ -114,7 +180,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
         <span>Drag to pan · Scroll to zoom · Each row = one arc stream · Nodes = story beats in order</span>
       </div>
 
-      {/* Arc colour legend */}
+      {/* Legend */}
       <div className="flex flex-wrap gap-2 text-xs">
         {layout.map(({ arc }) => {
           const c = ARC_COLORS[arc.key] ?? DEFAULT_COLORS;
@@ -124,6 +190,15 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
             </span>
           );
         })}
+        <span className="ml-3 flex items-center gap-1 text-slate-500">
+          <span className="inline-block h-0.5 w-6 bg-slate-300" /> sequential
+        </span>
+        <span className="flex items-center gap-1 text-indigo-500">
+          <span className="inline-block h-0.5 w-6 border-t-2 border-dotted border-indigo-400" /> branch (choice)
+        </span>
+        <span className="flex items-center gap-1 text-teal-500">
+          <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-teal-400" /> default fallback
+        </span>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[3fr_1fr]">
@@ -145,46 +220,91 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
               height: canvasHeight,
             }}
           >
-            {/* SVG layer: arc arrows */}
+            {/* SVG layer: arrows */}
             <svg className="absolute left-0 top-0" width={canvasWidth} height={canvasHeight}>
               <defs>
-                <marker id="arc-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <marker id="af-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                   <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8" />
                 </marker>
-                <marker id="arc-arrow-active" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <marker id="af-arrow-active" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                   <path d="M0,0 L6,3 L0,6 Z" fill="#374151" />
                 </marker>
+                <marker id="af-arrow-branch" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#6366f1" />
+                </marker>
+                <marker id="af-arrow-default" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#14b8a6" />
+                </marker>
               </defs>
+
+              {/* Sequential arrows between adjacent beats */}
               {layout.map(({ arc, steps, y }) => {
                 return steps.slice(0, -1).map((step, idx) => {
-                  const x1 = idx * COL_WIDTH + NODE_WIDTH;
-                  const x2 = (idx + 1) * COL_WIDTH;
+                  const x1 = LABEL_WIDTH + idx * COL_WIDTH + NODE_WIDTH;
+                  const x2 = LABEL_WIDTH + (idx + 1) * COL_WIDTH;
                   const midY = y + NODE_HEIGHT / 2;
                   const isActive = step.step_key === selectedStepKey || steps[idx + 1]?.step_key === selectedStepKey;
                   return (
                     <line
-                      key={`${arc.id}-arrow-${idx}`}
+                      key={`${arc.id}-seq-${idx}`}
                       x1={x1}
                       y1={midY}
                       x2={x2}
                       y2={midY}
                       stroke={isActive ? "#374151" : "#cbd5e1"}
                       strokeWidth={isActive ? 2.5 : 1.5}
-                      markerEnd={isActive ? "url(#arc-arrow-active)" : "url(#arc-arrow)"}
+                      markerEnd={isActive ? "url(#af-arrow-active)" : "url(#af-arrow)"}
                     />
                   );
                 });
               })}
+
+              {/* Non-sequential (branching) arrows */}
+              {branchEdges.map((edge, i) => {
+                const x1 = LABEL_WIDTH + edge.fromIdx * COL_WIDTH + NODE_WIDTH;
+                const x2 = LABEL_WIDTH + edge.toIdx * COL_WIDTH;
+                const isForward = edge.toIdx > edge.fromIdx;
+                const distance = Math.abs(edge.toIdx - edge.fromIdx);
+                const dip = 25 + distance * 12;
+
+                // Forward skips curve below, backward jumps curve above
+                const cy = isForward ? edge.y + NODE_HEIGHT + dip : edge.y - dip;
+                const y1 = isForward ? edge.y + NODE_HEIGHT * 0.75 : edge.y + NODE_HEIGHT * 0.25;
+                const y2 = isForward ? edge.y + NODE_HEIGHT * 0.75 : edge.y + NODE_HEIGHT * 0.25;
+
+                const isChoice = edge.kind === "choice";
+                const stroke = isChoice ? "#6366f1" : "#14b8a6";
+                const marker = isChoice ? "url(#af-arrow-branch)" : "url(#af-arrow-default)";
+                const dashArray = isChoice ? "3 3" : "6 3";
+
+                return (
+                  <path
+                    key={`branch-${edge.arcId}-${edge.fromIdx}-${edge.toIdx}-${edge.kind}-${i}`}
+                    d={`M ${x1} ${y1} C ${x1} ${cy}, ${x2} ${cy}, ${x2} ${y2}`}
+                    stroke={stroke}
+                    strokeWidth={1.5}
+                    strokeDasharray={dashArray}
+                    fill="none"
+                    markerEnd={marker}
+                    opacity={0.8}
+                  />
+                );
+              })}
             </svg>
 
-            {/* Arc row labels */}
+            {/* Arc row labels — positioned inside canvas at left edge */}
             {layout.map(({ arc, y }) => {
               const c = ARC_COLORS[arc.key] ?? DEFAULT_COLORS;
               return (
                 <div
                   key={`label-${arc.id}`}
-                  className={`absolute rounded-l-md px-2 py-0.5 text-xs font-semibold text-white ${c.header}`}
-                  style={{ left: 0, top: y + NODE_HEIGHT / 2 - 10, transform: "translateX(-100%)" }}
+                  className={`absolute rounded-md px-2 py-1 text-[10px] font-semibold text-white ${c.header}`}
+                  style={{
+                    left: 0,
+                    top: y + NODE_HEIGHT / 2 - 12,
+                    width: LABEL_WIDTH - 8,
+                    textAlign: "center",
+                  }}
                 >
                   {arc.title}
                 </div>
@@ -195,7 +315,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
             {layout.map(({ arc, steps, y }) => {
               const c = ARC_COLORS[arc.key] ?? DEFAULT_COLORS;
               return steps.map((step, idx) => {
-                const x = idx * COL_WIDTH;
+                const x = LABEL_WIDTH + idx * COL_WIDTH;
                 const isSelected = step.step_key === selectedStepKey;
                 return (
                   <button
@@ -245,12 +365,17 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
                 <p className="text-xs font-semibold text-slate-700">
                   Options ({(selectedStep.options as unknown[]).length})
                 </p>
-                {(selectedStep.options as Array<{ option_key: string; label: string; energy_cost?: number; sets_stream_state?: { stream: string; state: string }; money_effect?: string }>).map((opt) => (
-                  <div key={opt.option_key} className="rounded bg-slate-50 px-2 py-1.5 text-xs">
+                {(selectedStep.options as ArcOption[]).map((opt) => (
+                  <div key={opt.option_key ?? opt.id} className="rounded bg-slate-50 px-2 py-1.5 text-xs">
                     <p className="font-medium text-slate-800">{opt.label}</p>
                     <div className="mt-0.5 flex flex-wrap gap-1">
                       {opt.energy_cost !== undefined && opt.energy_cost !== 0 && (
                         <span className="text-slate-400">energy: {opt.energy_cost}</span>
+                      )}
+                      {opt.next_step_key && (
+                        <span className="rounded bg-indigo-50 px-1 text-indigo-600">
+                          → {opt.next_step_key}
+                        </span>
                       )}
                       {opt.sets_stream_state && (
                         <span className="rounded bg-indigo-50 px-1 text-indigo-600">
@@ -266,6 +391,11 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
                   </div>
                 ))}
               </div>
+              {selectedStep.default_next_step_key && (
+                <div className="text-xs text-teal-600">
+                  Default next: {selectedStep.default_next_step_key}
+                </div>
+              )}
               <div className="text-xs text-slate-400">
                 Due offset: Day {selectedStep.due_offset_days} · Expires after: {selectedStep.expires_after_days}d
               </div>

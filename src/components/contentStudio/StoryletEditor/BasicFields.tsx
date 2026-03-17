@@ -28,6 +28,25 @@ function getNonPhaseTags(tags?: string[]): string[] {
   );
 }
 
+function FieldHint({ text }: { text: string }) {
+  return (
+    <span className="ml-1 text-slate-400 cursor-help" title={text}>
+      [?]
+    </span>
+  );
+}
+
+const NPC_ID_SUGGESTIONS = [
+  "npc_roommate_dana",
+  "npc_floor_miguel",
+  "npc_floor_cal",
+  "npc_prof_marsh",
+  "npc_studious_priya",
+  "npc_ambiguous_jordan",
+  "npc_ra_sandra",
+  "npc_parent_voice",
+];
+
 interface BasicFieldsProps {
   storylet: Storylet;
   isNew: boolean;
@@ -79,15 +98,30 @@ export function BasicFields({
         Body
         <textarea
           className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-          rows={4}
+          rows={6}
           value={storylet.body}
           onChange={(e) => onChange({ body: e.target.value })}
         />
       </label>
 
+      {/* Introduces NPC — NEW */}
+      <div>
+        <p className="text-xs text-slate-600 mb-1">
+          Introduces NPC
+          <FieldHint text="NPC IDs whose short_intro is prepended to body text if not yet met. After any choice, these NPCs are auto-marked met." />
+        </p>
+        <TagEditor
+          tags={storylet.introduces_npc ?? []}
+          onChange={(npcs) => onChange({ introduces_npc: npcs.length ? npcs : undefined })}
+          suggestions={NPC_ID_SUGGESTIONS}
+          placeholder="Add NPC ID…"
+        />
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="text-xs text-slate-600">
           Weight
+          <FieldHint text="Higher weight = more likely selected from the daily pool. Default 100. Set to 0 to effectively disable." />
           <input
             type="number"
             className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -97,6 +131,7 @@ export function BasicFields({
         </label>
         <label className="text-xs text-slate-600">
           Phase
+          <FieldHint text="Controls storylet availability by game phase. Storylets tagged with a phase only appear during that phase. Blank = all phases." />
           <select
             className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
             value={getPhase(storylet.tags)}
@@ -111,6 +146,9 @@ export function BasicFields({
               </option>
             ))}
           </select>
+          <p className="text-xs text-slate-400 mt-1">
+            Phase is stored as a tag ({getPhase(storylet.tags) || "none"}) and controls when this storylet can appear.
+          </p>
         </label>
         <label className="flex items-center gap-2 text-xs text-slate-600 pt-4">
           <input

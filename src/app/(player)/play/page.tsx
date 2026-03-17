@@ -15,6 +15,7 @@ import { AllocationSection } from "@/components/play/AllocationSection";
 import { ReflectionSection } from "@/components/play/ReflectionSection";
 import { ArcOneReflection } from "@/components/play/ArcOneReflection";
 import { TesterFeedback } from "@/components/play/TesterFeedback";
+import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import { supabase } from "@/lib/supabase/browser";
@@ -82,7 +83,6 @@ import type { ReflectionResponse } from "@/types/reflections";
 import { useSession } from "@/contexts/SessionContext";
 import { ProgressPanel } from "@/components/ProgressPanel";
 import { OutcomeExplain } from "@/components/play/OutcomeExplain";
-import { SeasonBadge } from "@/components/SeasonBadge";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
 import { useDailyProgress, useGameContent } from "./hooks";
@@ -272,7 +272,12 @@ export default function PlayPage() {
   const [resolvedArcBeatIds, setResolvedArcBeatIds] = useState<Set<string>>(
     new Set()
   );
-  const [pendingDismissalBeats, setPendingDismissalBeats] = useState<ArcBeat[]>([]);
+  const [pendingDismissalBeats, setPendingDismissalBeats] = useState<
+    Array<{ beat: ArcBeat; chosenOption: StoryletChoice }>
+  >([]);
+  // Set when all arc beats are resolved but allocation hasn't been saved yet.
+  // Holds up markDailyComplete until after the player sets their time allocation.
+  const [awaitingAllocation, setAwaitingAllocation] = useState(false);
 
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
@@ -403,6 +408,12 @@ export default function PlayPage() {
     () => dailyRunQuery.data?.arcBeats ?? [],
     [dailyRunQuery.data?.arcBeats]
   );
+  // Clear resolved IDs (and allocation gate) when fresh arc beat data arrives
+  useEffect(() => {
+    setResolvedArcBeatIds(new Set());
+    // If allocation is now saved (e.g. day advanced), clear the gate
+    if (allocationSaved) setAwaitingAllocation(false);
+  }, [dailyRunQuery.data?.arcBeats, allocationSaved]);
   const relationshipsState = useMemo(
     () => arcOneState?.relationships ?? {},
     [arcOneState?.relationships]
@@ -494,7 +505,9 @@ export default function PlayPage() {
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR &&
       stage === "complete" &&
-      !(arcOneMode && (arcBeats.length > 0 || pendingDismissalBeats.length > 0))) ||
+      arcBeats.length === 0 &&
+      !awaitingAllocation &&
+      !(arcOneMode && pendingDismissalBeats.length > 0)) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
@@ -1363,7 +1376,20 @@ export default function PlayPage() {
       setAllocationSaved(true);
       setAllocationSummary(allocation);
       if (USE_DAILY_LOOP_ORCHESTRATOR) {
-        setStage("storylet_1");
+        if (awaitingAllocation) {
+          // Allocation was deferred to end-of-day — now mark the day complete
+          setAwaitingAllocation(false);
+          if (userId) {
+            try {
+              await markDailyComplete(userId, dayIndex);
+              incrementGroupObjective(2, "daily_complete").catch(() => {});
+            } catch (e) {
+              console.error("Failed to mark daily complete after end-of-day allocation", e);
+            }
+          }
+        } else {
+          setStage("storylet_1");
+        }
       }
     } catch (e) {
       console.error(e);
@@ -2022,28 +2048,157 @@ export default function PlayPage() {
         throw new Error((body as { error?: string }).error ?? "Request failed");
       }
 
-      const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
-      setResolvedArcBeatIds(newResolved);
-      // Keep this beat visible until the user dismisses it via the Continue button
-      setPendingDismissalBeats((prev) => [...prev, beat]);
+      const resBody = await res.json().catch(() => ({ next_step_key: null }));
 
-      // arcOneMode: mark day complete once all beats are resolved
-      if (arcOneMode && userId && arcBeats.every((b) => newResolved.has(b.instance_id))) {
-        try {
-          await markDailyComplete(userId, dayIndex);
-          incrementGroupObjective(2, "daily_complete").catch(() => {});
-        } catch (e) {
-          console.error("Failed to mark daily complete after arc beats", e);
+      // --- Apply relationship events from the arc beat choice ---
+      if (userId) {
+        const introEvents = (beat.introduces_npc ?? [])
+          .filter((npcId: string) => !relationshipsState[npcId]?.met)
+          .map((npcId: string) => ({ npc_id: npcId, type: "INTRODUCED_SELF" as const }));
+
+        const relationshipEvents = [
+          ...introEvents,
+          ...((option.events_emitted ?? []) as any),
+          ...mapLegacyRelationalEffects(option.relational_effects),
+          ...mapLegacyNpcKnowledge(option.set_npc_memory),
+        ] as any;
+
+        if (relationshipEvents.length > 0) {
+          const { next: nextRelationships, logs } = applyRelationshipEvents(
+            relationshipsState,
+            relationshipEvents,
+            { storylet_slug: beat.arc_key, choice_id: option.id }
+          );
+          await updateRelationships(userId, nextRelationships, dayIndex);
+          if (dailyState) {
+            setDailyState({ ...dailyState, relationships: nextRelationships });
+          }
+          // Log each relationship change
+          logs.forEach((entry) => {
+            const flagChanged =
+              typeof entry.delta.met === "boolean" ||
+              typeof entry.delta.knows_name === "boolean" ||
+              typeof entry.delta.knows_face === "boolean";
+            const payload = {
+              user_id: userId,
+              day: dayIndex,
+              event_type: "REL_DELTA",
+              arc_id: null,
+              arc_instance_id: beat.instance_id,
+              step_key: null,
+              option_key: option.id,
+              delta: entry.delta,
+              meta: {
+                storylet_slug: beat.arc_key,
+                choice_id: option.id,
+                npc_id: entry.npc_id,
+                kind: flagChanged ? "npc_memory" : "relational",
+                before: entry.before,
+                after: entry.after,
+              },
+            };
+            supabase.from("choice_log").insert(payload);
+            if (relationshipDebugEnabled) {
+              setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
+            }
+          });
         }
       }
 
-      setRefreshTick((t) => t + 1);
+      // --- Resolve conditional reaction text (e.g. money_band conditions) ---
+      let resolvedOption = option;
+      const conditions = option.reaction_text_conditions;
+      if (
+        conditions &&
+        conditions.length > 0 &&
+        (!option.reaction_text || option.reaction_text.trim() === "")
+      ) {
+        const npcMemForCond = Object.fromEntries(
+          Object.entries(relationshipsState).map(([npcId, entry]) => {
+            const rec = entry as Record<string, unknown>;
+            return [
+              npcId,
+              {
+                met: rec.met === true,
+                knows_name: rec.knows_name === true,
+                knows_face: rec.knows_face === true,
+              },
+            ];
+          })
+        );
+        const condContext: Record<string, unknown> = {
+          npc_memory: npcMemForCond,
+        };
+        if (arcOneState?.moneyBand) {
+          condContext.money_band = arcOneState.moneyBand;
+        }
+        for (const cond of conditions) {
+          if (matchesRequirement(cond.if, condContext)) {
+            resolvedOption = { ...option, reaction_text: cond.text };
+            break;
+          }
+        }
+      }
+
+      // --- Apply outcome.deltas to local dayState (optimistic update) ---
+      const outcomeDeltas = (option.outcome as { deltas?: { energy?: number; stress?: number; resources?: Record<string, number> } } | undefined)?.deltas;
+      if (outcomeDeltas && dayState) {
+        const nextEnergy =
+          typeof outcomeDeltas.energy === "number"
+            ? Math.max(0, Math.min(100, dayState.energy + outcomeDeltas.energy))
+            : dayState.energy;
+        const nextStress =
+          typeof outcomeDeltas.stress === "number"
+            ? Math.max(0, Math.min(100, dayState.stress + outcomeDeltas.stress))
+            : dayState.stress;
+        const res = outcomeDeltas.resources ?? {};
+        setDayState({
+          ...dayState,
+          energy: nextEnergy,
+          stress: nextStress,
+          cashOnHand: dayState.cashOnHand + (res.cashOnHand ?? 0),
+          knowledge: dayState.knowledge + (res.knowledge ?? 0),
+          socialLeverage: dayState.socialLeverage + (res.socialLeverage ?? 0),
+          physicalResilience: Math.max(
+            0,
+            Math.min(100, dayState.physicalResilience + (res.physicalResilience ?? 0))
+          ),
+        });
+      }
+
+      const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
+      setResolvedArcBeatIds(newResolved);
+      // Keep this beat visible until the user dismisses it via the Continue button
+      setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: resolvedOption }]);
+
+      // Only mark day complete when all beats are resolved AND no more steps are queued
+      const hasMoreSteps = resBody.next_step_key != null;
+      if (
+        arcOneMode &&
+        userId &&
+        !hasMoreSteps &&
+        arcBeats.every((b) => newResolved.has(b.instance_id))
+      ) {
+        if (!allocationSaved) {
+          // Gate daily-complete behind allocation — show it after beats are dismissed
+          setAwaitingAllocation(true);
+        } else {
+          try {
+            await markDailyComplete(userId, dayIndex);
+            incrementGroupObjective(2, "daily_complete").catch(() => {});
+          } catch (e) {
+            console.error("Failed to mark daily complete after arc beats", e);
+          }
+        }
+      }
     },
-    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId]
+    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState, allocationSaved, dayState, setDayState]
   );
 
   const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
-    setPendingDismissalBeats((prev) => prev.filter((b) => b.instance_id !== beat.instance_id));
+    setPendingDismissalBeats((prev) => prev.filter((entry) => entry.beat.instance_id !== beat.instance_id));
+    // Keep resolved ID to prevent flash of old beat; cleared when fresh data arrives
+    setRefreshTick((t) => t + 1);
   }, []);
 
   const handleAllocateSkillPoint = async (skillKey: string) => {
@@ -2245,17 +2400,6 @@ export default function PlayPage() {
                   <p>{getDailyStageCopy(stage).body}</p>
                 </div>
               )}
-              {seasonContext ? (
-                <div className="mt-2">
-                  <SeasonBadge
-                    seasonIndex={seasonContext.currentSeason.season_index}
-                    daysRemaining={seasonContext.daysRemaining}
-                  />
-                </div>
-              ) : null}
-              <p className="text-muted-foreground text-xs font-stat">
-                Signed in as {session.user.email ?? "unknown user"}.
-              </p>
               <div className="mt-3 space-y-2">
                 <TesterOnly>
                   <MessageCard message={testerNote} variant="inline" />
@@ -2468,7 +2612,7 @@ export default function PlayPage() {
             />
           ) : null}
 
-          {seasonResetPending ? (
+          {seasonResetPending && !arcOneMode ? (
             <section className="rounded border-2 border-primary/40 bg-primary px-4 py-4 space-y-3 text-primary-foreground prep-stripe-top">
               <h2 className="text-xl font-bold tracking-wide font-heading">
                 Season {seasonIndex ?? "?"} begins
@@ -2886,6 +3030,16 @@ export default function PlayPage() {
                                     </div>
                                   ) : null}
 
+                                  {/* Narrative feedback (tester only) */}
+                                  {currentStorylet && (
+                                    <TesterOnly>
+                                      <NarrativeFeedback
+                                        storyletId={currentStorylet.id}
+                                        dayIndex={dayIndex}
+                                      />
+                                    </TesterOnly>
+                                  )}
+
                                   {/* Continue button */}
                                   {(pendingReactionText || consequenceActive) && (
                                     <button
@@ -2936,13 +3090,14 @@ export default function PlayPage() {
                         Today&apos;s Moments
                       </h2>
                       {/* Resolved beats awaiting user dismissal (shown first so reaction text is prominent) */}
-                      {pendingDismissalBeats.map((beat) => (
+                      {pendingDismissalBeats.map(({ beat, chosenOption }) => (
                         <ArcBeatCard
                           key={beat.instance_id}
                           beat={beat}
                           dayIndex={dayIndex}
                           onChoice={handleArcBeatChoice}
                           disabled
+                          resolvedOption={chosenOption}
                           onDismiss={() => handleDismissArcBeat(beat)}
                         />
                       ))}
@@ -2955,8 +3110,28 @@ export default function PlayPage() {
                             beat={beat}
                             dayIndex={dayIndex}
                             onChoice={handleArcBeatChoice}
+                            moneyBand={arcOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
                           />
                         ))}
+                    </section>
+                  )}
+
+                  {/* End-of-day allocation — shown after all beats are resolved and dismissed */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR &&
+                    arcOneMode &&
+                    awaitingAllocation &&
+                    pendingDismissalBeats.length === 0 && (
+                    <section className="space-y-3">
+                      <h2 className="prep-label">Plan Your Day</h2>
+                      <AllocationSection
+                        allocation={allocation}
+                        totalAllocation={totalAllocation}
+                        allocationValid={allocationValid}
+                        savingAllocation={savingAllocation}
+                        onAllocationChange={handleAllocationChange}
+                        onSave={handleSaveAllocation}
+                        resourcesEnabled={featureFlags.resources}
+                      />
                     </section>
                   )}
 
