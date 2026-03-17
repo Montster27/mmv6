@@ -2134,6 +2134,32 @@ export default function PlayPage() {
         }
       }
 
+      // --- Apply outcome.deltas to local dayState (optimistic update) ---
+      const outcomeDeltas = (option.outcome as { deltas?: { energy?: number; stress?: number; resources?: Record<string, number> } } | undefined)?.deltas;
+      if (outcomeDeltas && dayState) {
+        const nextEnergy =
+          typeof outcomeDeltas.energy === "number"
+            ? Math.max(0, Math.min(100, dayState.energy + outcomeDeltas.energy))
+            : dayState.energy;
+        const nextStress =
+          typeof outcomeDeltas.stress === "number"
+            ? Math.max(0, Math.min(100, dayState.stress + outcomeDeltas.stress))
+            : dayState.stress;
+        const res = outcomeDeltas.resources ?? {};
+        setDayState({
+          ...dayState,
+          energy: nextEnergy,
+          stress: nextStress,
+          cashOnHand: dayState.cashOnHand + (res.cashOnHand ?? 0),
+          knowledge: dayState.knowledge + (res.knowledge ?? 0),
+          socialLeverage: dayState.socialLeverage + (res.socialLeverage ?? 0),
+          physicalResilience: Math.max(
+            0,
+            Math.min(100, dayState.physicalResilience + (res.physicalResilience ?? 0))
+          ),
+        });
+      }
+
       const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
       setResolvedArcBeatIds(newResolved);
       // Keep this beat visible until the user dismisses it via the Continue button
@@ -2160,7 +2186,7 @@ export default function PlayPage() {
         }
       }
     },
-    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState, allocationSaved]
+    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState, allocationSaved, dayState, setDayState]
   );
 
   const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
