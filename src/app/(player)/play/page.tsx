@@ -95,6 +95,7 @@ import { useBootstrap } from "@/hooks/queries/useBootstrap";
 import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { ArcBeatCard } from "@/components/play/ArcBeatCard";
+import { CapsInterstitial } from "@/components/play/CapsInterstitial";
 import type { ArcBeat } from "@/types/dailyRun";
 import type { StoryletChoice } from "@/types/storylets";
 
@@ -237,6 +238,7 @@ export default function PlayPage() {
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
   const [arcOneReflectionSaving, setArcOneReflectionSaving] = useState(false);
+  const [capsGameDone, setCapsGameDone] = useState(false);
   const [buddyAssignment, setBuddyAssignment] = useState<{
     buddy_type: "human" | "ai";
     buddy_user_id: string | null;
@@ -3118,11 +3120,26 @@ export default function PlayPage() {
                     </section>
                   )}
 
+                  {/* Caps minigame — end of Day 1, after all beats resolved */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR &&
+                    arcOneMode &&
+                    dayIndex === 1 &&
+                    arcBeats.length === 0 &&
+                    pendingDismissalBeats.length === 0 &&
+                    !capsGameDone && (
+                    <CapsInterstitial
+                      dayState={dayState ?? null}
+                      setDayState={setDayState}
+                      onComplete={() => setCapsGameDone(true)}
+                    />
+                  )}
+
                   {/* End-of-day allocation — shown after all beats are resolved and dismissed */}
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     arcOneMode &&
                     awaitingAllocation &&
-                    pendingDismissalBeats.length === 0 && (
+                    pendingDismissalBeats.length === 0 &&
+                    (dayIndex !== 1 || capsGameDone) && (
                     <section className="space-y-3">
                       <h2 className="prep-label">Plan Your Day</h2>
                       <AllocationSection
