@@ -96,6 +96,7 @@ import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { ArcBeatCard } from "@/components/play/ArcBeatCard";
 import { CapsInterstitial } from "@/components/play/CapsInterstitial";
+import { MemoryInterstitial } from "@/components/play/MemoryInterstitial";
 import type { ArcBeat } from "@/types/dailyRun";
 import type { StoryletChoice } from "@/types/storylets";
 
@@ -239,6 +240,7 @@ export default function PlayPage() {
   const [reflectionSaving, setReflectionSaving] = useState(false);
   const [arcOneReflectionSaving, setArcOneReflectionSaving] = useState(false);
   const [capsGameDone, setCapsGameDone] = useState(false);
+  const [memoryGameDone, setMemoryGameDone] = useState(false);
   const [buddyAssignment, setBuddyAssignment] = useState<{
     buddy_type: "human" | "ai";
     buddy_user_id: string | null;
@@ -510,7 +512,8 @@ export default function PlayPage() {
       arcBeats.length === 0 &&
       !awaitingAllocation &&
       !(arcOneMode && pendingDismissalBeats.length > 0) &&
-      !(arcOneMode && dayIndex === 1 && !capsGameDone)) ||
+      !(arcOneMode && dayIndex === 1 && !capsGameDone) &&
+      !(arcOneMode && dayIndex === 2 && !memoryGameDone)) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
@@ -3135,12 +3138,27 @@ export default function PlayPage() {
                     />
                   )}
 
+                  {/* Memory game — end of Day 2, after all beats resolved */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR &&
+                    arcOneMode &&
+                    dayIndex === 2 &&
+                    arcBeats.length === 0 &&
+                    pendingDismissalBeats.length === 0 &&
+                    !memoryGameDone && (
+                    <MemoryInterstitial
+                      dayState={dayState ?? null}
+                      setDayState={setDayState}
+                      onComplete={() => setMemoryGameDone(true)}
+                    />
+                  )}
+
                   {/* End-of-day allocation — shown after all beats are resolved and dismissed */}
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     arcOneMode &&
                     awaitingAllocation &&
                     pendingDismissalBeats.length === 0 &&
-                    (dayIndex !== 1 || capsGameDone) && (
+                    (dayIndex !== 1 || capsGameDone) &&
+                    (dayIndex !== 2 || memoryGameDone) && (
                     <section className="space-y-3">
                       <h2 className="prep-label">Plan Your Day</h2>
                       <AllocationSection
