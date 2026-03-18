@@ -2,10 +2,12 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { ArcDefinitionRow, ArcStepRow } from "@/hooks/contentStudio/useArcsAPI";
+import type { MinigameNode } from "@/types/minigame";
 
 export type ArcFlowViewProps = {
   arcDefinitions: ArcDefinitionRow[];
   arcSteps: ArcStepRow[];
+  minigameNodes?: MinigameNode[];
 };
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -19,6 +21,10 @@ type ArcOption = {
   sets_stream_state?: { stream: string; state: string };
   money_effect?: string;
 };
+
+type FlowNode =
+  | { kind: "beat"; data: ArcStepRow; order_index: number }
+  | { kind: "minigame"; data: MinigameNode; order_index: number };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -45,32 +51,42 @@ const LABEL_WIDTH = 80; // space reserved for arc row labels on the left
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
+export function ArcFlowView({ arcDefinitions, arcSteps, minigameNodes = [] }: ArcFlowViewProps) {
   const [offset, setOffset] = useState({ x: 20, y: 20 });
   const [scale, setScale] = useState(0.9);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
-  const [selectedStepKey, setSelectedStepKey] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  // Group steps by arc_id, sorted by order_index
-  const stepsByArc = useMemo(() => {
-    const map: Record<string, ArcStepRow[]> = {};
+  // Merge arcSteps and minigameNodes into FlowNode arrays keyed by arc_id, sorted by order_index
+  const nodesByArc = useMemo(() => {
+    const map: Record<string, FlowNode[]> = {};
+
     arcSteps.forEach((step) => {
       if (!map[step.arc_id]) map[step.arc_id] = [];
-      map[step.arc_id].push(step);
+      map[step.arc_id].push({ kind: "beat", data: step, order_index: step.order_index });
     });
-    Object.values(map).forEach((arr) => arr.sort((a, b) => a.order_index - b.order_index));
-    return map;
-  }, [arcSteps]);
 
-  // Layout: each arc is a row; steps are columns within that row
+    minigameNodes.forEach((mg) => {
+      if (!mg.arc_id) return;
+      if (!map[mg.arc_id]) map[mg.arc_id] = [];
+      map[mg.arc_id].push({ kind: "minigame", data: mg, order_index: mg.order_index });
+    });
+
+    Object.values(map).forEach((arr) =>
+      arr.sort((a, b) => a.order_index - b.order_index)
+    );
+
+    return map;
+  }, [arcSteps, minigameNodes]);
+
+  // Layout: each arc is a row; nodes are columns within that row
   const layout = useMemo(() => {
     const rows: Array<{
       arc: ArcDefinitionRow;
-      steps: ArcStepRow[];
+      nodes: FlowNode[];
       y: number;
     }> = [];
 
-    // Sort arc definitions by their key (roommate, academic, money, belonging, opportunity, home)
     const arcOrder = ["arc_roommate", "arc_academic", "arc_money", "arc_belonging", "arc_opportunity", "arc_home"];
     const sortedArcs = [...arcDefinitions].sort((a, b) => {
       const ai = arcOrder.indexOf(a.key);
@@ -81,22 +97,24 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
       return ai - bi;
     });
 
-    let currentY = 48; // start below a header area
+    let currentY = 48;
     sortedArcs.forEach((arc) => {
-      const steps = stepsByArc[arc.id] ?? [];
-      rows.push({ arc, steps, y: currentY });
+      const nodes = nodesByArc[arc.id] ?? [];
+      rows.push({ arc, nodes, y: currentY });
       currentY += NODE_HEIGHT + ARC_ROW_GAP;
     });
 
     return rows;
-  }, [arcDefinitions, stepsByArc]);
+  }, [arcDefinitions, nodesByArc]);
 
   // Build step_key → column index within each arc for branching edge lookup
   const stepKeyToIndex = useMemo(() => {
     const map = new Map<string, { arcId: string; idx: number }>();
-    layout.forEach(({ arc, steps }) => {
-      steps.forEach((step, idx) => {
-        map.set(`${arc.id}:${step.step_key}`, { arcId: arc.id, idx });
+    layout.forEach(({ arc, nodes }) => {
+      nodes.forEach((node, idx) => {
+        if (node.kind === "beat") {
+          map.set(`${arc.id}:${node.data.step_key}`, { arcId: arc.id, idx });
+        }
       });
     });
     return map;
@@ -113,21 +131,22 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
     }> = [];
     const seen = new Set<string>();
 
-    layout.forEach(({ arc, steps, y }) => {
-      steps.forEach((step, idx) => {
-        // Check each option for next_step_key
+    layout.forEach(({ arc, nodes, y }) => {
+      nodes.forEach((node, idx) => {
+        if (node.kind !== "beat") return;
+        const step = node.data;
+
         const options = step.options as ArcOption[];
         options.forEach((opt) => {
           if (!opt.next_step_key) return;
           const target = stepKeyToIndex.get(`${arc.id}:${opt.next_step_key}`);
-          if (!target || target.idx === idx + 1) return; // sequential = already drawn
+          if (!target || target.idx === idx + 1) return;
           const key = `${arc.id}:${idx}:${target.idx}:choice`;
           if (seen.has(key)) return;
           seen.add(key);
           edges.push({ arcId: arc.id, fromIdx: idx, toIdx: target.idx, y, kind: "choice" });
         });
 
-        // Check default_next_step_key
         if (step.default_next_step_key) {
           const target = stepKeyToIndex.get(`${arc.id}:${step.default_next_step_key}`);
           if (target && target.idx !== idx + 1) {
@@ -145,14 +164,14 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
   }, [layout, stepKeyToIndex]);
 
   const canvasWidth = useMemo(() => {
-    const maxSteps = Math.max(...layout.map((r) => r.steps.length), 0);
-    return Math.max(800, LABEL_WIDTH + maxSteps * COL_WIDTH + 80);
+    const maxNodes = Math.max(...layout.map((r) => r.nodes.length), 0);
+    return Math.max(800, LABEL_WIDTH + maxNodes * COL_WIDTH + 80);
   }, [layout]);
 
   const canvasHeight = useMemo(() => {
     const lastRow = layout[layout.length - 1];
     if (!lastRow) return 400;
-    return lastRow.y + NODE_HEIGHT + ARC_ROW_GAP + 40; // extra space for branch curves below
+    return lastRow.y + NODE_HEIGHT + ARC_ROW_GAP + 40;
   }, [layout]);
 
   // Interaction
@@ -169,10 +188,24 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
   };
   const handleMouseUp = () => { dragRef.current = null; };
 
-  const selectedStep = arcSteps.find((s) => s.step_key === selectedStepKey) ?? null;
-  const selectedArc = selectedStep
-    ? arcDefinitions.find((a) => a.id === selectedStep.arc_id)
-    : null;
+  // Resolve selected node details
+  const selectedBeat = useMemo(() => {
+    if (!selectedNodeId?.startsWith("beat:")) return null;
+    const stepKey = selectedNodeId.slice("beat:".length);
+    return arcSteps.find((s) => s.step_key === stepKey) ?? null;
+  }, [selectedNodeId, arcSteps]);
+
+  const selectedMinigame = useMemo(() => {
+    if (!selectedNodeId?.startsWith("mg:")) return null;
+    const mgKey = selectedNodeId.slice("mg:".length);
+    return minigameNodes.find((m) => m.key === mgKey) ?? null;
+  }, [selectedNodeId, minigameNodes]);
+
+  const selectedArc = useMemo(() => {
+    if (selectedBeat) return arcDefinitions.find((a) => a.id === selectedBeat.arc_id) ?? null;
+    if (selectedMinigame) return arcDefinitions.find((a) => a.id === selectedMinigame.arc_id) ?? null;
+    return null;
+  }, [selectedBeat, selectedMinigame, arcDefinitions]);
 
   return (
     <div className="space-y-4">
@@ -190,6 +223,9 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
             </span>
           );
         })}
+        <span className="rounded-full px-2 py-0.5 bg-amber-400 text-amber-900 font-medium">
+          Minigame
+        </span>
         <span className="ml-3 flex items-center gap-1 text-slate-500">
           <span className="inline-block h-0.5 w-6 bg-slate-300" /> sequential
         </span>
@@ -198,6 +234,12 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
         </span>
         <span className="flex items-center gap-1 text-teal-500">
           <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-teal-400" /> default fallback
+        </span>
+        <span className="flex items-center gap-1 text-green-500">
+          <span className="inline-block h-0.5 w-6 bg-green-500" /> win
+        </span>
+        <span className="flex items-center gap-1 text-red-500">
+          <span className="inline-block h-0.5 w-6 bg-red-500" /> lose
         </span>
       </div>
 
@@ -235,15 +277,56 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
                 <marker id="af-arrow-default" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                   <path d="M0,0 L6,3 L0,6 Z" fill="#14b8a6" />
                 </marker>
+                <marker id="af-arrow-win" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#22c55e" />
+                </marker>
+                <marker id="af-arrow-lose" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#ef4444" />
+                </marker>
               </defs>
 
-              {/* Sequential arrows between adjacent beats */}
-              {layout.map(({ arc, steps, y }) => {
-                return steps.slice(0, -1).map((step, idx) => {
+              {/* Sequential arrows between adjacent nodes */}
+              {layout.map(({ arc, nodes, y }) => {
+                return nodes.slice(0, -1).map((node, idx) => {
+                  const nextNode = nodes[idx + 1];
                   const x1 = LABEL_WIDTH + idx * COL_WIDTH + NODE_WIDTH;
                   const x2 = LABEL_WIDTH + (idx + 1) * COL_WIDTH;
                   const midY = y + NODE_HEIGHT / 2;
-                  const isActive = step.step_key === selectedStepKey || steps[idx + 1]?.step_key === selectedStepKey;
+
+                  const thisId = node.kind === "beat" ? `beat:${node.data.step_key}` : `mg:${node.data.key}`;
+                  const nextId = nextNode.kind === "beat" ? `beat:${nextNode.data.step_key}` : `mg:${nextNode.data.key}`;
+                  const isActive = selectedNodeId === thisId || selectedNodeId === nextId;
+
+                  // If current node is a minigame, draw three lines: win (green, y-8), lose (red, y+8), skip (gray, center)
+                  if (node.kind === "minigame") {
+                    return (
+                      <g key={`${arc.id}-seq-${idx}`}>
+                        {/* win line */}
+                        <line
+                          x1={x1} y1={midY - 8}
+                          x2={x2} y2={midY - 8}
+                          stroke="#22c55e" strokeWidth={1.5}
+                          markerEnd="url(#af-arrow-win)"
+                        />
+                        {/* lose line */}
+                        <line
+                          x1={x1} y1={midY + 8}
+                          x2={x2} y2={midY + 8}
+                          stroke="#ef4444" strokeWidth={1.5}
+                          markerEnd="url(#af-arrow-lose)"
+                        />
+                        {/* skip line */}
+                        <line
+                          x1={x1} y1={midY}
+                          x2={x2} y2={midY}
+                          stroke="#94a3b8" strokeWidth={1}
+                          strokeDasharray="3 3"
+                          markerEnd="url(#af-arrow)"
+                        />
+                      </g>
+                    );
+                  }
+
                   return (
                     <line
                       key={`${arc.id}-seq-${idx}`}
@@ -267,7 +350,6 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
                 const distance = Math.abs(edge.toIdx - edge.fromIdx);
                 const dip = 25 + distance * 12;
 
-                // Forward skips curve below, backward jumps curve above
                 const cy = isForward ? edge.y + NODE_HEIGHT + dip : edge.y - dip;
                 const y1 = isForward ? edge.y + NODE_HEIGHT * 0.75 : edge.y + NODE_HEIGHT * 0.25;
                 const y2 = isForward ? edge.y + NODE_HEIGHT * 0.75 : edge.y + NODE_HEIGHT * 0.25;
@@ -292,7 +374,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
               })}
             </svg>
 
-            {/* Arc row labels — positioned inside canvas at left edge */}
+            {/* Arc row labels */}
             {layout.map(({ arc, y }) => {
               const c = ARC_COLORS[arc.key] ?? DEFAULT_COLORS;
               return (
@@ -311,12 +393,48 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
               );
             })}
 
-            {/* Step nodes */}
-            {layout.map(({ arc, steps, y }) => {
+            {/* Flow nodes */}
+            {layout.map(({ arc, nodes, y }) => {
               const c = ARC_COLORS[arc.key] ?? DEFAULT_COLORS;
-              return steps.map((step, idx) => {
+              return nodes.map((node, idx) => {
                 const x = LABEL_WIDTH + idx * COL_WIDTH;
-                const isSelected = step.step_key === selectedStepKey;
+
+                if (node.kind === "minigame") {
+                  const mg = node.data;
+                  const nodeId = `mg:${mg.key}`;
+                  const isSelected = selectedNodeId === nodeId;
+                  return (
+                    <button
+                      key={`mg-${mg.key}`}
+                      className={`absolute rounded-md border-2 px-2 py-1.5 text-left shadow-sm bg-amber-50 border-amber-400 text-amber-900 ${
+                        isSelected ? "ring-2 ring-amber-600" : ""
+                      }`}
+                      style={{ width: NODE_WIDTH, height: NODE_HEIGHT, left: x, top: y }}
+                      onClick={() => setSelectedNodeId(isSelected ? null : nodeId)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-amber-600">
+                          MINIGAME
+                        </span>
+                        <span className="rounded bg-amber-200 px-1 text-[9px] font-semibold text-amber-800">
+                          {mg.game_type}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold truncate">{mg.title}</div>
+                      <div className="mt-0.5 text-[10px] opacity-70 truncate">{mg.key}</div>
+                      <div className="mt-1 flex gap-1">
+                        <span className="rounded bg-green-100 px-1 text-[9px] font-bold text-green-700">W</span>
+                        <span className="rounded bg-red-100 px-1 text-[9px] font-bold text-red-700">L</span>
+                        <span className="rounded bg-slate-200 px-1 text-[9px] font-bold text-slate-600">S</span>
+                      </div>
+                    </button>
+                  );
+                }
+
+                // Beat node
+                const step = node.data;
+                const nodeId = `beat:${step.step_key}`;
+                const isSelected = selectedNodeId === nodeId;
                 return (
                   <button
                     key={step.step_key}
@@ -324,7 +442,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
                       isSelected ? "ring-2 ring-slate-700" : ""
                     }`}
                     style={{ width: NODE_WIDTH, height: NODE_HEIGHT, left: x, top: y }}
-                    onClick={() => setSelectedStepKey(isSelected ? null : step.step_key)}
+                    onClick={() => setSelectedNodeId(isSelected ? null : nodeId)}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">
@@ -348,24 +466,82 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
 
         {/* Detail panel */}
         <div className="space-y-3 overflow-y-auto rounded-md border border-slate-200 bg-white px-4 py-4" style={{ maxHeight: 520 }}>
-          <h3 className="text-sm font-semibold text-slate-800">Selected beat</h3>
-          {!selectedStep ? (
+          <h3 className="text-sm font-semibold text-slate-800">Selected node</h3>
+
+          {!selectedBeat && !selectedMinigame ? (
             <p className="text-sm text-slate-600">Click a node to inspect it.</p>
-          ) : (
+          ) : selectedMinigame ? (
+            <div className="space-y-3">
+              {selectedArc && (
+                <p className="text-xs font-medium text-slate-500">{selectedArc.title}</p>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 uppercase">
+                  {selectedMinigame.game_type}
+                </span>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] ${selectedMinigame.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
+                  {selectedMinigame.is_active ? "active" : "inactive"}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{selectedMinigame.title}</p>
+                <p className="text-[10px] text-slate-400 font-mono">{selectedMinigame.key}</p>
+              </div>
+              {selectedMinigame.description && (
+                <p className="text-xs text-slate-600 leading-relaxed">{selectedMinigame.description}</p>
+              )}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-700">Outcomes</p>
+                {(["win", "lose", "skip"] as const).map((branch) => {
+                  const b = selectedMinigame.outcomes[branch];
+                  const branchColor = branch === "win" ? "bg-green-50 border-green-200" : branch === "lose" ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200";
+                  const badgeColor = branch === "win" ? "bg-green-100 text-green-700" : branch === "lose" ? "bg-red-100 text-red-700" : "bg-slate-200 text-slate-600";
+                  return (
+                    <div key={branch} className={`rounded border px-2 py-1.5 text-xs ${branchColor}`}>
+                      <span className={`rounded px-1 py-0.5 text-[10px] font-bold uppercase ${badgeColor}`}>{branch}</span>
+                      {b.reaction_text && (
+                        <p className="mt-1 text-slate-700 leading-relaxed italic">{b.reaction_text}</p>
+                      )}
+                      {Object.keys(b.deltas).length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {b.deltas.stress !== undefined && (
+                            <span className={`rounded px-1 text-[10px] ${b.deltas.stress > 0 ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>
+                              stress {b.deltas.stress > 0 ? "+" : ""}{b.deltas.stress}
+                            </span>
+                          )}
+                          {b.deltas.energy !== undefined && (
+                            <span className={`rounded px-1 text-[10px] ${b.deltas.energy > 0 ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}>
+                              energy {b.deltas.energy > 0 ? "+" : ""}{b.deltas.energy}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {b.next_step_key && (
+                        <p className="mt-0.5 text-[10px] text-indigo-600">→ {b.next_step_key}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="text-xs text-slate-400">
+                Order: {selectedMinigame.order_index} · Due offset: Day {selectedMinigame.due_offset_days}
+              </div>
+            </div>
+          ) : selectedBeat ? (
             <div className="space-y-3">
               {selectedArc && (
                 <p className="text-xs font-medium text-slate-500">{selectedArc.title}</p>
               )}
               <div>
-                <p className="text-sm font-semibold text-slate-900">{selectedStep.title}</p>
-                <p className="text-[10px] text-slate-400">{selectedStep.step_key}</p>
+                <p className="text-sm font-semibold text-slate-900">{selectedBeat.title}</p>
+                <p className="text-[10px] text-slate-400">{selectedBeat.step_key}</p>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">{selectedStep.body}</p>
+              <p className="text-xs text-slate-600 leading-relaxed">{selectedBeat.body}</p>
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-slate-700">
-                  Options ({(selectedStep.options as unknown[]).length})
+                  Options ({(selectedBeat.options as unknown[]).length})
                 </p>
-                {(selectedStep.options as ArcOption[]).map((opt) => (
+                {(selectedBeat.options as ArcOption[]).map((opt) => (
                   <div key={opt.option_key ?? opt.id} className="rounded bg-slate-50 px-2 py-1.5 text-xs">
                     <p className="font-medium text-slate-800">{opt.label}</p>
                     <div className="mt-0.5 flex flex-wrap gap-1">
@@ -391,16 +567,16 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
                   </div>
                 ))}
               </div>
-              {selectedStep.default_next_step_key && (
+              {selectedBeat.default_next_step_key && (
                 <div className="text-xs text-teal-600">
-                  Default next: {selectedStep.default_next_step_key}
+                  Default next: {selectedBeat.default_next_step_key}
                 </div>
               )}
               <div className="text-xs text-slate-400">
-                Due offset: Day {selectedStep.due_offset_days} · Expires after: {selectedStep.expires_after_days}d
+                Due offset: Day {selectedBeat.due_offset_days} · Expires after: {selectedBeat.expires_after_days}d
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

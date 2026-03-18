@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
 import { useArcsAPI } from "@/hooks/contentStudio/useArcsAPI";
+import { useMinigamesAPI } from "@/hooks/contentStudio/useMinigamesAPI";
 import type { Storylet } from "@/types/storylets";
 import type { Session } from "@supabase/supabase-js";
 
@@ -25,6 +26,7 @@ export default function GraphPage() {
   const router = useRouter();
   const { loadStorylets, saveStorylet } = useStoryletsAPI();
   const { loadArcDefinitions, arcDefinitions, arcDefinitionSteps } = useArcsAPI();
+  const { loadMinigameNodes, minigameNodes } = useMinigamesAPI();
 
   const [storylets, setStorylets] = useState<Storylet[]>([]);
   const [selected, setSelected] = useState<Storylet | null>(null);
@@ -33,6 +35,7 @@ export default function GraphPage() {
   useEffect(() => {
     loadStorylets().then(setStorylets);
     loadArcDefinitions();
+    loadMinigameNodes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -109,6 +112,7 @@ export default function GraphPage() {
             <ArcFlowView
               arcDefinitions={arcDefinitions}
               arcSteps={arcDefinitionSteps}
+              minigameNodes={minigameNodes}
             />
           )}
         </div>
