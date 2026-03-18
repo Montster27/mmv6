@@ -509,7 +509,8 @@ export default function PlayPage() {
       stage === "complete" &&
       arcBeats.length === 0 &&
       !awaitingAllocation &&
-      !(arcOneMode && pendingDismissalBeats.length > 0)) ||
+      !(arcOneMode && pendingDismissalBeats.length > 0) &&
+      !(arcOneMode && dayIndex === 1 && !capsGameDone)) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
