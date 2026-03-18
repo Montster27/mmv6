@@ -83,7 +83,6 @@ import type { ReflectionResponse } from "@/types/reflections";
 import { useSession } from "@/contexts/SessionContext";
 import { ProgressPanel } from "@/components/ProgressPanel";
 import { OutcomeExplain } from "@/components/play/OutcomeExplain";
-import { SeasonBadge } from "@/components/SeasonBadge";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
 import { useDailyProgress, useGameContent } from "./hooks";
@@ -500,8 +499,15 @@ export default function PlayPage() {
       return kind === "npc_memory";
     });
   }, [relDebugEvents, relDebugFilter]);
+  // In arcOneMode the "complete" screen must not appear while beats are still
+  // visible or pending dismissal — the server now prevents this, but guard
+  // client-side too for robustness.
   const showDailyComplete =
-    (USE_DAILY_LOOP_ORCHESTRATOR && stage === "complete" && arcBeats.length === 0 && !awaitingAllocation) ||
+    (USE_DAILY_LOOP_ORCHESTRATOR &&
+      stage === "complete" &&
+      arcBeats.length === 0 &&
+      !awaitingAllocation &&
+      !(arcOneMode && pendingDismissalBeats.length > 0)) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
@@ -2354,8 +2360,10 @@ export default function PlayPage() {
   // arcOneMode edge case: player returns to page after resolving all beats in a
   // previous session. Server returns arcBeats=[] but markDailyComplete was never
   // called. Auto-complete so the player sees "Daily complete ✓".
-  // Use !!dailyRunQuery.data (stable boolean) instead of the raw object to avoid
-  // re-firing every time a re-fetch returns a new object reference.
+  //
+  // Guard: only fire if the user has resolved at least one beat this session
+  // OR if the server explicitly returned stage="complete" with no beats.
+  // This prevents a fresh game from auto-completing before beats can load.
   const dailyRunDataLoaded = !!dailyRunQuery.data;
   useEffect(() => {
     if (!USE_DAILY_LOOP_ORCHESTRATOR) return;
@@ -2365,10 +2373,13 @@ export default function PlayPage() {
     if (alreadyCompletedToday) return;
     if (!dailyRunDataLoaded) return; // wait for data to load
     if (arcBeats.length > 0) return; // beats still pending
+    // Only auto-complete when the user has done something this session, or when
+    // the server already signalled there are no beats due (stage === "complete").
+    if (resolvedArcBeatIds.size === 0 && stage !== "complete") return;
     markDailyComplete(userId, dayIndex).catch(console.error);
     incrementGroupObjective(2, "daily_complete").catch(() => {});
     setRefreshTick((t) => t + 1);
-  }, [arcOneMode, arcBeats.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded]);
+  }, [arcOneMode, arcBeats.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedArcBeatIds.size, stage]);
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
@@ -2380,6 +2391,7 @@ export default function PlayPage() {
                 {dayState?.energy ?? dailyState?.energy ?? "—"} · Stress{" "}
                 {dayState?.stress ?? dailyState?.stress ?? "—"}
               </p>
+              {/* In arcOneMode hide the legacy stage copy while beats are pending */}
               {(!arcOneMode || (arcBeats.length === 0 && pendingDismissalBeats.length === 0)) && (
                 <div className="mt-2 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground/80">
@@ -2600,7 +2612,7 @@ export default function PlayPage() {
             />
           ) : null}
 
-          {seasonResetPending ? (
+          {seasonResetPending && !arcOneMode ? (
             <section className="rounded border-2 border-primary/40 bg-primary px-4 py-4 space-y-3 text-primary-foreground prep-stripe-top">
               <h2 className="text-xl font-bold tracking-wide font-heading">
                 Season {seasonIndex ?? "?"} begins
@@ -3087,6 +3099,7 @@ export default function PlayPage() {
                           disabled
                           resolvedOption={chosenOption}
                           onDismiss={() => handleDismissArcBeat(beat)}
+                          relationships={relationshipsState}
                         />
                       ))}
                       {/* Unresolved beats */}
@@ -3099,6 +3112,7 @@ export default function PlayPage() {
                             dayIndex={dayIndex}
                             onChoice={handleArcBeatChoice}
                             moneyBand={arcOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
+                            relationships={relationshipsState}
                           />
                         ))}
                     </section>

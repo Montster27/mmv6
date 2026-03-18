@@ -112,7 +112,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/play");
+      router.push("/welcome");
     } catch (err) {
       const fallback =
         err instanceof Error ? err.message : "Unexpected error occurred.";
@@ -147,7 +147,7 @@ export default function LoginPage() {
         email,
         password: signupPassword,
         options: {
-          emailRedirectTo: `${window.location.origin}/play`,
+          emailRedirectTo: `${window.location.origin}/welcome`,
         },
       });
 
@@ -162,7 +162,7 @@ export default function LoginPage() {
           email,
           username,
         });
-        router.push("/play");
+        router.push("/welcome");
       } else {
         setSignupMessage(
           "Check your email to confirm your account, then sign in."
@@ -199,7 +199,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/play");
+      router.push("/welcome");
     } catch (err) {
       const fallback =
         err instanceof Error ? err.message : "Unexpected error occurred.";
@@ -218,7 +218,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOtp({
         email: magicEmail.trim(),
         options: {
-          emailRedirectTo: `${window.location.origin}/play`,
+          emailRedirectTo: `${window.location.origin}/welcome`,
         },
       });
 
@@ -429,7 +429,7 @@ export default function LoginPage() {
                 setDevMessage(
                   `Signed in as ${displayName} (${user.id.slice(0, 6)}...)`
                 );
-                router.push("/play");
+                router.push("/welcome");
               } catch (err) {
                 const fallback =
                   err instanceof Error ? err.message : "Dev sign-in failed.";

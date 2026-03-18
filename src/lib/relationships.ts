@@ -354,6 +354,36 @@ const NPC_DISPLAY_NAMES: Record<string, string> = {
   npc_parent_voice: "your parent",
 };
 
+/**
+ * How to refer to an NPC when the player has seen their face but doesn't
+ * know their name yet. Used as a middle tier between stranger and named.
+ */
+const NPC_FACE_TEXT: Record<string, string> = {
+  npc_roommate_dana: "your roommate",
+  npc_floor_miguel: "the guy from orientation",
+  npc_prof_marsh: "the professor",
+  npc_studious_priya: "the woman from class",
+  npc_floor_cal: "the guy down the hall",
+  npc_ambiguous_jordan: "the person from orientation",
+  npc_ra_sandra: "the RA",
+  npc_parent_voice: "your parent",
+};
+
+/**
+ * How to refer to an NPC when the player has never encountered them before.
+ * Should read naturally as an indefinite noun phrase.
+ */
+const NPC_STRANGER_TEXT: Record<string, string> = {
+  npc_roommate_dana: "your roommate",
+  npc_floor_miguel: "a guy with an easy grin",
+  npc_prof_marsh: "the professor",
+  npc_studious_priya: "a woman with two columns in her notebook",
+  npc_floor_cal: "a guy from down the hall",
+  npc_ambiguous_jordan: "someone you haven't met",
+  npc_ra_sandra: "the RA",
+  npc_parent_voice: "your parent",
+};
+
 export function renderNpcName(
   npcId: string,
   relationships: Record<string, RelationshipState> | null | undefined,
@@ -362,6 +392,27 @@ export function renderNpcName(
   const known = relationships?.[npcId]?.knows_name;
   if (!known) return fallback;
   return NPC_DISPLAY_NAMES[npcId] ?? fallback;
+}
+
+/**
+ * Replace `[[npc_id]]` tokens in a string with the appropriate name or
+ * description based on the player's current relationship state.
+ *
+ * Three tiers (best-to-worst knowledge):
+ *   knows_name  → display name ("Miguel")
+ *   met / face  → face description ("the guy from orientation")
+ *   unknown     → stranger description ("a guy with an easy grin")
+ */
+export function resolveNpcTokens(
+  text: string,
+  relationships: Record<string, RelationshipState> | null | undefined
+): string {
+  return text.replace(/\[\[(\w+)\]\]/g, (_match, npcId: string) => {
+    const state = relationships?.[npcId];
+    if (state?.knows_name) return NPC_DISPLAY_NAMES[npcId] ?? npcId;
+    if (state?.met || state?.knows_face) return NPC_FACE_TEXT[npcId] ?? "someone you recognize";
+    return NPC_STRANGER_TEXT[npcId] ?? "someone";
+  });
 }
 
 export function mapLegacyRelationalEffects(

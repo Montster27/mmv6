@@ -6,6 +6,7 @@ import type { StoryletChoice } from "@/types/storylets";
 import { STREAM_LABELS } from "@/types/arcOneStreams";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
+import { resolveNpcTokens, type RelationshipState } from "@/lib/relationships";
 
 type MoneyBand = "tight" | "okay" | "comfortable";
 
@@ -26,6 +27,8 @@ type ArcBeatCardProps = {
   resolvedOption?: StoryletChoice;
   /** Current player money band — used to gate choices with money_requirement. */
   moneyBand?: MoneyBand | null;
+  /** Player's current NPC relationship state — used to resolve [[npc_id]] tokens in body text. */
+  relationships?: Record<string, RelationshipState> | null;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -89,12 +92,16 @@ function meetsMoneyRequirement(
   return playerRank >= requiredRank;
 }
 
-export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand }: ArcBeatCardProps) {
+export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand, relationships }: ArcBeatCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const displayedOption = resolvedOption ?? chosenOption;
+
+  // Resolve [[npc_id]] tokens using current relationship state so NPCs are
+  // named correctly if the player knows them, or described as strangers if not.
+  const resolve = (text: string) => resolveNpcTokens(text, relationships ?? null);
 
   const streamLabel = STREAM_LABELS[beat.stream_id as keyof typeof STREAM_LABELS] ?? beat.stream_id;
   const daysLeft = beat.expires_on_day - dayIndex;
@@ -132,28 +139,33 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
       </div>
 
       {/* Body */}
-      <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{beat.body}</p>
+      <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{resolve(beat.body)}</p>
 
       {/* Post-choice result */}
       {displayedOption && (
         <div className="rounded border border-border/60 bg-muted px-3 py-3 text-sm space-y-2">
-          <p className="font-medium text-primary">✓ {displayedOption.label}</p>
+          <p className="font-medium text-primary">✓ {resolve(displayedOption.label)}</p>
           {displayedOption.reaction_text && (
-            <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{displayedOption.reaction_text}</p>
+            <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{resolve(displayedOption.reaction_text)}</p>
           )}
           {resolvedDeltas.length > 0 && (
             <ul className="flex flex-wrap gap-2 text-xs font-stat">
-              {resolvedDeltas.map(({ label, delta }) => (
-                <li
-                  key={label}
-                  className={`rounded px-1.5 py-0.5 ${
-                    delta > 0 ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
-                    "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                  }`}
-                >
-                  {delta > 0 ? "+" : ""}{delta} {label}
-                </li>
-              ))}
+              {resolvedDeltas.map(({ label, delta }) => {
+                // Stress is inverted: going up is bad (red), going down is good (green)
+                const isGood = label === "stress" ? delta < 0 : delta > 0;
+                return (
+                  <li
+                    key={label}
+                    className={`rounded px-1.5 py-0.5 ${
+                      isGood
+                        ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    }`}
+                  >
+                    {delta > 0 ? "+" : ""}{delta} {label}
+                  </li>
+                );
+              })}
             </ul>
           )}
           <TesterOnly>
@@ -192,21 +204,25 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
                     : "border-primary/30 bg-card text-foreground hover:border-primary hover:bg-primary/5 active:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                   }`}
               >
-                <span className="block">{option.label}</span>
+                <span className="block">{resolve(option.label)}</span>
                 {(previewDeltas.length > 0 || locked) && (
                   <span className="mt-1 flex flex-wrap gap-1.5">
-                    {previewDeltas.map(({ label, delta }) => (
-                      <span
-                        key={label}
-                        className={`text-xs font-stat ${
-                          locked ? "text-foreground/30" :
-                          delta > 0 ? "text-green-600 dark:text-green-400" :
-                          "text-red-500 dark:text-red-400"
-                        }`}
-                      >
-                        {delta > 0 ? "+" : ""}{delta} {label}
-                      </span>
-                    ))}
+                    {previewDeltas.map(({ label, delta }) => {
+                      // Stress is inverted: going up is bad (red), going down is good (green)
+                      const isGood = label === "stress" ? delta < 0 : delta > 0;
+                      return (
+                        <span
+                          key={label}
+                          className={`text-xs font-stat ${
+                            locked ? "text-foreground/30" :
+                            isGood ? "text-green-600 dark:text-green-400" :
+                            "text-red-500 dark:text-red-400"
+                          }`}
+                        >
+                          {delta > 0 ? "+" : ""}{delta} {label}
+                        </span>
+                      );
+                    })}
                     {locked && (
                       <span className="text-xs text-foreground/30">(not enough money)</span>
                     )}

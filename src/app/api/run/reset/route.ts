@@ -36,6 +36,19 @@ export async function POST(request: Request) {
   const today = utcToday();
   const now = new Date().toISOString();
 
+  // Determine the currently active season so we can sync user_seasons in one
+  // shot. This prevents performSeasonReset from firing on the first page load
+  // after a reset and overwriting day_index back to 0.
+  const { data: currentSeasonRow } = await supabaseServer
+    .from("seasons")
+    .select("season_index")
+    .lte("starts_at", today)
+    .gte("ends_at", today)
+    .order("season_index", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const currentSeasonIndex = currentSeasonRow?.season_index ?? 1;
+
   const { data: dailyState } = await supabaseServer
     .from("daily_states")
     .select("day_index,replay_intention")
@@ -104,6 +117,23 @@ export async function POST(request: Request) {
     }),
     updated_at: now,
   });
+
+  // Sync user_seasons to the current active season so that getOrCreateDailyRun
+  // does NOT trigger performSeasonReset on the first load after a reset.
+  // performSeasonReset resets daily_states.day_index → 0, which would undo the
+  // day_index:1 we just set above.
+  await supabaseServer
+    .from("user_seasons")
+    .upsert(
+      {
+        user_id: userId,
+        current_season_index: currentSeasonIndex,
+        last_seen_season_index: currentSeasonIndex,
+        last_reset_at: now,
+        updated_at: now,
+      },
+      { onConflict: "user_id" }
+    );
 
   return NextResponse.json({ ok: true });
 }

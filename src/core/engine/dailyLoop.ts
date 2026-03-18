@@ -355,7 +355,9 @@ export async function getOrCreateDailyRun(
     Boolean(allocation) || (arcOneMode && !featureFlags.resources),
     runsForPair.length,
     cadence.alreadyCompletedToday,
-    hasStorylets,
+    // In arcOneMode legacy storylets are replaced by arc beats — always treat as
+    // having content so computeStage never short-circuits to "complete" prematurely.
+    arcOneMode ? true : hasStorylets,
     reflectionDone,
     funPulseEligible,
     funPulseDone
@@ -505,6 +507,17 @@ export async function getOrCreateDailyRun(
     }
   }
 
+  // In arcOneMode: if beats are available the stage must not be "complete" so the
+  // client renders them instead of the "Daily complete ✓" screen.  If beats are
+  // empty but the day is not yet marked complete we let the auto-complete logic
+  // in the client handle the transition gracefully.
+  const resolvedStage: typeof stage =
+    arcOneMode && arcBeats.length > 0 && !cadence.alreadyCompletedToday
+      ? "storylet_1"
+      : arcOneMode && arcBeats.length === 0 && !cadence.alreadyCompletedToday
+      ? "complete"
+      : stage;
+
   const { weekStart, weekEnd } = computeWeekWindow(dayIndex);
   const [worldInfluence, cohortInfluence, rivalrySnapshot] = await Promise.all([
     featureFlags.alignment
@@ -526,7 +539,7 @@ export async function getOrCreateDailyRun(
     userId,
     dayIndex,
     date: todayUtc,
-    stage,
+    stage: resolvedStage,
     allocation: allocation ?? null,
     allocationSeed,
     storylets,
