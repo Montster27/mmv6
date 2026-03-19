@@ -95,6 +95,9 @@ import { useBootstrap } from "@/hooks/queries/useBootstrap";
 import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { ArcBeatCard } from "@/components/play/ArcBeatCard";
+import { SleepCard } from "@/components/play/SleepCard";
+import { getBridgeText } from "@/lib/segmentBridge";
+import type { Segment as BridgeSegment } from "@/lib/segmentBridge";
 import type { ArcBeat } from "@/types/dailyRun";
 import type { StoryletChoice } from "@/types/storylets";
 
@@ -278,6 +281,8 @@ export default function PlayPage() {
   // Set when all arc beats are resolved but allocation hasn't been saved yet.
   // Holds up markDailyComplete until after the player sets their time allocation.
   const [awaitingAllocation, setAwaitingAllocation] = useState(false);
+  const [sleepCardDone, setSleepCardDone] = useState(false);
+  const [bridgeText, setBridgeText] = useState<string | null>(null);
 
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
@@ -507,7 +512,8 @@ export default function PlayPage() {
       stage === "complete" &&
       arcBeats.length === 0 &&
       !awaitingAllocation &&
-      !(arcOneMode && pendingDismissalBeats.length > 0)) ||
+      !(arcOneMode && pendingDismissalBeats.length > 0) &&
+      !(arcOneMode && dayState?.current_segment === 'night' && !sleepCardDone)) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
@@ -921,6 +927,18 @@ export default function PlayPage() {
       // Deduct 4 hours per segment advance for testing
       hours_remaining: Math.max(0, (dayState.hours_remaining ?? 16) - 4),
     });
+    setBridgeText(getBridgeText(next as BridgeSegment));
+    setSleepCardDone(false);
+  };
+
+  const handleSleep = async () => {
+    setSleepCardDone(true);
+    await handleFastForward();
+    setSleepCardDone(false);
+  };
+
+  const handleStayUp = () => {
+    setSleepCardDone(true);
   };
 
   const loadDevSettings = async (currentUserId: string) => {
@@ -2217,6 +2235,8 @@ export default function PlayPage() {
     setPendingDismissalBeats((prev) => prev.filter((entry) => entry.beat.instance_id !== beat.instance_id));
     // Keep resolved ID to prevent flash of old beat; cleared when fresh data arrives
     setRefreshTick((t) => t + 1);
+    // Clear bridge text once a beat has been interacted with
+    setBridgeText(null);
   }, []);
 
   const handleAllocateSkillPoint = async (skillKey: string) => {
@@ -3112,6 +3132,20 @@ export default function PlayPage() {
                     </section>
                     )}
 
+                  {/* Segment bridge text — shown when advancing to a new segment */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR && arcOneMode && bridgeText && (
+                    <div className="relative rounded border border-border/60 bg-muted/40 px-4 py-3 text-sm italic text-foreground/70">
+                      <span>{bridgeText}</span>
+                      <button
+                        onClick={() => setBridgeText(null)}
+                        className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                        aria-label="Dismiss"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     arcOneMode &&
                     (arcBeats.length > 0 || pendingDismissalBeats.length > 0) && (
@@ -3146,6 +3180,19 @@ export default function PlayPage() {
                           />
                         ))}
                     </section>
+                  )}
+
+                  {/* Sleep card — shown at end of night when no beats remain */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR && arcOneMode &&
+                    (dayState?.current_segment === 'night' || (dayState?.hours_remaining ?? 16) <= 0) &&
+                    arcBeats.length === 0 && pendingDismissalBeats.length === 0 &&
+                    !sleepCardDone && (
+                    <SleepCard
+                      dayIndex={dayIndex}
+                      hoursRemaining={dayState?.hours_remaining ?? 0}
+                      onSleep={handleSleep}
+                      onStayUp={handleStayUp}
+                    />
                   )}
 
                   {/* End-of-day allocation — shown after all beats are resolved and dismissed */}

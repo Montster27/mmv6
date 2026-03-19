@@ -16,6 +16,8 @@ type SelectArcBeatsArgs = {
   arcs: ArcDefinition[];
   /** Maximum number of beats to return per day. Default: 2. */
   maxBeats?: number;
+  /** Current day segment — if provided, filters beats by step.segment (null steps always pass). */
+  currentSegment?: string;
 };
 
 /**
@@ -33,6 +35,7 @@ export function selectArcBeats({
   steps,
   arcs,
   maxBeats = 2,
+  currentSegment,
 }: SelectArcBeatsArgs): DueStep[] {
   const arcMap = new Map(arcs.map((a) => [a.id, a]));
 
@@ -57,6 +60,14 @@ export function selectArcBeats({
     const expiresOnDay = dueDay + step.expires_after_days;
 
     if (dayIndex < dueDay || dayIndex > expiresOnDay) continue;
+
+    // Segment filter: if currentSegment is provided AND step.segment is set,
+    // only include beats where step.segment matches currentSegment.
+    // If step.segment is null/undefined, always include (backward compat).
+    // If currentSegment is not provided, include all (backward compat).
+    if (currentSegment && step.segment) {
+      if (step.segment !== currentSegment) continue;
+    }
 
     due.push({ instance, step, arc, expires_on_day: expiresOnDay });
   }

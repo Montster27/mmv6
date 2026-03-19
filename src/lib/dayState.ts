@@ -123,6 +123,8 @@ export async function createDayStateFromPrevious(
     total_social: nextState.total_social,
     total_health: nextState.total_health,
     total_fun: nextState.total_fun,
+    current_segment: 'morning',
+    hours_remaining: 16,
     updated_at: new Date().toISOString(),
   };
 

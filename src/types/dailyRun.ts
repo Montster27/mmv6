@@ -27,6 +27,8 @@ export type ArcBeat = {
   expires_on_day: number;
   /** NPC ids this beat can introduce (auto-marked met on choice). */
   introduces_npc?: string[];
+  /** Day segment this beat belongs to (null = any segment). */
+  segment?: 'morning' | 'afternoon' | 'evening' | 'night' | null;
 };
 
 export type DailyRunStage =
