@@ -601,6 +601,9 @@ export async function getOrCreateDailyRun(
         total_social: dayState.total_social,
         total_health: dayState.total_health,
         total_fun: dayState.total_fun,
+        current_segment: dayState.current_segment ?? 'morning',
+        hours_remaining: dayState.hours_remaining ?? 16,
+        hours_committed: dayState.hours_committed ?? 0,
       }
       : null,
     arcOneState: arcOneState ?? undefined,

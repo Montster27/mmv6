@@ -25,6 +25,14 @@ export type PlayerDayState = {
   end_stress?: number | null;
   next_energy?: number | null;
   next_stress?: number | null;
+  // ── Segment / time-budget system ─────────────────────────────────────────
+  /** Active day segment: morning | afternoon | evening | night | sleeping */
+  current_segment?: 'morning' | 'afternoon' | 'evening' | 'night' | 'sleeping';
+  /** Free hours remaining today (starts at 16; 8h sleep pre-deducted) */
+  hours_remaining?: number;
+  /** Hours locked for work + class (deducted at day start) */
+  hours_committed?: number;
+  // ─────────────────────────────────────────────────────────────────────────
   created_at: string;
   updated_at: string;
 };

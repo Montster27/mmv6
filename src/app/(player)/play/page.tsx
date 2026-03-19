@@ -905,6 +905,24 @@ export default function PlayPage() {
     }
   };
 
+  const SEGMENT_ORDER = ['morning', 'afternoon', 'evening', 'night'] as const;
+  type Segment = typeof SEGMENT_ORDER[number];
+
+  const handleAdvanceSegment = () => {
+    if (!dayState) return;
+    const current = (dayState.current_segment as Segment | undefined) ?? 'morning';
+    const idx = SEGMENT_ORDER.indexOf(current);
+    const next: Segment = idx < 0 || idx >= SEGMENT_ORDER.length - 1
+      ? SEGMENT_ORDER[0]
+      : SEGMENT_ORDER[idx + 1];
+    setDayState({
+      ...dayState,
+      current_segment: next,
+      // Deduct 4 hours per segment advance for testing
+      hours_remaining: Math.max(0, (dayState.hours_remaining ?? 16) - 4),
+    });
+  };
+
   const loadDevSettings = async (currentUserId: string) => {
     setDevSettingsLoading(true);
     try {
@@ -2387,7 +2405,16 @@ export default function PlayPage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-primary font-heading">Play</h1>
               <p className="font-stat text-sm tabular-nums text-foreground/70 tracking-wide">
-                Day {dayIndex} · Energy{" "}
+                Day {dayIndex}
+                {dayState?.current_segment ? (
+                  <span className="ml-2 capitalize">
+                    · {dayState.current_segment}
+                    {typeof dayState.hours_remaining === "number"
+                      ? ` · ${dayState.hours_remaining}h left`
+                      : null}
+                  </span>
+                ) : null}
+                {" "}· Energy{" "}
                 {dayState?.energy ?? dailyState?.energy ?? "—"} · Stress{" "}
                 {dayState?.stress ?? dailyState?.stress ?? "—"}
               </p>
@@ -2599,6 +2626,9 @@ export default function PlayPage() {
               togglingAdminId={togglingAdminId}
               onToggleTestMode={handleToggleTestMode}
               onFastForward={handleFastForward}
+              onAdvanceSegment={handleAdvanceSegment}
+              currentSegment={(dayState?.current_segment as 'morning' | 'afternoon' | 'evening' | 'night' | 'sleeping' | undefined) ?? 'morning'}
+              hoursRemaining={dayState?.hours_remaining ?? 16}
               onResetRun={handleRunReset}
               onClose={() => setShowDevMenu(false)}
               onAdvanceDay={handleAdvanceDay}
@@ -2853,7 +2883,7 @@ export default function PlayPage() {
                                       const meetsGate =
                                         !reqRes || !dayState
                                           ? true
-                                          : ((dayState as Record<string, number>)[reqRes.key] ?? 0) >= reqRes.min;
+                                          : (((dayState as unknown) as Record<string, number>)[reqRes.key] ?? 0) >= reqRes.min;
                                       const isDisabled = savingChoice || !meetsGate;
                                       return (
                                         <div key={typedChoice.id}>

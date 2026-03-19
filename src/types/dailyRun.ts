@@ -151,6 +151,9 @@ export type DailyRun = {
     | "total_social"
     | "total_health"
     | "total_fun"
+    | "current_segment"
+    | "hours_remaining"
+    | "hours_committed"
   > | null;
   arcOneState?: ArcOneState;
   /** Arc One narrative beats due today (one per stream, up to 2 shown). */
