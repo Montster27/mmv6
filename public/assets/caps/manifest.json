@@ -1,0 +1,142 @@
+{
+  "source": "/mnt/data/a_sprite_sheet_sheet_of_digital_assets_for_a_retro.png",
+  "sheetSize": [
+    1536,
+    1024
+  ],
+  "assets": [
+    {
+      "filename": "caps-target.png",
+      "box": [
+        114,
+        49,
+        411,
+        301
+      ],
+      "exportedSize": [
+        297,
+        252
+      ]
+    },
+    {
+      "filename": "caps-bottle.png",
+      "box": [
+        579,
+        14,
+        906,
+        476
+      ],
+      "exportedSize": [
+        327,
+        462
+      ]
+    },
+    {
+      "filename": "caps-shooter.png",
+      "box": [
+        894,
+        34,
+        1121,
+        276
+      ],
+      "exportedSize": [
+        227,
+        242
+      ]
+    },
+    {
+      "filename": "caps-shooter-flying.png",
+      "box": [
+        1164,
+        24,
+        1501,
+        271
+      ],
+      "exportedSize": [
+        337,
+        247
+      ]
+    },
+    {
+      "filename": "caps-aim-arrow.png",
+      "box": [
+        64,
+        279,
+        581,
+        461
+      ],
+      "exportedSize": [
+        517,
+        182
+      ]
+    },
+    {
+      "filename": "caps-power-bar-bg.png",
+      "box": [
+        149,
+        449,
+        716,
+        611
+      ],
+      "exportedSize": [
+        567,
+        162
+      ]
+    },
+    {
+      "filename": "caps-power-bar-fill.png",
+      "box": [
+        754,
+        449,
+        1331,
+        611
+      ],
+      "exportedSize": [
+        577,
+        162
+      ]
+    },
+    {
+      "filename": "caps-hand.png",
+      "box": [
+        64,
+        629,
+        576,
+        1006
+      ],
+      "exportedSize": [
+        512,
+        377
+      ]
+    },
+    {
+      "filename": "caps-result-hit.png",
+      "box": [
+        554,
+        634,
+        976,
+        986
+      ],
+      "exportedSize": [
+        422,
+        352
+      ]
+    },
+    {
+      "filename": "caps-result-miss.png",
+      "box": [
+        974,
+        669,
+        1421,
+        961
+      ],
+      "exportedSize": [
+        447,
+        292
+      ]
+    }
+  ],
+  "missing": [
+    "caps-floor.jpg"
+  ]
+}
