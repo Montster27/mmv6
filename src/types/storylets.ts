@@ -124,6 +124,8 @@ export type Storylet = {
   segment?: 'morning' | 'afternoon' | 'evening' | 'night' | null;
   /** Hours deducted from daily budget when this beat is played (default 1). */
   time_cost_hours?: number | null;
+  /** When true, this beat surfaces as a conflict event when the player's time budget is tight. */
+  is_conflict?: boolean;
 };
 
 export type StoryletRun = {

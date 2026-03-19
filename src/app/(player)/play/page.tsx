@@ -12,6 +12,7 @@ import { InitiativePanel } from "@/components/play/InitiativePanel";
 import { DailySetupPanel } from "@/components/play/DailySetupPanel";
 import { PlaySkeleton } from "@/components/skeletons/PlaySkeleton";
 import { AllocationSection } from "@/components/play/AllocationSection";
+import DaySummaryCard from "@/components/play/DaySummaryCard";
 import { ReflectionSection } from "@/components/play/ReflectionSection";
 import { ArcOneReflection } from "@/components/play/ArcOneReflection";
 import { TesterFeedback } from "@/components/play/TesterFeedback";
@@ -3200,18 +3201,19 @@ export default function PlayPage() {
                     arcOneMode &&
                     awaitingAllocation &&
                     pendingDismissalBeats.length === 0 && (
-                    <section className="space-y-3">
-                      <h2 className="prep-label">Plan Your Day</h2>
-                      <AllocationSection
-                        allocation={allocation}
-                        totalAllocation={totalAllocation}
-                        allocationValid={allocationValid}
-                        savingAllocation={savingAllocation}
-                        onAllocationChange={handleAllocationChange}
-                        onSave={handleSaveAllocation}
-                        resourcesEnabled={featureFlags.resources}
-                      />
-                    </section>
+                    <DaySummaryCard
+                      dayIndex={dayIndex}
+                      currentSegment={dayState?.current_segment ?? 'morning'}
+                      hoursRemaining={dayState?.hours_remaining ?? 16}
+                      hoursCommitted={dayState?.hours_committed ?? 0}
+                      allocation={allocation}
+                      totalAllocation={totalAllocation}
+                      allocationValid={allocationValid}
+                      savingAllocation={savingAllocation}
+                      onAllocationChange={handleAllocationChange}
+                      onSave={handleSaveAllocation}
+                      resourcesEnabled={featureFlags.resources}
+                    />
                   )}
 
               {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && arcOneReflectionReady ? (

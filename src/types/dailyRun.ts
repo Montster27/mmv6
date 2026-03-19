@@ -29,6 +29,8 @@ export type ArcBeat = {
   introduces_npc?: string[];
   /** Day segment this beat belongs to (null = any segment). */
   segment?: 'morning' | 'afternoon' | 'evening' | 'night' | null;
+  /** True when this is a conflict beat (time budget is tight). */
+  is_conflict?: boolean;
 };
 
 export type DailyRunStage =

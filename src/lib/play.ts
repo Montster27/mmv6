@@ -257,6 +257,14 @@ export async function saveTimeAllocation(
   const knowledgeGain = Math.floor(normalizedAllocation.study / 10);
   const socialGain = Math.floor(normalizedAllocation.social / 10);
   const resilienceGain = Math.floor(normalizedAllocation.health / 20);
+
+  // Compute hours committed from allocation percentages.
+  // Work: max 6h/day (proportional to % committed); Study/class: fixed 2h if study > 0.
+  // Total committed deducted from 16h free budget.
+  const workHours = Math.round(normalizedAllocation.work / 100 * 6);
+  const studyHours = normalizedAllocation.study > 0 ? 2 : 0;
+  const hoursCommitted = workHours + studyHours;
+  const hoursRemaining = Math.max(0, 16 - hoursCommitted);
   const nextCashOnHand = baseCashOnHand + cashGain;
   const nextKnowledge = baseKnowledge + knowledgeGain;
   const nextSocialLeverage = baseSocialLeverage + socialGain;
@@ -294,6 +302,8 @@ export async function saveTimeAllocation(
         pre_allocation_social_capital: baseSocialLeverage,
         pre_allocation_health: basePhysicalResilience,
         allocation_hash: allocationHash,
+        hours_committed: hoursCommitted,
+        hours_remaining: hoursRemaining,
       },
     }
   );

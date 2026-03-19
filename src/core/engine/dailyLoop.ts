@@ -408,7 +408,7 @@ export async function getOrCreateDailyRun(
         // 2. Load steps for these arcs from unified storylets table
         const { data: stepRows } = await supabase
           .from("storylets")
-          .select("id,slug,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours")
+          .select("id,slug,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours,is_conflict")
           .in("arc_id", arcIds)
           .order("order_index");
 
@@ -431,6 +431,7 @@ export async function getOrCreateDailyRun(
           introduces_npc: r.introduces_npc ?? undefined,
           segment: (r.segment as ArcStep['segment']) ?? null,
           time_cost_hours: r.time_cost_hours ?? 1,
+          is_conflict: Boolean(r.is_conflict),
         }));
 
         // 3. Load or create arc instances for this user
@@ -498,6 +499,7 @@ export async function getOrCreateDailyRun(
           steps: streamSteps,
           arcs: streamArcs,
           currentSegment: dayStateRaw?.current_segment ?? 'morning',
+          hoursRemaining: dayStateRaw?.hours_remaining ?? 16,
         });
         arcBeats = dueSteps.map((due) => ({
           instance_id: due.instance.id,
@@ -509,6 +511,7 @@ export async function getOrCreateDailyRun(
           expires_on_day: due.expires_on_day,
           introduces_npc: due.step.introduces_npc,
           segment: due.step.segment ?? null,
+          is_conflict: Boolean((due.step as any).is_conflict),
         }));
       }
     } catch (err) {
