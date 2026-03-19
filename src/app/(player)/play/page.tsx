@@ -97,6 +97,7 @@ import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { ArcBeatCard } from "@/components/play/ArcBeatCard";
 import { SleepCard } from "@/components/play/SleepCard";
+import { SegmentTransitionCard } from "@/components/play/SegmentTransitionCard";
 import { getBridgeText } from "@/lib/segmentBridge";
 import type { Segment as BridgeSegment } from "@/lib/segmentBridge";
 import type { ArcBeat } from "@/types/dailyRun";
@@ -508,13 +509,16 @@ export default function PlayPage() {
   // In arcOneMode the "complete" screen must not appear while beats are still
   // visible or pending dismissal — the server now prevents this, but guard
   // client-side too for robustness.
+  // In arcOneMode, daily complete must not show until the player has
+  // explicitly chosen to sleep (sleepCardDone = true).  Until then,
+  // they navigate through segments via the SegmentTransitionCard or SleepCard.
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR &&
       stage === "complete" &&
       arcBeats.length === 0 &&
       !awaitingAllocation &&
       !(arcOneMode && pendingDismissalBeats.length > 0) &&
-      !(arcOneMode && dayState?.current_segment === 'night' && !sleepCardDone)) ||
+      !(arcOneMode && !sleepCardDone)) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
@@ -3181,6 +3185,19 @@ export default function PlayPage() {
                           />
                         ))}
                     </section>
+                  )}
+
+                  {/* Segment transition card — morning/afternoon/evening done, advance to next */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR && arcOneMode &&
+                    arcBeats.length === 0 && pendingDismissalBeats.length === 0 &&
+                    !sleepCardDone &&
+                    dayState?.current_segment !== 'night' &&
+                    (dayState?.hours_remaining ?? 16) > 0 && (
+                    <SegmentTransitionCard
+                      currentSegment={(dayState?.current_segment ?? 'morning') as 'morning' | 'afternoon' | 'evening' | 'night'}
+                      hoursRemaining={dayState?.hours_remaining ?? 16}
+                      onAdvance={handleAdvanceSegment}
+                    />
                   )}
 
                   {/* Sleep card — shown at end of night when no beats remain */}
