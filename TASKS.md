@@ -22,11 +22,11 @@
 ## Backlog
 
 ### Revised Opening Content
-- [ ] **Revise s1_dorm_wake** — add dining hall plan with Dana, establish admin building errand across quad. `Priority: High` `Category: Content`
-- [x] **Write s_quad_reveal** — Gangsta's Paradise hummed on the quad. Mind-spin. Contact (Wren) delivers four directives + anomaly warning. Two choices (ask/listen). `Priority: High` `Category: Content`
-- [ ] **Write s_the_contact** — cagey upperclassman. Four directives. Academic path hints. Anomaly warning. `Priority: High` `Category: Content`
-- [ ] **Write s_dining_hall** — bad food realization, meet people, three invitations. New named NPCs. `Priority: High` `Category: Content`
-- [ ] **Wire floor meeting + phone call** — existing storylets into evening sequence. `Priority: Medium` `Category: Content`
+- [x] **Revise s1_dorm_wake** — replaced placeholders with real content, gender-corrected, segment + time fields added. `Priority: High` `Category: Content`
+- [x] **Write s_quad_reveal** — Gangsta's Paradise hummed on the quad. Mind-spin. Contact (Wren) delivers four directives + anomaly warning. Two choices (ask/listen). Wired into arc_roommate beat 2. `Priority: High` `Category: Content`
+- [x] **Write s_the_contact** — MERGED INTO s_quad_reveal. Wren is the contact. Four directives + anomaly warning delivered in quad scene. `Priority: High` `Category: Content`
+- [x] **Write s_dining_hall** — EXISTS as s01_dining_first_dinner. Meet Miguel, three seating choices. `Priority: High` `Category: Content`
+- [x] **Wire evening events into arc system** — s01_evening_choice in arc_belonging (evening segment). Three choices with mutual preclusion. `Priority: Medium` `Category: Content`
 
 ### Evening Events (Day 1 — mutually exclusive)
 - [x] **Write s_evening_caps** — Caps party at Cal's. Schlitz, girls from Pemberton, win/lose branching. Lose → "Caps Guy" reputation seed. Hangover Day 2. Precludes cards + SUB. `Priority: High` `Category: Content`
@@ -181,7 +181,7 @@
 
 ## Notes
 
-- **Milestone A is nearly complete.** Engine + time system merged. Mini-game framework built. Remaining: opening content (revised dorm wake, quad reveal, contact, dining hall) + evening storylet migrations.
+- **Milestone A is nearly complete.** Engine + time system merged. Mini-game framework built. Day 1 fully wired: hallway → room 212 → quad reveal (Wren) → dining hall → floor meeting → evening choice (caps/cards/SUB). Placeholders removed. Remaining: test the full playthrough, polish transitions.
 - **Evening events designed and drafted.** Caps (Cal's party), cards (Miguel's room + Spider), SUB arcade. All three have prose, choice architecture, and mini-game integration points. Need: SQL migrations to seed into DB.
 - **Mini-game framework is live.** MiniGameShell + 3 game components (snake, caps, memory). Wired into play page via StoryletChoice.mini_game field. Adaptive difficulty tracking per game type.
 - **Gender rule:** Protagonist male. All dorm-floor NPCs and RA are male (men's dorm, 1983). Female NPCs exist on campus (classrooms, library, events, Pemberton Hall). Sandra renamed to Scott.
