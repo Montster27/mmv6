@@ -387,11 +387,18 @@ export async function getOrCreateDailyRun(
       // 1. Load Arc One arc definitions (six narrative streams)
       // arc_opening is the legacy intro arc; Week 1 stream content replaces it.
       const allArcOneKeys = [...ARC_ONE_STREAM_KEYS];
-      const { data: arcDefs } = await supabase
+      const { data: arcDefs, error: arcDefsError } = await supabase
         .from("arc_definitions")
         .select("id,key,title,description,tags,is_enabled")
         .in("key", allArcOneKeys)
         .eq("is_enabled", true);
+
+      if (arcDefsError) {
+        console.error("[daily-run] arc_definitions query failed:", arcDefsError);
+      }
+      if (!arcDefs || arcDefs.length === 0) {
+        console.warn("[daily-run] No arc definitions found. Keys queried:", allArcOneKeys, "Result:", arcDefs, "Error:", arcDefsError);
+      }
 
       const streamArcs: ArcDefinition[] = (arcDefs ?? []).map((r) => ({
         id: r.id,
@@ -406,11 +413,16 @@ export async function getOrCreateDailyRun(
         const arcIds = streamArcs.map((a) => a.id);
 
         // 2. Load steps for these arcs from unified storylets table
-        const { data: stepRows } = await supabase
+        const { data: stepRows, error: stepRowsError } = await supabase
           .from("storylets")
           .select("id,slug,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours,is_conflict")
           .in("arc_id", arcIds)
           .order("order_index");
+
+        if (stepRowsError) {
+          console.error("[daily-run] storylets query failed:", stepRowsError);
+        }
+        console.log("[daily-run] Loaded", stepRows?.length ?? 0, "arc steps for", arcIds.length, "arcs");
 
         const streamSteps: ArcStep[] = (stepRows ?? []).map((r) => ({
           id: r.id,
@@ -493,14 +505,25 @@ export async function getOrCreateDailyRun(
         }
 
         // 5. Select due beats and format for DailyRun
+        const currentSeg = dayStateRaw?.current_segment ?? 'morning';
+        const hoursLeft = dayStateRaw?.hours_remaining ?? 16;
+        console.log("[daily-run] selectArcBeats input:", {
+          dayIndex,
+          instanceCount: instances.length,
+          instanceKeys: instances.map(i => `${i.current_step_key}@day${i.step_due_day}(${i.state})`),
+          stepCount: streamSteps.length,
+          currentSegment: currentSeg,
+          hoursRemaining: hoursLeft,
+        });
         const dueSteps = selectArcBeats({
           dayIndex,
           instances,
           steps: streamSteps,
           arcs: streamArcs,
-          currentSegment: dayStateRaw?.current_segment ?? 'morning',
-          hoursRemaining: dayStateRaw?.hours_remaining ?? 16,
+          currentSegment: currentSeg,
+          hoursRemaining: hoursLeft,
         });
+        console.log("[daily-run] selectArcBeats returned", dueSteps.length, "beats:", dueSteps.map(d => d.step.slug));
         arcBeats = dueSteps.map((due) => ({
           instance_id: due.instance.id,
           arc_key: due.arc.key,
