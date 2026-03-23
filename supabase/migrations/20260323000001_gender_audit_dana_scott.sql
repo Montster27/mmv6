@@ -9,15 +9,10 @@
 -- PART 1: Rename npc_ra_sandra → npc_ra_scott in all JSONB fields
 -- ============================================================
 
--- storylets.introduces_npc (jsonb array)
+-- storylets.introduces_npc (text[] array)
 UPDATE storylets
-SET introduces_npc = (
-  SELECT jsonb_agg(
-    CASE WHEN elem #>> '{}' = 'npc_ra_sandra' THEN '"npc_ra_scott"'::jsonb ELSE elem END
-  )
-  FROM jsonb_array_elements(introduces_npc) AS elem
-)
-WHERE introduces_npc::text LIKE '%npc_ra_sandra%';
+SET introduces_npc = array_replace(introduces_npc, 'npc_ra_sandra', 'npc_ra_scott')
+WHERE 'npc_ra_sandra' = ANY(introduces_npc);
 
 -- storylets.requirements (deep jsonb — replace as text then cast back)
 UPDATE storylets
@@ -28,22 +23,6 @@ WHERE requirements::text LIKE '%npc_ra_sandra%';
 UPDATE storylets
 SET choices = replace(choices::text, 'npc_ra_sandra', 'npc_ra_scott')::jsonb
 WHERE choices::text LIKE '%npc_ra_sandra%';
-
--- arc_steps table if it exists
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'arc_steps') THEN
-    EXECUTE $ex$
-      UPDATE arc_steps
-      SET choices = replace(choices::text, 'npc_ra_sandra', 'npc_ra_scott')::jsonb
-      WHERE choices::text LIKE '%npc_ra_sandra%';
-
-      UPDATE arc_steps
-      SET requirements = replace(requirements::text, 'npc_ra_sandra', 'npc_ra_scott')::jsonb
-      WHERE requirements IS NOT NULL AND requirements::text LIKE '%npc_ra_sandra%';
-    $ex$;
-  END IF;
-END $$;
 
 -- daily_states.relationships (player data — rename the key)
 UPDATE daily_states
@@ -78,20 +57,6 @@ WHERE body LIKE '%[[npc_ra_sandra]]%';
 UPDATE storylets
 SET choices = replace(choices::text, '[[npc_ra_sandra]]', '[[npc_ra_scott]]')::jsonb
 WHERE choices::text LIKE '%[[npc_ra_sandra]]%';
-
--- arc_steps if they exist
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'arc_steps') THEN
-    EXECUTE $ex$
-      UPDATE arc_steps SET body = replace(body, 'Sandra', 'Scott') WHERE body LIKE '%Sandra%';
-      UPDATE arc_steps SET choices = replace(choices::text, 'Sandra', 'Scott')::jsonb WHERE choices::text LIKE '%Sandra%';
-      UPDATE arc_steps SET body = replace(body, '[[npc_ra_sandra]]', '[[npc_ra_scott]]') WHERE body LIKE '%[[npc_ra_sandra]]%';
-      UPDATE arc_steps SET choices = replace(choices::text, '[[npc_ra_sandra]]', '[[npc_ra_scott]]')::jsonb WHERE choices::text LIKE '%[[npc_ra_sandra]]%';
-    $ex$;
-  END IF;
-END $$;
-
 
 -- ============================================================
 -- PART 3: Fix Sandra's gendered pronouns → male (she→he, her→his, She→He, Her→His)
@@ -188,25 +153,6 @@ SET choices = replace(
   replace(choices::text, ' her ', ' his '),
 ' her.', ' him.')::jsonb
 WHERE choices::text LIKE '%Dana%' AND choices::text LIKE '% her %';
-
--- arc_steps Dana fixes
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'arc_steps') THEN
-    EXECUTE $ex$
-      UPDATE arc_steps SET body = replace(body, ' she ', ' he ') WHERE body LIKE '%Dana%' AND body LIKE '% she %';
-      UPDATE arc_steps SET body = replace(body, '. She ', '. He ') WHERE body LIKE '%Dana%' AND body LIKE '%. She %';
-      UPDATE arc_steps SET body = replace(body, 'her bed', 'his bed') WHERE body LIKE '%Dana%' AND body LIKE '%her bed%';
-      UPDATE arc_steps SET body = replace(body, 'her desk', 'his desk') WHERE body LIKE '%Dana%' AND body LIKE '%her desk%';
-      UPDATE arc_steps SET body = replace(body, 'her eyes', 'his eyes') WHERE body LIKE '%Dana%' AND body LIKE '%her eyes%';
-      UPDATE arc_steps SET body = replace(body, 'her coat', 'his coat') WHERE body LIKE '%Dana%' AND body LIKE '%her coat%';
-      UPDATE arc_steps SET body = replace(body, 'her arms', 'his arms') WHERE body LIKE '%Dana%' AND body LIKE '%her arms%';
-      UPDATE arc_steps SET body = replace(body, 'she''', 'he''') WHERE body LIKE '%Dana%' AND body LIKE '%she''%';
-      UPDATE arc_steps SET body = replace(body, 'She''', 'He''') WHERE body LIKE '%Dana%' AND body LIKE '%She''%';
-      UPDATE arc_steps SET choices = replace(replace(replace(choices::text, ' she ', ' he '), 'her ', 'his '), 'She ', 'He ')::jsonb WHERE choices::text LIKE '%Dana%' AND (choices::text LIKE '% she %' OR choices::text LIKE '%her %');
-    $ex$;
-  END IF;
-END $$;
 
 -- ============================================================
 -- PART 5: Fix "polo shirt" → gender-neutral description for Scott
