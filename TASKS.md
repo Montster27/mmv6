@@ -6,6 +6,19 @@
 
 ---
 
+## Needs Breakdown
+
+> These tasks are too large to tackle as single items. Each needs a design/planning session to decompose into concrete steps before work begins. Pick one, break it down, then move the subtasks into the Backlog.
+
+- [ ] **BREAK DOWN: Define three evening event NPCs** — 3 separate NPC designs (cards host, caps host, study host), each needing personality, voice, role tag, stream connections, what they notice, preclusion relationships, mini-game linkage. Unblocks: s_dining_hall, s_evening_cards/caps/study, evening preclusion wiring. `Priority: High` `Category: Design`
+- [ ] **BREAK DOWN: Write s_the_contact** — Structurally complex: who is the contact (name, appearance, personality), what are the four directives exactly, how much does he reveal, what's the dialogue/choice tree, how do academic path hints surface, what's the anomaly warning tone. Needs design decisions before prose. `Priority: High` `Category: Content`
+- [ ] **BREAK DOWN: Write s_dining_hall** — The biggest single storylet in the game. Introduces multiple new NPCs, three mutually exclusive evening invitations that branch the entire evening. Depends on evening NPC designs. Needs: scene structure, NPC introductions, invitation mechanics, choice architecture. `Priority: High` `Category: Content`
+- [ ] **BREAK DOWN: Complete content creation agent** — Multi-part: audit current 3-stage pipeline for gaps, verify schema-reference.md matches current DB schema, run a worked example end-to-end (stage 1→2→3→JSON), fix any issues found, document the workflow. `Priority: Medium` `Category: Tooling`
+- [ ] **BREAK DOWN: Build mini-game UI framework** — Entire subsystem: interrupt flow (how storylets trigger mini-games), component architecture (shared shell, game-specific renderers), result handling (success/failure → branch to different storylets), difficulty system (adaptive tracker, invisible to player), integration with storylet engine. At least 4-5 subtasks. `Priority: Medium` `Category: Engine`
+- [ ] **BREAK DOWN: Map remaining Arc One storylets** — Needs a gap analysis first: audit existing storylets by day/segment/stream, identify holes in coverage, determine collision opportunities, then create individual storylet assignments. Can't be done in one shot. `Priority: Medium` `Category: Content`
+
+---
+
 ## Backlog
 
 ### Design Decisions (Revised Opening)
