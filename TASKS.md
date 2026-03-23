@@ -30,7 +30,7 @@
 
 ### Evening Events (Day 1 — mutually exclusive)
 - [x] **Write s_evening_caps** — Caps party at Cal's. Schlitz, girls from Pemberton, win/lose branching. Lose → "Caps Guy" reputation seed. Hangover Day 2. Precludes cards + SUB. `Priority: High` `Category: Content`
-- [ ] **Write s_evening_cards** — Hang out with students playing games. Memory card mini-game. Quieter, more personal. Precludes other two evenings. `Priority: High` `Category: Content`
+- [x] **Write s_evening_cards** — Card game in Miguel's room. Spider (nickname kid) dominates. Memory mini-game win/lose. Quiet connection path. Precludes caps + SUB. `Priority: High` `Category: Content`
 - [ ] **Write s_evening_sub** — Join friends at the Student Union Building (SUB) for video games. Snake mini-game. Precludes other two evenings. `Priority: High` `Category: Content`
 - [ ] **Build snake mini-game** — Classic snake game, 1983 arcade aesthetic. Adaptive difficulty (speed, grid size). Under 2 minutes. Integrates with mini-game framework. `Priority: High` `Category: Engine`
 
