@@ -148,7 +148,7 @@ Use these in `events_emitted`. Preferred over legacy `relational_effects`.
 | npc_prof_marsh | Prof. Marsh | professor | Day 2 (first class) |
 | npc_studious_priya | Priya | classmate | Day 2 (class or library) |
 | npc_ambiguous_jordan | Jordan | acquaintance | Week 1 |
-| npc_ra_sandra | Sandra | ra | Day 1 (floor meeting) |
+| npc_ra_scott | Scott | ra | Day 1 (floor meeting) |
 | npc_parent_voice | your parent | family | Day 3-4 (dorm phone) |
 
 ---

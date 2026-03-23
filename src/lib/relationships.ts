@@ -52,7 +52,7 @@ const ROLE_TAGS: Record<string, string> = {
   npc_studious_priya: "classmate",
   npc_floor_cal: "floormate",
   npc_ambiguous_jordan: "acquaintance",
-  npc_ra_sandra: "ra",
+  npc_ra_scott: "ra",
   npc_parent_voice: "family",
 };
 
@@ -63,7 +63,7 @@ export const ALL_YEAR_ONE_NPCS = [
   "npc_studious_priya",
   "npc_floor_cal",
   "npc_ambiguous_jordan",
-  "npc_ra_sandra",
+  "npc_ra_scott",
   "npc_parent_voice",
 ] as const;
 
@@ -186,7 +186,7 @@ export function ensureRelationshipDefaults(
     role_tag: "acquaintance",
     relationship: 5,
   });
-  ensure("npc_ra_sandra", {
+  ensure("npc_ra_scott", {
     met: false,
     knows_name: false,
     knows_face: false,
@@ -350,7 +350,7 @@ const NPC_DISPLAY_NAMES: Record<string, string> = {
   npc_studious_priya: "Priya",
   npc_floor_cal: "Cal",
   npc_ambiguous_jordan: "Jordan",
-  npc_ra_sandra: "Sandra",
+  npc_ra_scott: "Scott",
   npc_parent_voice: "your parent",
 };
 
@@ -365,7 +365,7 @@ const NPC_FACE_TEXT: Record<string, string> = {
   npc_studious_priya: "the woman from class",
   npc_floor_cal: "the guy down the hall",
   npc_ambiguous_jordan: "the person from orientation",
-  npc_ra_sandra: "the RA",
+  npc_ra_scott: "the RA",
   npc_parent_voice: "your parent",
 };
 
@@ -380,7 +380,7 @@ const NPC_STRANGER_TEXT: Record<string, string> = {
   npc_studious_priya: "a woman with two columns in her notebook",
   npc_floor_cal: "a guy from down the hall",
   npc_ambiguous_jordan: "someone you haven't met",
-  npc_ra_sandra: "the RA",
+  npc_ra_scott: "the RA",
   npc_parent_voice: "your parent",
 };
 

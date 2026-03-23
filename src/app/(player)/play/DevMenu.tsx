@@ -18,7 +18,7 @@ const NPC_LABELS: Record<string, string> = {
   npc_studious_priya: "Priya",
   npc_floor_cal: "Cal",
   npc_ambiguous_jordan: "Jordan",
-  npc_ra_sandra: "Sandra (RA)",
+  npc_ra_scott: "Scott (RA)",
   npc_parent_voice: "Parent",
 };
 

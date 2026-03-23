@@ -653,7 +653,7 @@ Gate later content on the flag:
 | `npc_studious_priya` | Priya | `classmate` | `false` | "Priya, from your sociology section — always three readings ahead, rarely wastes words" |
 | `npc_floor_cal` | Cal | `floormate` | `false` | "Cal, two doors down — the kind of person who shows up when things get inconvenient" |
 | `npc_ambiguous_jordan` | Jordan | `acquaintance` | `false` | "Jordan, someone you keep running into — their angle isn't clear yet" |
-| `npc_ra_sandra` | Sandra | `ra` | `false` | "Sandra, your RA — has seen this all before, handles it professionally anyway" |
+| `npc_ra_scott` | Scott | `ra` | `false` | "Scott, your RA — has seen this all before, handles it professionally anyway" |
 | `npc_parent_voice` | your parent | `family` | `true` | *(no short_intro — always known)* |
 
 > Additional NPCs for future arcs follow the creation workflow in Section 3.

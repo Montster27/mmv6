@@ -34,9 +34,9 @@ export const NPC_REGISTRY: NpcEntry[] = [
     short_intro: "Jordan, someone you keep running into — their angle isn't clear yet",
   },
   {
-    id: "npc_ra_sandra",
-    name: "Sandra",
-    short_intro: "Sandra, your RA — has seen this all before, handles it professionally anyway",
+    id: "npc_ra_scott",
+    name: "Scott",
+    short_intro: "Scott, your RA — has seen this all before, handles it professionally anyway",
   },
   {
     id: "npc_roommate_dana",

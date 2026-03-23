@@ -43,7 +43,7 @@ const NPC_ID_SUGGESTIONS = [
   "npc_prof_marsh",
   "npc_studious_priya",
   "npc_ambiguous_jordan",
-  "npc_ra_sandra",
+  "npc_ra_scott",
   "npc_parent_voice",
 ];
 
