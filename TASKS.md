@@ -2,7 +2,7 @@
 
 > Last updated: 2026-03-23
 > Current milestone: **A — "It Runs"**
-> Current branch: `time_system` (4 commits ahead of main)
+> Current branch: `main`
 
 ---
 
@@ -83,7 +83,7 @@
 
 ## In Progress
 
-- [ ] **Merge time_system branch** — 3-phase time system (segment state, time budget, segment-gated beats, allocation budget, conflict beats, DaySummaryCard, SegmentTransitionCard). 4 commits on `time_system` ahead of main. `Priority: High` `Category: Engine`
+*(nothing currently in progress)*
 
 ---
 
@@ -139,7 +139,7 @@
 - [x] **Storylet UX polish** — progress dots, card buttons, delta chips, fade transitions, reaction text. `Category: UI`
 - [x] **Segment bridge text** — src/lib/segmentBridge.ts — procedural transition flavor text. `Category: Engine`
 
-### System 1: Time System (on `time_system` branch, pending merge)
+### System 1: Time System (merged to main via PR #26)
 - [x] **Phase 1 — segment state + time budget** — DevMenu control, segment tracking. `Category: Engine`
 - [x] **Phase 2 — segment-gated beat selection** — beats filtered by segment + Sleep card. `Category: Engine`
 - [x] **Phase 3 — allocation budget, conflict beats, DaySummaryCard** — time allocation enforced, competing beats, end-of-day summary. `Category: Engine`
@@ -156,7 +156,7 @@
 
 | Milestone | Name | Key Deliverable | Status |
 |-----------|------|-----------------|--------|
-| A | "It Runs" | Game loop works with existing storylets. Play Day 1. | **~90% — engine complete, time system on branch** |
+| A | "It Runs" | Game loop works with existing storylets. Play Day 1. | **~95% — engine + time system merged, needs opening content** |
 | B | "It Squeezes" | Every slot has competing options. Two runs diverge. | Not started |
 | C | "It Breathes" | Energy, money, skill create ambient pressure. | Not started |
 | D | "They Remember" | NPCs respond to player history. | Not started |
@@ -167,7 +167,7 @@
 
 ## Notes
 
-- **Milestone A is nearly complete.** The day engine, state manager, storylet resolver, consequence applier, save system, and Supabase integration are all built and working. The time/segment system is built on the `time_system` branch (4 commits) and needs to be merged to main.
+- **Milestone A is nearly complete.** The day engine, state manager, storylet resolver, consequence applier, save system, Supabase integration, and time system are all built and merged to main (PR #26). Remaining: opening content (revised dorm wake, quad reveal, contact, dining hall).
 - **Only one design decision remains:** the three evening event NPCs (cards, caps, study hosts).
 - **Gender rule:** Protagonist male. All dorm-floor NPCs and RA are male. Female NPCs exist on campus (classrooms, library, events). Sandra renamed to Scott.
 - **Anomaly rule needs propagation.** Must be added to content-creator agent docs before new content.
