@@ -31,8 +31,8 @@
 ### Evening Events (Day 1 — mutually exclusive)
 - [x] **Write s_evening_caps** — Caps party at Cal's. Schlitz, girls from Pemberton, win/lose branching. Lose → "Caps Guy" reputation seed. Hangover Day 2. Precludes cards + SUB. `Priority: High` `Category: Content`
 - [x] **Write s_evening_cards** — Card game in Miguel's room. Spider (nickname kid) dominates. Memory mini-game win/lose. Quiet connection path. Precludes caps + SUB. `Priority: High` `Category: Content`
-- [ ] **Write s_evening_sub** — Join friends at the Student Union Building (SUB) for video games. Snake mini-game. Precludes other two evenings. `Priority: High` `Category: Content`
-- [ ] **Build snake mini-game** — Classic snake game, 1983 arcade aesthetic. Adaptive difficulty (speed, grid size). Under 2 minutes. Integrates with mini-game framework. `Priority: High` `Category: Engine`
+- [x] **Write s_evening_sub** — SUB arcade trip with Brendan's group. Snake mini-game on cabinet. Win → high score initials. Lose → quarters burned, place discovered. Precludes caps + cards. `Priority: High` `Category: Content`
+- [x] **Build snake mini-game** — SnakeGame.tsx component. Green phosphor CRT aesthetic, scanlines, vignette. Adaptive difficulty, 2-min timer, WASD/arrows. `Priority: High` `Category: Engine`
 
 ### System 2: Content Volume (Milestone B)
 - [ ] **Map remaining Arc One storylets** — gaps Days 1-14. Target: 30-40 additional. `Priority: Medium` `Category: Content`
