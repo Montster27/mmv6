@@ -16,6 +16,13 @@ type SelectArcBeatsArgs = {
   arcs: ArcDefinition[];
   /** Maximum number of beats to return per day. Default: 2. */
   maxBeats?: number;
+  /** Current day segment — if provided, filters beats by step.segment (null steps always pass). */
+  currentSegment?: string;
+  /**
+   * Free hours remaining today. When < CONFLICT_THRESHOLD (4h), beats with
+   * is_conflict=true bypass segment filtering and surface immediately.
+   */
+  hoursRemaining?: number;
 };
 
 /**
@@ -27,13 +34,19 @@ type SelectArcBeatsArgs = {
  * Results are sorted most-urgent first (earliest expiry day) so that
  * beats about to expire are surfaced before fresh ones.
  */
+/** Hours remaining threshold below which conflict beats bypass segment gating. */
+const CONFLICT_THRESHOLD = 4;
+
 export function selectArcBeats({
   dayIndex,
   instances,
   steps,
   arcs,
   maxBeats = 2,
+  currentSegment,
+  hoursRemaining,
 }: SelectArcBeatsArgs): DueStep[] {
+  const timeTight = typeof hoursRemaining === 'number' && hoursRemaining < CONFLICT_THRESHOLD;
   const arcMap = new Map(arcs.map((a) => [a.id, a]));
 
   // Build a lookup keyed by "arc_id:step_key" so we can retrieve the step
@@ -57,6 +70,16 @@ export function selectArcBeats({
     const expiresOnDay = dueDay + step.expires_after_days;
 
     if (dayIndex < dueDay || dayIndex > expiresOnDay) continue;
+
+    // Conflict beats bypass segment gating when time budget is tight.
+    const isConflict = Boolean((step as any).is_conflict);
+    if (isConflict && timeTight) {
+      // Conflict beats surface regardless of segment when time is tight.
+    } else if (currentSegment && step.segment) {
+      // Segment filter: beats with segment set only appear in their segment.
+      // null/undefined segment = always available (backward compat).
+      if (step.segment !== currentSegment) continue;
+    }
 
     due.push({ instance, step, arc, expires_on_day: expiresOnDay });
   }

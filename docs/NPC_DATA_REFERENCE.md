@@ -65,7 +65,7 @@ Defined in `src/lib/relationships.ts`.
 | `npc_studious_priya` | Priya | `classmate` | Day 2 (class or library) |
 | `npc_floor_cal` | Cal | `floormate` | Day 1 (floor meeting or hall) |
 | `npc_ambiguous_jordan` | Jordan | `acquaintance` | Week 1 orientation or through Miguel |
-| `npc_ra_sandra` | Sandra | `ra` | Day 1 (floor meeting) |
+| `npc_ra_scott` | Scott | `ra` | Day 1 (floor meeting) |
 | `npc_parent_voice` | your parent | `family` | Day 3–4 (dorm phone call) |
 
 Each NPC has a `short_intro` in the registry (≤20 words) used for first-encounter body prepends — see *Auto-Introduction* below.
@@ -216,7 +216,7 @@ Relationship values can be read via `condition` path expressions to gate individ
 ```json
 {
   "id": "confide_back",
-  "label": "Tell her something real",
+  "label": "Tell him something real",
   "condition": {
     "path": "relationships.npc_roommate_dana.trust",
     "equals": 2

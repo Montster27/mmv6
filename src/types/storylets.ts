@@ -119,6 +119,13 @@ export type Storylet = {
   expires_after_days?: number | null;
   /** Default next step_key when no choice specifies one. */
   default_next_step_key?: string | null;
+  // ── Segment / time-budget system ─────────────────────────────────────────
+  /** Which day segment this beat is available in: morning | afternoon | evening | night */
+  segment?: 'morning' | 'afternoon' | 'evening' | 'night' | null;
+  /** Hours deducted from daily budget when this beat is played (default 1). */
+  time_cost_hours?: number | null;
+  /** When true, this beat surfaces as a conflict event when the player's time budget is tight. */
+  is_conflict?: boolean;
 };
 
 export type StoryletRun = {

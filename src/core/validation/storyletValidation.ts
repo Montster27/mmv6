@@ -199,7 +199,7 @@ const GUARDED_NPC_NAMES: [RegExp, string, string][] = [
   [/\bPriya\b/, "npc_studious_priya", "Priya"],
   [/\bCal\b/, "npc_floor_cal", "Cal"],
   [/\bJordan\b/, "npc_ambiguous_jordan", "Jordan"],
-  [/\bSandra\b/, "npc_ra_sandra", "Sandra"],
+  [/\bScott\b/, "npc_ra_scott", "Scott"],
 ];
 
 function addIssue(

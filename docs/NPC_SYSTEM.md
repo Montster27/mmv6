@@ -70,14 +70,14 @@ DISMISSED
 **Pillar tested:** Belonging, Confront vs Avoid
 **Introduced:** Day 1, s1_dorm_wake_dislocation
 
-Dana is organized, slightly guarded, and observing you closely. She's not cold — she's cautious. She wants to know if you're someone she can trust in a small shared space.
+Dana is organized, slightly guarded, and observing you closely. He's not cold — he's cautious. He wants to know if you're someone he can trust in a small shared space.
 
-**What she notices:**
+**What he notices:**
 - Did you show up when you said you would?
 - Did you address tension or deflect it?
-- Did you acknowledge her or treat her as backdrop?
+- Did you acknowledge him or treat him as backdrop?
 
-**Storylines she anchors:**
+**Storylines he anchors:**
 - `roommate_tension_week1` (Days 1–3)
 - `roommate_study_habits` (Week 2)
 - `roommate_late_night_talk` (Week 3, trust-gated)
@@ -185,23 +185,23 @@ Jordan is hard to read on purpose. Quiet sometimes, sharp sometimes. Notices thi
 
 ---
 
-### 7. The RA — Sandra
-**Key:** `npc_ra_sandra`
+### 7. The RA — Scott
+**Key:** `npc_ra_scott`
 **Role:** Institutional presence. Fair but watching.
 **Pillar tested:** Authority, Integrity
 **Introduced:** Day 1 (floor meeting)
 
-Sandra runs the floor meeting. She is exactly what you'd expect: prepared, slightly weary, genuinely trying. She will matter later if something goes wrong on the floor. She's not a threat — she's a variable.
+Scott runs the floor meeting. He is exactly what you'd expect: prepared, slightly weary, genuinely trying. He will matter later if something goes wrong on the floor. He's not a threat — he's a variable.
 
-**What she notices:**
+**What he notices:**
 - Did you show up to the floor meeting?
 - Did you cause or resolve a problem?
-- Did you come to her with something before it escalated?
+- Did you come to him with something before it escalated?
 
-**Storylines she anchors:**
+**Storylines he anchors:**
 - `floor_meeting_day1` (Day 1)
-- `sandra_warning_cal` (Week 3, triggered by cal_incident)
-- `sandra_conversation` (Week 4–5, integrity-tested)
+- `scott_warning_cal` (Week 3, triggered by cal_incident)
+- `scott_conversation` (Week 4–5, integrity-tested)
 
 ---
 

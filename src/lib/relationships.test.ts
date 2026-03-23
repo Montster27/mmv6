@@ -9,7 +9,7 @@ const source = { storylet_slug: "test", choice_id: "choice" };
 
 describe("relationships", () => {
   it("seeds defaults for Dana and Miguel", () => {
-    // Dana is no longer auto-introduced at defaults — she is met through the
+    // Dana is no longer auto-introduced at defaults — he is met through the
     // room_212_morning arc beat (arc_opening was removed). Both start unmet.
     const { next } = ensureRelationshipDefaults({});
     expect(next.npc_roommate_dana.met).toBe(false);

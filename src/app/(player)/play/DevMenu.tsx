@@ -18,7 +18,7 @@ const NPC_LABELS: Record<string, string> = {
   npc_studious_priya: "Priya",
   npc_floor_cal: "Cal",
   npc_ambiguous_jordan: "Jordan",
-  npc_ra_sandra: "Sandra (RA)",
+  npc_ra_scott: "Scott (RA)",
   npc_parent_voice: "Parent",
 };
 
@@ -46,6 +46,9 @@ type Props = {
   togglingAdminId: string | null;
   onToggleTestMode: () => void;
   onFastForward: () => void;
+  onAdvanceSegment?: () => void;
+  currentSegment?: 'morning' | 'afternoon' | 'evening' | 'night' | 'sleeping';
+  hoursRemaining?: number;
   onResetRun?: () => void;
   onClose: () => void;
   onAdvanceDay: (userId: string) => void;
@@ -129,6 +132,9 @@ export default function DevMenu({
   togglingAdminId,
   onToggleTestMode,
   onFastForward,
+  onAdvanceSegment,
+  currentSegment = 'morning',
+  hoursRemaining,
   onResetRun,
   onClose,
   onAdvanceDay,
@@ -285,6 +291,24 @@ export default function DevMenu({
               className="border-amber-400 text-amber-900 hover:bg-amber-200/70"
             >
               ⏩ Fast Forward: Next Day (TEST MODE)
+            </Button>
+          </div>
+        ) : null}
+        {onAdvanceSegment ? (
+          <div className="flex items-center justify-between gap-2 rounded-md border border-teal-200 bg-teal-50/60 px-2 py-2 text-teal-900">
+            <span>
+              Advance segment:{" "}
+              <span className="font-semibold capitalize">{currentSegment}</span>
+              {typeof hoursRemaining === "number"
+                ? ` · ${hoursRemaining}h left`
+                : null}
+            </span>
+            <Button
+              variant="outline"
+              onClick={onAdvanceSegment}
+              className="border-teal-400 text-teal-900 hover:bg-teal-100"
+            >
+              ▶ Next Segment
             </Button>
           </div>
         ) : null}

@@ -408,7 +408,7 @@ export async function getOrCreateDailyRun(
         // 2. Load steps for these arcs from unified storylets table
         const { data: stepRows } = await supabase
           .from("storylets")
-          .select("id,slug,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc")
+          .select("id,slug,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours,is_conflict")
           .in("arc_id", arcIds)
           .order("order_index");
 
@@ -429,6 +429,9 @@ export async function getOrCreateDailyRun(
           requirements: r.requirements ?? {},
           weight: r.weight ?? 1,
           introduces_npc: r.introduces_npc ?? undefined,
+          segment: (r.segment as ArcStep['segment']) ?? null,
+          time_cost_hours: r.time_cost_hours ?? 1,
+          is_conflict: Boolean(r.is_conflict),
         }));
 
         // 3. Load or create arc instances for this user
@@ -490,7 +493,14 @@ export async function getOrCreateDailyRun(
         }
 
         // 5. Select due beats and format for DailyRun
-        const dueSteps = selectArcBeats({ dayIndex, instances, steps: streamSteps, arcs: streamArcs });
+        const dueSteps = selectArcBeats({
+          dayIndex,
+          instances,
+          steps: streamSteps,
+          arcs: streamArcs,
+          currentSegment: dayStateRaw?.current_segment ?? 'morning',
+          hoursRemaining: dayStateRaw?.hours_remaining ?? 16,
+        });
         arcBeats = dueSteps.map((due) => ({
           instance_id: due.instance.id,
           arc_key: due.arc.key,
@@ -500,6 +510,8 @@ export async function getOrCreateDailyRun(
           options: due.step.choices,
           expires_on_day: due.expires_on_day,
           introduces_npc: due.step.introduces_npc,
+          segment: due.step.segment ?? null,
+          is_conflict: Boolean((due.step as any).is_conflict),
         }));
       }
     } catch (err) {
@@ -601,6 +613,9 @@ export async function getOrCreateDailyRun(
         total_social: dayState.total_social,
         total_health: dayState.total_health,
         total_fun: dayState.total_fun,
+        current_segment: dayState.current_segment ?? 'morning',
+        hours_remaining: dayState.hours_remaining ?? 16,
+        hours_committed: dayState.hours_committed ?? 0,
       }
       : null,
     arcOneState: arcOneState ?? undefined,

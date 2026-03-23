@@ -27,6 +27,10 @@ export type ArcBeat = {
   expires_on_day: number;
   /** NPC ids this beat can introduce (auto-marked met on choice). */
   introduces_npc?: string[];
+  /** Day segment this beat belongs to (null = any segment). */
+  segment?: 'morning' | 'afternoon' | 'evening' | 'night' | null;
+  /** True when this is a conflict beat (time budget is tight). */
+  is_conflict?: boolean;
 };
 
 export type DailyRunStage =
@@ -151,6 +155,9 @@ export type DailyRun = {
     | "total_social"
     | "total_health"
     | "total_fun"
+    | "current_segment"
+    | "hours_remaining"
+    | "hours_committed"
   > | null;
   arcOneState?: ArcOneState;
   /** Arc One narrative beats due today (one per stream, up to 2 shown). */

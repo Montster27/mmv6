@@ -288,12 +288,12 @@
     {
       "slug": "arc_opening_floor",
       "title": "The Floor",
-      "body": "The hallway is louder now. Doors that were closed when you arrived have started to open, and the ones that were already open are propped wider — sneakers, textbooks, a rolled-up towel. Someone has a radio on. Someone else is arguing cheerfully about which bed is better.\n\nA woman with a clipboard and a stack of photocopied schedules stops at your door. She's maybe a year or two older than you, wearing a polo shirt with the college logo and a name tag that says SANDRA in block letters she clearly wrote herself.\n\n\"Hey — you're in 214, right? I'm Sandra, I'm your RA.\" She says it like she's said it fifteen times already today, which she probably has. But she looks at you when she says it, and that part isn't rehearsed.\n\nShe hands you a schedule. \"Floor meeting tonight, seven, common room. Orientation fair is on the quad right now if you want to check it out. And the bookstore closes at five — if you need books for tomorrow, today's the day.\"\n\nShe glances past you into the room, clocks that you're settling in, and nods like that's enough.",
+      "body": "The hallway is louder now. Doors that were closed when you arrived have started to open, and the ones that were already open are propped wider — sneakers, textbooks, a rolled-up towel. Someone has a radio on. Someone else is arguing cheerfully about which bed is better.\n\nA guy with a clipboard and a stack of photocopied schedules stops at your door. He's maybe a year or two older than you, wearing a polo shirt with the college logo and a name tag that says SANDRA in block letters he clearly wrote himself.\n\n\"Hey — you're in 214, right? I'm Scott, I'm your RA.\" He says it like he's said it fifteen times already today, which he probably has. But he looks at you when she says it, and that part isn't rehearsed.\n\nHe hands you a schedule. \"Floor meeting tonight, seven, common room. Orientation fair is on the quad right now if you want to check it out. And the bookstore closes at five — if you need books for tomorrow, today's the day.\"\n\nHe glances past you into the room, clocks that you're settling in, and nods like that's enough.",
       "is_active": true,
       "tags": ["arc_one", "opening", "social", "deja_vu"],
       "requirements": {},
       "weight": 1,
-      "introduces_npc": ["npc_ra_sandra"],
+      "introduces_npc": ["npc_ra_scott"],
       "arc_id": "arc_opening",
       "step_key": "opening_s4_floor",
       "order_index": 4,
@@ -303,7 +303,7 @@
       "choices": [
         {
           "id": "ask_sandra",
-          "label": "Ask her something practical — laundry, dining hall, where to find a campus map",
+          "label": "Ask him something practical — laundry, dining hall, where to find a campus map",
           "energy_cost": 0,
           "time_cost": 0,
           "outcome": {
@@ -314,21 +314,21 @@
               "resources": {}
             }
           },
-          "reaction_text": "She doesn't rush you. The laundry is basement level, quarters only, and somebody always leaves their clothes in the dryer so bring a book. The dining hall is fine for breakfast, questionable for dinner, and the trick is to go at 11:30 before the rush hits.\n\nShe's good at this — the practical stuff, delivered without condescension. You can tell she remembers being new here.\n\nA guy down the hall leans out of his doorway while you're talking. Dark hair, open face, the kind of person who enters a conversation by already being in it. \"Is it true they have a waffle iron at breakfast?\" he asks Sandra, and she laughs and says yes, and for a second the three of you are just standing in a hallway talking about waffles, and nothing about it feels like orientation.\n\nSandra moves on to the next door. The guy — you didn't catch his name — gives you a nod before ducking back into his room. You file his face away. You'll see him again.",
+          "reaction_text": "He doesn't rush you. The laundry is basement level, quarters only, and somebody always leaves their clothes in the dryer so bring a book. The dining hall is fine for breakfast, questionable for dinner, and the trick is to go at 11:30 before the rush hits.\n\nHe's good at this — the practical stuff, delivered without condescension. You can tell he remembers being new here.\n\nA guy down the hall leans out of his doorway while you're talking. Dark hair, open face, the kind of person who enters a conversation by already being in it. \"Is it true they have a waffle iron at breakfast?\" he asks Scott, and he laughs and says yes, and for a second the three of you are just standing in a hallway talking about waffles, and nothing about it feels like orientation.\n\nScott moves on to the next door. The guy — you didn't catch his name — gives you a nod before ducking back into his room. You file his face away. You'll see him again.",
           "identity_tags": ["people", "confront"],
           "relational_effects": {
-            "npc_ra_sandra": {
+            "npc_ra_scott": {
               "trust": 1
             }
           },
           "set_npc_memory": {
-            "npc_ra_sandra": {
+            "npc_ra_scott": {
               "gave_practical_advice": true
             }
           },
           "events_emitted": [
             {
-              "npc_id": "npc_ra_sandra",
+              "npc_id": "npc_ra_scott",
               "type": "INTRODUCED_SELF",
               "magnitude": 1
             }
@@ -348,13 +348,13 @@
               "resources": {}
             }
           },
-          "reaction_text": "\"Thanks.\" You take the schedule. She smiles — not disappointed, just moving on. She's got twenty more doors.\n\nYou sit on your bed and unfold the paper. It's a photocopy of a photocopy — the text is slightly crooked and the edges are soft. Orientation Fair, 1–4 PM, Main Quad. Floor Meeting, 7 PM, Common Room. Bookstore Hours: 9 AM – 5 PM.\n\nThree things. One afternoon. You read it again like the answer to a question you haven't figured out how to ask yet.\n\nDana's tape deck is still going. He's reading something on his bed — a paperback, the cover bent back. Neither of you says anything. The room is starting to feel like a room and not a mistake.",
+          "reaction_text": "\"Thanks.\" You take the schedule. He smiles — not disappointed, just moving on. He's got twenty more doors.\n\nYou sit on your bed and unfold the paper. It's a photocopy of a photocopy — the text is slightly crooked and the edges are soft. Orientation Fair, 1–4 PM, Main Quad. Floor Meeting, 7 PM, Common Room. Bookstore Hours: 9 AM – 5 PM.\n\nThree things. One afternoon. You read it again like the answer to a question you haven't figured out how to ask yet.\n\nDana's tape deck is still going. He's reading something on his bed — a paperback, the cover bent back. Neither of you says anything. The room is starting to feel like a room and not a mistake.",
           "identity_tags": ["safety"],
           "relational_effects": {},
           "set_npc_memory": {},
           "events_emitted": [
             {
-              "npc_id": "npc_ra_sandra",
+              "npc_id": "npc_ra_scott",
               "type": "INTRODUCED_SELF",
               "magnitude": 1
             }
@@ -374,13 +374,13 @@
               "resources": {}
             }
           },
-          "reaction_text": "Sandra moves on. You don't go back inside. Not yet.\n\nThe hallway has its own weather now. Someone three doors down is playing something you're pretty sure is Talking Heads. Two guys across the hall are comparing class schedules and discovering they're in the same intro psych. Another guy is sitting on the floor outside his room, back against the wall, eating an apple and watching the same hallway you're watching.\n\nHe catches your eye and raises the apple in a gesture that's either a greeting or a toast. You're not sure which. It doesn't matter. It's the first moment since you arrived that feels unscripted.\n\nYou stand there for another minute. The light coming through the window at the end of the hall is warm and angled and makes the linoleum look almost good. You can hear the orientation fair from outside — music, a megaphone, the distant hum of people gathering on the quad.\n\nThe floor meeting schedule Sandra gave you says seven o'clock. The words feel familiar before you've finished reading them — common room, bring your room key, don't be late. You've never been to a floor meeting in your life. But the cadence of it lands like something rehearsed. Like you've heard this before.\n\nYou're going to have to choose what to do with the afternoon. But for this one minute, you're just here.",
+          "reaction_text": "Scott moves on. You don't go back inside. Not yet.\n\nThe hallway has its own weather now. Someone three doors down is playing something you're pretty sure is Talking Heads. Two guys across the hall are comparing class schedules and discovering they're in the same intro psych. Another guy is sitting on the floor outside his room, back against the wall, eating an apple and watching the same hallway you're watching.\n\nHe catches your eye and raises the apple in a gesture that's either a greeting or a toast. You're not sure which. It doesn't matter. It's the first moment since you arrived that feels unscripted.\n\nYou stand there for another minute. The light coming through the window at the end of the hall is warm and angled and makes the linoleum look almost good. You can hear the orientation fair from outside — music, a megaphone, the distant hum of people gathering on the quad.\n\nThe floor meeting schedule Scott gave you says seven o'clock. The words feel familiar before you've finished reading them — common room, bring your room key, don't be late. You've never been to a floor meeting in your life. But the cadence of it lands like something rehearsed. Like you've heard this before.\n\nYou're going to have to choose what to do with the afternoon. But for this one minute, you're just here.",
           "identity_tags": ["people"],
           "relational_effects": {},
           "set_npc_memory": {},
           "events_emitted": [
             {
-              "npc_id": "npc_ra_sandra",
+              "npc_id": "npc_ra_scott",
               "type": "INTRODUCED_SELF",
               "magnitude": 1
             }
@@ -393,7 +393,7 @@
     {
       "slug": "arc_opening_afternoon",
       "title": "The First Afternoon",
-      "body": "It's the middle of the afternoon and the campus is in motion. Through the window at the end of the hall you can hear the orientation fair — a PA system, music that carries across the quad, voices layered on voices. Your class schedule says you need three textbooks by tomorrow morning. The bookstore closes in two hours.\n\nThere's also a part of you that just wants to walk. See the buildings. Find the library. Learn the edges of this place before it starts demanding things from you.\n\nSandra's photocopied schedule is on your desk. Three things. One afternoon. Something is going to have to wait.",
+      "body": "It's the middle of the afternoon and the campus is in motion. Through the window at the end of the hall you can hear the orientation fair — a PA system, music that carries across the quad, voices layered on voices. Your class schedule says you need three textbooks by tomorrow morning. The bookstore closes in two hours.\n\nThere's also a part of you that just wants to walk. See the buildings. Find the library. Learn the edges of this place before it starts demanding things from you.\n\nScott's photocopied schedule is on your desk. Three things. One afternoon. Something is going to have to wait.",
       "is_active": true,
       "tags": ["arc_one", "opening", "branch_point"],
       "requirements": {},
