@@ -53,6 +53,7 @@ const ROLE_TAGS: Record<string, string> = {
   npc_floor_cal: "floormate",
   npc_ambiguous_jordan: "acquaintance",
   npc_ra_scott: "ra",
+  npc_contact_wren: "contact",
   npc_parent_voice: "family",
 };
 
@@ -64,6 +65,7 @@ export const ALL_YEAR_ONE_NPCS = [
   "npc_floor_cal",
   "npc_ambiguous_jordan",
   "npc_ra_scott",
+  "npc_contact_wren",
   "npc_parent_voice",
 ] as const;
 
@@ -191,6 +193,13 @@ export function ensureRelationshipDefaults(
     knows_name: false,
     knows_face: false,
     role_tag: "ra",
+    relationship: 5,
+  });
+  ensure("npc_contact_wren", {
+    met: false,
+    knows_name: false,
+    knows_face: false,
+    role_tag: "contact",
     relationship: 5,
   });
   ensure("npc_parent_voice", {
@@ -351,6 +360,7 @@ const NPC_DISPLAY_NAMES: Record<string, string> = {
   npc_floor_cal: "Cal",
   npc_ambiguous_jordan: "Jordan",
   npc_ra_scott: "Scott",
+  npc_contact_wren: "Wren",
   npc_parent_voice: "your parent",
 };
 
@@ -366,6 +376,7 @@ const NPC_FACE_TEXT: Record<string, string> = {
   npc_floor_cal: "the guy down the hall",
   npc_ambiguous_jordan: "the person from orientation",
   npc_ra_scott: "the RA",
+  npc_contact_wren: "the guy from the quad",
   npc_parent_voice: "your parent",
 };
 
@@ -381,6 +392,7 @@ const NPC_STRANGER_TEXT: Record<string, string> = {
   npc_floor_cal: "a guy from down the hall",
   npc_ambiguous_jordan: "someone you haven't met",
   npc_ra_scott: "the RA",
+  npc_contact_wren: "an upperclassman with old eyes",
   npc_parent_voice: "your parent",
 };
 

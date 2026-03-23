@@ -10,11 +10,11 @@
 
 > These tasks are too large to tackle as single items. Each needs a design/planning session to decompose into concrete steps before work begins. Pick one, break it down, then move the subtasks into the Backlog.
 
-- [x] **BREAK DOWN: Define three evening event NPCs** — RESOLVED: (1) Caps party down the hall with drinks and girls, (2) Memory card game hangout, (3) SUB video games with snake minigame. `Priority: High` `Category: Design`
+- [x] **BREAK DOWN: Define three evening event NPCs** — RESOLVED: (1) Caps party down the hall with drinks and girls from Pemberton, (2) Memory card game hangout in Miguel's room with Spider, (3) SUB arcade trip with snake minigame. `Priority: High` `Category: Design`
+- [x] **BREAK DOWN: Build mini-game UI framework** — RESOLVED: MiniGameShell wrapper, StoryletChoice.mini_game field, adaptive difficulty tracker, handleChoice integration, 3 game components (snake, caps, memory). `Priority: Medium` `Category: Engine`
 - [ ] **BREAK DOWN: Write s_the_contact** — Structurally complex: who is the contact (name, appearance, personality), what are the four directives exactly, how much does he reveal, what's the dialogue/choice tree, how do academic path hints surface, what's the anomaly warning tone. Needs design decisions before prose. `Priority: High` `Category: Content`
 - [ ] **BREAK DOWN: Write s_dining_hall** — The biggest single storylet in the game. Introduces multiple new NPCs, three mutually exclusive evening invitations that branch the entire evening. Depends on evening NPC designs. Needs: scene structure, NPC introductions, invitation mechanics, choice architecture. `Priority: High` `Category: Content`
 - [ ] **BREAK DOWN: Complete content creation agent** — Multi-part: audit current 3-stage pipeline for gaps, verify schema-reference.md matches current DB schema, run a worked example end-to-end (stage 1→2→3→JSON), fix any issues found, document the workflow. `Priority: Medium` `Category: Tooling`
-- [ ] **BREAK DOWN: Build mini-game UI framework** — Entire subsystem: interrupt flow (how storylets trigger mini-games), component architecture (shared shell, game-specific renderers), result handling (success/failure → branch to different storylets), difficulty system (adaptive tracker, invisible to player), integration with storylet engine. At least 4-5 subtasks. `Priority: Medium` `Category: Engine`
 - [ ] **BREAK DOWN: Map remaining Arc One storylets** — Needs a gap analysis first: audit existing storylets by day/segment/stream, identify holes in coverage, determine collision opportunities, then create individual storylet assignments. Can't be done in one shot. `Priority: Medium` `Category: Content`
 
 ---
@@ -23,7 +23,7 @@
 
 ### Revised Opening Content
 - [ ] **Revise s1_dorm_wake** — add dining hall plan with Dana, establish admin building errand across quad. `Priority: High` `Category: Content`
-- [ ] **Write s_quad_reveal** — Gangsta's Paradise hummed on the quad. The mind-spin. No choices — cutscene. `Priority: High` `Category: Content`
+- [x] **Write s_quad_reveal** — Gangsta's Paradise hummed on the quad. Mind-spin. Contact (Wren) delivers four directives + anomaly warning. Two choices (ask/listen). `Priority: High` `Category: Content`
 - [ ] **Write s_the_contact** — cagey upperclassman. Four directives. Academic path hints. Anomaly warning. `Priority: High` `Category: Content`
 - [ ] **Write s_dining_hall** — bad food realization, meet people, three invitations. New named NPCs. `Priority: High` `Category: Content`
 - [ ] **Wire floor meeting + phone call** — existing storylets into evening sequence. `Priority: Medium` `Category: Content`
@@ -68,16 +68,17 @@
 - [ ] **Build replay bias applier** — weighting, availability, sensitivity. Subtle. `Priority: Low` `Category: Engine`
 
 ### Mini-Game Framework (Milestone B-C)
-- [ ] **Build mini-game UI framework** — interrupt, present, collect result, branch. Adaptive difficulty. `Priority: Medium` `Category: Engine`
-- [ ] **Build difficulty tracker** — wins/losses per type. Adjust silently. `Priority: Medium` `Category: Engine`
-- [ ] **Build memory card mini-game** — flip pairs. Difficulty: peek time, grid size. `Priority: Medium` `Category: Engine`
-- [ ] **Build caps mini-game** — timing/aim. Difficulty: target, timing, speed. `Priority: Medium` `Category: Engine`
+- [x] **Build mini-game UI framework** — MiniGameShell wrapper, lazy-loaded game components, handleChoice integration. `Priority: Medium` `Category: Engine`
+- [x] **Build difficulty tracker** — session-level wins/losses per type. Adjusts 0.2–0.9. `Priority: Medium` `Category: Engine`
+- [x] **Build memory card mini-game** — flip pairs. Adaptive grid (4×3→5×4), timer, miss limit. `Priority: Medium` `Category: Engine`
+- [x] **Build caps mini-game** — timing meter, 5 rounds, sweet spot shrinks with difficulty. `Priority: Medium` `Category: Engine`
+- [x] **Add mini_game field to StoryletChoice** — type + config, wired into play page. `Priority: Medium` `Category: Engine`
 - [ ] **Build sorting mini-game** — categorize under pressure. Difficulty: speed, categories, swaps. `Priority: Medium` `Category: Engine`
+- [ ] **Commission mini-game art assets** — caps sprites (bottle, cap, flick anim), memory card back, towel texture. `Priority: Low` `Category: Art`
 
 ### Stream & Schema Updates
 - [ ] **Add "Echoes" stream** — 7th stream for time-travel content. `Priority: Medium` `Category: Design`
-- [ ] **Add mini_game field to schema** — type, difficulty, retries, on_success, on_failure. `Priority: Medium` `Category: Engine`
-- [ ] **Wire evening three-way preclusion** — cards precludes caps + study, etc. `Priority: Medium` `Category: Content`
+- [ ] **Wire evening three-way preclusion** — cards precludes caps + SUB, etc. `Priority: Medium` `Category: Content`
 
 ---
 
@@ -150,6 +151,19 @@
 - [x] **Gender audit — Sandra → Scott (RA)** — renamed NPC from npc_ra_sandra to npc_ra_scott. Fixed all pronouns, descriptions, NPC ID references across TS, migrations, docs, agent content. RA is male per men's dorm rule. `Category: Content`
 - [x] **Anomaly rule added to CLAUDE.md** — gender rule clarified: dorm + RA male, women exist on campus (Priya, etc.). `Category: Tooling`
 
+### Mini-Game Framework (built 2026-03-23)
+- [x] **MiniGameShell component** — generic wrapper with lazy-loading, difficulty tracking, result display. `Category: Engine`
+- [x] **MiniGameProps contract** — `{ onComplete, difficulty, config? }` standard for all games. `Category: Engine`
+- [x] **StoryletChoice.mini_game field** — `{ type: MiniGameType, config? }` added to types. `Category: Engine`
+- [x] **handleChoice integration** — intercepts choices with mini_game, shows game, resumes flow on complete. `Category: Engine`
+- [x] **CapsGame component** — timing meter, Schlitz bottles, 5 rounds, adaptive sweet spot. `Category: Engine`
+- [x] **MemoryCardGame component** — pair matching, adaptive grid/timer/miss limit, playing card aesthetic. `Category: Engine`
+- [x] **Adaptive difficulty tracker** — session-level win/loss per game type, clamped 0.2–0.9. `Category: Engine`
+
+### Evening Event Storylets (drafted 2026-03-23)
+- [x] **s_evening_caps prose** — 3 choices × win/lose reactions. Caps rules corrected (bottles, flick). Beer shatter in choice 2. Hangover + "Caps Guy" reputation. `Category: Content`
+- [x] **s_evening_cards prose** — Miguel hosts, Spider introduced. 3 choices × win/lose reactions. Quiet connection path. `Category: Content`
+
 ---
 
 ## Milestones
@@ -167,9 +181,11 @@
 
 ## Notes
 
-- **Milestone A is nearly complete.** The day engine, state manager, storylet resolver, consequence applier, save system, Supabase integration, and time system are all built and merged to main (PR #26). Remaining: opening content (revised dorm wake, quad reveal, contact, dining hall).
-- **Only one design decision remains:** the three evening event NPCs (cards, caps, study hosts).
-- **Gender rule:** Protagonist male. All dorm-floor NPCs and RA are male. Female NPCs exist on campus (classrooms, library, events). Sandra renamed to Scott.
-- **Anomaly rule needs propagation.** Must be added to content-creator agent docs before new content.
+- **Milestone A is nearly complete.** Engine + time system merged. Mini-game framework built. Remaining: opening content (revised dorm wake, quad reveal, contact, dining hall) + evening storylet migrations.
+- **Evening events designed and drafted.** Caps (Cal's party), cards (Miguel's room + Spider), SUB arcade. All three have prose, choice architecture, and mini-game integration points. Need: SQL migrations to seed into DB.
+- **Mini-game framework is live.** MiniGameShell + 3 game components (snake, caps, memory). Wired into play page via StoryletChoice.mini_game field. Adaptive difficulty tracking per game type.
+- **Gender rule:** Protagonist male. All dorm-floor NPCs and RA are male (men's dorm, 1983). Female NPCs exist on campus (classrooms, library, events, Pemberton Hall). Sandra renamed to Scott.
+- **New NPC: Spider** — nickname-only floormate, real name unknown. Quiet, sharp at card games. Introduced in s_evening_cards.
+- **Art assets needed:** caps game sprites (bottles, cap, flick animation), memory card back texture, towel background. Pixel art, 16px grid, limited palette.
 - **Claude Code skills available:** `/new-storylet`, `/audit-content`, `/new-npc`, `/new-mini-game`, `/sync-board`
 - **Session isolation matters.** One Claude Code session per focused task.

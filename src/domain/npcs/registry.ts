@@ -43,6 +43,11 @@ export const NPC_REGISTRY: NpcEntry[] = [
     name: "Dana",
     short_intro: "Dana, your roommate — already here when you arrived, still figuring each other out",
   },
+  {
+    id: "npc_contact_wren",
+    name: "Wren",
+    short_intro: "Wren — an upperclassman who knows more than he's saying, and has reasons for the restraint",
+  },
 ];
 
 export function getNpcEntry(id: string): NpcEntry | undefined {

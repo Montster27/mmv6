@@ -66,6 +66,7 @@ Defined in `src/lib/relationships.ts`.
 | `npc_floor_cal` | Cal | `floormate` | Day 1 (floor meeting or hall) |
 | `npc_ambiguous_jordan` | Jordan | `acquaintance` | Week 1 orientation or through Miguel |
 | `npc_ra_scott` | Scott | `ra` | Day 1 (floor meeting) |
+| `npc_contact_wren` | Wren | `contact` | Day 1 (quad — `s_quad_reveal`) |
 | `npc_parent_voice` | your parent | `family` | Day 3–4 (dorm phone call) |
 
 Each NPC has a `short_intro` in the registry (≤20 words) used for first-encounter body prepends — see *Auto-Introduction* below.

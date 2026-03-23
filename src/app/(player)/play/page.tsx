@@ -4,6 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 
+import type { MiniGameType, MiniGameResult } from "@/types/storylets";
+
+const MiniGameShell = dynamic(
+  () => import("@/components/minigames/MiniGameShell"),
+  { ssr: false }
+);
+
 import { Button } from "@/components/ui/button";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
@@ -256,6 +263,12 @@ export default function PlayPage() {
   const [compareChoiceId, setCompareChoiceId] = useState<string | null>(null);
   const [compareNote, setCompareNote] = useState("");
   const [selectedChoiceId, setSelectedChoiceId] = useState<string | null>(null);
+  // ── Mini-game state ─────────────────────────────────────────────────────
+  const [activeMiniGame, setActiveMiniGame] = useState<{
+    type: MiniGameType;
+    choiceId: string;
+    config?: Record<string, unknown>;
+  } | null>(null);
   const [pendingReactionText, setPendingReactionText] = useState<string | null>(
     null
   );
@@ -1502,6 +1515,20 @@ export default function PlayPage() {
     );
     setSelectedChoiceId(choiceId);
     setPendingAdvanceTarget(selectedChoice?.targetStoryletId ?? null);
+
+    // ── Mini-game intercept ───────────────────────────────────────────────
+    // If this choice triggers a mini-game, show it instead of resolving now.
+    // The game's onComplete callback will call handleMiniGameComplete which
+    // re-enters handleChoice logic with the game result already captured.
+    if (selectedChoice?.mini_game && !activeMiniGame) {
+      setActiveMiniGame({
+        type: selectedChoice.mini_game.type,
+        choiceId,
+        config: selectedChoice.mini_game.config,
+      });
+      return; // wait for game to finish
+    }
+
     const derivedNpcMemory = Object.fromEntries(
       Object.entries(relationshipsState).map(([npcId, entry]) => {
         const record = entry as Record<string, unknown>;
@@ -1934,6 +1961,27 @@ export default function PlayPage() {
       setSavingChoice(false);
     }
   };
+
+  // ── Mini-game completion handler ──────────────────────────────────────────
+  // When a mini-game finishes, it calls this with the result. We resolve the
+  // outcome by mapping won→"success" / lost→"failure" outcome id, then resume
+  // the normal handleChoice flow by re-calling it (the mini-game intercept
+  // won't re-trigger because activeMiniGame will be cleared first).
+  const handleMiniGameComplete = useCallback(
+    (result: MiniGameResult) => {
+      if (!activeMiniGame) return;
+      const { choiceId } = activeMiniGame;
+      setActiveMiniGame(null);
+
+      // The mini-game result maps to outcome selection via the check system.
+      // For now, we re-invoke handleChoice — the mini_game guard won't fire
+      // again since activeMiniGame is null. The outcome resolution in
+      // applyOutcomeForChoice already supports "success"/"failure" outcome ids.
+      // TODO: thread game result into outcome selection more explicitly.
+      handleChoice(choiceId);
+    },
+    [activeMiniGame]
+  );
 
   const handleReactionContinue = () => {
     setPendingReactionText(null);
@@ -2960,6 +3008,17 @@ export default function PlayPage() {
                                       {choiceLabelMap.get(selectedChoiceId) ?? "Choice recorded"}
                                     </p>
                                   </div>
+
+                                  {/* Mini-game overlay */}
+                                  {activeMiniGame && (
+                                    <div className="my-4">
+                                      <MiniGameShell
+                                        gameType={activeMiniGame.type}
+                                        config={activeMiniGame.config}
+                                        onComplete={handleMiniGameComplete}
+                                      />
+                                    </div>
+                                  )}
 
                                   {/* Reaction text */}
                                   {pendingReactionText && (

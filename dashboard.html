@@ -16,11 +16,11 @@
 <div class="toast" id="toast"></div>
 <script>
 var DEFAULT_TASKS=[
-{id:"t01",section:"Needs Breakdown",title:"BREAK DOWN: Define three evening event NPCs",desc:"RESOLVED: (1) Caps party down the hall with drinks and girls, (2) Memory card game hangout, (3) SUB video games with sn…",priority:"high",category:"Design",status:"backlog"},
-{id:"t02",section:"Needs Breakdown",title:"BREAK DOWN: Write s_the_contact",desc:"Structurally complex: who is the contact (name, appearance, personality), what are the four directives exactly, how muc…",priority:"high",category:"Content",status:"backlog"},
-{id:"t03",section:"Needs Breakdown",title:"BREAK DOWN: Write s_dining_hall",desc:"The biggest single storylet in the game. Introduces multiple new NPCs, three mutually exclusive evening invitations tha…",priority:"high",category:"Content",status:"backlog"},
-{id:"t04",section:"Needs Breakdown",title:"BREAK DOWN: Complete content creation agent",desc:"Multi-part: audit current 3-stage pipeline for gaps, verify schema-reference.md matches current DB schema, run a worked…",priority:"medium",category:"Tooling",status:"backlog"},
-{id:"t05",section:"Needs Breakdown",title:"BREAK DOWN: Build mini-game UI framework",desc:"Entire subsystem: interrupt flow (how storylets trigger mini-games), component architecture (shared shell, game-specifi…",priority:"medium",category:"Engine",status:"backlog"},
+{id:"t01",section:"Needs Breakdown",title:"BREAK DOWN: Define three evening event NPCs",desc:"RESOLVED: (1) Caps party down the hall with drinks and girls from Pemberton, (2) Memory card game hangout in Miguel's r…",priority:"high",category:"Design",status:"backlog"},
+{id:"t02",section:"Needs Breakdown",title:"BREAK DOWN: Build mini-game UI framework",desc:"RESOLVED: MiniGameShell wrapper, StoryletChoice.mini_game field, adaptive difficulty tracker, handleChoice integration,…",priority:"medium",category:"Engine",status:"backlog"},
+{id:"t03",section:"Needs Breakdown",title:"BREAK DOWN: Write s_the_contact",desc:"Structurally complex: who is the contact (name, appearance, personality), what are the four directives exactly, how muc…",priority:"high",category:"Content",status:"backlog"},
+{id:"t04",section:"Needs Breakdown",title:"BREAK DOWN: Write s_dining_hall",desc:"The biggest single storylet in the game. Introduces multiple new NPCs, three mutually exclusive evening invitations tha…",priority:"high",category:"Content",status:"backlog"},
+{id:"t05",section:"Needs Breakdown",title:"BREAK DOWN: Complete content creation agent",desc:"Multi-part: audit current 3-stage pipeline for gaps, verify schema-reference.md matches current DB schema, run a worked…",priority:"medium",category:"Tooling",status:"backlog"},
 {id:"t06",section:"Needs Breakdown",title:"BREAK DOWN: Map remaining Arc One storylets",desc:"Needs a gap analysis first: audit existing storylets by day/segment/stream, identify holes in coverage, determine colli…",priority:"medium",category:"Content",status:"backlog"},
 {id:"t07",section:"Revised Opening Content",title:"Revise s1_dorm_wake",desc:"add dining hall plan with Dana, establish admin building errand across quad.",priority:"high",category:"Content",status:"backlog"},
 {id:"t08",section:"Revised Opening Content",title:"Write s_quad_reveal",desc:"Gangsta's Paradise hummed on the quad. The mind-spin. No choices — cutscene.",priority:"high",category:"Content",status:"backlog"},
@@ -52,14 +52,15 @@ var DEFAULT_TASKS=[
 {id:"t34",section:"System 6: Reflection Engine",title:"Write reflection prose templates",desc:"literary quality.",priority:"low",category:"Content",status:"backlog"},
 {id:"t35",section:"System 7: Replay System",title:"Design replay intention mechanics",desc:"bias → gameplay nudges.",priority:"low",category:"Design",status:"backlog"},
 {id:"t36",section:"System 7: Replay System",title:"Build replay bias applier",desc:"weighting, availability, sensitivity. Subtle.",priority:"low",category:"Engine",status:"backlog"},
-{id:"t37",section:"Mini-Game Framework",title:"Build mini-game UI framework",desc:"interrupt, present, collect result, branch. Adaptive difficulty.",priority:"medium",category:"Engine",status:"backlog"},
-{id:"t38",section:"Mini-Game Framework",title:"Build difficulty tracker",desc:"wins/losses per type. Adjust silently.",priority:"medium",category:"Engine",status:"backlog"},
-{id:"t39",section:"Mini-Game Framework",title:"Build memory card mini-game",desc:"flip pairs. Difficulty: peek time, grid size.",priority:"medium",category:"Engine",status:"backlog"},
-{id:"t40",section:"Mini-Game Framework",title:"Build caps mini-game",desc:"timing/aim. Difficulty: target, timing, speed.",priority:"medium",category:"Engine",status:"backlog"},
-{id:"t41",section:"Mini-Game Framework",title:"Build sorting mini-game",desc:"categorize under pressure. Difficulty: speed, categories, swaps.",priority:"medium",category:"Engine",status:"backlog"},
-{id:"t42",section:"Stream & Schema Updates",title:"Add \"Echoes\" stream",desc:"7th stream for time-travel content.",priority:"medium",category:"Design",status:"backlog"},
-{id:"t43",section:"Stream & Schema Updates",title:"Add mini_game field to schema",desc:"type, difficulty, retries, on_success, on_failure.",priority:"medium",category:"Engine",status:"backlog"},
-{id:"t44",section:"Stream & Schema Updates",title:"Wire evening three-way preclusion",desc:"cards precludes caps + study, etc.",priority:"medium",category:"Content",status:"backlog"},
+{id:"t37",section:"Mini-Game Framework",title:"Build mini-game UI framework",desc:"MiniGameShell wrapper, lazy-loaded game components, handleChoice integration.",priority:"medium",category:"Engine",status:"backlog"},
+{id:"t38",section:"Mini-Game Framework",title:"Build difficulty tracker",desc:"session-level wins/losses per type. Adjusts 0.2–0.9.",priority:"medium",category:"Engine",status:"backlog"},
+{id:"t39",section:"Mini-Game Framework",title:"Build memory card mini-game",desc:"flip pairs. Adaptive grid (4×3→5×4), timer, miss limit.",priority:"medium",category:"Engine",status:"backlog"},
+{id:"t40",section:"Mini-Game Framework",title:"Build caps mini-game",desc:"timing meter, 5 rounds, sweet spot shrinks with difficulty.",priority:"medium",category:"Engine",status:"backlog"},
+{id:"t41",section:"Mini-Game Framework",title:"Add mini_game field to StoryletChoice",desc:"type + config, wired into play page.",priority:"medium",category:"Engine",status:"backlog"},
+{id:"t42",section:"Mini-Game Framework",title:"Build sorting mini-game",desc:"categorize under pressure. Difficulty: speed, categories, swaps.",priority:"medium",category:"Engine",status:"backlog"},
+{id:"t43",section:"Mini-Game Framework",title:"Commission mini-game art assets",desc:"caps sprites (bottle, cap, flick anim), memory card back, towel texture.",priority:"low",category:"Art",status:"backlog"},
+{id:"t44",section:"Stream & Schema Updates",title:"Add \"Echoes\" stream",desc:"7th stream for time-travel content.",priority:"medium",category:"Design",status:"backlog"},
+{id:"t45",section:"Stream & Schema Updates",title:"Wire evening three-way preclusion",desc:"cards precludes caps + SUB, etc.",priority:"medium",category:"Content",status:"backlog"},
 {id:"d01",section:"Dev Workflow",title:"Set up .claude/settings.json",desc:"git/bash allowlist + git push.",priority:"",category:"Tooling",status:"done"},
 {id:"d02",section:"Dev Workflow",title:"Create CLAUDE.md",desc:"project brain for Claude Code.",priority:"",category:"Tooling",status:"done"},
 {id:"d03",section:"Dev Workflow",title:"Create TASKS.md",desc:"kanban task board.",priority:"",category:"Tooling",status:"done"},
@@ -103,7 +104,16 @@ var DEFAULT_TASKS=[
 {id:"d41",section:"System 1: Time System",title:"SegmentTransitionCard",desc:"day no longer ends after first beat.",priority:"",category:"Engine",status:"done"},
 {id:"d42",section:"Gender & NPC Audit",title:"Gender audit — Dana (roommate)",desc:"fixed remaining she/her → he/him in all migrations, TS code, docs, exemplars. Dana is male per men's dorm rule.",priority:"",category:"Content",status:"done"},
 {id:"d43",section:"Gender & NPC Audit",title:"Gender audit — Sandra → Scott (RA)",desc:"renamed NPC from npc_ra_sandra to npc_ra_scott. Fixed all pronouns, descriptions, NPC ID references across TS, migratio…",priority:"",category:"Content",status:"done"},
-{id:"d44",section:"Gender & NPC Audit",title:"Anomaly rule added to CLAUDE.md",desc:"gender rule clarified: dorm + RA male, women exist on campus (Priya, etc.).",priority:"",category:"Tooling",status:"done"}
+{id:"d44",section:"Gender & NPC Audit",title:"Anomaly rule added to CLAUDE.md",desc:"gender rule clarified: dorm + RA male, women exist on campus (Priya, etc.).",priority:"",category:"Tooling",status:"done"},
+{id:"d45",section:"Mini-Game Framework",title:"MiniGameShell component",desc:"generic wrapper with lazy-loading, difficulty tracking, result display.",priority:"",category:"Engine",status:"done"},
+{id:"d46",section:"Mini-Game Framework",title:"MiniGameProps contract",desc:"standard for all games.",priority:"",category:"Engine",status:"done"},
+{id:"d47",section:"Mini-Game Framework",title:"StoryletChoice.mini_game field",desc:"added to types.",priority:"",category:"Engine",status:"done"},
+{id:"d48",section:"Mini-Game Framework",title:"handleChoice integration",desc:"intercepts choices with mini_game, shows game, resumes flow on complete.",priority:"",category:"Engine",status:"done"},
+{id:"d49",section:"Mini-Game Framework",title:"CapsGame component",desc:"timing meter, Schlitz bottles, 5 rounds, adaptive sweet spot.",priority:"",category:"Engine",status:"done"},
+{id:"d50",section:"Mini-Game Framework",title:"MemoryCardGame component",desc:"pair matching, adaptive grid/timer/miss limit, playing card aesthetic.",priority:"",category:"Engine",status:"done"},
+{id:"d51",section:"Mini-Game Framework",title:"Adaptive difficulty tracker",desc:"session-level win/loss per game type, clamped 0.2–0.9.",priority:"",category:"Engine",status:"done"},
+{id:"d52",section:"Evening Event Storylets",title:"s_evening_caps prose",desc:"3 choices × win/lose reactions. Caps rules corrected (bottles, flick). Beer shatter in choice 2. Hangover + \"Caps Guy\" …",priority:"",category:"Content",status:"done"},
+{id:"d53",section:"Evening Event Storylets",title:"s_evening_cards prose",desc:"Miguel hosts, Spider introduced. 3 choices × win/lose reactions. Quiet connection path.",priority:"",category:"Content",status:"done"}
 ];
 var STORAGE_KEY='mmv_dashboard_state';
 function loadTasks(){try{var s=localStorage.getItem(STORAGE_KEY);if(s){var o=JSON.parse(s);return DEFAULT_TASKS.map(function(t){return Object.assign({},t,{status:o[t.id]||t.status})})}}catch(e){}return DEFAULT_TASKS.map(function(t){return Object.assign({},t)})}

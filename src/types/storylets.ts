@@ -1,5 +1,24 @@
 import type { ResourceKey } from "@/core/resources/resourceKeys";
 
+// ── Mini-game types ──────────────────────────────────────────────────────────
+
+export type MiniGameType = "snake" | "caps" | "memory";
+
+export type MiniGameResult = {
+  won: boolean;
+  score: number;
+};
+
+/** Props contract every mini-game component must accept. */
+export type MiniGameProps = {
+  /** Called when the game ends. Shell routes result to outcome resolution. */
+  onComplete: (result: MiniGameResult) => void;
+  /** Adaptive difficulty 0–1. Higher = harder. */
+  difficulty: number;
+  /** Optional per-instance config overrides from the storylet. */
+  config?: Record<string, unknown>;
+};
+
 export type StoryletOutcome = {
   text?: string;
   deltas?: {
@@ -87,6 +106,18 @@ export type StoryletChoice = {
   relational_effects?: Record<string, Record<string, number>>;
   set_npc_memory?: Record<string, Record<string, boolean>>;
   condition?: Record<string, unknown>;
+  // ── Mini-game trigger ──────────────────────────────────────────────────────
+  /**
+   * When present, selecting this choice launches a mini-game before resolving
+   * the outcome. The game result (won/lost) determines which outcome fires.
+   * Use with `outcomes` array containing `id: "success"` and `id: "failure"`.
+   */
+  mini_game?: {
+    /** Which game to launch: "snake" | "caps" | "memory" */
+    type: MiniGameType;
+    /** Optional per-instance overrides (e.g. custom win threshold). */
+    config?: Record<string, unknown>;
+  };
 };
 
 export type Storylet = {
