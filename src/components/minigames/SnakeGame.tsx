@@ -8,8 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Point = { x: number; y: number };
 type Direction = "UP" | "DOWN" | "LEFT" | "RIGHT";
-
-type GameState = "waiting" | "playing" | "won" | "lost";
+type GameState = "waiting" | "coin" | "playing" | "dying" | "won" | "lost";
 
 type SnakeGameProps = {
   /** Grid cells wide (default 20) */
@@ -22,7 +21,7 @@ type SnakeGameProps = {
   baseSpeed?: number;
   /** Score needed to win. Default 15 food eaten. */
   winScore?: number;
-  /** Max game duration in seconds (default 120 — 2 minutes). */
+  /** Max game duration in seconds (default 120). */
   maxSeconds?: number;
   /** Called when the game ends. */
   onComplete?: (result: { won: boolean; score: number }) => void;
@@ -37,8 +36,6 @@ type SnakeGameProps = {
 const PHOSPHOR_GREEN = "#33ff33";
 const PHOSPHOR_DIM = "#0a3a0a";
 const PHOSPHOR_BG = "#0a0a0a";
-const FOOD_COLOR = "#66ff66";
-const SCANLINE_ALPHA = 0.08;
 
 const OPPOSITE: Record<Direction, Direction> = {
   UP: "DOWN",
@@ -47,15 +44,35 @@ const OPPOSITE: Record<Direction, Direction> = {
   RIGHT: "LEFT",
 };
 
+// Asset paths
+const ASSET = "/assets";
+const HEAD_SPRITES: Record<Direction, string> = {
+  UP: `${ASSET}/snake_head_up.png`,
+  DOWN: `${ASSET}/snake_head_down.png`,
+  LEFT: `${ASSET}/snake_head_left.png`,
+  RIGHT: `${ASSET}/snake_head_right.png`,
+};
+
+// Sprite sheet layout
+const FOOD_FRAMES = 4;
+const FOOD_FRAME_W = 16;
+const DEATH_FRAMES = 6;
+const DEATH_FRAME_W = 16;
+const COIN_FRAMES = 6;
+const COIN_FRAME_W = 32;
+const COIN_FRAME_H = 32;
+
+// Bezel layout: canvas sits inside the cabinet bezel
+const BEZEL_W = 400;
+const BEZEL_H = 500;
+const CANVAS_OFFSET_X = 40; // where the transparent hole starts
+const CANVAS_OFFSET_Y = 60;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function randomFood(
-  gridW: number,
-  gridH: number,
-  snake: Point[]
-): Point {
+function randomFood(gridW: number, gridH: number, snake: Point[]): Point {
   const occupied = new Set(snake.map((p) => `${p.x},${p.y}`));
   let p: Point;
   do {
@@ -65,6 +82,15 @@ function randomFood(
     };
   } while (occupied.has(`${p.x},${p.y}`));
   return p;
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -81,12 +107,11 @@ export default function SnakeGame({
   onComplete,
   difficulty = 0.5,
 }: SnakeGameProps) {
-  // Adjust difficulty
   const adjustedSpeed = Math.round(baseSpeed * (1 - difficulty * 0.4));
   const adjustedWin = Math.round(winScore * (0.7 + difficulty * 0.6));
 
-  const canvasW = gridWidth * cellSize;
-  const canvasH = gridHeight * cellSize;
+  const canvasW = gridWidth * cellSize; // 320
+  const canvasH = gridHeight * cellSize; // 320
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameLoopRef = useRef<number | null>(null);
@@ -98,7 +123,7 @@ export default function SnakeGame({
   const [timeLeft, setTimeLeft] = useState(maxSeconds);
   const [highScore, setHighScore] = useState(0);
 
-  // Game state refs (avoid stale closures in rAF loop)
+  // Game state refs
   const snakeRef = useRef<Point[]>([]);
   const dirRef = useRef<Direction>("RIGHT");
   const foodRef = useRef<Point>({ x: 10, y: 10 });
@@ -107,10 +132,64 @@ export default function SnakeGame({
   const startTimeRef = useRef(0);
   const speedRef = useRef(adjustedSpeed);
 
+  // Animation refs
+  const foodFrameRef = useRef(0);
+  const foodTickRef = useRef(0);
+  const deathFrameRef = useRef(0);
+  const deathPosRef = useRef<Point>({ x: 0, y: 0 });
+  const coinFrameRef = useRef(0);
+
+  // Loaded images
+  const imagesRef = useRef<{
+    heads: Record<Direction, HTMLImageElement>;
+    food: HTMLImageElement;
+    death: HTMLImageElement;
+    coin: HTMLImageElement;
+    crt: HTMLImageElement;
+  } | null>(null);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
+
   // Sync state ref
   useEffect(() => {
     stateRef.current = gameState;
   }, [gameState]);
+
+  // ------------------------------------------------------------------
+  // Load assets
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [headUp, headDown, headLeft, headRight, food, death, coin, crt] =
+          await Promise.all([
+            loadImage(HEAD_SPRITES.UP),
+            loadImage(HEAD_SPRITES.DOWN),
+            loadImage(HEAD_SPRITES.LEFT),
+            loadImage(HEAD_SPRITES.RIGHT),
+            loadImage(`${ASSET}/food_strip.png`),
+            loadImage(`${ASSET}/death_strip.png`),
+            loadImage(`${ASSET}/coin_strip.png`),
+            loadImage(`${ASSET}/crt_overlay.png`),
+          ]);
+        if (cancelled) return;
+        imagesRef.current = {
+          heads: { UP: headUp, DOWN: headDown, LEFT: headLeft, RIGHT: headRight },
+          food,
+          death,
+          coin,
+          crt,
+        };
+        setAssetsLoaded(true);
+      } catch {
+        // Fallback: run without sprites
+        console.warn("Snake game: some assets failed to load, using fallback rendering");
+        setAssetsLoaded(true);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   // ------------------------------------------------------------------
   // Drawing
@@ -119,6 +198,7 @@ export default function SnakeGame({
   const draw = useCallback(() => {
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
+    const imgs = imagesRef.current;
 
     // Background
     ctx.fillStyle = PHOSPHOR_BG;
@@ -140,60 +220,130 @@ export default function SnakeGame({
       ctx.stroke();
     }
 
-    // Food
+    // Food (animated sprite or fallback)
     const f = foodRef.current;
-    ctx.fillStyle = FOOD_COLOR;
-    ctx.shadowColor = FOOD_COLOR;
-    ctx.shadowBlur = 8;
-    ctx.fillRect(
-      f.x * cellSize + 2,
-      f.y * cellSize + 2,
-      cellSize - 4,
-      cellSize - 4
-    );
-    ctx.shadowBlur = 0;
+    foodTickRef.current++;
+    if (foodTickRef.current % 10 === 0) {
+      foodFrameRef.current = (foodFrameRef.current + 1) % FOOD_FRAMES;
+    }
+    if (imgs?.food) {
+      ctx.drawImage(
+        imgs.food,
+        foodFrameRef.current * FOOD_FRAME_W, 0, FOOD_FRAME_W, 16,
+        f.x * cellSize, f.y * cellSize, cellSize, cellSize
+      );
+    } else {
+      ctx.fillStyle = "#66ff66";
+      ctx.shadowColor = "#66ff66";
+      ctx.shadowBlur = 8;
+      ctx.fillRect(f.x * cellSize + 2, f.y * cellSize + 2, cellSize - 4, cellSize - 4);
+      ctx.shadowBlur = 0;
+    }
 
-    // Snake
+    // Snake body (drawn before head so head overlaps)
     const snake = snakeRef.current;
-    snake.forEach((seg, i) => {
+    for (let i = snake.length - 1; i >= 1; i--) {
+      const seg = snake[i];
       const brightness = 1 - (i / snake.length) * 0.5;
       const g = Math.round(255 * brightness);
       ctx.fillStyle = `rgb(0, ${g}, 0)`;
       ctx.shadowColor = PHOSPHOR_GREEN;
-      ctx.shadowBlur = i === 0 ? 6 : 2;
+      ctx.shadowBlur = 2;
       ctx.fillRect(
         seg.x * cellSize + 1,
         seg.y * cellSize + 1,
         cellSize - 2,
         cellSize - 2
       );
-    });
+    }
     ctx.shadowBlur = 0;
 
-    // Scanlines
-    ctx.fillStyle = `rgba(0, 0, 0, ${SCANLINE_ALPHA})`;
+    // Snake head (sprite or fallback)
+    if (snake.length > 0 && stateRef.current !== "dying") {
+      const head = snake[0];
+      const headImg = imgs?.heads[dirRef.current];
+      if (headImg) {
+        ctx.drawImage(
+          headImg,
+          head.x * cellSize,
+          head.y * cellSize,
+          cellSize,
+          cellSize
+        );
+      } else {
+        ctx.fillStyle = PHOSPHOR_GREEN;
+        ctx.shadowColor = PHOSPHOR_GREEN;
+        ctx.shadowBlur = 6;
+        ctx.fillRect(
+          head.x * cellSize + 1,
+          head.y * cellSize + 1,
+          cellSize - 2,
+          cellSize - 2
+        );
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    // Death animation
+    if (stateRef.current === "dying" && imgs?.death) {
+      const dp = deathPosRef.current;
+      ctx.drawImage(
+        imgs.death,
+        deathFrameRef.current * DEATH_FRAME_W, 0, DEATH_FRAME_W, 16,
+        dp.x * cellSize, dp.y * cellSize, cellSize, cellSize
+      );
+    }
+
+    // Scanlines (drawn on canvas for pixel-perfect look)
+    ctx.fillStyle = `rgba(0, 0, 0, 0.06)`;
     for (let y = 0; y < canvasH; y += 3) {
       ctx.fillRect(0, y, canvasW, 1);
     }
 
-    // CRT vignette
-    const gradient = ctx.createRadialGradient(
-      canvasW / 2,
-      canvasH / 2,
-      canvasW * 0.3,
-      canvasW / 2,
-      canvasH / 2,
-      canvasW * 0.7
-    );
-    gradient.addColorStop(0, "rgba(0,0,0,0)");
-    gradient.addColorStop(1, "rgba(0,0,0,0.3)");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvasW, canvasH);
+    // CRT overlay (glass reflection)
+    if (imgs?.crt) {
+      ctx.globalAlpha = 0.15;
+      ctx.drawImage(imgs.crt, 0, 0, canvasW, canvasH);
+      ctx.globalAlpha = 1;
+    }
   }, [canvasW, canvasH, cellSize, gridWidth, gridHeight]);
 
   // ------------------------------------------------------------------
   // Game tick
   // ------------------------------------------------------------------
+
+  const endGame = useCallback(
+    (won: boolean) => {
+      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
+      const finalState = won ? "won" : "lost";
+      setGameState(finalState);
+      stateRef.current = finalState;
+      if (scoreRef.current > highScore) setHighScore(scoreRef.current);
+      draw();
+      onComplete?.({ won, score: scoreRef.current });
+    },
+    [draw, onComplete, highScore]
+  );
+
+  const startDeathAnim = useCallback(() => {
+    if (snakeRef.current.length > 0) {
+      deathPosRef.current = { ...snakeRef.current[0] };
+    }
+    deathFrameRef.current = 0;
+    setGameState("dying");
+    stateRef.current = "dying";
+
+    let frame = 0;
+    const interval = setInterval(() => {
+      frame++;
+      deathFrameRef.current = frame;
+      draw();
+      if (frame >= DEATH_FRAMES - 1) {
+        clearInterval(interval);
+        endGame(false);
+      }
+    }, 100);
+  }, [draw, endGame]);
 
   const tick = useCallback(() => {
     // Process direction queue
@@ -209,7 +359,6 @@ export default function SnakeGame({
     const head = snake[0];
     const dir = dirRef.current;
 
-    // Move head
     let nx = head.x;
     let ny = head.y;
     if (dir === "UP") ny--;
@@ -219,13 +368,13 @@ export default function SnakeGame({
 
     // Wall collision
     if (nx < 0 || nx >= gridWidth || ny < 0 || ny >= gridHeight) {
-      endGame(false);
+      startDeathAnim();
       return;
     }
 
     // Self collision
     if (snake.some((s) => s.x === nx && s.y === ny)) {
-      endGame(false);
+      startDeathAnim();
       return;
     }
 
@@ -236,8 +385,6 @@ export default function SnakeGame({
     if (nx === foodRef.current.x && ny === foodRef.current.y) {
       scoreRef.current++;
       setScore(scoreRef.current);
-
-      // Speed up slightly with each food
       speedRef.current = Math.max(60, speedRef.current - 3);
 
       if (scoreRef.current >= adjustedWin) {
@@ -245,7 +392,6 @@ export default function SnakeGame({
         endGame(true);
         return;
       }
-
       foodRef.current = randomFood(gridWidth, gridHeight, newSnake);
     } else {
       newSnake.pop();
@@ -258,9 +404,9 @@ export default function SnakeGame({
     const remaining = Math.max(0, maxSeconds - Math.floor(elapsed));
     setTimeLeft(remaining);
     if (remaining <= 0) {
-      endGame(false);
+      startDeathAnim();
     }
-  }, [gridWidth, gridHeight, adjustedWin, maxSeconds]);
+  }, [gridWidth, gridHeight, adjustedWin, maxSeconds, startDeathAnim, endGame]);
 
   // ------------------------------------------------------------------
   // Game loop
@@ -282,43 +428,70 @@ export default function SnakeGame({
   );
 
   // ------------------------------------------------------------------
-  // Start / End
+  // Coin insert animation
   // ------------------------------------------------------------------
 
-  const startGame = useCallback(() => {
-    const midX = Math.floor(gridWidth / 2);
-    const midY = Math.floor(gridHeight / 2);
-    snakeRef.current = [
-      { x: midX, y: midY },
-      { x: midX - 1, y: midY },
-      { x: midX - 2, y: midY },
-    ];
-    dirRef.current = "RIGHT";
-    dirQueueRef.current = [];
-    foodRef.current = randomFood(gridWidth, gridHeight, snakeRef.current);
-    scoreRef.current = 0;
-    speedRef.current = adjustedSpeed;
-    startTimeRef.current = performance.now();
-    setScore(0);
-    setTimeLeft(maxSeconds);
-    setGameState("playing");
+  const playCoinAnim = useCallback(() => {
+    setGameState("coin");
+    stateRef.current = "coin";
+    coinFrameRef.current = 0;
 
-    lastTickRef.current = performance.now();
-    gameLoopRef.current = requestAnimationFrame(gameLoop);
+    let frame = 0;
+    const interval = setInterval(() => {
+      frame++;
+      coinFrameRef.current = frame;
+      if (frame >= COIN_FRAMES - 1) {
+        clearInterval(interval);
+        // Start actual game
+        const midX = Math.floor(gridWidth / 2);
+        const midY = Math.floor(gridHeight / 2);
+        snakeRef.current = [
+          { x: midX, y: midY },
+          { x: midX - 1, y: midY },
+          { x: midX - 2, y: midY },
+        ];
+        dirRef.current = "RIGHT";
+        dirQueueRef.current = [];
+        foodRef.current = randomFood(gridWidth, gridHeight, snakeRef.current);
+        scoreRef.current = 0;
+        speedRef.current = adjustedSpeed;
+        startTimeRef.current = performance.now();
+        setScore(0);
+        setTimeLeft(maxSeconds);
+        setGameState("playing");
+        stateRef.current = "playing";
+        lastTickRef.current = performance.now();
+        gameLoopRef.current = requestAnimationFrame(gameLoop);
+      }
+    }, 120);
   }, [gridWidth, gridHeight, adjustedSpeed, maxSeconds, gameLoop]);
 
-  const endGame = useCallback(
-    (won: boolean) => {
-      if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-      const finalState = won ? "won" : "lost";
-      setGameState(finalState);
-      stateRef.current = finalState;
-      if (scoreRef.current > highScore) setHighScore(scoreRef.current);
-      draw();
-      onComplete?.({ won, score: scoreRef.current });
-    },
-    [draw, onComplete, highScore]
-  );
+  const startGame = useCallback(() => {
+    if (imagesRef.current?.coin) {
+      playCoinAnim();
+    } else {
+      // No coin sprite — start directly
+      const midX = Math.floor(gridWidth / 2);
+      const midY = Math.floor(gridHeight / 2);
+      snakeRef.current = [
+        { x: midX, y: midY },
+        { x: midX - 1, y: midY },
+        { x: midX - 2, y: midY },
+      ];
+      dirRef.current = "RIGHT";
+      dirQueueRef.current = [];
+      foodRef.current = randomFood(gridWidth, gridHeight, snakeRef.current);
+      scoreRef.current = 0;
+      speedRef.current = adjustedSpeed;
+      startTimeRef.current = performance.now();
+      setScore(0);
+      setTimeLeft(maxSeconds);
+      setGameState("playing");
+      stateRef.current = "playing";
+      lastTickRef.current = performance.now();
+      gameLoopRef.current = requestAnimationFrame(gameLoop);
+    }
+  }, [playCoinAnim, gridWidth, gridHeight, adjustedSpeed, maxSeconds, gameLoop]);
 
   // ------------------------------------------------------------------
   // Input
@@ -326,7 +499,10 @@ export default function SnakeGame({
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (stateRef.current === "waiting" && e.key === " ") {
+      if (
+        (stateRef.current === "waiting" || stateRef.current === "won" || stateRef.current === "lost") &&
+        e.key === " "
+      ) {
         e.preventDefault();
         startGame();
         return;
@@ -336,26 +512,10 @@ export default function SnakeGame({
 
       let dir: Direction | null = null;
       switch (e.key) {
-        case "ArrowUp":
-        case "w":
-        case "W":
-          dir = "UP";
-          break;
-        case "ArrowDown":
-        case "s":
-        case "S":
-          dir = "DOWN";
-          break;
-        case "ArrowLeft":
-        case "a":
-        case "A":
-          dir = "LEFT";
-          break;
-        case "ArrowRight":
-        case "d":
-        case "D":
-          dir = "RIGHT";
-          break;
+        case "ArrowUp": case "w": case "W": dir = "UP"; break;
+        case "ArrowDown": case "s": case "S": dir = "DOWN"; break;
+        case "ArrowLeft": case "a": case "A": dir = "LEFT"; break;
+        case "ArrowRight": case "d": case "D": dir = "RIGHT"; break;
       }
 
       if (dir) {
@@ -368,7 +528,7 @@ export default function SnakeGame({
     return () => window.removeEventListener("keydown", handleKey);
   }, [startGame]);
 
-  // Cleanup on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
@@ -377,7 +537,7 @@ export default function SnakeGame({
 
   // Initial draw
   useEffect(() => {
-    if (gameState === "waiting") {
+    if (assetsLoaded && gameState === "waiting") {
       const midX = Math.floor(gridWidth / 2);
       const midY = Math.floor(gridHeight / 2);
       snakeRef.current = [
@@ -388,116 +548,163 @@ export default function SnakeGame({
       foodRef.current = randomFood(gridWidth, gridHeight, snakeRef.current);
       draw();
     }
-  }, [gameState, gridWidth, gridHeight, draw]);
+  }, [assetsLoaded, gameState, gridWidth, gridHeight, draw]);
 
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
 
+  if (!assetsLoaded) {
+    return (
+      <div className="flex items-center justify-center p-8 font-mono text-sm" style={{ color: PHOSPHOR_GREEN }}>
+        LOADING...
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Cabinet bezel */}
+      {/* Cabinet bezel wrapper */}
       <div
-        className="relative rounded-lg border-4 p-3"
-        style={{
-          borderColor: "#2a2a2a",
-          backgroundColor: "#1a1a1a",
-          boxShadow:
-            "inset 0 0 30px rgba(0,255,0,0.05), 0 0 20px rgba(0,0,0,0.5)",
-        }}
+        className="relative"
+        style={{ width: BEZEL_W, height: BEZEL_H }}
       >
-        {/* Title strip */}
-        <div
-          className="mb-2 text-center font-mono text-xs tracking-widest"
-          style={{ color: PHOSPHOR_GREEN }}
-        >
-          S N A K E
-        </div>
-
-        {/* HUD */}
-        <div
-          className="mb-1 flex justify-between font-mono text-xs"
-          style={{ color: PHOSPHOR_GREEN, width: canvasW }}
-        >
-          <span>SCORE: {String(score).padStart(3, "0")}</span>
-          <span>
-            {gameState === "playing"
-              ? `TIME: ${String(timeLeft).padStart(3, "0")}`
-              : gameState === "won"
-                ? "HIGH SCORE!"
-                : gameState === "lost"
-                  ? "GAME OVER"
-                  : "INSERT QUARTER"}
-          </span>
-          <span>HI: {String(Math.max(score, highScore)).padStart(3, "0")}</span>
-        </div>
-
-        {/* Canvas */}
-        <canvas
-          ref={canvasRef}
-          width={canvasW}
-          height={canvasH}
-          className="block rounded"
+        {/* Bezel image */}
+        <img
+          src={`${ASSET}/cabinet_bezel.png`}
+          alt=""
+          className="pointer-events-none absolute inset-0"
           style={{
+            width: BEZEL_W,
+            height: BEZEL_H,
             imageRendering: "pixelated",
-            border: `1px solid ${PHOSPHOR_DIM}`,
+            zIndex: 2,
           }}
         />
 
-        {/* Overlay messages */}
-        {gameState === "waiting" && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <button
-              onClick={startGame}
-              className="animate-pulse rounded px-4 py-2 font-mono text-sm"
-              style={{
-                color: PHOSPHOR_GREEN,
-                border: `1px solid ${PHOSPHOR_GREEN}`,
-                backgroundColor: "rgba(0,0,0,0.8)",
-              }}
-            >
-              PRESS SPACE OR CLICK TO START
-            </button>
+        {/* Game area positioned inside the bezel */}
+        <div
+          className="absolute"
+          style={{
+            left: CANVAS_OFFSET_X,
+            top: CANVAS_OFFSET_Y,
+            width: canvasW,
+            height: canvasH,
+          }}
+        >
+          {/* HUD */}
+          <div
+            className="mb-1 flex justify-between font-mono"
+            style={{
+              color: PHOSPHOR_GREEN,
+              fontSize: "10px",
+              width: canvasW,
+              position: "absolute",
+              top: -14,
+              zIndex: 3,
+            }}
+          >
+            <span>SCORE:{String(score).padStart(3, "0")}</span>
+            <span>
+              {gameState === "playing"
+                ? `TIME:${String(timeLeft).padStart(3, "0")}`
+                : gameState === "won"
+                  ? "HIGH SCORE!"
+                  : gameState === "lost"
+                    ? "GAME OVER"
+                    : gameState === "coin"
+                      ? "INSERT COIN..."
+                      : "PRESS START"}
+            </span>
+            <span>HI:{String(Math.max(score, highScore)).padStart(3, "0")}</span>
           </div>
-        )}
 
-        {(gameState === "won" || gameState === "lost") && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          {/* Game canvas */}
+          <canvas
+            ref={canvasRef}
+            width={canvasW}
+            height={canvasH}
+            className="block"
+            style={{ imageRendering: "pixelated" }}
+          />
+
+          {/* Coin insert animation overlay */}
+          {gameState === "coin" && imagesRef.current?.coin && (
             <div
-              className="rounded px-6 py-4 text-center font-mono"
-              style={{
-                color: PHOSPHOR_GREEN,
-                backgroundColor: "rgba(0,0,0,0.85)",
-                border: `1px solid ${PHOSPHOR_GREEN}`,
-              }}
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ zIndex: 3 }}
             >
-              <div className="text-lg">
-                {gameState === "won" ? "HIGH SCORE!" : "GAME OVER"}
-              </div>
-              <div className="mt-1 text-sm">
-                SCORE: {score} / {adjustedWin}
-              </div>
+              <canvas
+                ref={(el) => {
+                  if (!el || !imagesRef.current?.coin) return;
+                  const c = el.getContext("2d");
+                  if (!c) return;
+                  c.clearRect(0, 0, 64, 64);
+                  c.drawImage(
+                    imagesRef.current.coin,
+                    coinFrameRef.current * COIN_FRAME_W, 0, COIN_FRAME_W, COIN_FRAME_H,
+                    0, 0, 64, 64
+                  );
+                }}
+                width={64}
+                height={64}
+                style={{ imageRendering: "pixelated" }}
+              />
+            </div>
+          )}
+
+          {/* Start/end overlays */}
+          {gameState === "waiting" && (
+            <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 3 }}>
               <button
                 onClick={startGame}
-                className="mt-3 rounded px-3 py-1 text-xs"
+                className="animate-pulse rounded px-4 py-2 font-mono text-sm"
                 style={{
-                  border: `1px solid ${PHOSPHOR_GREEN}`,
                   color: PHOSPHOR_GREEN,
-                  backgroundColor: "transparent",
+                  border: `1px solid ${PHOSPHOR_GREEN}`,
+                  backgroundColor: "rgba(0,0,0,0.8)",
                 }}
               >
-                PLAY AGAIN
+                INSERT QUARTER
               </button>
             </div>
-          </div>
-        )}
+          )}
+
+          {(gameState === "won" || gameState === "lost") && (
+            <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 3 }}>
+              <div
+                className="rounded px-6 py-4 text-center font-mono"
+                style={{
+                  color: PHOSPHOR_GREEN,
+                  backgroundColor: "rgba(0,0,0,0.85)",
+                  border: `1px solid ${PHOSPHOR_GREEN}`,
+                }}
+              >
+                <div className="text-lg">
+                  {gameState === "won" ? "HIGH SCORE!" : "GAME OVER"}
+                </div>
+                <div className="mt-1 text-sm">
+                  SCORE: {score} / {adjustedWin}
+                </div>
+                <button
+                  onClick={startGame}
+                  className="mt-3 rounded px-3 py-1 text-xs"
+                  style={{
+                    border: `1px solid ${PHOSPHOR_GREEN}`,
+                    color: PHOSPHOR_GREEN,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  INSERT ANOTHER QUARTER
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Controls hint */}
-      <div
-        className="font-mono text-xs"
-        style={{ color: "rgba(51, 255, 51, 0.5)" }}
-      >
+      <div className="font-mono text-xs" style={{ color: "rgba(51, 255, 51, 0.5)" }}>
         ARROW KEYS OR WASD TO MOVE
       </div>
     </div>
