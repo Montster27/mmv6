@@ -10,7 +10,7 @@
 
 > These tasks are too large to tackle as single items. Each needs a design/planning session to decompose into concrete steps before work begins. Pick one, break it down, then move the subtasks into the Backlog.
 
-- [ ] **BREAK DOWN: Define three evening event NPCs** — 3 separate NPC designs (cards host, caps host, study host), each needing personality, voice, role tag, stream connections, what they notice, preclusion relationships, mini-game linkage. Unblocks: s_dining_hall, s_evening_cards/caps/study, evening preclusion wiring. `Priority: High` `Category: Design`
+- [x] **BREAK DOWN: Define three evening event NPCs** — RESOLVED: (1) Caps party down the hall with drinks and girls, (2) Memory card game hangout, (3) SUB video games with snake minigame. `Priority: High` `Category: Design`
 - [ ] **BREAK DOWN: Write s_the_contact** — Structurally complex: who is the contact (name, appearance, personality), what are the four directives exactly, how much does he reveal, what's the dialogue/choice tree, how do academic path hints surface, what's the anomaly warning tone. Needs design decisions before prose. `Priority: High` `Category: Content`
 - [ ] **BREAK DOWN: Write s_dining_hall** — The biggest single storylet in the game. Introduces multiple new NPCs, three mutually exclusive evening invitations that branch the entire evening. Depends on evening NPC designs. Needs: scene structure, NPC introductions, invitation mechanics, choice architecture. `Priority: High` `Category: Content`
 - [ ] **BREAK DOWN: Complete content creation agent** — Multi-part: audit current 3-stage pipeline for gaps, verify schema-reference.md matches current DB schema, run a worked example end-to-end (stage 1→2→3→JSON), fix any issues found, document the workflow. `Priority: Medium` `Category: Tooling`
@@ -21,18 +21,18 @@
 
 ## Backlog
 
-### Design Decisions (Revised Opening)
-- [ ] **Define three evening event NPCs** — who invites to cards, caps, study. Named characters with Dana/Miguel-level care. Host NPC, social dynamic, stream connections, associated mini-game, preclusion chains. `Priority: High` `Category: Design`
-
 ### Revised Opening Content
 - [ ] **Revise s1_dorm_wake** — add dining hall plan with Dana, establish admin building errand across quad. `Priority: High` `Category: Content`
 - [ ] **Write s_quad_reveal** — Gangsta's Paradise hummed on the quad. The mind-spin. No choices — cutscene. `Priority: High` `Category: Content`
 - [ ] **Write s_the_contact** — cagey upperclassman. Four directives. Academic path hints. Anomaly warning. `Priority: High` `Category: Content`
 - [ ] **Write s_dining_hall** — bad food realization, meet people, three invitations. New named NPCs. `Priority: High` `Category: Content`
-- [ ] **Write s_evening_cards** — intimate card game, personal reveal, memory card mini-game. `Priority: Medium` `Category: Content`
-- [ ] **Write s_evening_caps** — loud socializing, caps timing mini-game. `Priority: Medium` `Category: Content`
-- [ ] **Write s_evening_study** — intellectual spark, sorting mini-game. `Priority: Medium` `Category: Content`
 - [ ] **Wire floor meeting + phone call** — existing storylets into evening sequence. `Priority: Medium` `Category: Content`
+
+### Evening Events (Day 1 — mutually exclusive)
+- [x] **Write s_evening_caps** — Caps party at Cal's. Schlitz, girls from Pemberton, win/lose branching. Lose → "Caps Guy" reputation seed. Hangover Day 2. Precludes cards + SUB. `Priority: High` `Category: Content`
+- [ ] **Write s_evening_cards** — Hang out with students playing games. Memory card mini-game. Quieter, more personal. Precludes other two evenings. `Priority: High` `Category: Content`
+- [ ] **Write s_evening_sub** — Join friends at the Student Union Building (SUB) for video games. Snake mini-game. Precludes other two evenings. `Priority: High` `Category: Content`
+- [ ] **Build snake mini-game** — Classic snake game, 1983 arcade aesthetic. Adaptive difficulty (speed, grid size). Under 2 minutes. Integrates with mini-game framework. `Priority: High` `Category: Engine`
 
 ### System 2: Content Volume (Milestone B)
 - [ ] **Map remaining Arc One storylets** — gaps Days 1-14. Target: 30-40 additional. `Priority: Medium` `Category: Content`
