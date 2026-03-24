@@ -953,7 +953,7 @@ export default function PlayPage() {
     // Persist segment change to DB so the daily run query uses it
     const { data: sessionData } = await supabase.auth.getSession();
     const uid = sessionData?.session?.user?.id;
-    if (uid && dayState.day_index) {
+    if (uid && dayIndex) {
       await supabase
         .from("player_day_state")
         .update({
@@ -962,7 +962,7 @@ export default function PlayPage() {
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", uid)
-        .eq("day_index", dayState.day_index);
+        .eq("day_index", dayIndex);
     }
 
     // Re-trigger daily run fetch with new segment
