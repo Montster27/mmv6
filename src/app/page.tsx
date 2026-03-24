@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -44,14 +43,7 @@ export default function LandingPage() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-4">
-            <Link
-              href="/play"
-              className="bg-[#003061] text-white px-8 py-3 h-14 rounded-xl text-lg font-semibold hover:bg-[#1f477b] transition-all active:scale-95 duration-150 flex items-center"
-            >
-              Play Now
-            </Link>
-          </div>
+          <div className="flex items-center gap-4" />
         </div>
       </header>
 
@@ -74,8 +66,8 @@ export default function LandingPage() {
                 pace, your health, and your connections.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link
-                  href="/play"
+                <a
+                  href="#survey"
                   className="bg-gradient-to-br from-[#003061] to-[#1f477b] text-white px-10 py-5 h-[3.5rem] rounded-md text-lg font-bold shadow-lg hover:opacity-90 transition-all flex items-center justify-center gap-2"
                 >
                   Join the Inner Circle
@@ -92,7 +84,7 @@ export default function LandingPage() {
                       d="M13 7l5 5m0 0l-5 5m5-5H6"
                     />
                   </svg>
-                </Link>
+                </a>
               </div>
             </div>
 
@@ -250,12 +242,12 @@ export default function LandingPage() {
             <h2 className="text-4xl md:text-5xl font-black mb-8">
               Ready for a better way to play?
             </h2>
-            <Link
-              href="/play"
+            <a
+              href="#survey"
               className="inline-block bg-[#a6eff3] text-[#004f53] px-12 py-6 rounded-md text-xl font-bold hover:bg-[#a3ecf0] transition-all"
             >
-              Play the Game
-            </Link>
+              Register Your Interest
+            </a>
             <p className="mt-8 text-[#93b6f1] opacity-80 italic">
               Limited founder spots remaining for Summer 2025 cohort.
             </p>
