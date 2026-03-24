@@ -2162,6 +2162,7 @@ export default function PlayPage() {
         return; // wait for game to finish — handleMiniGameComplete resumes
       }
 
+      try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("No session");
@@ -2334,8 +2335,18 @@ export default function PlayPage() {
           }
         }
       }
+      } catch (e) {
+        console.error("[track-storylet-choice]", e);
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.startsWith("Insufficient ") || msg.includes("Not enough")) {
+          toast(msg, { variant: "destructive", duration: 5000 });
+        } else {
+          toast("Something went wrong. Please try again.", { variant: "destructive" });
+        }
+        setSavingChoice(false);
+      }
     },
-    [dayIndex, resolvedTrackStoryletIds, trackStorylets, chapterOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, chapterOneState, allocationSaved, dayState, setDayState, activeMiniGame]
+    [dayIndex, resolvedTrackStoryletIds, trackStorylets, chapterOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, chapterOneState, allocationSaved, dayState, setDayState, activeMiniGame, toast]
   );
 
   // Keep the ref in sync so handleMiniGameComplete can call it without circular deps
