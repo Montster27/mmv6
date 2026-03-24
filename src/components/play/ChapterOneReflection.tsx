@@ -16,7 +16,7 @@ type Props = {
   onSelect: (key: string) => void;
 };
 
-export function ArcOneReflection({ summaryLines, prompt, submitting, onSelect }: Props) {
+export function ChapterOneReflection({ summaryLines, prompt, submitting, onSelect }: Props) {
   return (
     <section className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-3">
       <h2 className="text-xl font-semibold">Reflection</h2>

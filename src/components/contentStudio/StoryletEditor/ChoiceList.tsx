@@ -119,9 +119,9 @@ export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onCh
                     NPC
                   </span>
                 )}
-                {choice.sets_stream_state?.stream && (
+                {choice.sets_track_state?.state && (
                   <span className="text-xs bg-emerald-50 text-emerald-600 rounded-full px-1.5">
-                    {choice.sets_stream_state.stream}
+                    {choice.sets_track_state.state}
                   </span>
                 )}
                 {choice.precludes?.length ? (
@@ -129,7 +129,7 @@ export function ChoiceList({ choices, storyletOptions, stepKeyOptions = [], onCh
                     ✕{choice.precludes.length}
                   </span>
                 ) : null}
-                {(choice.next_step_key || targetId) && (
+                {(choice.next_key || targetId) && (
                   <span className="text-xs text-emerald-600">
                     &rarr;
                   </span>

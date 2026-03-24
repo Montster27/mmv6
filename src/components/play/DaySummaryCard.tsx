@@ -20,7 +20,7 @@ type Props = {
 };
 
 /**
- * Phase 3: Replaces the raw AllocationSection in arcOneMode.
+ * Phase 3: Replaces the raw AllocationSection in chapterOneMode.
  * Shows a brief day-start summary (free hours, committed blocks) with
  * a collapsible panel for adjusting the underlying allocation sliders.
  */

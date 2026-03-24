@@ -1,4 +1,4 @@
-import type { MoneyBand } from "@/core/arcOne/types";
+import type { MoneyBand } from "@/core/chapter/types";
 
 export function canSpendMoney(band: MoneyBand, required?: MoneyBand | null): boolean {
   if (!required) return true;

@@ -20,11 +20,6 @@ export type LogEventType =
   | "ARC_COMPLETED"
   | "OFFER_EXPIRED";
 
-/** @deprecated Use StoryletChoice instead — all choice fields are now unified. */
-export type ArcStepOption = StoryletChoice & {
-  /** Arc-style option key — same as StoryletChoice.id in unified model. */
-  option_key: string;
-};
 
 export type ArcDefinition = {
   id: string;

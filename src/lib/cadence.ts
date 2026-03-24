@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase/browser";
 import type { DailyState } from "@/types/daily";
-import { deriveEnergyLevel } from "@/core/arcOne/state";
+import { deriveEnergyLevel } from "@/core/chapter/state";
 
 export function utcToday(): string {
   const now = new Date();

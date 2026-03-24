@@ -1,4 +1,4 @@
-import type { SkillFlags } from "@/core/arcOne/types";
+import type { SkillFlags } from "@/core/chapter/types";
 
 export function parseSkillRequirement(
   requirement?: string | null

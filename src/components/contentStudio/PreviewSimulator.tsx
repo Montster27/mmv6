@@ -7,7 +7,7 @@ import {
   STREAM_LABELS,
   type StreamId,
   type StreamStates,
-} from "@/types/arcOneStreams";
+} from "@/types/chapterStreams";
 import { trackEvent } from "@/lib/events";
 
 // ── types ─────────────────────────────────────────────────────────────────────
@@ -124,10 +124,11 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
         }
       }
 
-      // stream state transition
-      if (choice.sets_stream_state) {
-        const { stream, state } = choice.sets_stream_state;
-        (next.streamStates as Record<string, string>)[stream] = state;
+      // track state transition
+      if (choice.sets_track_state) {
+        // In preview mode we don't know which track this belongs to,
+        // but we can record the state for display purposes.
+        (next.streamStates as Record<string, string>)["_last"] = choice.sets_track_state.state;
       }
 
       // preclusions
@@ -216,9 +217,9 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
                 <h3 className="text-lg font-semibold text-slate-900">
                   {current.title}
                 </h3>
-                {current.step_key && (
+                {current.storylet_key && (
                   <p className="text-xs font-mono text-slate-400">
-                    step: {current.step_key}
+                    step: {current.storylet_key}
                   </p>
                 )}
               </div>

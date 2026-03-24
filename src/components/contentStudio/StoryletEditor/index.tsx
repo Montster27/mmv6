@@ -95,7 +95,7 @@ export function StoryletEditor({
     { id: "basic", label: "Basic" },
     { id: "requirements", label: "Requirements" },
     { id: "choices", label: `Choices (${draft.choices?.length ?? 0})` },
-    { id: "arc", label: draft.arc_id ? "Arc \u25cf" : "Arc" },
+    { id: "arc", label: draft.track_id ? "Track \u25cf" : "Track" },
     { id: "raw", label: "Raw JSON" },
   ];
 

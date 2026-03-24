@@ -1,12 +1,12 @@
 import "server-only";
 
 import { supabaseServer } from "@/lib/supabase/server";
-import { getArcOneState, deriveEnergyLevel, normalizeMoneyBand } from "@/core/arcOne/state";
-import type { ArcOneState, ExpiredOpportunity, MoneyBand } from "@/core/arcOne/types";
-import { applyMoneyEffect, canSpendMoney } from "@/core/arcOne/money";
-import { parseSkillRequirement } from "@/core/arcOne/skill";
+import { getChapterOneState, deriveEnergyLevel, normalizeMoneyBand } from "@/core/chapter/state";
+import type { ChapterOneState, ExpiredOpportunity, MoneyBand } from "@/core/chapter/types";
+import { applyMoneyEffect, canSpendMoney } from "@/core/chapter/money";
+import { parseSkillRequirement } from "@/core/chapter/skill";
 
-export async function fetchArcOneState(userId: string): Promise<ArcOneState | null> {
+export async function fetchChapterOneState(userId: string): Promise<ChapterOneState | null> {
   const { data, error } = await supabaseServer
     .from("daily_states")
     .select(
@@ -21,10 +21,10 @@ export async function fetchArcOneState(userId: string): Promise<ArcOneState | nu
     return null;
   }
 
-  return getArcOneState(data ?? null);
+  return getChapterOneState(data ?? null);
 }
 
-export async function updateArcOneState(userId: string, next: Partial<ArcOneState>) {
+export async function updateChapterOneState(userId: string, next: Partial<ChapterOneState>) {
   const payload: Record<string, unknown> = {};
   if (next.lifePressureState) payload.life_pressure_state = next.lifePressureState;
   if (next.energyLevel) payload.energy_level = next.energyLevel;

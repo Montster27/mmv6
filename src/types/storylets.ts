@@ -49,10 +49,10 @@ export type StoryletChoice = {
   outcomes?: StoryletOutcomeOption[];
   check?: import("./checks").Check;
   // ── Navigation ────────────────────────────────────────────────────────────
-  /** Jump to any storylet (same or different arc). */
+  /** Jump to any storylet (same or different track). */
   targetStoryletId?: string;
-  /** Advance to the next step within the same arc (arc FSM). */
-  next_step_key?: string | null;
+  /** Advance to the next storylet within the same track. */
+  next_key?: string | null;
   // ── Costs ─────────────────────────────────────────────────────────────────
   time_cost?: number;
   energy_cost?: number;
@@ -77,9 +77,9 @@ export type StoryletChoice = {
     key: ResourceKey;
     amount: number;
   };
-  // ── FSM effects (arc-specific) ────────────────────────────────────────────
-  /** Transition a named stream to a new FSM state. */
-  sets_stream_state?: { stream: string; state: string };
+  // ── FSM effects (track-specific) ──────────────────────────────────────────
+  /** Set the track's narrative state on track_progress. */
+  sets_track_state?: { state: string };
   /** Mark a named opportunity type as expired. */
   sets_expired_opportunity?: "academic" | "social" | "financial";
   /** Shift the player's money band. */
@@ -137,25 +137,25 @@ export type Storylet = {
    * auto-marked met after any choice is taken. No requires_npc_met gate needed.
    */
   introduces_npc?: string[];
-  // ── Arc membership ────────────────────────────────────────────────────────
-  /** The arc this storylet belongs to (null = standalone / ungrouped). */
-  arc_id?: string | null;
-  /** Unique key within the arc (used by arc_instances.current_step_key). */
-  step_key?: string | null;
-  /** Display order within the arc. */
+  // ── Track membership ──────────────────────────────────────────────────────
+  /** The track this storylet belongs to (null = standalone). */
+  track_id?: string | null;
+  /** Unique key within the track (used by track_progress.current_storylet_key). */
+  storylet_key?: string | null;
+  /** Display order within the track. */
   order_index?: number | null;
-  /** Days after arc start this step becomes due. */
+  /** Days after track start this storylet becomes due. */
   due_offset_days?: number | null;
-  /** Window (days) in which this step can be completed after it becomes due. */
+  /** Window (days) in which this storylet can be completed after due day. */
   expires_after_days?: number | null;
-  /** Default next step_key when no choice specifies one. */
-  default_next_step_key?: string | null;
+  /** Default next storylet_key when no choice specifies one. */
+  default_next_key?: string | null;
   // ── Segment / time-budget system ─────────────────────────────────────────
-  /** Which day segment this beat is available in: morning | afternoon | evening | night */
+  /** Which day segment this storylet is available in. */
   segment?: 'morning' | 'afternoon' | 'evening' | 'night' | null;
-  /** Hours deducted from daily budget when this beat is played (default 1). */
+  /** Hours deducted from daily budget (default 1). */
   time_cost_hours?: number | null;
-  /** When true, this beat surfaces as a conflict event when the player's time budget is tight. */
+  /** When true, surfaces as a conflict event when time budget is tight. */
   is_conflict?: boolean;
 };
 

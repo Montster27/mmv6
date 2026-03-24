@@ -47,8 +47,8 @@ function makeNewStorylet(seed?: { arcId?: string | null; stepKey?: string } | nu
     tags: [],
     requirements: {},
     weight: 100,
-    arc_id: seed?.arcId ?? null,
-    step_key: seed?.stepKey ?? null,
+    track_id: seed?.arcId ?? null,
+    storylet_key: seed?.stepKey ?? null,
   };
 }
 
@@ -128,11 +128,11 @@ function StoryletsContent() {
 
   // Step key options for autocomplete — filtered to the active arc (selected or new)
   const stepKeyOptions = useMemo(() => {
-    const arcId = isNew ? (linkedSeed?.arcId ?? null) : (selected?.arc_id ?? null);
+    const arcId = isNew ? (linkedSeed?.arcId ?? null) : (selected?.track_id ?? null);
     if (!arcId) return [];
     return storylets
-      .filter((s) => s.step_key && s.arc_id === arcId)
-      .map((s) => ({ value: s.step_key!, label: `${s.step_key} (${s.title})` }));
+      .filter((s) => s.storylet_key && s.track_id === arcId)
+      .map((s) => ({ value: s.storylet_key!, label: `${s.storylet_key} (${s.title})` }));
   }, [storylets, isNew, linkedSeed, selected]);
 
   // Validation summary counts for list
@@ -157,7 +157,7 @@ function StoryletsContent() {
 
   function handleCreateLinkedStorylet(stepKey: string) {
     if (editorDirtyRef.current && !confirm("You have unsaved changes. Discard?")) return;
-    setLinkedSeed({ arcId: selected?.arc_id ?? null, stepKey });
+    setLinkedSeed({ arcId: selected?.track_id ?? null, stepKey });
     setSelectedId(null);
     setIsNew(true);
   }

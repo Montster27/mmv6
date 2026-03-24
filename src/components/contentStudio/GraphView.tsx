@@ -84,8 +84,8 @@ function getGroupTag(
   storylet: Storylet,
   arcIdToKey?: Map<string, string>
 ): string {
-  if (storylet.arc_id && arcIdToKey?.has(storylet.arc_id)) {
-    return `arc:${arcIdToKey.get(storylet.arc_id)!}`;
+  if (storylet.track_id && arcIdToKey?.has(storylet.track_id)) {
+    return `arc:${arcIdToKey.get(storylet.track_id)!}`;
   }
   const tags = storylet.tags ?? [];
   const streamTag = tags.find((t) => STREAM_SET.has(t));
@@ -158,8 +158,8 @@ export function GraphView({
   const stepKeyToId = useMemo(() => {
     const map = new Map<string, string>();
     storylets.forEach((s) => {
-      if (s.arc_id && s.step_key) {
-        map.set(`${s.arc_id}:${s.step_key}`, s.id);
+      if (s.track_id && s.storylet_key) {
+        map.set(`${s.track_id}:${s.storylet_key}`, s.id);
       }
     });
     return map;
@@ -238,9 +238,9 @@ export function GraphView({
           }
         }
 
-        // next_step_key edges (arc FSM advance via choice)
-        if (choice.next_step_key && storylet.arc_id) {
-          const toId = stepKeyToId.get(`${storylet.arc_id}:${choice.next_step_key}`);
+        // next_key edges (arc FSM advance via choice)
+        if (choice.next_key && storylet.track_id) {
+          const toId = stepKeyToId.get(`${storylet.track_id}:${choice.next_key}`);
           if (toId && toId !== storylet.id && toId !== target) {
             const key = `${storylet.id}:${toId}:arc_step`;
             if (!seen.has(key)) {
@@ -264,9 +264,9 @@ export function GraphView({
         });
       });
 
-      // default_next_step_key edges (storylet-level fallback advance)
-      if (storylet.default_next_step_key && storylet.arc_id) {
-        const toId = stepKeyToId.get(`${storylet.arc_id}:${storylet.default_next_step_key}`);
+      // default_next_key edges (storylet-level fallback advance)
+      if (storylet.default_next_key && storylet.track_id) {
+        const toId = stepKeyToId.get(`${storylet.track_id}:${storylet.default_next_key}`);
         if (toId && toId !== storylet.id) {
           const key = `${storylet.id}:${toId}:arc_default`;
           if (!seen.has(key)) {

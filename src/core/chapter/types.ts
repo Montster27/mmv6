@@ -53,7 +53,7 @@ export type ExpiredOpportunity = {
   day_index: number;
 };
 
-export type ArcOneState = {
+export type ChapterOneState = {
   lifePressureState: LifePressureState;
   energyLevel: EnergyLevel;
   moneyBand: MoneyBand;
@@ -64,5 +64,5 @@ export type ArcOneState = {
   replayIntention: ReplayIntention;
   reflectionDone: boolean;
   /** Per-stream FSM states for the six Arc One narrative streams. */
-  streamStates?: import("@/types/arcOneStreams").StreamStates;
+  streamStates?: import("@/types/chapterStreams").StreamStates;
 };

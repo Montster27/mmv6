@@ -356,7 +356,7 @@ export async function fetchTodayStoryletCandidates(
   };
 
   const storylets = await fetchStoryletCatalog(seasonIndex, fetcher);
-  if (featureFlags.arcOneScarcityEnabled) {
+  if (featureFlags.chapterOneScarcityEnabled) {
     return storylets.filter((storylet) =>
       (storylet.tags ?? []).includes("arc_one_core")
     );

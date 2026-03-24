@@ -105,7 +105,7 @@ export const DEFAULT_STREAM_STATES: StreamStates = {
 };
 
 /** Maps each arc_key to its StreamId for display/routing. */
-export const ARC_KEY_TO_STREAM_ID: Record<string, StreamId> = {
+export const TRACK_KEY_TO_STREAM_ID: Record<string, StreamId> = {
   arc_roommate: "roommate",
   arc_academic: "academic",
   arc_money: "money",
@@ -134,7 +134,7 @@ export const STREAM_LABELS: Record<StreamId, string> = {
 };
 
 /** The six arc keys that belong to Arc One. */
-export const ARC_ONE_STREAM_KEYS: string[] = [
+export const CHAPTER_ONE_TRACK_KEYS: string[] = [
   "arc_roommate",
   "arc_academic",
   "arc_money",

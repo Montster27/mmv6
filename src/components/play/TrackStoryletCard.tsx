@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { ArcBeat } from "@/types/dailyRun";
+import type { TrackStorylet } from "@/types/tracks";
 import type { StoryletChoice } from "@/types/storylets";
-import { STREAM_LABELS } from "@/types/arcOneStreams";
+import { TRACK_LABELS, type TrackKey } from "@/types/tracks";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 import { resolveNpcTokens, type RelationshipState } from "@/lib/relationships";
@@ -17,17 +17,14 @@ const MONEY_BAND_RANK: Record<string, number> = {
   comfortable: 2,
 };
 
-type ArcBeatCardProps = {
-  beat: ArcBeat;
+type TrackStoryletCardProps = {
+  storylet: TrackStorylet;
   dayIndex: number;
-  onChoice: (beat: ArcBeat, option: StoryletChoice) => Promise<void>;
+  onChoice: (storylet: TrackStorylet, option: StoryletChoice) => Promise<void>;
   disabled?: boolean;
   onDismiss?: () => void;
-  /** When provided, the card renders in "resolved" mode showing this option's reaction text + Continue. */
   resolvedOption?: StoryletChoice;
-  /** Current player money band — used to gate choices with money_requirement. */
   moneyBand?: MoneyBand | null;
-  /** Player's current NPC relationship state — used to resolve [[npc_id]] tokens in body text. */
   relationships?: Record<string, RelationshipState> | null;
 };
 
@@ -43,7 +40,6 @@ const RESOURCE_LABELS: Record<string, string> = {
 function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: number }> {
   const totals: Record<string, number> = {};
 
-  // Legacy format
   if (option.energy_cost) {
     totals.energy = (totals.energy ?? 0) - option.energy_cost;
   }
@@ -58,7 +54,6 @@ function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: nu
     }
   }
 
-  // Content format: outcome.deltas
   const deltas = option.outcome?.deltas;
   if (deltas) {
     if (typeof deltas.energy === "number" && deltas.energy !== 0) {
@@ -81,7 +76,6 @@ function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: nu
     .map(([k, v]) => ({ label: RESOURCE_LABELS[k] ?? k, delta: v }));
 }
 
-/** Returns true if the player's money band meets or exceeds the requirement. */
 function meetsMoneyRequirement(
   playerBand: MoneyBand | null | undefined,
   required: string | undefined
@@ -92,19 +86,17 @@ function meetsMoneyRequirement(
   return playerRank >= requiredRank;
 }
 
-export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand, relationships }: ArcBeatCardProps) {
+export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand, relationships }: TrackStoryletCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const displayedOption = resolvedOption ?? chosenOption;
 
-  // Resolve [[npc_id]] tokens using current relationship state so NPCs are
-  // named correctly if the player knows them, or described as strangers if not.
   const resolve = (text: string) => resolveNpcTokens(text, relationships ?? null);
 
-  const streamLabel = STREAM_LABELS[beat.stream_id as keyof typeof STREAM_LABELS] ?? beat.stream_id;
-  const daysLeft = beat.expires_on_day - dayIndex;
+  const trackLabel = TRACK_LABELS[storylet.track_key as TrackKey] ?? storylet.track_key;
+  const daysLeft = storylet.expires_on_day - dayIndex;
 
   async function handleChoice(option: StoryletChoice) {
     if (choosing || displayedOption) return;
@@ -112,7 +104,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
     setError(null);
     setChosenOption(option);
     try {
-      await onChoice(beat, option);
+      await onChoice(storylet, option);
     } catch (err) {
       setChosenOption(null);
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -128,8 +120,8 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
       {/* Header */}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <span className="prep-label text-primary/60">{streamLabel}</span>
-          <h3 className="mt-0.5 text-lg font-bold text-primary font-heading">{beat.title}</h3>
+          <span className="prep-label text-primary/60">{trackLabel}</span>
+          <h3 className="mt-0.5 text-lg font-bold text-primary font-heading">{storylet.title}</h3>
         </div>
         {daysLeft <= 1 && (
           <span className="shrink-0 rounded bg-accent border border-accent-foreground/20 px-2 py-0.5 text-xs font-medium text-accent-foreground">
@@ -139,7 +131,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
       </div>
 
       {/* Body */}
-      <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{resolve(beat.body)}</p>
+      <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{resolve(storylet.body)}</p>
 
       {/* Post-choice result */}
       {displayedOption && (
@@ -151,7 +143,6 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
           {resolvedDeltas.length > 0 && (
             <ul className="flex flex-wrap gap-2 text-xs font-stat">
               {resolvedDeltas.map(({ label, delta }) => {
-                // Stress is inverted: going up is bad (red), going down is good (green)
                 const isGood = label === "stress" ? delta < 0 : delta > 0;
                 return (
                   <li
@@ -170,7 +161,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
           )}
           <TesterOnly>
             <NarrativeFeedback
-              storyletId={beat.instance_id}
+              storyletId={storylet.progress_id}
               dayIndex={dayIndex}
             />
           </TesterOnly>
@@ -190,7 +181,7 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
       {/* Options */}
       {!displayedOption && (
         <div className="flex flex-col gap-2">
-          {beat.options.map((option) => {
+          {storylet.options.map((option) => {
             const locked = !meetsMoneyRequirement(moneyBand, option.money_requirement);
             const previewDeltas = computeDeltas(option);
             return (
@@ -208,7 +199,6 @@ export function ArcBeatCard({ beat, dayIndex, onChoice, disabled, onDismiss, res
                 {(previewDeltas.length > 0 || locked) && (
                   <span className="mt-1 flex flex-wrap gap-1.5">
                     {previewDeltas.map(({ label, delta }) => {
-                      // Stress is inverted: going up is bad (red), going down is good (green)
                       const isGood = label === "stress" ? delta < 0 : delta > 0;
                       return (
                         <span

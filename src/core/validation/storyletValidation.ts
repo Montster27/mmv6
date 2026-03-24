@@ -129,13 +129,13 @@ export function coerceStoryletRow(row: any): Storylet {
     introduces_npc: Array.isArray(row?.introduces_npc)
       ? (row.introduces_npc as unknown[]).filter((v) => typeof v === "string") as string[]
       : undefined,
-    // Arc membership fields — preserved so edits don't silently clear them
-    arc_id: isString(row?.arc_id) ? row.arc_id : (row?.arc_id === null ? null : undefined),
-    step_key: isString(row?.step_key) ? row.step_key : (row?.step_key === null ? null : undefined),
+    // Track membership fields — preserved so edits don't silently clear them
+    track_id: isString(row?.track_id) ? row.track_id : (row?.track_id === null ? null : undefined),
+    storylet_key: isString(row?.storylet_key) ? row.storylet_key : (row?.storylet_key === null ? null : undefined),
     order_index: typeof row?.order_index === "number" ? row.order_index : undefined,
     due_offset_days: typeof row?.due_offset_days === "number" ? row.due_offset_days : undefined,
     expires_after_days: typeof row?.expires_after_days === "number" ? row.expires_after_days : undefined,
-    default_next_step_key: isString(row?.default_next_step_key) ? row.default_next_step_key : (row?.default_next_step_key === null ? null : undefined),
+    default_next_key: isString(row?.default_next_key) ? row.default_next_key : (row?.default_next_key === null ? null : undefined),
   };
 }
 

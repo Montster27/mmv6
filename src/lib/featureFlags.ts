@@ -1,5 +1,5 @@
 export type FeatureFlags = {
-  arcOneScarcityEnabled: boolean;
+  chapterOneScarcityEnabled: boolean;
   arcs: boolean;
   resources: boolean;
   skills: boolean;
@@ -43,7 +43,7 @@ export function getFeatureFlags(): FeatureFlags {
   const base: FeatureFlags =
     set === "muted"
       ? {
-          arcOneScarcityEnabled: true,
+          chapterOneScarcityEnabled: true,
           arcs: true,
           resources: true,
           skills: true,
@@ -63,7 +63,7 @@ export function getFeatureFlags(): FeatureFlags {
           relationshipDebugEnabled: true,
         }
       : {
-          arcOneScarcityEnabled: true,
+          chapterOneScarcityEnabled: true,
           arcs: true,
           resources: true,
           skills: true,
@@ -101,7 +101,7 @@ export function getFeatureFlags(): FeatureFlags {
       };
 
   const overrides: Partial<FeatureFlags> = {
-    arcOneScarcityEnabled:
+    chapterOneScarcityEnabled:
       parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARC_ONE_SCARCITY) ?? undefined,
     arcs: parseFlag(process.env.NEXT_PUBLIC_FEATURE_ARCS) ?? undefined,
     resources: parseFlag(process.env.NEXT_PUBLIC_FEATURE_RESOURCES) ?? undefined,

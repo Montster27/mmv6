@@ -60,7 +60,7 @@ describe("arc engine helpers", () => {
       title: "Title",
       body: "Body",
       choices: [],
-      default_next_step_key: null,
+      default_next_key: null,
       due_offset_days: 2,
       expires_after_days: 3,
     };

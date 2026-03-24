@@ -1,4 +1,4 @@
-import type { ArcOneState, LifePressureState, MoneyBand, SkillFlags, RelationshipState } from "@/core/arcOne/types";
+import type { ChapterOneState, LifePressureState, MoneyBand, SkillFlags, RelationshipState } from "@/core/chapter/types";
 
 const SKEW_THRESHOLD = 2;
 
@@ -15,7 +15,7 @@ function moneyLine(bandHistory: MoneyBand[]): string | null {
   return null;
 }
 
-function energyLine(energyLevel: ArcOneState["energyLevel"]): string | null {
+function energyLine(energyLevel: ChapterOneState["energyLevel"]): string | null {
   if (energyLevel === "low") {
     return "You repeatedly ran yourself thin.";
   }
@@ -45,13 +45,13 @@ function relationalLine(relationships: Record<string, RelationshipState>): strin
 }
 
 export function buildReflectionSummary(params: {
-  arcOneState: ArcOneState;
+  chapterOneState: ChapterOneState;
   moneyBandHistory?: MoneyBand[];
 }): string[] {
   // TODO(arc-one): tune reflection verbosity and ordering.
-  const { arcOneState } = params;
+  const { chapterOneState } = params;
   const lines: Array<string | null> = [];
-  const lp: LifePressureState = arcOneState.lifePressureState;
+  const lp: LifePressureState = chapterOneState.lifePressureState;
 
   lines.push(
     compareAxis(
@@ -78,10 +78,10 @@ export function buildReflectionSummary(params: {
     )
   );
 
-  lines.push(energyLine(arcOneState.energyLevel));
-  lines.push(expiredLine(arcOneState.expiredOpportunities.length, lp.people >= lp.achievement));
+  lines.push(energyLine(chapterOneState.energyLevel));
+  lines.push(expiredLine(chapterOneState.expiredOpportunities.length, lp.people >= lp.achievement));
   lines.push(moneyLine(params.moneyBandHistory ?? []));
-  lines.push(relationalLine(arcOneState.relationships ?? {}));
+  lines.push(relationalLine(chapterOneState.relationships ?? {}));
 
   return lines.filter((line): line is string => Boolean(line)).slice(0, 5);
 }

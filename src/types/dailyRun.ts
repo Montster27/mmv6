@@ -11,27 +11,8 @@ import type {
 import type { Initiative } from "./initiatives";
 import type { AlignmentEvent, Faction } from "./factions";
 import type { PlayerDayState } from "./dayState";
-import type { ArcOneState } from "@/core/arcOne/types";
-import type { StoryletChoice } from "./storylets";
-
-/** A single arc narrative beat that is due today for the player. */
-export type ArcBeat = {
-  instance_id: string;
-  arc_key: string;
-  /** Which of the six streams this beat belongs to. */
-  stream_id: string;
-  title: string;
-  body: string;
-  /** Unified choices — use choice.id as option_key when resolving beats. */
-  options: StoryletChoice[];
-  expires_on_day: number;
-  /** NPC ids this beat can introduce (auto-marked met on choice). */
-  introduces_npc?: string[];
-  /** Day segment this beat belongs to (null = any segment). */
-  segment?: 'morning' | 'afternoon' | 'evening' | 'night' | null;
-  /** True when this is a conflict beat (time budget is tight). */
-  is_conflict?: boolean;
-};
+import type { ChapterOneState } from "@/core/chapter/types";
+import type { TrackStorylet } from "./tracks";
 
 export type DailyRunStage =
   | "setup"
@@ -159,9 +140,9 @@ export type DailyRun = {
     | "hours_remaining"
     | "hours_committed"
   > | null;
-  arcOneState?: ArcOneState;
-  /** Arc One narrative beats due today (one per stream, up to 2 shown). */
-  arcBeats?: ArcBeat[];
+  chapterOneState?: ChapterOneState;
+  /** Track storylets due today (one per track, up to 2 shown). */
+  trackStorylets?: TrackStorylet[];
   lastCheck?: import("./checks").CheckResult | null;
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;

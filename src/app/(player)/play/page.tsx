@@ -21,7 +21,7 @@ import { PlaySkeleton } from "@/components/skeletons/PlaySkeleton";
 import { AllocationSection } from "@/components/play/AllocationSection";
 import DaySummaryCard from "@/components/play/DaySummaryCard";
 import { ReflectionSection } from "@/components/play/ReflectionSection";
-import { ArcOneReflection } from "@/components/play/ArcOneReflection";
+import { ChapterOneReflection } from "@/components/play/ChapterOneReflection";
 import { TesterFeedback } from "@/components/play/TesterFeedback";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 import { ensureCadenceUpToDate } from "@/lib/cadence";
@@ -68,7 +68,7 @@ import {
   type CompareSnapshot,
 } from "@/lib/afterActionCompare";
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
-import { getArcOneState, bumpLifePressure, updateSkillFlag } from "@/core/arcOne/state";
+import { getChapterOneState, bumpLifePressure, updateSkillFlag } from "@/core/chapter/state";
 import {
   applyRelationshipEvents,
   ensureRelationshipDefaults,
@@ -79,9 +79,9 @@ import {
   type RelationshipEvent,
 } from "@/lib/relationships";
 import { getDisplayBody } from "@/domain/npcs/registry";
-import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
+import { CHAPTER_ONE_LAST_DAY } from "@/core/chapter/constants";
 import { skillCostForLevel } from "@/core/sim/skillProgression";
-import { buildReflectionSummary, buildReplayPrompt } from "@/core/arcOne/reflection";
+import { buildReflectionSummary, buildReplayPrompt } from "@/core/chapter/reflection";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 import type { TelemetryEvent } from "@/types/telemetry";
 import type {
@@ -102,12 +102,12 @@ import { getFeatureFlags } from "@/lib/featureFlags";
 import { useBootstrap } from "@/hooks/queries/useBootstrap";
 import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
-import { ArcBeatCard } from "@/components/play/ArcBeatCard";
+import { TrackStoryletCard } from "@/components/play/TrackStoryletCard";
 import { SleepCard } from "@/components/play/SleepCard";
 import { SegmentTransitionCard } from "@/components/play/SegmentTransitionCard";
 import { getBridgeText } from "@/lib/segmentBridge";
 import type { Segment as BridgeSegment } from "@/lib/segmentBridge";
-import type { ArcBeat } from "@/types/dailyRun";
+import type { TrackStorylet } from "@/types/tracks";
 import type { StoryletChoice } from "@/types/storylets";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
@@ -248,7 +248,7 @@ export default function PlayPage() {
   const [advancingUserId, setAdvancingUserId] = useState<string | null>(null);
   const [togglingAdminId, setTogglingAdminId] = useState<string | null>(null);
   const [reflectionSaving, setReflectionSaving] = useState(false);
-  const [arcOneReflectionSaving, setArcOneReflectionSaving] = useState(false);
+  const [chapterOneReflectionSaving, setChapterOneReflectionSaving] = useState(false);
   const [buddyAssignment, setBuddyAssignment] = useState<{
     buddy_type: "human" | "ai";
     buddy_user_id: string | null;
@@ -268,8 +268,8 @@ export default function PlayPage() {
     type: MiniGameType;
     choiceId: string;
     config?: Record<string, unknown>;
-    /** When the mini-game was triggered from an arc beat, store the beat+option to resume. */
-    pendingArcBeat?: { beat: ArcBeat; option: StoryletChoice };
+    /** When the mini-game was triggered from a track storylet, store it to resume. */
+    pendingTrackStorylet?: { storylet: TrackStorylet; option: StoryletChoice };
   } | null>(null);
   const [pendingReactionText, setPendingReactionText] = useState<string | null>(
     null
@@ -289,11 +289,11 @@ export default function PlayPage() {
     count: number;
     handles: string[];
   } | null>(null);
-  const [resolvedArcBeatIds, setResolvedArcBeatIds] = useState<Set<string>>(
+  const [resolvedTrackStoryletIds, setResolvedTrackStoryletIds] = useState<Set<string>>(
     new Set()
   );
   const [pendingDismissalBeats, setPendingDismissalBeats] = useState<
-    Array<{ beat: ArcBeat; chosenOption: StoryletChoice }>
+    Array<{ beat: TrackStorylet; chosenOption: StoryletChoice }>
   >([]);
   // Set when all arc beats are resolved but allocation hasn't been saved yet.
   // Holds up markDailyComplete until after the player sets their time allocation.
@@ -410,10 +410,10 @@ export default function PlayPage() {
     () => dailyState?.day_index ?? dayIndexState,
     [dailyState?.day_index, dayIndexState]
   );
-  const arcOneMode = useMemo(
+  const chapterOneMode = useMemo(
     () =>
-      featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY,
-    [featureFlags.arcOneScarcityEnabled, dayIndex]
+      featureFlags.chapterOneScarcityEnabled && dayIndex <= CHAPTER_ONE_LAST_DAY,
+    [featureFlags.chapterOneScarcityEnabled, dayIndex]
   );
   const beatBufferEnabled = Boolean(featureFlags.beatBufferEnabled);
   const relationshipDebugEnabled = Boolean(featureFlags.relationshipDebugEnabled);
@@ -422,26 +422,25 @@ export default function PlayPage() {
     if (npcId === "npc_floor_miguel") return "Miguel";
     return npcId;
   }, []);
-  const arcOneState = useMemo(
-    () => (arcOneMode ? getArcOneState(dailyState) : null),
-    [arcOneMode, dailyState]
+  const chapterOneState = useMemo(
+    () => (chapterOneMode ? getChapterOneState(dailyState) : null),
+    [chapterOneMode, dailyState]
   );
-  const arcBeats = useMemo(
-    () => dailyRunQuery.data?.arcBeats ?? [],
-    [dailyRunQuery.data?.arcBeats]
+  const trackStorylets = useMemo(
+    () => dailyRunQuery.data?.trackStorylets ?? [],
+    [dailyRunQuery.data?.trackStorylets]
   );
-  // Clear resolved IDs (and allocation gate) when fresh arc beat data arrives
+  // Clear resolved IDs when fresh track storylet data arrives
   useEffect(() => {
-    setResolvedArcBeatIds(new Set());
-    // If allocation is now saved (e.g. day advanced), clear the gate
+    setResolvedTrackStoryletIds(new Set());
     if (allocationSaved) setAwaitingAllocation(false);
-  }, [dailyRunQuery.data?.arcBeats, allocationSaved]);
+  }, [dailyRunQuery.data?.trackStorylets, allocationSaved]);
   const relationshipsState = useMemo(
-    () => arcOneState?.relationships ?? {},
-    [arcOneState?.relationships]
+    () => chapterOneState?.relationships ?? {},
+    [chapterOneState?.relationships]
   );
   useEffect(() => {
-    if (!arcOneMode || !dailyState || !userId) return;
+    if (!chapterOneMode || !dailyState || !userId) return;
     const { next: migrated, changed: migratedChanged } = migrateLegacyNpcMemory(
       relationshipsState,
       dailyState.npc_memory as Record<string, unknown>
@@ -458,22 +457,22 @@ export default function PlayPage() {
       .catch((err) => {
         console.error("Failed to ensure relationship defaults", err);
       });
-  }, [arcOneMode, dailyState?.id, userId, dayIndex, relationshipsState]);
-  const arcOneReflectionReady = Boolean(
-    arcOneMode &&
-      arcOneState &&
-      dayIndex >= ARC_ONE_LAST_DAY &&
-      !arcOneState.reflectionDone
+  }, [chapterOneMode, dailyState?.id, userId, dayIndex, relationshipsState]);
+  const chapterOneReflectionReady = Boolean(
+    chapterOneMode &&
+      chapterOneState &&
+      dayIndex >= CHAPTER_ONE_LAST_DAY &&
+      !chapterOneState.reflectionDone
   );
-  const arcOneReflectionLines = useMemo(
+  const chapterOneReflectionLines = useMemo(
     () =>
-      arcOneReflectionReady && arcOneState
-        ? buildReflectionSummary({ arcOneState, moneyBandHistory: [] })
+      chapterOneReflectionReady && chapterOneState
+        ? buildReflectionSummary({ chapterOneState, moneyBandHistory: [] })
         : [],
-    [arcOneReflectionReady, arcOneState]
+    [chapterOneReflectionReady, chapterOneState]
   );
   const skillUiEnabled = useMemo(() => {
-    if (!featureFlags.skills || arcOneMode) return false;
+    if (!featureFlags.skills || chapterOneMode) return false;
     const unlockDay = dailyRunQuery.data?.nextSkillUnlockDay ?? 2;
     if (dayIndex < unlockDay) return false;
     const levels = {
@@ -491,7 +490,7 @@ export default function PlayPage() {
     return (skillBank?.available_points ?? 0) >= minCost;
   }, [
     featureFlags.skills,
-    arcOneMode,
+    chapterOneMode,
     dayIndex,
     dailyRunQuery.data?.nextSkillUnlockDay,
     skills,
@@ -521,19 +520,19 @@ export default function PlayPage() {
       return kind === "npc_memory";
     });
   }, [relDebugEvents, relDebugFilter]);
-  // In arcOneMode the "complete" screen must not appear while beats are still
+  // In chapterOneMode the "complete" screen must not appear while beats are still
   // visible or pending dismissal — the server now prevents this, but guard
   // client-side too for robustness.
-  // In arcOneMode, daily complete must not show until the player has
+  // In chapterOneMode, daily complete must not show until the player has
   // explicitly chosen to sleep (sleepCardDone = true).  Until then,
   // they navigate through segments via the SegmentTransitionCard or SleepCard.
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR &&
       stage === "complete" &&
-      arcBeats.length === 0 &&
+      trackStorylets.length === 0 &&
       !awaitingAllocation &&
-      !(arcOneMode && pendingDismissalBeats.length > 0) &&
-      !(arcOneMode && !sleepCardDone)) ||
+      !(chapterOneMode && pendingDismissalBeats.length > 0) &&
+      !(chapterOneMode && !sleepCardDone)) ||
     (!USE_DAILY_LOOP_ORCHESTRATOR && alreadyCompletedToday);
 
   const loadDevCharacters = async () => {
@@ -862,8 +861,8 @@ export default function PlayPage() {
           const next = candidates.filter((c) => !used.has(c.id)).slice(0, 3);
           const entrySlug = "s1_dorm_wake_dislocation";
           const shouldForceEntry =
-            featureFlags.arcOneScarcityEnabled &&
-            day <= ARC_ONE_LAST_DAY &&
+            featureFlags.chapterOneScarcityEnabled &&
+            day <= CHAPTER_ONE_LAST_DAY &&
             day === 1;
           let entryStorylet = shouldForceEntry
             ? candidates.find((c) => c.slug === entrySlug)
@@ -1842,8 +1841,8 @@ export default function PlayPage() {
           user_id: userId,
           day: dayIndex,
           event_type: "BEAT_SHOWN",
-          arc_id: null,
-          arc_instance_id: null,
+          track_id: null,
+          track_progress_id: null,
           step_key: null,
           option_key: choiceId,
           delta: null,
@@ -1926,8 +1925,8 @@ export default function PlayPage() {
             user_id: userId,
             day: dayIndex,
             event_type: "REL_DELTA",
-            arc_id: null,
-            arc_instance_id: null,
+            track_id: null,
+            track_progress_id: null,
             step_key: null,
             option_key: choiceId,
             delta: entry.delta,
@@ -1948,8 +1947,8 @@ export default function PlayPage() {
       }
       // Wire identity_tags → lifePressureState
       const choiceIdentityTags = (selectedChoice?.identity_tags ?? []) as string[];
-      if (choiceIdentityTags.length > 0 && arcOneState) {
-        const nextLp = bumpLifePressure(arcOneState.lifePressureState, choiceIdentityTags);
+      if (choiceIdentityTags.length > 0 && chapterOneState) {
+        const nextLp = bumpLifePressure(chapterOneState.lifePressureState, choiceIdentityTags);
         await updateLifePressureState(userId, nextLp);
         if (dailyState) {
           setDailyState({ ...dailyState, life_pressure_state: nextLp });
@@ -1958,8 +1957,8 @@ export default function PlayPage() {
 
       // Wire skill_modifier → skillFlags
       const skillModifier = selectedChoice?.skill_modifier as string | undefined;
-      if (skillModifier && arcOneState?.skillFlags) {
-        const nextFlags = updateSkillFlag(arcOneState.skillFlags, skillModifier as any);
+      if (skillModifier && chapterOneState?.skillFlags) {
+        const nextFlags = updateSkillFlag(chapterOneState.skillFlags, skillModifier as any);
         await updateSkillFlags(userId, nextFlags);
         if (dailyState) {
           setDailyState({ ...dailyState, skill_flags: nextFlags });
@@ -1989,21 +1988,21 @@ export default function PlayPage() {
   // outcome by mapping won→"success" / lost→"failure" outcome id, then resume
   // the normal handleChoice flow by re-calling it (the mini-game intercept
   // won't re-trigger because activeMiniGame will be cleared first).
-  // Ref to hold handleArcBeatChoice so handleMiniGameComplete can call it
+  // Ref to hold handleTrackStoryletChoice so handleMiniGameComplete can call it
   // without a circular dependency (handleMiniGameComplete is defined first).
-  const arcBeatChoiceRef = useRef<((beat: ArcBeat, option: StoryletChoice) => Promise<void>) | undefined>(undefined);
+  const trackStoryletChoiceRef = useRef<((beat: TrackStorylet, option: StoryletChoice) => Promise<void>) | undefined>(undefined);
 
   const handleMiniGameComplete = useCallback(
     (result: MiniGameResult) => {
       if (!activeMiniGame) return;
-      const pending = activeMiniGame.pendingArcBeat;
+      const pending = activeMiniGame.pendingTrackStorylet;
       const { choiceId } = activeMiniGame;
       setActiveMiniGame(null);
 
-      if (pending && arcBeatChoiceRef.current) {
-        // Arc beat path: resume handleArcBeatChoice (mini_game guard won't
-        // fire again because activeMiniGame is now null).
-        arcBeatChoiceRef.current(pending.beat, pending.option);
+      if (pending && trackStoryletChoiceRef.current) {
+        // Track storylet path: resume handleTrackStoryletChoice (mini_game guard
+        // won't fire again because activeMiniGame is now null).
+        trackStoryletChoiceRef.current(pending.storylet, pending.option);
       } else {
         // Legacy storylet path: re-invoke handleChoice.
         handleChoice(choiceId);
@@ -2112,8 +2111,8 @@ export default function PlayPage() {
     }
   };
 
-  const handleArcOneReplayIntention = async (intention: string) => {
-    setArcOneReflectionSaving(true);
+  const handleChapterOneReplayIntention = async (intention: string) => {
+    setChapterOneReflectionSaving(true);
     setError(null);
     try {
       const { data } = await supabase.auth.getSession();
@@ -2139,19 +2138,19 @@ export default function PlayPage() {
       console.error(e);
       setError(e instanceof Error ? e.message : "Failed to save intention.");
     } finally {
-      setArcOneReflectionSaving(false);
+      setChapterOneReflectionSaving(false);
     }
   };
 
-  const handleArcBeatChoice = useCallback(
-    async (beat: ArcBeat, option: StoryletChoice) => {
-      // ── Mini-game intercept for arc beats ───────────────────────────────
+  const handleTrackStoryletChoice = useCallback(
+    async (beat: TrackStorylet, option: StoryletChoice) => {
+      // ── Mini-game intercept for track storylets ─────────────────────────
       if (option.mini_game && !activeMiniGame) {
         setActiveMiniGame({
           type: option.mini_game.type,
           choiceId: option.id,
           config: option.mini_game.config,
-          pendingArcBeat: { beat, option },
+          pendingTrackStorylet: { storylet: beat, option },
         });
         return; // wait for game to finish — handleMiniGameComplete resumes
       }
@@ -2160,14 +2159,14 @@ export default function PlayPage() {
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("No session");
 
-      const res = await fetch("/api/arc-one/beat", {
+      const res = await fetch("/api/tracks/resolve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          instance_id: beat.instance_id,
+          progress_id: beat.progress_id,
           option_key: option.id,
           day_index: dayIndex,
         }),
@@ -2196,7 +2195,7 @@ export default function PlayPage() {
           const { next: nextRelationships, logs } = applyRelationshipEvents(
             relationshipsState,
             relationshipEvents,
-            { storylet_slug: beat.arc_key, choice_id: option.id }
+            { storylet_slug: beat.track_key, choice_id: option.id }
           );
           await updateRelationships(userId, nextRelationships, dayIndex);
           if (dailyState) {
@@ -2212,13 +2211,13 @@ export default function PlayPage() {
               user_id: userId,
               day: dayIndex,
               event_type: "REL_DELTA",
-              arc_id: null,
-              arc_instance_id: beat.instance_id,
+              track_id: null,
+              track_progress_id: beat.progress_id,
               step_key: null,
               option_key: option.id,
               delta: entry.delta,
               meta: {
-                storylet_slug: beat.arc_key,
+                storylet_slug: beat.track_key,
                 choice_id: option.id,
                 npc_id: entry.npc_id,
                 kind: flagChanged ? "npc_memory" : "relational",
@@ -2258,8 +2257,8 @@ export default function PlayPage() {
         const condContext: Record<string, unknown> = {
           npc_memory: npcMemForCond,
         };
-        if (arcOneState?.moneyBand) {
-          condContext.money_band = arcOneState.moneyBand;
+        if (chapterOneState?.moneyBand) {
+          condContext.money_band = chapterOneState.moneyBand;
         }
         for (const cond of conditions) {
           if (matchesRequirement(cond.if, condContext)) {
@@ -2295,18 +2294,18 @@ export default function PlayPage() {
         });
       }
 
-      const newResolved = new Set([...resolvedArcBeatIds, beat.instance_id]);
-      setResolvedArcBeatIds(newResolved);
+      const newResolved = new Set([...resolvedTrackStoryletIds, beat.progress_id]);
+      setResolvedTrackStoryletIds(newResolved);
       // Keep this beat visible until the user dismisses it via the Continue button
       setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: resolvedOption }]);
 
       // Only mark day complete when all beats are resolved AND no more steps are queued
       const hasMoreSteps = resBody.next_step_key != null;
       if (
-        arcOneMode &&
+        chapterOneMode &&
         userId &&
         !hasMoreSteps &&
-        arcBeats.every((b) => newResolved.has(b.instance_id))
+        trackStorylets.every((b) => newResolved.has(b.progress_id))
       ) {
         if (!allocationSaved) {
           // Gate daily-complete behind allocation — show it after beats are dismissed
@@ -2321,14 +2320,14 @@ export default function PlayPage() {
         }
       }
     },
-    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState, allocationSaved, dayState, setDayState, activeMiniGame]
+    [dayIndex, resolvedTrackStoryletIds, trackStorylets, chapterOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, chapterOneState, allocationSaved, dayState, setDayState, activeMiniGame]
   );
 
   // Keep the ref in sync so handleMiniGameComplete can call it without circular deps
-  arcBeatChoiceRef.current = handleArcBeatChoice;
+  trackStoryletChoiceRef.current = handleTrackStoryletChoice;
 
-  const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
-    setPendingDismissalBeats((prev) => prev.filter((entry) => entry.beat.instance_id !== beat.instance_id));
+  const handleDismissTrackStorylet = useCallback((beat: TrackStorylet) => {
+    setPendingDismissalBeats((prev) => prev.filter((entry) => entry.beat.progress_id !== beat.progress_id));
     // Keep resolved ID to prevent flash of old beat; cleared when fresh data arrives
     setRefreshTick((t) => t + 1);
     // Clear bridge text once a beat has been interacted with
@@ -2491,8 +2490,8 @@ export default function PlayPage() {
     }
   }, [stage, alreadyCompletedToday, userId, dayIndex]);
 
-  // arcOneMode edge case: player returns to page after resolving all beats in a
-  // previous session. Server returns arcBeats=[] but markDailyComplete was never
+  // chapterOneMode edge case: player returns to page after resolving all beats in a
+  // previous session. Server returns trackStorylets=[] but markDailyComplete was never
   // called. Auto-complete so the player sees "Daily complete ✓".
   //
   // Guard: only fire if the user has resolved at least one beat this session
@@ -2501,19 +2500,19 @@ export default function PlayPage() {
   const dailyRunDataLoaded = !!dailyRunQuery.data;
   useEffect(() => {
     if (!USE_DAILY_LOOP_ORCHESTRATOR) return;
-    if (!arcOneMode) return;
+    if (!chapterOneMode) return;
     if (!userId) return;
     if (loading) return;
     if (alreadyCompletedToday) return;
     if (!dailyRunDataLoaded) return; // wait for data to load
-    if (arcBeats.length > 0) return; // beats still pending
+    if (trackStorylets.length > 0) return; // beats still pending
     // Only auto-complete when the user has done something this session, or when
     // the server already signalled there are no beats due (stage === "complete").
-    if (resolvedArcBeatIds.size === 0 && stage !== "complete") return;
+    if (resolvedTrackStoryletIds.size === 0 && stage !== "complete") return;
     markDailyComplete(userId, dayIndex).catch(console.error);
     incrementGroupObjective(2, "daily_complete").catch(() => {});
     setRefreshTick((t) => t + 1);
-  }, [arcOneMode, arcBeats.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedArcBeatIds.size, stage]);
+  }, [chapterOneMode, trackStorylets.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage]);
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
@@ -2534,8 +2533,8 @@ export default function PlayPage() {
                 {dayState?.energy ?? dailyState?.energy ?? "—"} · Stress{" "}
                 {dayState?.stress ?? dailyState?.stress ?? "—"}
               </p>
-              {/* In arcOneMode hide the legacy stage copy while beats are pending */}
-              {(!arcOneMode || (arcBeats.length === 0 && pendingDismissalBeats.length === 0)) && (
+              {/* In chapterOneMode hide the legacy stage copy while beats are pending */}
+              {(!chapterOneMode || (trackStorylets.length === 0 && pendingDismissalBeats.length === 0)) && (
                 <div className="mt-2 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground/80">
                     {getDailyStageCopy(stage).title}
@@ -2659,7 +2658,7 @@ export default function PlayPage() {
                     </div>
                   </TesterOnly>
                 ) : null}
-                {testerMode && arcOneState ? (
+                {testerMode && chapterOneState ? (
                   <TesterOnly>
                     <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                       <p className="font-semibold text-slate-700">People</p>
@@ -2758,7 +2757,7 @@ export default function PlayPage() {
             />
           ) : null}
 
-          {seasonResetPending && !arcOneMode ? (
+          {seasonResetPending && !chapterOneMode ? (
             <section className="rounded border-2 border-primary/40 bg-primary px-4 py-4 space-y-3 text-primary-foreground prep-stripe-top">
               <h2 className="text-xl font-bold tracking-wide font-heading">
                 Season {seasonIndex ?? "?"} begins
@@ -2887,7 +2886,7 @@ export default function PlayPage() {
                         allocations={skillAllocations}
                         skills={skills ?? undefined}
                         skillsEnabled={skillUiEnabled}
-                        scarcityMode={arcOneMode}
+                        scarcityMode={chapterOneMode}
                         onAllocateSkillPoint={handleAllocateSkillPoint}
                         submitting={allocatingSkill}
                         onSubmitPosture={handleSubmitPosture}
@@ -2913,7 +2912,7 @@ export default function PlayPage() {
                   {((stage === "storylet_1" ||
                     stage === "storylet_2" ||
                     stage === "storylet_3" ||
-                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && !arcOneMode) && (
+                    (!USE_DAILY_LOOP_ORCHESTRATOR && allocationSaved)) && !chapterOneMode) && (
                     <section className="space-y-3">
                         <h2 className="prep-label">Today&apos;s Choices</h2>
 
@@ -3223,7 +3222,7 @@ export default function PlayPage() {
 
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     featureFlags.alignment &&
-                    !arcOneMode &&
+                    !chapterOneMode &&
                     factions.length > 0 && (
                     <section className="space-y-3">
                       <FactionStatusPanel
@@ -3240,7 +3239,7 @@ export default function PlayPage() {
                     )}
 
                   {/* Segment bridge text — shown when advancing to a new segment */}
-                  {USE_DAILY_LOOP_ORCHESTRATOR && arcOneMode && bridgeText && (
+                  {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode && bridgeText && (
                     <div className="relative rounded border border-border/60 bg-muted/40 px-4 py-3 text-sm italic text-foreground/70">
                       <span>{bridgeText}</span>
                       <button
@@ -3254,7 +3253,7 @@ export default function PlayPage() {
                   )}
 
                   {/* Global mini-game overlay — shows on top of arc beats when active */}
-                  {activeMiniGame && activeMiniGame.pendingArcBeat && (
+                  {activeMiniGame && activeMiniGame.pendingTrackStorylet && (
                     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                       <MiniGameShell
                         gameType={activeMiniGame.type}
@@ -3265,36 +3264,36 @@ export default function PlayPage() {
                   )}
 
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
-                    arcOneMode &&
-                    !activeMiniGame?.pendingArcBeat &&
-                    (arcBeats.length > 0 || pendingDismissalBeats.length > 0) && (
+                    chapterOneMode &&
+                    !activeMiniGame?.pendingTrackStorylet &&
+                    (trackStorylets.length > 0 || pendingDismissalBeats.length > 0) && (
                     <section className="space-y-3">
                       <h2 className="prep-label">
                         Today&apos;s Moments
                       </h2>
                       {/* Resolved beats awaiting user dismissal (shown first so reaction text is prominent) */}
                       {pendingDismissalBeats.map(({ beat, chosenOption }) => (
-                        <ArcBeatCard
-                          key={beat.instance_id}
-                          beat={beat}
+                        <TrackStoryletCard
+                          key={beat.progress_id}
+                          storylet={beat}
                           dayIndex={dayIndex}
-                          onChoice={handleArcBeatChoice}
+                          onChoice={handleTrackStoryletChoice}
                           disabled
                           resolvedOption={chosenOption}
-                          onDismiss={() => handleDismissArcBeat(beat)}
+                          onDismiss={() => handleDismissTrackStorylet(beat)}
                           relationships={relationshipsState}
                         />
                       ))}
-                      {/* Unresolved beats */}
-                      {arcBeats
-                        .filter((b) => !resolvedArcBeatIds.has(b.instance_id))
-                        .map((beat) => (
-                          <ArcBeatCard
-                            key={beat.instance_id}
-                            beat={beat}
+                      {/* Unresolved track storylets */}
+                      {trackStorylets
+                        .filter((b) => !resolvedTrackStoryletIds.has(b.progress_id))
+                        .map((ts) => (
+                          <TrackStoryletCard
+                            key={ts.progress_id}
+                            storylet={ts}
                             dayIndex={dayIndex}
-                            onChoice={handleArcBeatChoice}
-                            moneyBand={arcOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
+                            onChoice={handleTrackStoryletChoice}
+                            moneyBand={chapterOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
                             relationships={relationshipsState}
                           />
                         ))}
@@ -3302,8 +3301,8 @@ export default function PlayPage() {
                   )}
 
                   {/* Segment transition card — morning/afternoon/evening done, advance to next */}
-                  {USE_DAILY_LOOP_ORCHESTRATOR && arcOneMode &&
-                    arcBeats.length === 0 && pendingDismissalBeats.length === 0 &&
+                  {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode &&
+                    trackStorylets.length === 0 && pendingDismissalBeats.length === 0 &&
                     !sleepCardDone &&
                     dayState?.current_segment !== 'night' &&
                     (dayState?.hours_remaining ?? 16) > 0 && (
@@ -3315,9 +3314,9 @@ export default function PlayPage() {
                   )}
 
                   {/* Sleep card — shown at end of night when no beats remain */}
-                  {USE_DAILY_LOOP_ORCHESTRATOR && arcOneMode &&
+                  {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode &&
                     (dayState?.current_segment === 'night' || (dayState?.hours_remaining ?? 16) <= 0) &&
-                    arcBeats.length === 0 && pendingDismissalBeats.length === 0 &&
+                    trackStorylets.length === 0 && pendingDismissalBeats.length === 0 &&
                     !sleepCardDone && (
                     <SleepCard
                       dayIndex={dayIndex}
@@ -3329,7 +3328,7 @@ export default function PlayPage() {
 
                   {/* End-of-day allocation — shown after all beats are resolved and dismissed */}
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
-                    arcOneMode &&
+                    chapterOneMode &&
                     awaitingAllocation &&
                     pendingDismissalBeats.length === 0 && (
                     <DaySummaryCard
@@ -3347,25 +3346,25 @@ export default function PlayPage() {
                     />
                   )}
 
-              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && arcOneReflectionReady ? (
+              {USE_DAILY_LOOP_ORCHESTRATOR && stage === "reflection" && chapterOneReflectionReady ? (
                 <section className="space-y-3">
-                  <ArcOneReflection
-                    summaryLines={arcOneReflectionLines}
+                  <ChapterOneReflection
+                    summaryLines={chapterOneReflectionLines}
                     prompt={buildReplayPrompt()}
-                    submitting={arcOneReflectionSaving}
-                    onSelect={handleArcOneReplayIntention}
+                    submitting={chapterOneReflectionSaving}
+                    onSelect={handleChapterOneReplayIntention}
                   />
                   <TesterOnly>
                     <TesterFeedback
                       dayIndex={dayIndex}
                       context={{
-                        lifePressureState: arcOneState?.lifePressureState,
-                        energyLevel: arcOneState?.energyLevel,
-                        moneyBand: arcOneState?.moneyBand,
-                        skillFlags: arcOneState?.skillFlags,
-                        npcMemory: arcOneState?.npcMemory,
-                        replayIntention: arcOneState?.replayIntention,
-                        expiredOpportunities: arcOneState?.expiredOpportunities,
+                        lifePressureState: chapterOneState?.lifePressureState,
+                        energyLevel: chapterOneState?.energyLevel,
+                        moneyBand: chapterOneState?.moneyBand,
+                        skillFlags: chapterOneState?.skillFlags,
+                        npcMemory: chapterOneState?.npcMemory,
+                        replayIntention: chapterOneState?.replayIntention,
+                        expiredOpportunities: chapterOneState?.expiredOpportunities,
                       }}
                       label="Leave feedback"
                     />
@@ -3401,8 +3400,8 @@ export default function PlayPage() {
                   skills={skills}
                   resourcesEnabled={featureFlags.resources}
                   skillsEnabled={skillUiEnabled}
-                  scarcityMode={arcOneMode && !featureFlags.resources}
-                  energyLevel={arcOneState?.energyLevel}
+                  scarcityMode={chapterOneMode && !featureFlags.resources}
+                  energyLevel={chapterOneState?.energyLevel}
                   onResourcesHoverStart={() => startHover("resources_panel")}
                   onResourcesHoverEnd={() => endHover("resources_panel")}
                   onVectorsHoverStart={() => startHover("vectors_panel")}

@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
   const admin = getAdminClient();
   const { data, error } = await admin
-    .from("arc_definitions")
+    .from("tracks")
     .select("id,key,title,description,tags,is_enabled,created_at")
     .order("created_at", { ascending: false });
 
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
 
   const admin = getAdminClient();
   const { data, error } = await admin
-    .from("arc_definitions")
+    .from("tracks")
     .insert({
       key,
       title,

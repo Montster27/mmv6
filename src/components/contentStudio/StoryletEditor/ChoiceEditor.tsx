@@ -12,7 +12,7 @@ interface ChoiceEditorProps {
   storyletOptions: { value: string; label?: string }[];
   stepKeyOptions?: { value: string; label?: string }[];
   onChange: (updates: Partial<StoryletChoice>) => void;
-  /** Called when the user wants to create a new storylet linked to this next_step_key. */
+  /** Called when the user wants to create a new storylet linked to this next_key. */
   onCreateLinkedStorylet?: (stepKey: string) => void;
 }
 
@@ -339,8 +339,8 @@ export function ChoiceEditor({
 
   const navCount = countSet(
     (choice as unknown as Record<string, unknown>).targetStoryletId,
-    choice.next_step_key,
-    choice.sets_stream_state?.stream,
+    choice.next_key,
+    choice.sets_track_state?.state,
     choice.money_effect,
     choice.outcome_type
   );
@@ -647,16 +647,17 @@ export function ChoiceEditor({
             </label>
             <div>
               <label className="block text-xs text-slate-600">
-                Next step key{" "}
-                <span className="text-slate-400">(within same arc)</span>
+                Next storylet key{" "}
+                <span className="text-slate-400">(within same track)</span>
                 <input
                   className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
                   list={stepKeyListId}
-                  value={choice.next_step_key ?? ""}
+                  value={choice.next_key ?? choice.next_key ?? ""}
                   placeholder="e.g. roommate_follow_up"
-                  onChange={(e) =>
-                    onChange({ next_step_key: e.target.value || null })
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value || null;
+                    onChange({ next_key: val });
+                  }}
                 />
                 {stepKeyOptions.length > 0 && (
                   <datalist id={stepKeyListId}>
@@ -669,53 +670,34 @@ export function ChoiceEditor({
                 )}
               </label>
               {onCreateLinkedStorylet &&
-                choice.next_step_key &&
-                !stepKeyOptions.some((o) => o.value === choice.next_step_key) && (
+                (choice.next_key ?? choice.next_key) &&
+                !stepKeyOptions.some((o) => o.value === (choice.next_key ?? choice.next_key)) && (
                   <button
                     type="button"
                     className="mt-1.5 text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
-                    onClick={() => onCreateLinkedStorylet(choice.next_step_key!)}
+                    onClick={() => onCreateLinkedStorylet((choice.next_key ?? choice.next_key)!)}
                   >
-                    ↳ Create &ldquo;{choice.next_step_key}&rdquo; storylet in this arc
+                    ↳ Create &ldquo;{choice.next_key ?? choice.next_key}&rdquo; storylet in this track
                   </button>
                 )}
             </div>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="block text-xs text-slate-600">
-              Sets stream state — stream
-              <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
-                value={choice.sets_stream_state?.stream ?? ""}
-                placeholder="e.g. roommate"
-                onChange={(e) => {
-                  const stream = e.target.value;
-                  onChange({
-                    sets_stream_state: stream
-                      ? { stream, state: choice.sets_stream_state?.state ?? "" }
-                      : undefined,
-                  });
-                }}
-              />
-            </label>
-            <label className="block text-xs text-slate-600">
-              Sets stream state — state
-              <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
-                value={choice.sets_stream_state?.state ?? ""}
-                placeholder="e.g. genuine_connection"
-                onChange={(e) => {
-                  const state = e.target.value;
-                  onChange({
-                    sets_stream_state: state
-                      ? { stream: choice.sets_stream_state?.stream ?? "", state }
-                      : undefined,
-                  });
-                }}
-              />
-            </label>
-          </div>
+          <label className="block text-xs text-slate-600">
+            Sets track state{" "}
+            <span className="text-slate-400">(narrative FSM state for this track)</span>
+            <input
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
+              value={choice.sets_track_state?.state ?? ""}
+              placeholder="e.g. genuine_connection"
+              onChange={(e) => {
+                const state = e.target.value;
+                onChange({
+                  sets_track_state: state ? { state } : undefined,
+                });
+              }}
+            />
+          </label>
 
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="block text-xs text-slate-600">

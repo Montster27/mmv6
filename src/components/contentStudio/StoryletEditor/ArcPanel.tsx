@@ -11,12 +11,12 @@ interface ArcPanelProps {
 }
 
 /**
- * Arc membership panel — shown as a tab in the StoryletEditor.
- * Lets you attach any storylet to an arc (making it an arc step)
+ * Track membership panel — shown as a tab in the StoryletEditor.
+ * Lets you attach any storylet to a track (making it a track storylet)
  * or detach it (making it standalone).
  */
 export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }: ArcPanelProps) {
-  const isArcStep = Boolean(storylet.arc_id);
+  const isTrackStorylet = Boolean(storylet.track_id);
 
   return (
     <div className="space-y-5">
@@ -26,21 +26,21 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
           <input
             type="checkbox"
             className="rounded"
-            checked={isArcStep}
+            checked={isTrackStorylet}
             onChange={(e) => {
               if (!e.target.checked) {
                 onChange({
-                  arc_id: null,
-                  step_key: null,
+                  track_id: null,
+                  storylet_key: null,
                   order_index: null,
                   due_offset_days: null,
                   expires_after_days: null,
-                  default_next_step_key: null,
+                  default_next_key: null,
                 });
               }
             }}
           />
-          <span className="font-medium">This storylet belongs to an arc</span>
+          <span className="font-medium">This storylet belongs to a track</span>
         </label>
         <p className="mt-1 text-xs text-slate-500 pl-5">
           Arc steps are scheduled with due/expiry windows and advance an arc instance FSM.
@@ -48,17 +48,17 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
         </p>
       </div>
 
-      {isArcStep && (
+      {isTrackStorylet && (
         <div className="space-y-4">
-          {/* Arc selector */}
+          {/* Track selector */}
           <label className="block text-xs text-slate-600">
-            Arc
+            Track
             <select
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-              value={storylet.arc_id ?? ""}
-              onChange={(e) => onChange({ arc_id: e.target.value || null })}
+              value={storylet.track_id ?? ""}
+              onChange={(e) => onChange({ track_id: e.target.value || null })}
             >
-              <option value="">— select arc —</option>
+              <option value="">— select track —</option>
               {arcOptions.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.title} ({a.key})
@@ -70,13 +70,13 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
           {/* Step key + order */}
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs text-slate-600">
-              Step key{" "}
-              <span className="text-slate-400">(unique within arc)</span>
+              Storylet key{" "}
+              <span className="text-slate-400">(unique within track)</span>
               <input
                 className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm font-mono"
-                value={storylet.step_key ?? ""}
+                value={storylet.storylet_key ?? ""}
                 placeholder="e.g. roommate_intro"
-                onChange={(e) => onChange({ step_key: e.target.value || null })}
+                onChange={(e) => onChange({ storylet_key: e.target.value || null })}
               />
             </label>
             <label className="text-xs text-slate-600">
@@ -127,20 +127,18 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
             </label>
           </div>
 
-          {/* Default next step */}
+          {/* Default next storylet */}
           <label className="block text-xs text-slate-600">
-            Default next step key{" "}
+            Default next storylet key{" "}
             <span className="text-slate-400">
-              (advance to this step if no choice specifies next_step_key)
+              (advance to this if no choice specifies next_key)
             </span>
             <input
               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm font-mono"
               list="arc-panel-step-keys"
-              value={storylet.default_next_step_key ?? ""}
+              value={storylet.default_next_key ?? ""}
               placeholder="e.g. roommate_follow_up"
-              onChange={(e) =>
-                onChange({ default_next_step_key: e.target.value || null })
-              }
+              onChange={(e) => onChange({ default_next_key: e.target.value || null })}
             />
             {stepKeyOptions.length > 0 && (
               <datalist id="arc-panel-step-keys">

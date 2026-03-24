@@ -79,7 +79,7 @@ export async function POST(request: Request) {
   await supabaseServer.from("skill_point_allocations").delete().eq("user_id", userId);
   await supabaseServer.from("user_alignment").delete().eq("user_id", userId);
   await supabaseServer.from("alignment_events").delete().eq("user_id", userId);
-  await supabaseServer.from("arc_instances").delete().eq("user_id", userId);
+  await supabaseServer.from("track_progress").delete().eq("user_id", userId);
   await supabaseServer.from("arc_offers").delete().eq("user_id", userId);
   await supabaseServer.from("player_dispositions").delete().eq("user_id", userId);
   await supabaseServer.from("choice_log").delete().eq("user_id", userId);

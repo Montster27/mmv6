@@ -56,15 +56,15 @@ import {
 } from "@/lib/dailyInteractions";
 import { ensureDayStateUpToDate } from "@/lib/dayState";
 import { getFeatureFlags } from "@/lib/featureFlags";
-import { getArcOneState } from "@/core/arcOne/state";
+import { getChapterOneState } from "@/core/chapter/state";
 import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
 import { computeMorale } from "@/core/resources/resourceDelta";
-import { ARC_ONE_LAST_DAY } from "@/core/arcOne/constants";
-import { selectArcBeats, buildInitialArcInstances } from "@/core/arcs/selectArcBeats";
-import { ARC_ONE_STREAM_KEYS, ARC_KEY_TO_STREAM_ID } from "@/types/arcOneStreams";
+import { CHAPTER_ONE_LAST_DAY } from "@/core/chapter/constants";
+import { selectTrackStorylets, buildInitialTrackProgress } from "@/core/tracks/selectTrackStorylets";
+import { CHAPTER_ONE_TRACK_KEYS } from "@/types/tracks";
+import type { Track, TrackProgress, TrackStoryletRow, TrackStorylet } from "@/types/tracks";
 import { supabase } from "@/lib/supabase/browser";
-import type { DailyRun, DailyRunStage, ArcBeat } from "@/types/dailyRun";
-import type { ArcDefinition, ArcInstance, ArcStep } from "@/domain/arcs/types";
+import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 
 import type { Storylet, StoryletRun } from "@/types/storylets";
 
@@ -347,17 +347,17 @@ export async function getOrCreateDailyRun(
 
   const hasStorylets = storylets.length > 0;
   const runsForPair = runsForTodayPair(runs, storylets);
-  const arcOneMode =
-    featureFlags.arcOneScarcityEnabled && dayIndex <= ARC_ONE_LAST_DAY;
+  const chapterOneMode =
+    featureFlags.chapterOneScarcityEnabled && dayIndex <= CHAPTER_ONE_LAST_DAY;
   // Setup is handled via auto-default posture above; no additional setup gate needed.
   const setupNeeded = false;
   const baseStage = computeStage(
-    Boolean(allocation) || (arcOneMode && !featureFlags.resources),
+    Boolean(allocation) || (chapterOneMode && !featureFlags.resources),
     runsForPair.length,
     cadence.alreadyCompletedToday,
-    // In arcOneMode legacy storylets are replaced by arc beats — always treat as
+    // In chapterOneMode legacy storylets are replaced by arc beats — always treat as
     // having content so computeStage never short-circuits to "complete" prematurely.
-    arcOneMode ? true : hasStorylets,
+    chapterOneMode ? true : hasStorylets,
     reflectionDone,
     funPulseEligible,
     funPulseDone
@@ -365,7 +365,7 @@ export async function getOrCreateDailyRun(
   const stage =
     !cadence.alreadyCompletedToday && setupNeeded ? "setup" : baseStage;
 
-  const arcOneState = arcOneMode ? getArcOneState(daily ?? null) : null;
+  const chapterOneState = chapterOneMode ? getChapterOneState(daily ?? null) : null;
 
   devLogStage({
     dayIndex,
@@ -379,61 +379,61 @@ export async function getOrCreateDailyRun(
   const availableArcs: DailyRun["availableArcs"] = [];
 
   // ---------------------------------------------------------------------------
-  // Arc One beat scheduler
+  // Track storylet scheduler (Chapter One)
   // ---------------------------------------------------------------------------
-  let arcBeats: ArcBeat[] = [];
-  if (arcOneMode) {
+  let trackStorylets: TrackStorylet[] = [];
+  if (chapterOneMode) {
     try {
-      // 1. Load Arc One arc definitions (six narrative streams)
-      // arc_opening is the legacy intro arc; Week 1 stream content replaces it.
-      const allArcOneKeys = [...ARC_ONE_STREAM_KEYS];
-      const { data: arcDefs, error: arcDefsError } = await supabase
-        .from("arc_definitions")
-        .select("id,key,title,description,tags,is_enabled")
-        .in("key", allArcOneKeys)
+      // 1. Load Chapter One track definitions
+      const { data: trackDefs, error: trackDefsError } = await supabase
+        .from("tracks")
+        .select("id,key,title,description,tags,is_enabled,category,chapter")
+        .in("key", CHAPTER_ONE_TRACK_KEYS)
         .eq("is_enabled", true);
 
-      if (arcDefsError) {
-        console.error("[daily-run] arc_definitions query failed:", arcDefsError);
+      if (trackDefsError) {
+        console.error("[daily-run] tracks query failed:", trackDefsError);
       }
-      if (!arcDefs || arcDefs.length === 0) {
-        console.warn("[daily-run] No arc definitions found. Keys queried:", allArcOneKeys, "Result:", arcDefs, "Error:", arcDefsError);
+      if (!trackDefs || trackDefs.length === 0) {
+        console.warn("[daily-run] No tracks found. Keys queried:", CHAPTER_ONE_TRACK_KEYS);
       }
 
-      const streamArcs: ArcDefinition[] = (arcDefs ?? []).map((r) => ({
+      const tracks: Track[] = (trackDefs ?? []).map((r) => ({
         id: r.id,
         key: r.key,
         title: r.title,
-        description: r.description,
+        description: r.description ?? "",
+        category: r.category ?? "life_stream",
+        chapter: r.chapter ?? "one",
         tags: Array.isArray(r.tags) ? r.tags : [],
         is_enabled: Boolean(r.is_enabled),
       }));
 
-      if (streamArcs.length > 0) {
-        const arcIds = streamArcs.map((a) => a.id);
+      if (tracks.length > 0) {
+        const trackIds = tracks.map((t) => t.id);
 
-        // 2. Load steps for these arcs from unified storylets table
-        const { data: stepRows, error: stepRowsError } = await supabase
+        // 2. Load storylets for these tracks
+        const { data: storyletRows, error: storyletRowsError } = await supabase
           .from("storylets")
-          .select("id,slug,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours,is_conflict")
-          .in("arc_id", arcIds)
+          .select("id,slug,track_id,storylet_key,order_index,title,body,choices,default_next_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours,is_conflict")
+          .in("track_id", trackIds)
           .order("order_index");
 
-        if (stepRowsError) {
-          console.error("[daily-run] storylets query failed:", stepRowsError);
+        if (storyletRowsError) {
+          console.error("[daily-run] storylets query failed:", storyletRowsError);
         }
-        console.log("[daily-run] Loaded", stepRows?.length ?? 0, "arc steps for", arcIds.length, "arcs");
+        console.log("[daily-run] Loaded", storyletRows?.length ?? 0, "track storylets for", trackIds.length, "tracks");
 
-        const streamSteps: ArcStep[] = (stepRows ?? []).map((r) => ({
+        const trackStoryletRows: TrackStoryletRow[] = (storyletRows ?? []).map((r) => ({
           id: r.id,
           slug: r.slug,
-          arc_id: r.arc_id,
-          step_key: r.step_key,
+          track_id: r.track_id,
+          storylet_key: r.storylet_key,
           order_index: r.order_index ?? 0,
           title: r.title,
           body: r.body,
           choices: Array.isArray(r.choices) ? r.choices : [],
-          default_next_step_key: r.default_next_step_key ?? null,
+          default_next_key: r.default_next_key ?? null,
           due_offset_days: r.due_offset_days ?? 0,
           expires_after_days: r.expires_after_days ?? 0,
           is_active: Boolean(r.is_active),
@@ -441,26 +441,27 @@ export async function getOrCreateDailyRun(
           requirements: r.requirements ?? {},
           weight: r.weight ?? 1,
           introduces_npc: r.introduces_npc ?? undefined,
-          segment: (r.segment as ArcStep['segment']) ?? null,
+          segment: (r.segment as TrackStoryletRow["segment"]) ?? null,
           time_cost_hours: r.time_cost_hours ?? 1,
           is_conflict: Boolean(r.is_conflict),
         }));
 
-        // 3. Load or create arc instances for this user
-        const { data: instanceRows } = await supabase
-          .from("arc_instances")
-          .select("id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key")
+        // 3. Load or create track progress for this user
+        const { data: progressRows } = await supabase
+          .from("track_progress")
+          .select("id,user_id,track_id,state,current_storylet_key,storylet_due_day,defer_count,track_state,started_day,updated_day,completed_day,failure_reason,branch_key")
           .eq("user_id", userId)
-          .in("arc_id", arcIds);
+          .in("track_id", trackIds);
 
-        let instances: ArcInstance[] = (instanceRows ?? []).map((r) => ({
+        let progress: TrackProgress[] = (progressRows ?? []).map((r) => ({
           id: r.id,
           user_id: r.user_id,
-          arc_id: r.arc_id,
-          state: r.state as ArcInstance["state"],
-          current_step_key: r.current_step_key,
-          step_due_day: r.step_due_day,
-          step_defer_count: r.step_defer_count,
+          track_id: r.track_id,
+          state: r.state as TrackProgress["state"],
+          current_storylet_key: r.current_storylet_key,
+          storylet_due_day: r.storylet_due_day,
+          defer_count: r.defer_count ?? 0,
+          track_state: r.track_state ?? null,
           started_day: r.started_day,
           updated_day: r.updated_day,
           completed_day: r.completed_day ?? null,
@@ -468,32 +469,32 @@ export async function getOrCreateDailyRun(
           branch_key: r.branch_key ?? null,
         }));
 
-        // 4. Ensure instances exist for every arc that has steps but no instance yet.
-        //    All stream arcs initialize from Day 1 — no opening-arc gate required.
-        const arcIdsWithInstances = new Set(instances.map((i) => i.arc_id));
-        const arcsNeedingInstances = streamArcs.filter(
-          (a) =>
-            !arcIdsWithInstances.has(a.id) &&
-            streamSteps.some((s) => s.arc_id === a.id)
+        // 4. Ensure progress exists for every track that has storylets but no progress yet.
+        const trackIdsWithProgress = new Set(progress.map((p) => p.track_id));
+        const tracksNeedingProgress = tracks.filter(
+          (t) =>
+            !trackIdsWithProgress.has(t.id) &&
+            trackStoryletRows.some((s) => s.track_id === t.id)
         );
 
-        if (arcsNeedingInstances.length > 0) {
-          const toInsert = buildInitialArcInstances(userId, arcsNeedingInstances, streamSteps, dayIndex);
+        if (tracksNeedingProgress.length > 0) {
+          const toInsert = buildInitialTrackProgress(userId, tracksNeedingProgress, trackStoryletRows, dayIndex);
           if (toInsert.length > 0) {
             const { data: inserted } = await supabase
-              .from("arc_instances")
+              .from("track_progress")
               .insert(toInsert)
-              .select("id,user_id,arc_id,state,current_step_key,step_due_day,step_defer_count,started_day,updated_day,completed_day,failure_reason,branch_key");
-            instances = [
-              ...instances,
+              .select("id,user_id,track_id,state,current_storylet_key,storylet_due_day,defer_count,track_state,started_day,updated_day,completed_day,failure_reason,branch_key");
+            progress = [
+              ...progress,
               ...(inserted ?? []).map((r) => ({
                 id: r.id,
                 user_id: r.user_id,
-                arc_id: r.arc_id,
-                state: r.state as ArcInstance["state"],
-                current_step_key: r.current_step_key,
-                step_due_day: r.step_due_day,
-                step_defer_count: r.step_defer_count,
+                track_id: r.track_id,
+                state: r.state as TrackProgress["state"],
+                current_storylet_key: r.current_storylet_key,
+                storylet_due_day: r.storylet_due_day,
+                defer_count: r.defer_count ?? 0,
+                track_state: r.track_state ?? null,
                 started_day: r.started_day,
                 updated_day: r.updated_day,
                 completed_day: r.completed_day ?? null,
@@ -504,52 +505,49 @@ export async function getOrCreateDailyRun(
           }
         }
 
-        // 5. Select due beats and format for DailyRun
+        // 5. Select due storylets and format for DailyRun
         const currentSeg = dayStateRaw?.current_segment ?? 'morning';
         const hoursLeft = dayStateRaw?.hours_remaining ?? 16;
-        console.log("[daily-run] selectArcBeats input:", {
+        console.log("[daily-run] selectTrackStorylets input:", {
           dayIndex,
-          instanceCount: instances.length,
-          instanceKeys: instances.map(i => `${i.current_step_key}@day${i.step_due_day}(${i.state})`),
-          stepCount: streamSteps.length,
+          progressCount: progress.length,
+          progressKeys: progress.map(p => `${p.current_storylet_key}@day${p.storylet_due_day}(${p.state})`),
+          storyletCount: trackStoryletRows.length,
           currentSegment: currentSeg,
           hoursRemaining: hoursLeft,
         });
-        const dueSteps = selectArcBeats({
+        const dueStorylets = selectTrackStorylets({
           dayIndex,
-          instances,
-          steps: streamSteps,
-          arcs: streamArcs,
+          progress,
+          storylets: trackStoryletRows,
+          tracks,
           currentSegment: currentSeg,
           hoursRemaining: hoursLeft,
         });
-        console.log("[daily-run] selectArcBeats returned", dueSteps.length, "beats:", dueSteps.map(d => d.step.slug));
-        arcBeats = dueSteps.map((due) => ({
-          instance_id: due.instance.id,
-          arc_key: due.arc.key,
-          stream_id: ARC_KEY_TO_STREAM_ID[due.arc.key] ?? due.arc.key.replace("arc_", ""),
-          title: due.step.title,
-          body: due.step.body,
-          options: due.step.choices,
+        console.log("[daily-run] selectTrackStorylets returned", dueStorylets.length, "storylets:", dueStorylets.map(d => d.storylet.slug));
+        trackStorylets = dueStorylets.map((due) => ({
+          progress_id: due.progress.id,
+          track_key: due.track.key,
+          title: due.storylet.title,
+          body: due.storylet.body,
+          options: due.storylet.choices,
           expires_on_day: due.expires_on_day,
-          introduces_npc: due.step.introduces_npc,
-          segment: due.step.segment ?? null,
-          is_conflict: Boolean((due.step as any).is_conflict),
+          introduces_npc: due.storylet.introduces_npc,
+          segment: due.storylet.segment ?? null,
+          is_conflict: Boolean(due.storylet.is_conflict),
         }));
       }
     } catch (err) {
-      console.error("[daily-run] Failed to load arc beats", err);
+      console.error("[daily-run] Failed to load track storylets", err);
     }
   }
 
-  // In arcOneMode: if beats are available the stage must not be "complete" so the
-  // client renders them instead of the "Daily complete ✓" screen.  If beats are
-  // empty but the day is not yet marked complete we let the auto-complete logic
-  // in the client handle the transition gracefully.
+  // In chapterOneMode: if track storylets are available the stage must not be "complete"
+  // so the client renders them instead of the "Daily complete" screen.
   const resolvedStage: typeof stage =
-    arcOneMode && arcBeats.length > 0 && !cadence.alreadyCompletedToday
+    chapterOneMode && trackStorylets.length > 0 && !cadence.alreadyCompletedToday
       ? "storylet_1"
-      : arcOneMode && arcBeats.length === 0 && !cadence.alreadyCompletedToday
+      : chapterOneMode && trackStorylets.length === 0 && !cadence.alreadyCompletedToday
       ? "complete"
       : stage;
 
@@ -641,8 +639,8 @@ export async function getOrCreateDailyRun(
         hours_committed: dayState.hours_committed ?? 0,
       }
       : null,
-    arcOneState: arcOneState ?? undefined,
-    arcBeats: arcBeats.length > 0 ? arcBeats : undefined,
+    chapterOneState: chapterOneState ?? undefined,
+    trackStorylets: trackStorylets.length > 0 ? trackStorylets : undefined,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
     seasonRecap: seasonResetNeeded ? seasonRecap : undefined,

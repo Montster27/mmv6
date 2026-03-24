@@ -1,5 +1,5 @@
-import type { StreamStates, StreamId } from "@/types/arcOneStreams";
-import { DEFAULT_STREAM_STATES } from "@/types/arcOneStreams";
+import type { StreamStates, StreamId } from "@/types/chapterStreams";
+import { DEFAULT_STREAM_STATES } from "@/types/chapterStreams";
 
 /** Return a fresh copy of default stream states for Arc One day 1. */
 export function initStreamStates(): StreamStates {

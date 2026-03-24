@@ -6,10 +6,9 @@ import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
 import type { Storylet } from "@/types/storylets";
 import {
   STREAM_LABELS,
-  ARC_KEY_TO_STREAM_ID,
   STREAM_ALIASES,
   type StreamId,
-} from "@/types/arcOneStreams";
+} from "@/types/chapterStreams";
 import { Stat } from "@/components/contentStudio/Stat";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -17,11 +16,8 @@ import { Stat } from "@/components/contentStudio/Stat";
 function getStreamsForStorylet(s: Storylet): StreamId[] {
   const ids = new Set<StreamId>();
 
-  if (s.arc_id) {
-    const direct = ARC_KEY_TO_STREAM_ID[s.arc_id];
-    if (direct) ids.add(direct);
-  }
-
+  // track_id is a UUID — look up the track key from available tracks
+  // For now, use tags as the primary stream identifier
   for (const tag of s.tags ?? []) {
     if (tag.startsWith("stream:")) {
       const raw = tag.replace("stream:", "");
@@ -39,13 +35,11 @@ function getStreamTransitions(
 ): { stream: StreamId; state: string; choiceLabel: string }[] {
   const out: { stream: StreamId; state: string; choiceLabel: string }[] = [];
   for (const c of s.choices) {
-    if (c.sets_stream_state) {
-      const { stream, state } = c.sets_stream_state;
-      const resolved =
-        (STREAM_ALIASES[stream] as StreamId | undefined) ?? (stream as StreamId);
-      if (STREAM_LABELS[resolved]) {
-        out.push({ stream: resolved, state, choiceLabel: c.label });
-      }
+    if (c.sets_track_state) {
+      // Track state doesn't carry stream name — infer from tags
+      const streams = getStreamsForStorylet(s);
+      const stream = streams[0] ?? ("roommate" as StreamId);
+      out.push({ stream, state: c.sets_track_state.state, choiceLabel: c.label });
     }
   }
   return out;
@@ -416,9 +410,9 @@ export default function StreamsPage() {
                                       {e.storylet.choices.map((c) => (
                                         <div key={c.id} className="flex items-center gap-2">
                                           <span className="text-slate-600">"{c.label}"</span>
-                                          {c.sets_stream_state && (
+                                          {c.sets_track_state && (
                                             <span className="rounded bg-indigo-50 border border-indigo-200 px-1 py-0.5 text-[10px] text-indigo-600">
-                                              → {c.sets_stream_state.stream}:{c.sets_stream_state.state}
+                                              → {c.sets_track_state.state}
                                             </span>
                                           )}
                                           {(c.precludes ?? []).map((p) => (

@@ -1,4 +1,4 @@
-import type { ExpiredOpportunity, LifePressureState } from "@/core/arcOne/types";
+import type { ExpiredOpportunity, LifePressureState } from "@/core/chapter/types";
 
 export function mapTagsToIdentity(tags: string[]): string[] {
   const identity: string[] = [];

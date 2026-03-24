@@ -7,7 +7,7 @@ import type { DailyRun } from "@/types/dailyRun";
 import type { SevenVectors } from "@/types/vectors";
 import { summarizeVectors } from "@/core/ui/vectorSummary";
 import { resourceLabel } from "@/core/resources/resourceMap";
-import { deriveEnergyLevel } from "@/core/arcOne/state";
+import { deriveEnergyLevel } from "@/core/chapter/state";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 
 type DeltaInfo = {

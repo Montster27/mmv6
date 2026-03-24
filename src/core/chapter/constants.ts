@@ -5,4 +5,4 @@ export const ARC_ONE_ARC_KEYS = new Set([
   "arc_study_group",
 ]);
 
-export const ARC_ONE_LAST_DAY = 7;
+export const CHAPTER_ONE_LAST_DAY = 7;

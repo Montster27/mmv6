@@ -1,6 +1,6 @@
 # MMV — Claude Code Project Guide
 
-> **Many More Versions of You** — a narrative life-simulation game set in 1983 at fictional Harwick University. The player faces more compelling choices than they can take. Every selection permanently closes other story arcs. Life is modeled as overlapping concurrent streams that collide and compete for limited resources. The player is a time traveler who doesn't fully understand their situation yet.
+> **Many More Versions of You** — a narrative life-simulation game set in 1983 at fictional Harwick University. The player faces more compelling choices than they can take. Every selection permanently closes other story tracks. Life is modeled as overlapping concurrent tracks that collide and compete for limited resources. The player is a time traveler who doesn't fully understand their situation yet.
 
 ---
 
@@ -40,8 +40,15 @@
 - Never edit storylet content in TypeScript files — it goes through migrations
 - Migration naming: numbered `NNNN_description.sql` for legacy, `YYYYMMDDNNNNNN_description.sql` for new
 
-### Streams Model
-Six life-simulation streams run concurrently. Each has defined states:
+### Content Model: Track + Storylet
+See `docs/TRACK_AND_STORYLET_MODEL.md` for the full spec. Summary:
+
+- **Track** = a named parallel narrative thread (DAG of storylets). Multiple run concurrently.
+- **Storylet** = the universal content unit. Can belong to a track or float standalone.
+- DB tables: `tracks` (was arc_definitions), `track_progress` (was arc_instances), `storylets` (unchanged).
+- Types: `src/types/tracks.ts` (TrackKey, Track, TrackProgress, TrackStorylet, DueStorylet).
+
+Six Chapter One tracks run concurrently. Each has a narrative FSM state stored on `track_progress.track_state`:
 - **Roommate** — `neutral_coexistence | genuine_connection | surface_tension | open_conflict | avoidance_pattern`
 - **Academic** — `false_confidence | quiet_doubt | active_engagement | avoidance_spiral | found_a_thread`
 - **Money** — `not_yet_felt | background_hum | friction_visible | active_stress | resolved`
@@ -49,7 +56,7 @@ Six life-simulation streams run concurrently. Each has defined states:
 - **Opportunity** — `undiscovered | noticed | considering | pursuing | committed | expired`
 - **Home** — `clean_break | background_warmth | guilt_current | active_pull | identity_rupture`
 
-A 7th stream ("Echoes") is reserved for the time-travel frame layer. Not yet implemented.
+A 7th track ("Echoes") is reserved for the time-travel frame layer. Not yet implemented.
 
 ### Choice Schema
 Every storylet choice must include:
@@ -65,7 +72,7 @@ Every storylet choice must include:
   relational_effects?: object,
   set_npc_memory?: object,
   events_emitted?: array,
-  sets_stream_state?: object,
+  sets_track_state?: object,  // { state: "genuine_connection" }
   precludes?: string[],       // REQUIRED — storylet slugs this choice locks out
   outcome | outcomes: object, // deterministic or weighted
   mini_game?: object          // optional — see Mini-Game System below

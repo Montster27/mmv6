@@ -148,8 +148,8 @@ export default function ArcsPage() {
   const stepKeyOptions = useMemo(() => {
     if (!selectedArc) return [];
     return storylets
-      .filter((s) => s.step_key && s.arc_id === selectedArc.id)
-      .map((s) => ({ value: s.step_key!, label: `${s.step_key} (${s.title})` }));
+      .filter((s) => s.storylet_key && s.track_id === selectedArc.id)
+      .map((s) => ({ value: s.storylet_key!, label: `${s.storylet_key} (${s.title})` }));
   }, [storylets, selectedArc]);
 
   const storyletOptions = useMemo(

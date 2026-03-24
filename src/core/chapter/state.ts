@@ -1,6 +1,6 @@
 import type { DailyState } from "@/types/daily";
 import type {
-  ArcOneState,
+  ChapterOneState,
   EnergyLevel,
   ExpiredOpportunity,
   LifePressureState,
@@ -8,8 +8,8 @@ import type {
   NpcMemory,
   SkillFlags,
   RelationshipState,
-} from "@/core/arcOne/types";
-import { normalizeStreamStates } from "@/core/arcOne/streamState";
+} from "@/core/chapter/types";
+import { normalizeStreamStates } from "@/core/chapter/streamState";
 
 const DEFAULT_LIFE_PRESSURE: LifePressureState = {
   risk: 0,
@@ -147,7 +147,7 @@ function normalizeReplayIntention(raw: unknown) {
   };
 }
 
-export function getArcOneState(dailyState: DailyState | null): ArcOneState {
+export function getChapterOneState(dailyState: DailyState | null): ChapterOneState {
   const energy = typeof dailyState?.energy === "number" ? dailyState.energy : 100;
   return {
     lifePressureState: normalizeLifePressure(dailyState?.life_pressure_state),

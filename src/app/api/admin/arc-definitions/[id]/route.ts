@@ -48,7 +48,7 @@ export async function PUT(
 
   const admin = getAdminClient();
   const { error } = await admin
-    .from("arc_definitions")
+    .from("tracks")
     .update(update)
     .eq("id", id);
 
@@ -72,7 +72,7 @@ export async function DELETE(
 
   const { id } = await context.params;
   const admin = getAdminClient();
-  const { error } = await admin.from("arc_definitions").delete().eq("id", id);
+  const { error } = await admin.from("tracks").delete().eq("id", id);
 
   if (error) {
     console.error("Failed to delete arc definition", error);
