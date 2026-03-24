@@ -27,6 +27,8 @@ type SnakeGameProps = {
   onComplete?: (result: { won: boolean; score: number }) => void;
   /** Adaptive difficulty level 0-1. Affects speed and win threshold. */
   difficulty?: number;
+  /** Number of attempts the player gets (default 3). */
+  maxAttempts?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -106,6 +108,7 @@ export default function SnakeGame({
   maxSeconds = 120,
   onComplete,
   difficulty = 0.5,
+  maxAttempts = 3,
 }: SnakeGameProps) {
   const adjustedSpeed = Math.round(baseSpeed * (1 - difficulty * 0.4));
   const adjustedWin = Math.round(winScore * (0.7 + difficulty * 0.6));
@@ -122,6 +125,8 @@ export default function SnakeGame({
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(maxSeconds);
   const [highScore, setHighScore] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+  const [bestScore, setBestScore] = useState(0);
 
   // Game state refs
   const snakeRef = useRef<Point[]>([]);
@@ -315,14 +320,33 @@ export default function SnakeGame({
   const endGame = useCallback(
     (won: boolean) => {
       if (gameLoopRef.current) cancelAnimationFrame(gameLoopRef.current);
-      const finalState = won ? "won" : "lost";
-      setGameState(finalState);
-      stateRef.current = finalState;
       if (scoreRef.current > highScore) setHighScore(scoreRef.current);
+      setBestScore((prev) => Math.max(prev, scoreRef.current));
       draw();
-      onComplete?.({ won, score: scoreRef.current });
+
+      if (won) {
+        // Win — report immediately
+        setGameState("won");
+        stateRef.current = "won";
+        onComplete?.({ won: true, score: scoreRef.current });
+      } else {
+        setAttempt((prev) => {
+          const next = prev + 1;
+          if (next >= maxAttempts) {
+            // No more tries — final loss
+            setGameState("lost");
+            stateRef.current = "lost";
+            onComplete?.({ won: false, score: scoreRef.current });
+          } else {
+            // Tries remain — show retry screen
+            setGameState("lost");
+            stateRef.current = "lost";
+          }
+          return next;
+        });
+      }
     },
-    [draw, onComplete, highScore]
+    [draw, onComplete, highScore, maxAttempts]
   );
 
   const startDeathAnim = useCallback(() => {
@@ -499,10 +523,13 @@ export default function SnakeGame({
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (
-        (stateRef.current === "waiting" || stateRef.current === "won" || stateRef.current === "lost") &&
-        e.key === " "
-      ) {
+      if (stateRef.current === "waiting" && e.key === " ") {
+        e.preventDefault();
+        startGame();
+        return;
+      }
+      // Allow retry on loss only if attempts remain
+      if (stateRef.current === "lost" && attempt < maxAttempts && e.key === " ") {
         e.preventDefault();
         startGame();
         return;
@@ -526,7 +553,7 @@ export default function SnakeGame({
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [startGame]);
+  }, [startGame, attempt, maxAttempts]);
 
   // Cleanup
   useEffect(() => {
@@ -614,9 +641,9 @@ export default function SnakeGame({
                     ? "GAME OVER"
                     : gameState === "coin"
                       ? "INSERT COIN..."
-                      : "PRESS START"}
+                      : "READY?"}
             </span>
-            <span>HI:{String(Math.max(score, highScore)).padStart(3, "0")}</span>
+            <span>LIFE:{maxAttempts - attempt}/{maxAttempts}</span>
           </div>
 
           {/* Game canvas */}
@@ -656,17 +683,37 @@ export default function SnakeGame({
           {/* Start/end overlays */}
           {gameState === "waiting" && (
             <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 3 }}>
-              <button
-                onClick={startGame}
-                className="animate-pulse rounded px-4 py-2 font-mono text-sm"
+              <div
+                className="rounded px-5 py-4 text-center font-mono"
                 style={{
                   color: PHOSPHOR_GREEN,
+                  backgroundColor: "rgba(0,0,0,0.9)",
                   border: `1px solid ${PHOSPHOR_GREEN}`,
-                  backgroundColor: "rgba(0,0,0,0.8)",
+                  maxWidth: canvasW - 32,
                 }}
               >
-                INSERT QUARTER
-              </button>
+                <div className="text-sm tracking-wider mb-3">🐍 SERPENT 🐍</div>
+                <div className="text-[10px] leading-relaxed text-left space-y-1" style={{ color: "rgba(51,255,51,0.75)" }}>
+                  <p>▸ ARROW KEYS or WASD to steer</p>
+                  <p>▸ Eat the blinking food to grow</p>
+                  <p>▸ Don&apos;t hit the walls or yourself</p>
+                  <p>▸ Reach {adjustedWin} points to win</p>
+                  <p className="pt-1" style={{ color: "rgba(51,255,51,0.5)" }}>
+                    You have {maxAttempts} {maxAttempts === 1 ? "try" : "tries"}. Good luck.
+                  </p>
+                </div>
+                <button
+                  onClick={startGame}
+                  className="mt-3 animate-pulse rounded px-4 py-1.5 text-xs tracking-wider"
+                  style={{
+                    color: PHOSPHOR_GREEN,
+                    border: `1px solid ${PHOSPHOR_GREEN}`,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  INSERT QUARTER
+                </button>
+              </div>
             </div>
           )}
 
@@ -675,28 +722,46 @@ export default function SnakeGame({
               <div
                 className="rounded px-6 py-4 text-center font-mono"
                 style={{
-                  color: PHOSPHOR_GREEN,
-                  backgroundColor: "rgba(0,0,0,0.85)",
-                  border: `1px solid ${PHOSPHOR_GREEN}`,
+                  color: gameState === "won" ? PHOSPHOR_GREEN : "#ff4444",
+                  backgroundColor: "rgba(0,0,0,0.9)",
+                  border: `1px solid ${gameState === "won" ? PHOSPHOR_GREEN : "#ff4444"}`,
                 }}
               >
                 <div className="text-lg">
-                  {gameState === "won" ? "HIGH SCORE!" : "GAME OVER"}
+                  {gameState === "won" ? "YOU WIN!" : "GAME OVER"}
                 </div>
-                <div className="mt-1 text-sm">
+                <div className="mt-1 text-sm" style={{ color: PHOSPHOR_GREEN }}>
                   SCORE: {score} / {adjustedWin}
                 </div>
-                <button
-                  onClick={startGame}
-                  className="mt-3 rounded px-3 py-1 text-xs"
-                  style={{
-                    border: `1px solid ${PHOSPHOR_GREEN}`,
-                    color: PHOSPHOR_GREEN,
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  INSERT ANOTHER QUARTER
-                </button>
+                {gameState === "lost" && attempt < maxAttempts && (
+                  <>
+                    <div
+                      className="mt-2 text-[10px]"
+                      style={{ color: "rgba(255,255,255,0.5)" }}
+                    >
+                      {maxAttempts - attempt} {maxAttempts - attempt === 1 ? "TRY" : "TRIES"} REMAINING
+                    </div>
+                    <button
+                      onClick={startGame}
+                      className="mt-2 animate-pulse rounded px-3 py-1 text-xs"
+                      style={{
+                        border: `1px solid ${PHOSPHOR_GREEN}`,
+                        color: PHOSPHOR_GREEN,
+                        backgroundColor: "transparent",
+                      }}
+                    >
+                      TRY AGAIN
+                    </button>
+                  </>
+                )}
+                {gameState === "lost" && attempt >= maxAttempts && (
+                  <div
+                    className="mt-2 text-[10px]"
+                    style={{ color: "rgba(255,68,68,0.7)" }}
+                  >
+                    NO QUARTERS LEFT
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -704,8 +769,8 @@ export default function SnakeGame({
       </div>
 
       {/* Controls hint */}
-      <div className="font-mono text-xs" style={{ color: "rgba(51, 255, 51, 0.5)" }}>
-        ARROW KEYS OR WASD TO MOVE
+      <div className="font-mono text-xs text-center space-y-0.5" style={{ color: "rgba(51, 255, 51, 0.5)" }}>
+        <div>ARROW KEYS OR WASD TO MOVE · SPACE TO START</div>
       </div>
     </div>
   );
