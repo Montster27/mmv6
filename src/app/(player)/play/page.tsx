@@ -932,21 +932,41 @@ export default function PlayPage() {
   const SEGMENT_ORDER = ['morning', 'afternoon', 'evening', 'night'] as const;
   type Segment = typeof SEGMENT_ORDER[number];
 
-  const handleAdvanceSegment = () => {
+  const handleAdvanceSegment = async () => {
     if (!dayState) return;
     const current = (dayState.current_segment as Segment | undefined) ?? 'morning';
     const idx = SEGMENT_ORDER.indexOf(current);
     const next: Segment = idx < 0 || idx >= SEGMENT_ORDER.length - 1
       ? SEGMENT_ORDER[0]
       : SEGMENT_ORDER[idx + 1];
+    const nextHours = Math.max(0, (dayState.hours_remaining ?? 16) - 4);
+
+    // Optimistic local update
     setDayState({
       ...dayState,
       current_segment: next,
-      // Deduct 4 hours per segment advance for testing
-      hours_remaining: Math.max(0, (dayState.hours_remaining ?? 16) - 4),
+      hours_remaining: nextHours,
     });
     setBridgeText(getBridgeText(next as BridgeSegment));
     setSleepCardDone(false);
+
+    // Persist segment change to DB so the daily run query uses it
+    const { data: sessionData } = await supabase.auth.getSession();
+    const uid = sessionData?.session?.user?.id;
+    if (uid && dayState.day_index) {
+      await supabase
+        .from("player_day_state")
+        .update({
+          current_segment: next,
+          hours_remaining: nextHours,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", uid)
+        .eq("day_index", dayState.day_index);
+    }
+
+    // Re-trigger daily run fetch with new segment
+    setRefreshTick((tick) => tick + 1);
   };
 
   const handleSleep = async () => {
