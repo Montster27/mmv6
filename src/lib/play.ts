@@ -565,6 +565,26 @@ export async function applyOutcomeForChoice(
   lastCheck?: CheckResult;
 }> {
   const choice = toChoices(storylet).find((c) => c.id === choiceId);
+
+  // Server-side resource gate validation
+  const requiresResource = (choice as any)?.requires_resource as
+    | { key: string; min: number }
+    | undefined;
+  if (requiresResource?.key && typeof requiresResource.min === "number") {
+    const { getResourceSnapshot, checkResourceGate } = await import(
+      "@/core/resources/applyResourcesServer"
+    );
+    const snapshot = await getResourceSnapshot(supabase as any, userId, dayIndex);
+    const gate = checkResourceGate(snapshot, choice as Record<string, unknown>);
+    if (!gate.passed) {
+      const { resourceLabel: rl } = await import("@/core/resources/resourceMap");
+      const label = gate.failedKey ? rl(gate.failedKey as any) : "a resource";
+      throw new Error(
+        `Insufficient ${label}: have ${gate.current}, need ${gate.required}`
+      );
+    }
+  }
+
   let resolvedOutcome: StoryletOutcome | undefined = choice?.outcome;
   let resolvedOutcomeId: string | undefined;
   let resolvedOutcomeAnomalies: string[] | undefined = choice?.outcome?.anomalies;

@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { shiftMoneyBand } from "@/core/chapter/state";
 import { DEFAULT_TRACK_STATES, type TrackKey } from "@/types/tracks";
+import {
+  getResourceSnapshot,
+  checkResourceGate,
+  collectChoiceResourceDeltas,
+  applyResourceDeltas,
+} from "@/core/resources/applyResourcesServer";
+import { resourceLabel } from "@/core/resources/resourceMap";
+import type { ResourceKey } from "@/core/resources/resourceKeys";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -89,74 +97,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Option not found" }, { status: 400 });
   }
 
-  // --- 3. Apply resource effects ---
-  const costs = chosenOption.costs as Record<string, Record<string, number>> | undefined;
-  const rewards = chosenOption.rewards as Record<string, Record<string, number>> | undefined;
-  const energyCost = typeof chosenOption.energy_cost === "number" ? chosenOption.energy_cost : 0;
-
-  const resourceDeltas: Record<string, number> = {};
-
-  if (costs?.resources) {
-    for (const [k, v] of Object.entries(costs.resources)) {
-      resourceDeltas[k] = (resourceDeltas[k] ?? 0) - v;
-    }
-  }
-  if (rewards?.resources) {
-    for (const [k, v] of Object.entries(rewards.resources)) {
-      resourceDeltas[k] = (resourceDeltas[k] ?? 0) + v;
-    }
-  }
-  if (energyCost > 0) {
-    resourceDeltas["energy"] = (resourceDeltas["energy"] ?? 0) - energyCost;
+  // --- 3. Validate resource gate (server-side) ---
+  const snapshot = await getResourceSnapshot(supabaseServer as any, user.id, day_index);
+  const gate = checkResourceGate(snapshot, chosenOption);
+  if (!gate.passed) {
+    const label = gate.failedKey
+      ? resourceLabel(gate.failedKey as ResourceKey)
+      : "a resource";
+    return NextResponse.json({
+      error: "insufficient_resources",
+      message: `Not enough ${label}. You have ${gate.current}, but need at least ${gate.required}.`,
+      resource: gate.failedKey,
+      current: gate.current,
+      required: gate.required,
+    }, { status: 422 });
   }
 
-  const outcome = chosenOption.outcome as
-    | { deltas?: { energy?: number; stress?: number; resources?: Record<string, number> } }
-    | undefined;
-  if (outcome?.deltas) {
-    const d = outcome.deltas;
-    if (typeof d.energy === "number" && d.energy !== 0) {
-      resourceDeltas["energy"] = (resourceDeltas["energy"] ?? 0) + d.energy;
-    }
-    if (typeof d.stress === "number" && d.stress !== 0) {
-      resourceDeltas["stress"] = (resourceDeltas["stress"] ?? 0) + d.stress;
-    }
-    if (d.resources) {
-      for (const [k, v] of Object.entries(d.resources)) {
-        if (typeof v === "number" && v !== 0) {
-          resourceDeltas[k] = (resourceDeltas[k] ?? 0) + v;
-        }
-      }
-    }
+  // --- 4. Collect and apply all resource effects ---
+  // Handles: costs.resources, rewards.resources, energy_cost, outcome.deltas, costs_resource
+  // Uses shared clamping (energy 0-100, stress 0-100, etc.)
+  // Writes to player_day_state (canonical) + syncs energy/stress to daily_states
+  const rawDeltas = collectChoiceResourceDeltas(chosenOption);
+  let resourceResult: { deltas: Record<string, number> } | null = null;
+
+  if (Object.keys(rawDeltas).length > 0) {
+    resourceResult = await applyResourceDeltas(
+      supabaseServer as any,
+      user.id,
+      day_index,
+      rawDeltas
+    );
   }
 
-  if (Object.keys(resourceDeltas).length > 0) {
-    const { data: dayStateRow } = await supabaseServer
-      .from("day_states")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("day_index", day_index)
-      .maybeSingle();
-
-    if (dayStateRow) {
-      const updates: Record<string, number> = {};
-      for (const [k, delta] of Object.entries(resourceDeltas)) {
-        const current = typeof (dayStateRow as Record<string, unknown>)[k] === "number"
-          ? (dayStateRow as Record<string, number>)[k]
-          : 0;
-        updates[k] = current + delta;
-      }
-      if (Object.keys(updates).length > 0) {
-        await supabaseServer
-          .from("day_states")
-          .update(updates)
-          .eq("user_id", user.id)
-          .eq("day_index", day_index);
-      }
-    }
-  }
-
-  // --- 4. Apply track state transition ---
+  // --- 5. Apply track state transition ---
   const setsTrackState = chosenOption.sets_track_state as { state: string } | undefined;
   const newTrackState = setsTrackState?.state ?? null;
 
@@ -212,7 +185,7 @@ export async function POST(request: Request) {
       .eq("day_index", day_index);
   }
 
-  // --- 5. Advance track progress ---
+  // --- 6. Advance track progress ---
   const nextKey: string | null =
     typeof chosenOption.next_key === "string"
       ? chosenOption.next_key
@@ -252,7 +225,7 @@ export async function POST(request: Request) {
       .eq("id", progressId);
   }
 
-  // --- 6. Activate a new track if the choice triggers one ---
+  // --- 7. Activate a new track if the choice triggers one ---
   const trackActivated = chosenOption._arc_activated as string | undefined;
   let activatedTrackKey: string | null = null;
 
@@ -309,7 +282,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // --- 7. Record to choice_log ---
+  // --- 8. Record to choice_log ---
   await supabaseServer.from("choice_log").insert({
     user_id: user.id,
     day: day_index,
@@ -321,6 +294,7 @@ export async function POST(request: Request) {
     meta: {
       next_key: nextKey ?? null,
       ...(activatedTrackKey ? { activated_track: activatedTrackKey } : {}),
+      ...(resourceResult ? { resource_deltas: resourceResult.deltas } : {}),
     },
   });
 
@@ -328,5 +302,6 @@ export async function POST(request: Request) {
     ok: true,
     next_key: nextKey ?? null,
     activated_track: activatedTrackKey,
+    resource_deltas: resourceResult?.deltas ?? null,
   });
 }

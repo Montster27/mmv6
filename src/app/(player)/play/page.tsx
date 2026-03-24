@@ -12,6 +12,7 @@ const MiniGameShell = dynamic(
 );
 
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast-provider";
 import { ConsequenceMoment } from "@/components/storylets/ConsequenceMoment";
 import { FunPulse } from "@/components/FunPulse";
 import { FactionStatusPanel } from "@/components/play/FactionStatusPanel";
@@ -126,6 +127,7 @@ const BEAT_AUTO_ADVANCE_MS: number | null = null;
 export default function PlayPage() {
   const session = useSession();
   const router = useRouter();
+  const { toast } = useToast();
   const [userId, setUserId] = useState<string | null>(null);
   const bootstrapQuery = useBootstrap();
   const {
@@ -1977,7 +1979,12 @@ export default function PlayPage() {
       }
     } catch (e) {
       console.error(e);
-      setError("Failed to record choice.");
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.startsWith("Insufficient ")) {
+        toast(msg, { variant: "destructive", duration: 5000 });
+      } else {
+        setError("Failed to record choice.");
+      }
     } finally {
       setSavingChoice(false);
     }
@@ -2172,11 +2179,19 @@ export default function PlayPage() {
         }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? "Request failed");
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+        if (body.error === "insufficient_resources") {
+          toast(
+            (body.message as string) ?? "Not enough resources for this choice.",
+            { variant: "destructive", duration: 5000 }
+          );
+          setSavingChoice(false);
+          return;
+        }
+        throw new Error((body.error as string) ?? "Request failed");
       }
 
-      const resBody = await res.json().catch(() => ({ next_step_key: null }));
+      const resBody = await res.json().catch(() => ({ next_key: null }));
 
       // --- Apply relationship events from the arc beat choice ---
       if (userId) {
