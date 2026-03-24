@@ -3025,26 +3025,42 @@ export default function PlayPage() {
                                         !reqRes || !dayState
                                           ? true
                                           : (((dayState as unknown) as Record<string, number>)[reqRes.key] ?? 0) >= reqRes.min;
-                                      const isDisabled = savingChoice || !meetsGate;
+                                      const canAffordCost =
+                                        !costRes || !dayState
+                                          ? true
+                                          : (((dayState as unknown) as Record<string, number>)[costRes.key] ?? 0) >= costRes.amount;
+                                      const isLocked = !meetsGate || !canAffordCost;
+                                      const isDisabled = savingChoice || isLocked;
                                       return (
                                         <div key={typedChoice.id}>
                                           <button
                                             disabled={isDisabled}
                                             onClick={() => handleChoice(typedChoice.id)}
-                                            className="w-full rounded-lg border-2 border-primary/25 bg-card px-4 py-3 text-left text-sm font-medium text-foreground transition-all hover:border-primary hover:bg-primary/5 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                                            className={`w-full rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-all active:scale-[0.99] disabled:cursor-not-allowed ${
+                                              isLocked
+                                                ? "border-border/40 bg-muted text-foreground/40"
+                                                : "border-primary/25 bg-card text-foreground hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+                                            }`}
                                           >
                                             <span>{typedChoice.label}</span>
                                             {costRes ? (
-                                              <span className="ml-2 text-xs font-normal text-amber-600">
+                                              <span className={`ml-2 text-xs font-normal ${canAffordCost ? "text-amber-600" : "text-red-400"}`}>
                                                 −{costRes.amount}{" "}
                                                 {RESOURCE_LABELS[costRes.key] ?? costRes.key}
                                               </span>
                                             ) : null}
                                           </button>
                                           {!meetsGate && reqRes ? (
-                                            <p className="mt-0.5 pl-1 text-xs text-muted-foreground">
-                                              🔒 Requires {reqRes.min}{" "}
-                                              {RESOURCE_LABELS[reqRes.key] ?? reqRes.key}
+                                            <p className="mt-0.5 pl-1 text-xs text-red-400 italic">
+                                              Need {reqRes.min}{" "}
+                                              {RESOURCE_LABELS[reqRes.key] ?? reqRes.key}{" "}
+                                              (have {((dayState as unknown) as Record<string, number>)?.[reqRes.key] ?? 0})
+                                            </p>
+                                          ) : !canAffordCost && costRes ? (
+                                            <p className="mt-0.5 pl-1 text-xs text-red-400 italic">
+                                              Need {costRes.amount}{" "}
+                                              {RESOURCE_LABELS[costRes.key] ?? costRes.key}{" "}
+                                              (have {((dayState as unknown) as Record<string, number>)?.[costRes.key] ?? 0})
                                             </p>
                                           ) : null}
                                         </div>
@@ -3321,6 +3337,14 @@ export default function PlayPage() {
                             onChoice={handleTrackStoryletChoice}
                             moneyBand={chapterOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
                             relationships={relationshipsState}
+                            resources={dayState ? {
+                              energy: dayState.energy,
+                              stress: dayState.stress,
+                              cashOnHand: dayState.cashOnHand,
+                              knowledge: dayState.knowledge,
+                              socialLeverage: dayState.socialLeverage,
+                              physicalResilience: dayState.physicalResilience,
+                            } : null}
                           />
                         ))}
                     </section>

@@ -17,6 +17,15 @@ const MONEY_BAND_RANK: Record<string, number> = {
   comfortable: 2,
 };
 
+type ResourceSnapshot = {
+  energy?: number;
+  stress?: number;
+  cashOnHand?: number;
+  knowledge?: number;
+  socialLeverage?: number;
+  physicalResilience?: number;
+};
+
 type TrackStoryletCardProps = {
   storylet: TrackStorylet;
   dayIndex: number;
@@ -26,6 +35,8 @@ type TrackStoryletCardProps = {
   resolvedOption?: StoryletChoice;
   moneyBand?: MoneyBand | null;
   relationships?: Record<string, RelationshipState> | null;
+  /** Player's current resource levels — used to gate choices with requires_resource / costs_resource */
+  resources?: ResourceSnapshot | null;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -76,6 +87,39 @@ function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: nu
     .map(([k, v]) => ({ label: RESOURCE_LABELS[k] ?? k, delta: v }));
 }
 
+/**
+ * Checks requires_resource gate AND whether costs_resource can be afforded.
+ * Returns null if the choice is available, or a message explaining what's missing.
+ */
+function checkResourceAvailability(
+  option: StoryletChoice,
+  resources: ResourceSnapshot | null | undefined
+): string | null {
+  if (!resources) return null;
+
+  // Check requires_resource gate
+  const req = option.requires_resource;
+  if (req?.key && typeof req.min === "number") {
+    const current = (resources as Record<string, number | undefined>)[req.key] ?? 0;
+    if (current < req.min) {
+      const label = RESOURCE_LABELS[req.key] ?? req.key;
+      return `Need ${req.min} ${label} (have ${current})`;
+    }
+  }
+
+  // Check costs_resource affordability
+  const cost = option.costs_resource;
+  if (cost?.key && typeof cost.amount === "number") {
+    const current = (resources as Record<string, number | undefined>)[cost.key] ?? 0;
+    if (current < cost.amount) {
+      const label = RESOURCE_LABELS[cost.key] ?? cost.key;
+      return `Need ${cost.amount} ${label} (have ${current})`;
+    }
+  }
+
+  return null;
+}
+
 function meetsMoneyRequirement(
   playerBand: MoneyBand | null | undefined,
   required: string | undefined
@@ -86,7 +130,7 @@ function meetsMoneyRequirement(
   return playerRank >= requiredRank;
 }
 
-export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand, relationships }: TrackStoryletCardProps) {
+export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand, relationships, resources }: TrackStoryletCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +226,12 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
       {!displayedOption && (
         <div className="flex flex-col gap-2">
           {storylet.options.map((option) => {
-            const locked = !meetsMoneyRequirement(moneyBand, option.money_requirement);
+            const moneyLocked = !meetsMoneyRequirement(moneyBand, option.money_requirement);
+            const resourceBlock = checkResourceAvailability(option, resources);
+            const locked = moneyLocked || !!resourceBlock;
+            const lockReason = moneyLocked
+              ? "(not enough money)"
+              : resourceBlock;
             const previewDeltas = computeDeltas(option);
             return (
               <button
@@ -213,8 +262,8 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
                         </span>
                       );
                     })}
-                    {locked && (
-                      <span className="text-xs text-foreground/30">(not enough money)</span>
+                    {locked && lockReason && (
+                      <span className="text-xs text-red-400 italic">{lockReason}</span>
                     )}
                   </span>
                 )}
