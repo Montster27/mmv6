@@ -268,6 +268,8 @@ export default function PlayPage() {
     type: MiniGameType;
     choiceId: string;
     config?: Record<string, unknown>;
+    /** When the mini-game was triggered from an arc beat, store the beat+option to resume. */
+    pendingArcBeat?: { beat: ArcBeat; option: StoryletChoice };
   } | null>(null);
   const [pendingReactionText, setPendingReactionText] = useState<string | null>(
     null
@@ -1987,18 +1989,25 @@ export default function PlayPage() {
   // outcome by mapping won→"success" / lost→"failure" outcome id, then resume
   // the normal handleChoice flow by re-calling it (the mini-game intercept
   // won't re-trigger because activeMiniGame will be cleared first).
+  // Ref to hold handleArcBeatChoice so handleMiniGameComplete can call it
+  // without a circular dependency (handleMiniGameComplete is defined first).
+  const arcBeatChoiceRef = useRef<((beat: ArcBeat, option: StoryletChoice) => Promise<void>) | undefined>(undefined);
+
   const handleMiniGameComplete = useCallback(
     (result: MiniGameResult) => {
       if (!activeMiniGame) return;
+      const pending = activeMiniGame.pendingArcBeat;
       const { choiceId } = activeMiniGame;
       setActiveMiniGame(null);
 
-      // The mini-game result maps to outcome selection via the check system.
-      // For now, we re-invoke handleChoice — the mini_game guard won't fire
-      // again since activeMiniGame is null. The outcome resolution in
-      // applyOutcomeForChoice already supports "success"/"failure" outcome ids.
-      // TODO: thread game result into outcome selection more explicitly.
-      handleChoice(choiceId);
+      if (pending && arcBeatChoiceRef.current) {
+        // Arc beat path: resume handleArcBeatChoice (mini_game guard won't
+        // fire again because activeMiniGame is now null).
+        arcBeatChoiceRef.current(pending.beat, pending.option);
+      } else {
+        // Legacy storylet path: re-invoke handleChoice.
+        handleChoice(choiceId);
+      }
     },
     [activeMiniGame]
   );
@@ -2136,6 +2145,17 @@ export default function PlayPage() {
 
   const handleArcBeatChoice = useCallback(
     async (beat: ArcBeat, option: StoryletChoice) => {
+      // ── Mini-game intercept for arc beats ───────────────────────────────
+      if (option.mini_game && !activeMiniGame) {
+        setActiveMiniGame({
+          type: option.mini_game.type,
+          choiceId: option.id,
+          config: option.mini_game.config,
+          pendingArcBeat: { beat, option },
+        });
+        return; // wait for game to finish — handleMiniGameComplete resumes
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("No session");
@@ -2301,8 +2321,11 @@ export default function PlayPage() {
         }
       }
     },
-    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState, allocationSaved, dayState, setDayState]
+    [dayIndex, resolvedArcBeatIds, arcBeats, arcOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, arcOneState, allocationSaved, dayState, setDayState, activeMiniGame]
   );
+
+  // Keep the ref in sync so handleMiniGameComplete can call it without circular deps
+  arcBeatChoiceRef.current = handleArcBeatChoice;
 
   const handleDismissArcBeat = useCallback((beat: ArcBeat) => {
     setPendingDismissalBeats((prev) => prev.filter((entry) => entry.beat.instance_id !== beat.instance_id));
@@ -3230,8 +3253,20 @@ export default function PlayPage() {
                     </div>
                   )}
 
+                  {/* Global mini-game overlay — shows on top of arc beats when active */}
+                  {activeMiniGame && activeMiniGame.pendingArcBeat && (
+                    <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                      <MiniGameShell
+                        gameType={activeMiniGame.type}
+                        config={activeMiniGame.config}
+                        onComplete={handleMiniGameComplete}
+                      />
+                    </div>
+                  )}
+
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     arcOneMode &&
+                    !activeMiniGame?.pendingArcBeat &&
                     (arcBeats.length > 0 || pendingDismissalBeats.length > 0) && (
                     <section className="space-y-3">
                       <h2 className="prep-label">
