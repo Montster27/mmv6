@@ -1,6 +1,6 @@
 # MMV — Task Board
 
-> Last updated: 2026-03-23
+> Last updated: 2026-03-24
 > Current milestone: **A — "It Runs"**
 > Current branch: `main`
 
@@ -163,6 +163,20 @@
 ### Evening Event Storylets (drafted 2026-03-23)
 - [x] **s_evening_caps prose** — 3 choices × win/lose reactions. Caps rules corrected (bottles, flick). Beer shatter in choice 2. Hangover + "Caps Guy" reputation. `Category: Content`
 - [x] **s_evening_cards prose** — Miguel hosts, Spider introduced. 3 choices × win/lose reactions. Quiet connection path. `Category: Content`
+
+### Terminology Unification (2026-03-24)
+- [x] **Unified Track + Storylet model** — streams/arcs collapsed into Tracks, beats/steps collapsed into Storylets. Two-entity model: Container + Content. `Category: Engine`
+- [x] **Deleted dead code** — ArcBeatCard shim, content_arcs lib+routes, selectArcBeats, legacy /api/arc-one/ route, deprecated ArcStepOption type. `Category: Engine`
+- [x] **Removed all backward-compat shims** — ArcBeat alias, arcBeats field, deprecated Storylet/StoryletChoice fields, field fallbacks in dailyLoop and tracks/resolve. `Category: Engine`
+- [x] **Updated Studio components** — ArcPanel, ChoiceEditor, ChoiceList, GraphView, PreviewSimulator all using track_id, storylet_key, sets_track_state, default_next_key. `Category: Engine`
+- [x] **Renamed arcOne → chapter** — src/core/arcOne/ → src/core/chapter/, ArcOneState → ChapterOneState, arcOneMode → chapterOneMode, arcOneStreams.ts → chapterStreams.ts. 118 occurrences across 20 files. `Category: Engine`
+
+### Snake Mini-Game Enhancement (2026-03-24)
+- [x] **3-try system for snake game** — maxAttempts prop (default 3), lives counter in HUD, retry screen between attempts, instructions on first load. `Category: Engine`
+
+### Landing Page (2026-03-24)
+- [x] **Landing page for mmvstudios.com** — marketing page at /, dev hub moved to /dev. Hero, benefits, co-creation survey, CTA sections. Inter font added. `Category: UI`
+- [x] **Domain connected** — mmvstudios.com pointed to Vercel via Cloudflare DNS. `Category: Tooling`
 
 ---
 

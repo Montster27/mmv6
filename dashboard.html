@@ -113,7 +113,15 @@ var DEFAULT_TASKS=[
 {id:"d50",section:"Mini-Game Framework",title:"MemoryCardGame component",desc:"pair matching, adaptive grid/timer/miss limit, playing card aesthetic.",priority:"",category:"Engine",status:"done"},
 {id:"d51",section:"Mini-Game Framework",title:"Adaptive difficulty tracker",desc:"session-level win/loss per game type, clamped 0.2–0.9.",priority:"",category:"Engine",status:"done"},
 {id:"d52",section:"Evening Event Storylets",title:"s_evening_caps prose",desc:"3 choices × win/lose reactions. Caps rules corrected (bottles, flick). Beer shatter in choice 2. Hangover + \"Caps Guy\" …",priority:"",category:"Content",status:"done"},
-{id:"d53",section:"Evening Event Storylets",title:"s_evening_cards prose",desc:"Miguel hosts, Spider introduced. 3 choices × win/lose reactions. Quiet connection path.",priority:"",category:"Content",status:"done"}
+{id:"d53",section:"Evening Event Storylets",title:"s_evening_cards prose",desc:"Miguel hosts, Spider introduced. 3 choices × win/lose reactions. Quiet connection path.",priority:"",category:"Content",status:"done"},
+{id:"d54",section:"Terminology Unification",title:"Unified Track + Storylet model",desc:"streams/arcs collapsed into Tracks, beats/steps collapsed into Storylets. Two-entity model: Container + Content.",priority:"",category:"Engine",status:"done"},
+{id:"d55",section:"Terminology Unification",title:"Deleted dead code",desc:"ArcBeatCard shim, content_arcs lib+routes, selectArcBeats, legacy /api/arc-one/ route, deprecated ArcStepOption type.",priority:"",category:"Engine",status:"done"},
+{id:"d56",section:"Terminology Unification",title:"Removed all backward-compat shims",desc:"ArcBeat alias, arcBeats field, deprecated Storylet/StoryletChoice fields, field fallbacks in dailyLoop and tracks/resol…",priority:"",category:"Engine",status:"done"},
+{id:"d57",section:"Terminology Unification",title:"Updated Studio components",desc:"ArcPanel, ChoiceEditor, ChoiceList, GraphView, PreviewSimulator all using track_id, storylet_key, sets_track_state, def…",priority:"",category:"Engine",status:"done"},
+{id:"d58",section:"Terminology Unification",title:"Renamed arcOne → chapter",desc:"src/core/arcOne/ → src/core/chapter/, ArcOneState → ChapterOneState, arcOneMode → chapterOneMode, arcOneStreams.ts → ch…",priority:"",category:"Engine",status:"done"},
+{id:"d59",section:"Snake Mini-Game Enhancement",title:"3-try system for snake game",desc:"maxAttempts prop (default 3), lives counter in HUD, retry screen between attempts, instructions on first load.",priority:"",category:"Engine",status:"done"},
+{id:"d60",section:"Landing Page",title:"Landing page for mmvstudios.com",desc:"marketing page at /, dev hub moved to /dev. Hero, benefits, co-creation survey, CTA sections. Inter font added.",priority:"",category:"UI",status:"done"},
+{id:"d61",section:"Landing Page",title:"Domain connected",desc:"mmvstudios.com pointed to Vercel via Cloudflare DNS.",priority:"",category:"Tooling",status:"done"}
 ];
 var STORAGE_KEY='mmv_dashboard_state';
 function loadTasks(){try{var s=localStorage.getItem(STORAGE_KEY);if(s){var o=JSON.parse(s);return DEFAULT_TASKS.map(function(t){return Object.assign({},t,{status:o[t.id]||t.status})})}}catch(e){}return DEFAULT_TASKS.map(function(t){return Object.assign({},t)})}
