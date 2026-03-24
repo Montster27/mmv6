@@ -277,7 +277,7 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
                   : panel === "npc"
                   ? "NPC Memory"
                   : panel === "streams"
-                  ? "Streams"
+                  ? "Track States"
                   : "Log"}
               </button>
             ))}
@@ -364,7 +364,7 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
             </div>
           )}
 
-          {/* Streams panel */}
+          {/* Track States panel */}
           {activePanel === "streams" && (
             <div className="space-y-1.5">
               {(Object.keys(STREAM_LABELS) as StreamId[]).map((sid) => {

@@ -169,9 +169,9 @@ export default function ArcsPage() {
         <div className="h-full overflow-auto p-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">Narrative Arcs</h2>
+              <h2 className="text-xl font-semibold text-slate-900">Tracks</h2>
               <p className="text-sm text-slate-600">
-                Arc definitions and steps. Expand a step to edit it inline, or use the{" "}
+                Track definitions and storylets. Expand a storylet to edit it inline, or use the{" "}
                 <Link href="/studio/content/storylets" className="text-indigo-600 underline">
                   Storylets editor
                 </Link>{" "}
@@ -191,7 +191,7 @@ export default function ArcsPage() {
                   setCreateError(null);
                 }}
               >
-                + New Arc
+                + New Track
               </Button>
             </div>
           </div>
@@ -199,13 +199,13 @@ export default function ArcsPage() {
           {/* Create arc inline form */}
           {isCreating && (
             <div className="rounded-md border border-indigo-200 bg-indigo-50 p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-indigo-900">New Arc</h3>
+              <h3 className="text-sm font-semibold text-indigo-900">New Track</h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm text-slate-700">
                   Key <span className="text-red-500">*</span>
                   <input
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono"
-                    placeholder="arc-one"
+                    placeholder="roommate"
                     value={createDraft.key}
                     onChange={(e) => setCreateDraft({ ...createDraft, key: e.target.value })}
                   />
@@ -214,7 +214,7 @@ export default function ArcsPage() {
                   Title <span className="text-red-500">*</span>
                   <input
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-                    placeholder="Arc One"
+                    placeholder="Roommate"
                     value={createDraft.title}
                     onChange={(e) => setCreateDraft({ ...createDraft, title: e.target.value })}
                   />
@@ -361,14 +361,14 @@ export default function ArcsPage() {
                         onClick={handleDeleteArc}
                         className="rounded-md border border-red-300 px-4 py-1.5 text-sm text-red-600 hover:bg-red-50"
                       >
-                        Delete arc
+                        Delete track
                       </button>
                       <Button onClick={handleSaveArc} disabled={arcSaveState === "saving"}>
                         {arcSaveState === "saving"
                           ? "Saving\u2026"
                           : arcSaveState === "saved"
                             ? "Saved \u2713"
-                            : "Save arc"}
+                            : "Save track"}
                       </Button>
                     </div>
                   </div>

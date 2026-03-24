@@ -83,10 +83,10 @@ export default function GraphPage() {
               }`}
               onClick={() => setViewMode("arcs")}
             >
-              Arc Beat Sequences
+              Track Sequences
               {arcDefinitions.length > 0 && (
                 <span className="ml-1.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] text-indigo-700">
-                  {arcDefinitions.length} arcs · {arcDefinitionSteps.length} beats
+                  {arcDefinitions.length} tracks · {arcDefinitionSteps.length} storylets
                 </span>
               )}
             </button>

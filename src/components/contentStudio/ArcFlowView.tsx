@@ -177,7 +177,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        <span>Drag to pan · Scroll to zoom · Each row = one arc stream · Nodes = story beats in order</span>
+        <span>Drag to pan · Scroll to zoom · Each row = one track · Nodes = storylets in order</span>
       </div>
 
       {/* Legend */}
@@ -237,7 +237,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
                 </marker>
               </defs>
 
-              {/* Sequential arrows between adjacent beats */}
+              {/* Sequential arrows between adjacent storylets */}
               {layout.map(({ arc, steps, y }) => {
                 return steps.slice(0, -1).map((step, idx) => {
                   const x1 = LABEL_WIDTH + idx * COL_WIDTH + NODE_WIDTH;
@@ -348,7 +348,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
 
         {/* Detail panel */}
         <div className="space-y-3 overflow-y-auto rounded-md border border-slate-200 bg-white px-4 py-4" style={{ maxHeight: 520 }}>
-          <h3 className="text-sm font-semibold text-slate-800">Selected beat</h3>
+          <h3 className="text-sm font-semibold text-slate-800">Selected storylet</h3>
           {!selectedStep ? (
             <p className="text-sm text-slate-600">Click a node to inspect it.</p>
           ) : (

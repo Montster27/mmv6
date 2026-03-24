@@ -191,10 +191,10 @@ export default function StreamsPage() {
           {/* Header */}
           <div>
             <h2 className="text-base font-semibold text-slate-800">
-              Stream Collision View
+              Track State View
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Which storylets touch multiple concurrent streams — and what state
+              Which storylets touch multiple concurrent tracks — and what state
               transitions and preclusions they fire.
             </p>
           </div>
