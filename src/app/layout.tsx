@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
-import { Playfair_Display, Space_Mono } from "next/font/google";
+import { Inter, Playfair_Display, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ToastProvider } from "@/components/ui/toast-provider";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -29,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${playfair.variable} ${spaceMono.variable}`}>
+      <body className={`${inter.variable} ${playfair.variable} ${spaceMono.variable}`}>
         <QueryProvider>
           <ToastProvider>
             {children}
