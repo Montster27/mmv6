@@ -63,26 +63,26 @@ ALTER TABLE public.arc_instances RENAME TO track_progress;
 -- from the most recent daily_states row for that user.
 DO $$
 DECLARE
-  tp RECORD;
+  rec RECORD;
   track_key text;
   stream_val text;
 BEGIN
-  FOR tp IN SELECT tp.id, tp.user_id, tp.track_id, t.key as tkey
-            FROM public.track_progress tp
-            JOIN public.tracks t ON t.id = tp.track_id
-            WHERE tp.track_state IS NULL
+  FOR rec IN SELECT p.id, p.user_id, p.track_id, t.key as tkey
+             FROM public.track_progress p
+             JOIN public.tracks t ON t.id = p.track_id
+             WHERE p.track_state IS NULL
   LOOP
-    track_key := tp.tkey;
+    track_key := rec.tkey;
 
     -- Get the stream state from the latest daily_states row
     SELECT ds.stream_states->>track_key INTO stream_val
     FROM public.daily_states ds
-    WHERE ds.user_id = tp.user_id
+    WHERE ds.user_id = rec.user_id
     ORDER BY ds.day_index DESC
     LIMIT 1;
 
     IF stream_val IS NOT NULL THEN
-      UPDATE public.track_progress SET track_state = stream_val WHERE id = tp.id;
+      UPDATE public.track_progress SET track_state = stream_val WHERE id = rec.id;
     END IF;
   END LOOP;
 END $$;
