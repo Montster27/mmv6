@@ -91,6 +91,8 @@ import type {
 import type { ReflectionResponse } from "@/types/reflections";
 import { useSession } from "@/contexts/SessionContext";
 import { ProgressPanel } from "@/components/ProgressPanel";
+import { SkillWebPanel } from "@/components/SkillWebPanel";
+import type { SkillWebState } from "@/types/skillWeb";
 import { OutcomeExplain } from "@/components/play/OutcomeExplain";
 import { isEmailAllowed } from "@/lib/adminAuth";
 import { getDailyStageCopy } from "@/lib/ui/dailyStageCopy";
@@ -302,6 +304,11 @@ export default function PlayPage() {
   const [awaitingAllocation, setAwaitingAllocation] = useState(false);
   const [sleepCardDone, setSleepCardDone] = useState(false);
   const [bridgeText, setBridgeText] = useState<string | null>(null);
+  const [skillWebOpen, setSkillWebOpen] = useState(false);
+  const [skillWebState, setSkillWebState] = useState<SkillWebState>({
+    skills: [],
+    composites: [],
+  });
 
   const isAdmin =
     Boolean(session?.user?.email && isEmailAllowed(session.user.email)) ||
@@ -330,6 +337,21 @@ export default function PlayPage() {
     setBootstrapAssignments(bootstrapQuery.data.experiments ?? {});
     setUserId(bootstrapQuery.data.userId);
   }, [bootstrapQuery.data, bootstrapQuery.isError]);
+
+  // Fetch skill web on bootstrap
+  useEffect(() => {
+    if (!bootstrapUserId) return;
+    const token = session?.access_token;
+    if (!token) return;
+    fetch("/api/skills/web", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.skills) setSkillWebState(data);
+      })
+      .catch(() => {});
+  }, [bootstrapUserId, session?.access_token]);
 
   const testerMode = useMemo(() => getAppMode().testerMode, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3456,6 +3478,13 @@ export default function PlayPage() {
                   onResourcesHoverEnd={() => endHover("resources_panel")}
                   onVectorsHoverStart={() => startHover("vectors_panel")}
                   onVectorsHoverEnd={() => endHover("vectors_panel")}
+                  onSkillWebOpen={() => setSkillWebOpen(true)}
+                />
+                <SkillWebPanel
+                  skills={skillWebState.skills}
+                  composites={skillWebState.composites}
+                  open={skillWebOpen}
+                  onClose={() => setSkillWebOpen(false)}
                 />
               </div>
             </div>

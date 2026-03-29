@@ -102,6 +102,10 @@ export type StoryletChoice = {
   identity_tags?: string[];
   skill_modifier?: string;
   skill_requirement?: string;
+  /** Skill web: grow skills when this choice is taken. */
+  skill_growth?: Array<{ skill: string; increment: number }>;
+  /** Skill web: require minimum skill levels to show/enable this choice. */
+  skill_web_requirements?: Array<{ skill: string; min_level: number }>;
   precludes?: string[];
   relational_effects?: Record<string, Record<string, number>>;
   set_npc_memory?: Record<string, Record<string, boolean>>;

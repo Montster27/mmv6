@@ -48,13 +48,19 @@ export default function WelcomePage() {
         return;
       }
 
-      // Day 1 — check if any storylets have been played
-      const { count } = await supabase
-        .from("storylet_runs")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId);
+      // Day 1 — check if any storylets have been played (via either path)
+      const [{ count: runCount }, { count: logCount }] = await Promise.all([
+        supabase
+          .from("storylet_runs")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId),
+        supabase
+          .from("choice_log")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId),
+      ]);
 
-      if ((count ?? 0) > 0) {
+      if ((runCount ?? 0) > 0 || (logCount ?? 0) > 0) {
         setDailyState(data);
         setStatus("has_game");
       } else {

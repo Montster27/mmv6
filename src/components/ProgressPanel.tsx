@@ -33,6 +33,7 @@ type Props = {
   onResourcesHoverEnd?: () => void;
   onVectorsHoverStart?: () => void;
   onVectorsHoverEnd?: () => void;
+  onSkillWebOpen?: () => void;
 };
 
 const HIGHLIGHT_MS = 250;
@@ -94,6 +95,7 @@ function ProgressPanelComponent({
   onResourcesHoverEnd,
   onVectorsHoverStart,
   onVectorsHoverEnd,
+  onSkillWebOpen,
 }: Props) {
   const [highlight, setHighlight] = useState<DeltaInfo | null>(null);
   const energy = dayState?.energy ?? dailyState?.energy;
@@ -294,6 +296,15 @@ function ProgressPanelComponent({
           <p>{summary}</p>
         </div>
       ) : null}
+
+      {onSkillWebOpen && (
+        <button
+          onClick={onSkillWebOpen}
+          className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition"
+        >
+          Skill Web
+        </button>
+      )}
     </aside>
   );
 }
