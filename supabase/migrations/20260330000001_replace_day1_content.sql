@@ -107,7 +107,7 @@ The feeling passes. Your shoulder aches under the duffel strap. You don't know w
       "reaction_text": "You find a spot on the low wall and sit. The duffel rests against your leg. You watch: students with boxes, parents lingering near cars, a guy in a Harwick Athletics shirt giving directions to someone who clearly doesn't speak enough English to follow them.\n\nThe oak tree across the path looks like a place you've sat before. You haven't. The feeling is warm and wrong at the same time. It fades when a frisbee skips across the brick near your feet.\n\nYou pick up the duffel and head for the dorm."
     }
   ]$choices$::jsonb,
-  ARRAY['arc_one', 'opening', 'day1'],
+  ARRAY['arc_one', 'arc_one_core', 'onboarding', 'opening', 'day1'],
   '{}'::jsonb,
   1000, true,
   ARRAY[]::text[],
@@ -192,7 +192,7 @@ His side: the poster, a desk lamp, a milk crate of cassette tapes, a framed phot
       "reaction_text": "The window looks out over the side of the building — a strip of grass, a bike rack, the edge of another dorm. Two guys are carrying a mini-fridge between them across the lawn, arguing about which door to use.\n\nFor a moment the view has a double-exposure quality. The same window, a different season. Snow on the bike rack. The feeling of knowing exactly which bike is yours. Then it's September again and the bikes belong to strangers.\n\n\"I was gonna go find the dining hall in a bit,\" Scott says behind you. \"Haven't actually eaten since the drive. You want to come, or—?\"\n\nBefore you can answer, there's a knock on the open door. Not a knock exactly — more like a palm slapping the doorframe twice, fast."
     }
   ]$choices$::jsonb,
-  ARRAY['arc_one', 'roommate', 'day1'],
+  ARRAY['arc_one', 'arc_one_core', 'onboarding', 'roommate', 'day1'],
   '{}'::jsonb,
   200, true,
   ARRAY['npc_roommate_scott']::text[],
@@ -292,7 +292,7 @@ Doug looks at you.$body$,
       "reaction_text": "\"Cool, cool.\" Doug says it lighter than he means it. Doug files people into two categories — in or out — and 'maybe' reads as out.\n\nMike glances at you. Something between assessment and sympathy. He knows what Doug's 'cool, cool' means.\n\nThey leave. Keith is last. \"The dining hall food's fine.\" He says it to no one in particular and closes the door gently behind him.\n\nScott looks at you. \"Doug's a lot.\" He grins. \"He's alright though.\""
     }
   ]$choices$::jsonb,
-  ARRAY['arc_one', 'belonging', 'day1'],
+  ARRAY['arc_one', 'arc_one_core', 'onboarding', 'belonging', 'day1'],
   '{}'::jsonb,
   200, true,
   ARRAY['npc_floor_doug', 'npc_floor_mike', 'npc_floor_keith']::text[],
@@ -369,7 +369,7 @@ But the meal plan form has options.$body$,
       "reaction_text": "Cheapest. Most flexible. Most planning required. You'll skip meals or buy cheap food off-campus sometimes. The woman stamps the form without comment.\n\nYou walk down the hall and find Room 108. A course catalog sits on a table outside the advisor's door. You flip through it. Introduction to Computer Science — 'New for Fall 1983. Limited enrollment. Lab hours required.' Physics I. Introduction to Business. You take a mental note.\n\nYou push through the front door and the September air hits you. The quad stretches out ahead. The path cuts across past the chapel."
     }
   ]$choices$::jsonb,
-  ARRAY['arc_one', 'academic', 'day1'],
+  ARRAY['arc_one', 'arc_one_core', 'onboarding', 'academic', 'day1'],
   '{}'::jsonb,
   200, true,
   ARRAY[]::text[],
@@ -451,7 +451,7 @@ He closes the paperback. Stands up. He's wearing a corduroy jacket with the slee
       "reaction_text": "You don't say anything. He reads the silence like it's an answer and nods.\n\n\"Yeah. That's about right.\"\n\nHe sits back down and nods at the other end of the bench. You sit because standing feels wrong.\n\nHe watches two students walk past arguing about a dining hall waffle iron. Waits until they're gone.\n\n\"Glenn.\" Like that's enough.\n\nThen he talks. The cadence of someone who's thought about exactly how much to say and decided on less than he knows. He talks the way you'd give directions to someone in a foreign city — enough to get them moving, not enough to map the whole place.\n\n\"You're going to need people. Not just friends. People in different places, different circles. The guy who eats alone doesn't make it.\"\n\n\"Money matters. Not later — now. Figure out how it works. How to make it, how to keep it, how to move. Independence isn't a feeling. It's a bank balance.\"\n\nA groundskeeper crosses behind the bench pulling a cart of rakes.\n\n\"Knowledge. Not just classes — the right classes. History, if you want to understand what built the things you're going to run into. Physics, if you want to understand what's happening to you. Computers — there's a revolution coming in that direction and almost nobody here sees it. Sociology, politics, if you want to know how groups work. Business, if you want the money part to go faster.\"\n\nHe runs through these like someone giving a debrief, not a prophecy.\n\n\"And find the others. Work together. The goal is to make things better. Not through force. Through being in the right place with the right people knowing the right things.\"\n\nYou're sitting very still. He notices.\n\n\"Good. The ones who ask too many questions right away usually aren't ready for the answers.\"\n\nHe stands. Paperback in the jacket pocket.\n\n\"Last thing. Don't trust what you remember. About how things went — history, sports, elections, any of it. This place rhymes with what you know. But it doesn't repeat. The details are different. Sometimes a little, sometimes a lot.\"\n\nHe's walking before you can respond.\n\n\"More will come back. Memories, feelings, things that haven't happened yet. Don't fight them. Don't force them. Just live it.\"\n\nHe crosses the quad toward the library. Doesn't look back. You watch him until he's around the corner of the building or through the door or gone.\n\nThe bench is empty. The melody is still in your head. The schedule in your pocket says Fall 1983 and you believe it less than you did two minutes ago."
     }
   ]$choices$::jsonb,
-  ARRAY['arc_one', 'opening', 'frame', 'time_travel', 'contact', 'day1'],
+  ARRAY['arc_one', 'arc_one_core', 'onboarding', 'opening', 'frame', 'time_travel', 'contact', 'day1'],
   '{}'::jsonb,
   1000, true,
   ARRAY['npc_contact_glenn']::text[],
@@ -530,7 +530,7 @@ Doug picks up a chicken leg and points it at Keith. "Keith, you ever seen a sala
       "reaction_text": "You eat. The chicken is fine. The mashed potatoes taste like they were made by a machine that once met a potato. The brownie is better than it looks.\n\nMike finishes chewing. \"Anyone figure out their schedule yet? I've got Chem 101 at eight AM on Tuesdays.\"\n\nDoug: \"Eight AM? That's punishment.\"\n\nThe conversation moves on. Doug leans back. \"So tonight. First night, we gotta do something. I heard there's a thing at Anderson Hall — a guy on third floor is throwing a party. Beer, girls from the other dorms.\"\n\n\"There's also some guys on our floor doing cards in the lounge,\" Mike says. \"Quieter.\"\n\nScott: \"Both sound good.\"\n\nThe meal is done. The afternoon opens up. Tonight you'll have to choose."
     }
   ]$choices$::jsonb,
-  ARRAY['arc_one', 'belonging', 'day1'],
+  ARRAY['arc_one', 'arc_one_core', 'onboarding', 'belonging', 'day1'],
   '{}'::jsonb,
   200, true,
   ARRAY[]::text[],
@@ -624,7 +624,7 @@ Student union, downstairs. Open until midnight. Arcade cabinets, a pool table, v
       "reaction_text": "The student union at night. Half the lights are dimmer than they should be. A pool table where two guys are playing a slow, serious game. Vending machines humming. And in the corner, the arcade cabinet — a snake game, green pixels on a black screen.\n\nYou play alone. Or next to someone else who's playing alone. A quarter exchanged. Maybe a nod.\n\nYou walk back to the dorm alone. The campus is different at night — the oaks are black shapes, the brick paths are gray, the buildings have lit windows scattered like someone rolled dice on a grid. Your room is empty when you get there — Scott is still out. The clock radio is off.\n\nYou brush your teeth in a bathroom that smells like toothpaste and industrial soap. The face in the mirror is the same one from this morning. You're not sure it should be.\n\nYou lie on the mattress. The plastic cover crinkles. Scott's Return of the Jedi poster. Your side has whatever you put there today.\n\nThe melody. Still there. Fall 1983. The ceiling above your bed.\n\nTomorrow there will be more of it.\n\nYou close your eyes."
     }
   ]$choices$::jsonb,
-  ARRAY['arc_one', 'belonging', 'day1'],
+  ARRAY['arc_one', 'arc_one_core', 'onboarding', 'belonging', 'day1'],
   '{}'::jsonb,
   200, true,
   ARRAY[]::text[],

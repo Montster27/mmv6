@@ -883,7 +883,7 @@ export default function PlayPage() {
 
           const used = new Set(existingRuns.map((r) => r.storylet_id));
           const next = candidates.filter((c) => !used.has(c.id)).slice(0, 3);
-          const entrySlug = "s1_dorm_wake_dislocation";
+          const entrySlug = "s_d1_the_quad";
           const shouldForceEntry =
             featureFlags.chapterOneScarcityEnabled &&
             day <= CHAPTER_ONE_LAST_DAY &&
