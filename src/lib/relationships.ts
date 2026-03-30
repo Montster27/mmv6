@@ -46,26 +46,24 @@ export type RelationshipLogEntry = {
 const DEFAULT_RELATIONSHIP = 5;
 
 const ROLE_TAGS: Record<string, string> = {
-  npc_roommate_dana: "roommate",
-  npc_floor_miguel: "orientation",
+  npc_roommate_scott: "roommate",
+  npc_floor_doug: "orientation",
   npc_prof_marsh: "professor",
   npc_studious_priya: "classmate",
-  npc_floor_cal: "floormate",
+  npc_floor_keith: "floormate",
   npc_ambiguous_jordan: "acquaintance",
-  npc_ra_scott: "ra",
-  npc_contact_wren: "contact",
+  npc_contact_glenn: "contact",
   npc_parent_voice: "family",
 };
 
 export const ALL_YEAR_ONE_NPCS = [
-  "npc_roommate_dana",
-  "npc_floor_miguel",
+  "npc_roommate_scott",
+  "npc_floor_doug",
   "npc_prof_marsh",
   "npc_studious_priya",
-  "npc_floor_cal",
+  "npc_floor_keith",
   "npc_ambiguous_jordan",
-  "npc_ra_scott",
-  "npc_contact_wren",
+  "npc_contact_glenn",
   "npc_parent_voice",
 ] as const;
 
@@ -144,8 +142,8 @@ export function ensureRelationshipDefaults(
     next[npcId] = merged;
   };
 
-  // Dana: introduced through the opening arc (arc_opening beat 3)
-  ensure("npc_roommate_dana", {
+  // Scott: introduced through the opening arc (arc_opening beat 3)
+  ensure("npc_roommate_scott", {
     met: false,
     knows_name: false,
     knows_face: false,
@@ -153,7 +151,7 @@ export function ensureRelationshipDefaults(
     relationship: 5,
   });
   // All others start unmet — they are introduced through storylet events
-  ensure("npc_floor_miguel", {
+  ensure("npc_floor_doug", {
     met: false,
     knows_name: false,
     knows_face: false,
@@ -174,7 +172,7 @@ export function ensureRelationshipDefaults(
     role_tag: "classmate",
     relationship: 5,
   });
-  ensure("npc_floor_cal", {
+  ensure("npc_floor_keith", {
     met: false,
     knows_name: false,
     knows_face: false,
@@ -188,14 +186,7 @@ export function ensureRelationshipDefaults(
     role_tag: "acquaintance",
     relationship: 5,
   });
-  ensure("npc_ra_scott", {
-    met: false,
-    knows_name: false,
-    knows_face: false,
-    role_tag: "ra",
-    relationship: 5,
-  });
-  ensure("npc_contact_wren", {
+  ensure("npc_contact_glenn", {
     met: false,
     knows_name: false,
     knows_face: false,
@@ -353,14 +344,13 @@ export function applyRelationshipEvents(
 }
 
 const NPC_DISPLAY_NAMES: Record<string, string> = {
-  npc_roommate_dana: "Dana",
-  npc_floor_miguel: "Miguel",
+  npc_roommate_scott: "Scott",
+  npc_floor_doug: "Doug",
   npc_prof_marsh: "Prof. Marsh",
   npc_studious_priya: "Priya",
-  npc_floor_cal: "Cal",
+  npc_floor_keith: "Keith",
   npc_ambiguous_jordan: "Jordan",
-  npc_ra_scott: "Scott",
-  npc_contact_wren: "Wren",
+  npc_contact_glenn: "Glenn",
   npc_parent_voice: "your parent",
 };
 
@@ -369,14 +359,13 @@ const NPC_DISPLAY_NAMES: Record<string, string> = {
  * know their name yet. Used as a middle tier between stranger and named.
  */
 const NPC_FACE_TEXT: Record<string, string> = {
-  npc_roommate_dana: "your roommate",
-  npc_floor_miguel: "the guy from orientation",
+  npc_roommate_scott: "your roommate",
+  npc_floor_doug: "the guy from orientation",
   npc_prof_marsh: "the professor",
   npc_studious_priya: "the woman from class",
-  npc_floor_cal: "the guy down the hall",
+  npc_floor_keith: "the guy down the hall",
   npc_ambiguous_jordan: "the person from orientation",
-  npc_ra_scott: "the RA",
-  npc_contact_wren: "the guy from the quad",
+  npc_contact_glenn: "the guy from the quad",
   npc_parent_voice: "your parent",
 };
 
@@ -385,14 +374,13 @@ const NPC_FACE_TEXT: Record<string, string> = {
  * Should read naturally as an indefinite noun phrase.
  */
 const NPC_STRANGER_TEXT: Record<string, string> = {
-  npc_roommate_dana: "your roommate",
-  npc_floor_miguel: "a guy with an easy grin",
+  npc_roommate_scott: "your roommate",
+  npc_floor_doug: "a guy with an easy grin",
   npc_prof_marsh: "the professor",
   npc_studious_priya: "a woman with two columns in her notebook",
-  npc_floor_cal: "a guy from down the hall",
+  npc_floor_keith: "a guy from down the hall",
   npc_ambiguous_jordan: "someone you haven't met",
-  npc_ra_scott: "the RA",
-  npc_contact_wren: "an upperclassman with old eyes",
+  npc_contact_glenn: "an upperclassman with old eyes",
   npc_parent_voice: "your parent",
 };
 

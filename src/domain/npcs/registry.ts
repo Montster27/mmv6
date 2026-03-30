@@ -8,11 +8,43 @@ export type NpcEntry = {
 };
 
 export const NPC_REGISTRY: NpcEntry[] = [
+  // ── Day 1 Core NPCs ──
   {
-    id: "npc_floor_miguel",
-    name: "Miguel",
-    short_intro: "Miguel Reyes, room 214 — from San Antonio, first on the floor to learn everyone's name",
+    id: "npc_roommate_scott",
+    name: "Scott",
+    short_intro: "Scott, your roommate — already set up when you arrived, easy smile, says yes to everything",
   },
+  {
+    id: "npc_contact_glenn",
+    name: "Glenn",
+    short_intro: "Glenn — an upperclassman on a bench near the chapel, knows more than he's saying",
+  },
+  {
+    id: "npc_floor_doug",
+    name: "Doug",
+    short_intro: "Doug, two doors down — his brother went here, he already knows where everything is",
+  },
+  {
+    id: "npc_floor_mike",
+    name: "Mike",
+    short_intro: "Mike, down the hall — textbook under his arm on day one, precise when he talks",
+  },
+  {
+    id: "npc_floor_keith",
+    name: "Keith",
+    short_intro: "Keith Hollis, end of the hall — calloused hands, gives his full name, from a farm",
+  },
+  {
+    id: "npc_anderson_bryce",
+    name: "Bryce",
+    short_intro: "Bryce, Anderson Hall — throws parties, greets everyone like they're already friends",
+  },
+  {
+    id: "npc_floor_peterson",
+    name: "Peterson",
+    short_intro: "Peterson, from the floor — tall, glasses, quiet voice, shuffles cards like he means it",
+  },
+  // ── Later NPCs (Week 1+) ──
   {
     id: "npc_prof_marsh",
     name: "Marsh",
@@ -24,29 +56,14 @@ export const NPC_REGISTRY: NpcEntry[] = [
     short_intro: "Priya, from your sociology section — always three readings ahead, rarely wastes words",
   },
   {
-    id: "npc_floor_cal",
-    name: "Cal",
-    short_intro: "Cal, two doors down — the kind of person who shows up when things get inconvenient",
-  },
-  {
     id: "npc_ambiguous_jordan",
     name: "Jordan",
     short_intro: "Jordan, someone you keep running into — their angle isn't clear yet",
   },
   {
-    id: "npc_ra_scott",
-    name: "Scott",
-    short_intro: "Scott, your RA — has seen this all before, handles it professionally anyway",
-  },
-  {
-    id: "npc_roommate_dana",
-    name: "Dana",
-    short_intro: "Dana, your roommate — already here when you arrived, still figuring each other out",
-  },
-  {
-    id: "npc_contact_wren",
-    name: "Wren",
-    short_intro: "Wren — an upperclassman who knows more than he's saying, and has reasons for the restraint",
+    id: "npc_parent_voice",
+    name: "your parent",
+    short_intro: "Your parent — the voice on the other end of the hallway phone",
   },
 ];
 

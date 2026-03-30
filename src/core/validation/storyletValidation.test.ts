@@ -185,7 +185,7 @@ describe("storyletValidation", () => {
   it("accepts valid requires_npc_met array", () => {
     const res = validateStorylet({
       ...valid,
-      requirements: { requires_npc_met: ["npc_floor_cal"] },
+      requirements: { requires_npc_met: ["npc_floor_keith"] },
     });
     expect(res.ok).toBe(true);
   });
@@ -193,7 +193,7 @@ describe("storyletValidation", () => {
   it("rejects requires_npc_met that is not an array", () => {
     const res = validateStorylet({
       ...valid,
-      requirements: { requires_npc_met: "npc_floor_cal" },
+      requirements: { requires_npc_met: "npc_floor_keith" },
     });
     expect(res.ok).toBe(false);
   });
@@ -209,7 +209,7 @@ describe("storyletValidation", () => {
   it("accepts valid requires_npc_not_met array", () => {
     const res = validateStorylet({
       ...valid,
-      requirements: { requires_npc_not_met: ["npc_floor_cal"] },
+      requirements: { requires_npc_not_met: ["npc_floor_keith"] },
     });
     expect(res.ok).toBe(true);
   });
@@ -217,41 +217,41 @@ describe("storyletValidation", () => {
   // ── NPC name-leak detection ─────────────────────────────────────────────
 
   it("warns when body text contains an unguarded NPC name", () => {
-    const withNameLeak = { ...valid, body: "You spot Miguel across the hall." };
+    const withNameLeak = { ...valid, body: "You spot Doug across the hall." };
     const res = validateStoryletIssues(withNameLeak);
-    expect(res.warnings.some((w) => w.path === "body" && w.message.includes("Miguel"))).toBe(true);
+    expect(res.warnings.some((w) => w.path === "body" && w.message.includes("Doug"))).toBe(true);
   });
 
   it("does not warn about NPC name when requires_npc_met is set", () => {
     const guarded = {
       ...valid,
-      body: "You find Miguel at the table.",
-      requirements: { requires_npc_met: ["npc_floor_miguel"] },
+      body: "You find Doug at the table.",
+      requirements: { requires_npc_met: ["npc_floor_doug"] },
     };
     const res = validateStoryletIssues(guarded);
-    expect(res.warnings.some((w) => w.path === "body" && w.message.includes("Miguel"))).toBe(false);
+    expect(res.warnings.some((w) => w.path === "body" && w.message.includes("Doug"))).toBe(false);
   });
 
   it("warns when a choice label contains an unguarded NPC name", () => {
     const withLabelLeak = {
       ...valid,
-      choices: [{ id: "a", label: "Follow Miguel to the table" }],
+      choices: [{ id: "a", label: "Follow Doug to the table" }],
     };
     const res = validateStoryletIssues(withLabelLeak);
     expect(
-      res.warnings.some((w) => w.path.startsWith("choices") && w.message.includes("Miguel"))
+      res.warnings.some((w) => w.path.startsWith("choices") && w.message.includes("Doug"))
     ).toBe(true);
   });
 
   it("does not warn about NPC name in choice label when storylet requires that NPC met", () => {
     const guarded = {
       ...valid,
-      choices: [{ id: "a", label: "Ask Miguel about the club" }],
-      requirements: { requires_npc_met: ["npc_floor_miguel"] },
+      choices: [{ id: "a", label: "Ask Doug about the club" }],
+      requirements: { requires_npc_met: ["npc_floor_doug"] },
     };
     const res = validateStoryletIssues(guarded);
     expect(
-      res.warnings.some((w) => w.path.startsWith("choices") && w.message.includes("Miguel"))
+      res.warnings.some((w) => w.path.startsWith("choices") && w.message.includes("Doug"))
     ).toBe(false);
   });
 });

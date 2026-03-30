@@ -12,14 +12,13 @@ import { ALL_YEAR_ONE_NPCS } from "@/lib/relationships";
 import type { RelationshipState } from "@/lib/relationships";
 
 const NPC_LABELS: Record<string, string> = {
-  npc_roommate_dana: "Dana",
-  npc_floor_miguel: "Miguel",
+  npc_roommate_scott: "Scott",
+  npc_floor_doug: "Doug",
   npc_prof_marsh: "Prof. Marsh",
   npc_studious_priya: "Priya",
-  npc_floor_cal: "Cal",
+  npc_floor_keith: "Keith",
   npc_ambiguous_jordan: "Jordan",
-  npc_ra_scott: "Scott (RA)",
-  npc_contact_wren: "Wren (Contact)",
+  npc_contact_glenn: "Glenn (Contact)",
   npc_parent_voice: "Parent",
 };
 

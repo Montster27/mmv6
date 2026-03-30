@@ -102,7 +102,7 @@ function RelationalEffectsEditor({
       <div className="flex gap-1">
         <input
           className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs font-mono"
-          placeholder="npc_id (e.g. npc_floor_miguel)"
+          placeholder="npc_id (e.g. npc_floor_doug)"
           value={newNpcId}
           onChange={(e) => setNewNpcId(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addNpc(); } }}
@@ -220,7 +220,7 @@ function EventsEmittedEditor({
             <input
               className="w-full rounded border border-slate-200 px-1 py-0.5 text-xs font-mono"
               value={event.npc_id}
-              placeholder="npc_floor_miguel"
+              placeholder="npc_floor_doug"
               onChange={(e) => updateEvent(i, { npc_id: e.target.value })}
             />
           </label>

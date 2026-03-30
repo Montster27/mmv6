@@ -442,8 +442,8 @@ export default function PlayPage() {
   const beatBufferEnabled = Boolean(featureFlags.beatBufferEnabled);
   const relationshipDebugEnabled = Boolean(featureFlags.relationshipDebugEnabled);
   const npcNameForId = useCallback((npcId: string) => {
-    if (npcId === "npc_roommate_dana") return "Dana";
-    if (npcId === "npc_floor_miguel") return "Miguel";
+    if (npcId === "npc_roommate_scott") return "Scott";
+    if (npcId === "npc_floor_doug") return "Doug";
     return npcId;
   }, []);
   const chapterOneState = useMemo(
@@ -2711,7 +2711,7 @@ export default function PlayPage() {
                     <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                       <p className="font-semibold text-slate-700">People</p>
                       <div className="mt-2 space-y-2">
-                        {["npc_roommate_dana", "npc_floor_miguel"].map(
+                        {["npc_roommate_scott", "npc_floor_doug"].map(
                           (npcId) => {
                             const entry = relationshipsState[npcId] ?? {};
                             const met = entry.met ? "✅" : "❌";
@@ -2723,9 +2723,9 @@ export default function PlayPage() {
                               >
                                 <div className="flex items-center justify-between">
                                   <span className="font-medium text-slate-700">
-                                    {npcId === "npc_roommate_dana"
-                                      ? "Dana"
-                                      : "Miguel"}
+                                    {npcId === "npc_roommate_scott"
+                                      ? "Scott"
+                                      : "Doug"}
                                   </span>
                                   <span className="text-[10px] text-slate-400">
                                     met {met} · name {known}

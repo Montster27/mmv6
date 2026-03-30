@@ -194,13 +194,13 @@ const RESOURCE_GATE_KEYS = new Set([
  * Format: [word-boundary regex, npc_id, display name for messages]
  */
 const GUARDED_NPC_NAMES: [RegExp, string, string][] = [
-  [/\bMiguel\b/, "npc_floor_miguel", "Miguel"],
+  [/\bDoug\b/, "npc_floor_doug", "Doug"],
   [/\bMarsh\b/, "npc_prof_marsh", "Marsh"],
   [/\bPriya\b/, "npc_studious_priya", "Priya"],
-  [/\bCal\b/, "npc_floor_cal", "Cal"],
+  [/\bKeith\b/, "npc_floor_keith", "Keith"],
   [/\bJordan\b/, "npc_ambiguous_jordan", "Jordan"],
-  [/\bScott\b/, "npc_ra_scott", "Scott"],
-  [/\bWren\b/, "npc_contact_wren", "Wren"],
+  [/\bScott\b/, "npc_roommate_scott", "Scott"],
+  [/\bGlenn\b/, "npc_contact_glenn", "Glenn"],
 ];
 
 function addIssue(

@@ -37,14 +37,13 @@ function FieldHint({ text }: { text: string }) {
 }
 
 const NPC_ID_SUGGESTIONS = [
-  "npc_roommate_dana",
-  "npc_floor_miguel",
-  "npc_floor_cal",
+  "npc_roommate_scott",
+  "npc_floor_doug",
+  "npc_floor_keith",
   "npc_prof_marsh",
   "npc_studious_priya",
   "npc_ambiguous_jordan",
-  "npc_ra_scott",
-  "npc_contact_wren",
+  "npc_contact_glenn",
   "npc_parent_voice",
 ];
 

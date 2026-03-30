@@ -8,22 +8,22 @@ import {
 const source = { storylet_slug: "test", choice_id: "choice" };
 
 describe("relationships", () => {
-  it("seeds defaults for Dana and Miguel", () => {
-    // Dana is no longer auto-introduced at defaults — he is met through the
+  it("seeds defaults for Scott and Doug", () => {
+    // Scott is no longer auto-introduced at defaults — he is met through the
     // room_212_morning arc beat (arc_opening was removed). Both start unmet.
     const { next } = ensureRelationshipDefaults({});
-    expect(next.npc_roommate_dana.met).toBe(false);
-    expect(next.npc_roommate_dana.knows_name).toBe(false);
-    expect(next.npc_roommate_dana.relationship).toBe(5);
-    expect(next.npc_floor_miguel.met).toBe(false);
-    expect(next.npc_floor_miguel.knows_name).toBe(false);
-    expect(next.npc_floor_miguel.relationship).toBe(5);
+    expect(next.npc_roommate_scott.met).toBe(false);
+    expect(next.npc_roommate_scott.knows_name).toBe(false);
+    expect(next.npc_roommate_scott.relationship).toBe(5);
+    expect(next.npc_floor_doug.met).toBe(false);
+    expect(next.npc_floor_doug.knows_name).toBe(false);
+    expect(next.npc_floor_doug.relationship).toBe(5);
   });
 
   it("clamps relationship within 1..10", () => {
     const { next } = applyRelationshipEvents(
       {
-        npc_roommate_dana: {
+        npc_roommate_scott: {
           met: true,
           knows_name: true,
           knows_face: true,
@@ -33,54 +33,54 @@ describe("relationships", () => {
           emotionalLoad: 0,
         },
       },
-      [{ npc_id: "npc_roommate_dana", type: "SMALL_KINDNESS", magnitude: 5 }],
+      [{ npc_id: "npc_roommate_scott", type: "SMALL_KINDNESS", magnitude: 5 }],
       source
     );
-    expect(next.npc_roommate_dana.relationship).toBe(10);
+    expect(next.npc_roommate_scott.relationship).toBe(10);
   });
 
   it("INTRODUCED_SELF sets knowledge and bumps relationship", () => {
     const { next } = applyRelationshipEvents(
       {},
-      [{ npc_id: "npc_floor_miguel", type: "INTRODUCED_SELF", magnitude: 1 }],
+      [{ npc_id: "npc_floor_doug", type: "INTRODUCED_SELF", magnitude: 1 }],
       source
     );
-    expect(next.npc_floor_miguel.met).toBe(true);
-    expect(next.npc_floor_miguel.knows_name).toBe(true);
-    expect(next.npc_floor_miguel.knows_face).toBe(true);
-    expect(next.npc_floor_miguel.relationship).toBeGreaterThan(5);
+    expect(next.npc_floor_doug.met).toBe(true);
+    expect(next.npc_floor_doug.knows_name).toBe(true);
+    expect(next.npc_floor_doug.knows_face).toBe(true);
+    expect(next.npc_floor_doug.relationship).toBeGreaterThan(5);
   });
 
   it("OVERHEARD_NAME sets knows_name without met", () => {
     const { next } = applyRelationshipEvents(
       {},
-      [{ npc_id: "npc_floor_miguel", type: "OVERHEARD_NAME", magnitude: 1 }],
+      [{ npc_id: "npc_floor_doug", type: "OVERHEARD_NAME", magnitude: 1 }],
       source
     );
-    expect(next.npc_floor_miguel.knows_name).toBe(true);
-    expect(next.npc_floor_miguel.met).toBe(false);
+    expect(next.npc_floor_doug.knows_name).toBe(true);
+    expect(next.npc_floor_doug.met).toBe(false);
   });
 
   it("phone then dining results in consistent state", () => {
     const afterPhone = applyRelationshipEvents(
       {},
-      [{ npc_id: "npc_floor_miguel", type: "OVERHEARD_NAME", magnitude: 1 }],
+      [{ npc_id: "npc_floor_doug", type: "OVERHEARD_NAME", magnitude: 1 }],
       source
     ).next;
     const afterMeet = applyRelationshipEvents(
       afterPhone,
-      [{ npc_id: "npc_floor_miguel", type: "INTRODUCED_SELF", magnitude: 1 }],
+      [{ npc_id: "npc_floor_doug", type: "INTRODUCED_SELF", magnitude: 1 }],
       source
     ).next;
-    expect(afterMeet.npc_floor_miguel.knows_name).toBe(true);
-    expect(afterMeet.npc_floor_miguel.met).toBe(true);
+    expect(afterMeet.npc_floor_doug.knows_name).toBe(true);
+    expect(afterMeet.npc_floor_doug.met).toBe(true);
   });
 
   it("legacy trust maps into relationship", () => {
     const { next } = migrateLegacyNpcMemory({}, {
-      npc_roommate_dana: { trust: 2, met: true, knows_name: true },
+      npc_roommate_scott: { trust: 2, met: true, knows_name: true },
     });
-    expect(next.npc_roommate_dana.relationship).toBeGreaterThanOrEqual(5);
-    expect(next.npc_roommate_dana.met).toBe(true);
+    expect(next.npc_roommate_scott.relationship).toBeGreaterThanOrEqual(5);
+    expect(next.npc_roommate_scott.met).toBe(true);
   });
 });

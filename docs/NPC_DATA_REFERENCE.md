@@ -10,7 +10,7 @@ All NPC relationship data is stored per-player in `daily_states.relationships` a
 
 ```json
 {
-  "npc_roommate_dana": {
+  "npc_roommate_scott": {
     "met": true,
     "knows_name": true,
     "knows_face": true,
@@ -21,7 +21,7 @@ All NPC relationship data is stored per-player in `daily_states.relationships` a
     "emotionalLoad": 0,
     "updated_at": "2026-03-01T00:00:00.000Z"
   },
-  "npc_floor_miguel": { ... }
+  "npc_floor_doug": { ... }
 }
 ```
 
@@ -49,7 +49,7 @@ Defined in `src/lib/relationships.ts`.
 
 | NPC | `met` | `knows_name` | `knows_face` | `relationship` |
 |---|---|---|---|---|
-| `npc_roommate_dana` | `true` | `true` | `true` | 6 |
+| `npc_roommate_scott` | `true` | `true` | `true` | 6 |
 | `npc_parent_voice` | `true` | `true` | `true` | 7 |
 | All others | `false` | `false` | `false` | 5 |
 
@@ -59,14 +59,16 @@ Defined in `src/lib/relationships.ts`.
 
 | Key | Name | Role tag | Introduced |
 |---|---|---|---|
-| `npc_roommate_dana` | Dana | `roommate` | Day 1 (auto — already present) |
-| `npc_floor_miguel` | Miguel | `orientation` | Day 1 via `introduces_npc` in hall/dining storylet |
+| `npc_roommate_scott` | Scott | `roommate` | Day 1 (Room 214 — `s_d1_dorm_roommate`) |
+| `npc_contact_glenn` | Glenn | `contact` | Day 1 (bench near chapel — `s_d1_bench_glenn`) |
+| `npc_floor_doug` | Doug | `floormate` | Day 1 (hallway — `s_d1_dorm_hallmates`) |
+| `npc_floor_mike` | Mike | `floormate` | Day 1 (hallway — `s_d1_dorm_hallmates`) |
+| `npc_floor_keith` | Keith | `floormate` | Day 1 (hallway — `s_d1_dorm_hallmates`) |
+| `npc_anderson_bryce` | Bryce | `acquaintance` | Day 1 evening (Anderson Hall party) |
+| `npc_floor_peterson` | Peterson | `floormate` | Day 1 evening (floor lounge card game) |
 | `npc_prof_marsh` | Prof. Marsh | `professor` | Day 2 (first class) |
 | `npc_studious_priya` | Priya | `classmate` | Day 2 (class or library) |
-| `npc_floor_cal` | Cal | `floormate` | Day 1 (floor meeting or hall) |
-| `npc_ambiguous_jordan` | Jordan | `acquaintance` | Week 1 orientation or through Miguel |
-| `npc_ra_scott` | Scott | `ra` | Day 1 (floor meeting) |
-| `npc_contact_wren` | Wren | `contact` | Day 1 (quad — `s_quad_reveal`) |
+| `npc_ambiguous_jordan` | Jordan | `acquaintance` | Week 1 orientation |
 | `npc_parent_voice` | your parent | `family` | Day 3–4 (dorm phone call) |
 
 Each NPC has a `short_intro` in the registry (≤20 words) used for first-encounter body prepends — see *Auto-Introduction* below.

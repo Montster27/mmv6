@@ -345,19 +345,19 @@ describe("selectStorylets", () => {
   it("excludes a storylet when a required NPC has not been met", () => {
     const storylets = [
       makeStorylet("npc-gated", {
-        requirements: { requires_npc_met: ["npc_floor_cal"] },
+        requirements: { requires_npc_met: ["npc_floor_keith"] },
       }),
       makeStorylet("open-a"),
       makeStorylet("open-b"),
     ];
     // Cal is present but met=false
-    const stateCalUnmet: DailyState = {
+    const stateKeithUnmet: DailyState = {
       ...baseState,
-      relationships: { npc_floor_cal: { met: false, relationship: 5 } },
+      relationships: { npc_floor_keith: { met: false, relationship: 5 } },
     };
     const ids = selectStorylets({
       seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
-      dailyState: stateCalUnmet, allStorylets: storylets, recentRuns: [],
+      dailyState: stateKeithUnmet, allStorylets: storylets, recentRuns: [],
     }).map((s) => s.id);
     expect(ids).not.toContain("npc-gated");
   });
@@ -365,17 +365,17 @@ describe("selectStorylets", () => {
   it("includes a storylet when a required NPC has been met", () => {
     const storylets = [
       makeStorylet("npc-gated", {
-        requirements: { requires_npc_met: ["npc_floor_cal"] },
+        requirements: { requires_npc_met: ["npc_floor_keith"] },
       }),
       makeStorylet("filler"),
     ];
-    const stateCalMet: DailyState = {
+    const stateKeithMet: DailyState = {
       ...baseState,
-      relationships: { npc_floor_cal: { met: true, relationship: 6 } },
+      relationships: { npc_floor_keith: { met: true, relationship: 6 } },
     };
     const ids = selectStorylets({
       seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
-      dailyState: stateCalMet, allStorylets: storylets, recentRuns: [],
+      dailyState: stateKeithMet, allStorylets: storylets, recentRuns: [],
     }).map((s) => s.id);
     expect(ids).toContain("npc-gated");
   });
@@ -385,18 +385,18 @@ describe("selectStorylets", () => {
   it("excludes a first-encounter storylet after the NPC has been met", () => {
     const storylets = [
       makeStorylet("first-meet", {
-        requirements: { requires_npc_not_met: ["npc_floor_cal"] },
+        requirements: { requires_npc_not_met: ["npc_floor_keith"] },
       }),
       makeStorylet("filler-a"),
       makeStorylet("filler-b"),
     ];
-    const stateCalMet: DailyState = {
+    const stateKeithMet: DailyState = {
       ...baseState,
-      relationships: { npc_floor_cal: { met: true, relationship: 6 } },
+      relationships: { npc_floor_keith: { met: true, relationship: 6 } },
     };
     const ids = selectStorylets({
       seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
-      dailyState: stateCalMet, allStorylets: storylets, recentRuns: [],
+      dailyState: stateKeithMet, allStorylets: storylets, recentRuns: [],
     }).map((s) => s.id);
     expect(ids).not.toContain("first-meet");
   });
@@ -404,17 +404,17 @@ describe("selectStorylets", () => {
   it("includes a first-encounter storylet when the NPC has not yet been met", () => {
     const storylets = [
       makeStorylet("first-meet", {
-        requirements: { requires_npc_not_met: ["npc_floor_cal"] },
+        requirements: { requires_npc_not_met: ["npc_floor_keith"] },
       }),
       makeStorylet("filler"),
     ];
-    const stateCalUnmet: DailyState = {
+    const stateKeithUnmet: DailyState = {
       ...baseState,
-      relationships: { npc_floor_cal: { met: false, relationship: 5 } },
+      relationships: { npc_floor_keith: { met: false, relationship: 5 } },
     };
     const ids = selectStorylets({
       seed: "seed", userId: "user-1", dayIndex: 5, seasonIndex: 1,
-      dailyState: stateCalUnmet, allStorylets: storylets, recentRuns: [],
+      dailyState: stateKeithUnmet, allStorylets: storylets, recentRuns: [],
     }).map((s) => s.id);
     expect(ids).toContain("first-meet");
   });
