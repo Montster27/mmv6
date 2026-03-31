@@ -38,6 +38,7 @@ import { fetchDevSettings, saveDevSettings } from "@/lib/devSettings";
 import {
   createStoryletRun,
   fetchDailyState,
+  fetchGameEntryStorylet,
   fetchStoryletBySlug,
   fetchTimeAllocation,
   fetchTodayRuns,
@@ -883,16 +884,19 @@ export default function PlayPage() {
 
           const used = new Set(existingRuns.map((r) => r.storylet_id));
           const next = candidates.filter((c) => !used.has(c.id)).slice(0, 3);
-          const entrySlug = "s_d1_the_quad";
           const shouldForceEntry =
             featureFlags.chapterOneScarcityEnabled &&
             day <= CHAPTER_ONE_LAST_DAY &&
             day === 1;
           let entryStorylet = shouldForceEntry
-            ? candidates.find((c) => c.slug === entrySlug)
+            ? candidates.find((c) => (c.tags ?? []).includes("game_entry"))
             : null;
           if (shouldForceEntry && !entryStorylet) {
-            entryStorylet = await fetchStoryletBySlug(entrySlug);
+            // Fallback: try tag-based fetch, then legacy slug
+            entryStorylet = await fetchGameEntryStorylet();
+            if (!entryStorylet) {
+              entryStorylet = await fetchStoryletBySlug("s_d1_the_quad");
+            }
           }
           const nextStorylets = entryStorylet
             ? [entryStorylet, ...next.filter((c) => c.id !== entryStorylet.id)].slice(

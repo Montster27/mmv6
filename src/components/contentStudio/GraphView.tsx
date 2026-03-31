@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/events";
@@ -48,50 +48,40 @@ const GROUP_COLORS: Record<string, string> = {
   roommate:          "bg-blue-100 border-blue-300 text-blue-800",
   academic:          "bg-amber-100 border-amber-300 text-amber-800",
   money:             "bg-emerald-100 border-emerald-300 text-emerald-800",
-  belonging:         "bg-purple-100 border-purple-300 text-purple-800",
-  opportunity:       "bg-orange-100 border-orange-300 text-orange-800",
-  home:              "bg-rose-100 border-rose-300 text-rose-800",
-  // Legacy phase tags
-  intro_hook:        "bg-blue-100 border-blue-300 text-blue-800",
-  guided_core_loop:  "bg-emerald-100 border-emerald-300 text-emerald-800",
-  reflection_arc:    "bg-amber-100 border-amber-300 text-amber-800",
-  community_purpose: "bg-purple-100 border-purple-300 text-purple-800",
-  unphased:          "bg-slate-50 border-slate-200 text-slate-600",
+  belonging:         "bg-violet-100 border-violet-300 text-violet-800",
+  opportunity:       "bg-rose-100 border-rose-300 text-rose-800",
+  home:              "bg-cyan-100 border-cyan-300 text-cyan-800",
+  // Phase columns
+  intro_hook:        "bg-purple-100 border-purple-300 text-purple-800",
+  guided_core_loop:  "bg-sky-100 border-sky-300 text-sky-800",
+  reflection_arc:    "bg-lime-100 border-lime-300 text-lime-800",
+  community_purpose: "bg-orange-100 border-orange-300 text-orange-800",
+  // Catch-all
+  unphased:          "bg-slate-100 border-slate-300 text-slate-600",
 };
 
-/** Rotating palette for arc groups */
 const ARC_PALETTE = [
-  "bg-violet-100 border-violet-400 text-violet-900",
-  "bg-cyan-100 border-cyan-400 text-cyan-900",
-  "bg-teal-100 border-teal-400 text-teal-900",
-  "bg-pink-100 border-pink-400 text-pink-900",
-  "bg-lime-100 border-lime-400 text-lime-900",
-  "bg-indigo-100 border-indigo-400 text-indigo-900",
-  "bg-fuchsia-100 border-fuchsia-400 text-fuchsia-900",
+  "bg-indigo-100 border-indigo-300 text-indigo-800",
+  "bg-pink-100 border-pink-300 text-pink-800",
+  "bg-teal-100 border-teal-300 text-teal-800",
+  "bg-yellow-100 border-yellow-300 text-yellow-800",
+  "bg-fuchsia-100 border-fuchsia-300 text-fuchsia-800",
+  "bg-lime-100 border-lime-300 text-lime-800",
 ];
-
-const STREAM_SET = new Set(STREAM_ORDER);
 
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 108;
 const COLUMN_GAP = 80;
 const ROW_GAP = 32;
 
-// ── Helper functions ──────────────────────────────────────────────────────────
-
-/** Returns the group key for a storylet (arc first, then stream tag, then phase: tag, then "unphased"). */
-function getGroupTag(
-  storylet: Storylet,
-  arcIdToKey?: Map<string, string>
-): string {
-  if (storylet.track_id && arcIdToKey?.has(storylet.track_id)) {
-    return `arc:${arcIdToKey.get(storylet.track_id)!}`;
+function getGroupTag(storylet: Storylet, arcIdToKey: Map<string, string>): string {
+  if (storylet.track_id) {
+    const k = arcIdToKey.get(storylet.track_id);
+    if (k) return STREAM_ORDER.includes(k) ? k : `arc:${k}`;
   }
   const tags = storylet.tags ?? [];
-  const streamTag = tags.find((t) => STREAM_SET.has(t));
-  if (streamTag) return streamTag;
-  const phaseTag = tags.find((t) => t.startsWith("phase:"));
-  if (phaseTag) return phaseTag.replace("phase:", "");
+  for (const s of STREAM_ORDER) if (tags.includes(s)) return s;
+  for (const p of PHASE_ORDER) if (tags.includes(p)) return p;
   return "unphased";
 }
 
@@ -104,6 +94,89 @@ function getChoiceTarget(choice: StoryletChoice): string {
 function getMinDay(storylet: Storylet): number {
   const req = storylet.requirements ?? {};
   return typeof req.min_day_index === "number" ? req.min_day_index : 999;
+}
+
+// ── Choice Picker Modal ─────────────────────────────────────────────────────
+
+function ChoicePickerModal({
+  sourceStorylet,
+  targetStorylet,
+  allStorylets,
+  onConnect,
+  onCancel,
+}: {
+  sourceStorylet: Storylet;
+  targetStorylet: Storylet;
+  allStorylets: Storylet[];
+  onConnect: (choiceId: string) => void;
+  onCancel: () => void;
+}) {
+  const [selectedChoiceId, setSelectedChoiceId] = useState("");
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+      onClick={onCancel}
+    >
+      <div
+        className="w-96 rounded-lg border border-slate-200 bg-white p-5 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-sm font-semibold text-slate-900">Connect Nodes</h3>
+        <p className="mt-1 text-xs text-slate-500">
+          <span className="font-medium text-slate-700">{sourceStorylet.title || sourceStorylet.slug}</span>
+          {" → "}
+          <span className="font-medium text-slate-700">{targetStorylet.title || targetStorylet.slug}</span>
+        </p>
+        <p className="mt-3 text-xs font-medium text-slate-700">Which choice should link to this target?</p>
+        <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+          {sourceStorylet.choices.map((choice) => {
+            const existingTarget = getChoiceTarget(choice);
+            const existingName = existingTarget
+              ? allStorylets.find((s) => s.id === existingTarget)?.title ?? existingTarget.slice(0, 12)
+              : null;
+            return (
+              <label
+                key={choice.id}
+                className={`flex items-start gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer hover:bg-slate-50 ${
+                  selectedChoiceId === choice.id ? "bg-green-50 ring-1 ring-green-300" : ""
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="connect-choice"
+                  value={choice.id}
+                  checked={selectedChoiceId === choice.id}
+                  onChange={() => setSelectedChoiceId(choice.id)}
+                  className="mt-0.5"
+                />
+                <div>
+                  <span className="text-slate-800">{choice.label}</span>
+                  {existingName && (
+                    <span className="ml-1.5 text-[10px] text-slate-400">
+                      (currently → {existingName})
+                    </span>
+                  )}
+                </div>
+              </label>
+            );
+          })}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            disabled={!selectedChoiceId}
+            onClick={() => onConnect(selectedChoiceId)}
+          >
+            Connect
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -123,9 +196,20 @@ export function GraphView({
   const [offset, setOffset] = useState({ x: 20, y: 20 });
   const [scale, setScale] = useState(1);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
+
+  // ── Dropdown-based connect (right panel, existing) ──
   const [connectSourceId, setConnectSourceId] = useState("");
   const [connectChoiceId, setConnectChoiceId] = useState("");
   const [connectTargetId, setConnectTargetId] = useState("");
+
+  // ── Click-to-connect mode ──
+  const [connectingMode, setConnectingMode] = useState(false);
+  const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const [showChoiceModal, setShowChoiceModal] = useState(false);
+  const [pendingTargetId, setPendingTargetId] = useState<string | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
 
   /** arc id → arc key (for getGroupTag) */
   const arcIdToKey = useMemo(() => {
@@ -146,6 +230,21 @@ export function GraphView({
   useEffect(() => {
     trackEvent({ event_type: "graph_opened" });
   }, []);
+
+  // Escape key exits connect mode
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && connectingMode) {
+        setConnectingMode(false);
+        setConnectingSourceId(null);
+        setCursorPos(null);
+        setShowChoiceModal(false);
+        setPendingTargetId(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [connectingMode]);
 
   // Build a slug → id map for preclusion edge lookups
   const slugToId = useMemo(() => {
@@ -177,106 +276,82 @@ export function GraphView({
     Object.values(grouped).forEach((list) =>
       list.sort((a, b) => {
         // Arc steps sort by order_index first
-        const aOrder = typeof a.order_index === "number" ? a.order_index : 999;
-        const bOrder = typeof b.order_index === "number" ? b.order_index : 999;
-        if (aOrder !== bOrder) return aOrder - bOrder;
+        const oA = typeof a.order_index === "number" ? a.order_index : 9999;
+        const oB = typeof b.order_index === "number" ? b.order_index : 9999;
+        if (oA !== oB) return oA - oB;
         return getMinDay(a) - getMinDay(b);
       })
     );
 
-    // Build ordered column list: arcs first, then streams, then legacy phases, then unphased
-    const arcGroups = arcDefinitions
-      .map((a) => `arc:${a.key}`)
-      .filter((g) => grouped[g]);
-    const allGroups = [
-      ...arcGroups,
-      ...STREAM_ORDER.filter((g) => grouped[g]),
-      ...PHASE_ORDER.filter((g) => grouped[g] && !STREAM_SET.has(g)),
-      ...Object.keys(grouped).filter(
-        (g) =>
-          !g.startsWith("arc:") &&
-          !STREAM_SET.has(g) &&
-          !PHASE_ORDER.includes(g) &&
-          g !== "unphased"
-      ),
-      ...(grouped.unphased ? ["unphased"] : []),
+    const colOrder = [
+      ...STREAM_ORDER,
+      ...Object.keys(grouped)
+        .filter((g) => g.startsWith("arc:"))
+        .sort(),
+      ...PHASE_ORDER.filter((p) => grouped[p]),
+      ...(grouped["unphased"] ? ["unphased"] : []),
     ];
 
     const positions: Record<string, { x: number; y: number }> = {};
-    allGroups.forEach((group, colIndex) => {
+    let colIndex = 0;
+    colOrder.forEach((group) => {
       const list = grouped[group] ?? [];
+      if (list.length === 0) return;
       list.forEach((storylet, rowIndex) => {
         positions[storylet.id] = {
           x: colIndex * (NODE_WIDTH + COLUMN_GAP),
           y: rowIndex * (NODE_HEIGHT + ROW_GAP),
         };
       });
+      colIndex++;
     });
+
     return positions;
-  }, [storylets, arcIdToKey, arcDefinitions]);
+  }, [storylets, arcIdToKey]);
 
-  /** Directed edges: targetStoryletId (solid) + precludes (dashed red) + arc step (dotted indigo) + arc default (dotted teal) */
-  const edges = useMemo(() => {
-    const list: Array<{
-      from: string;
-      to: string;
-      invalid: boolean;
-      kind: "target" | "precludes" | "arc_step" | "arc_default";
-    }> = [];
-    const ids = new Set(storylets.map((s) => s.id));
-    const seen = new Set<string>(); // deduplicate from:to:kind
+  type Edge = {
+    from: string;
+    to: string;
+    kind: "target" | "precludes" | "arc_step" | "arc_default";
+    invalid: boolean;
+  };
 
+  const edges = useMemo<Edge[]>(() => {
+    const result: Edge[] = [];
     storylets.forEach((storylet) => {
       storylet.choices.forEach((choice) => {
-        // targetStoryletId edges
         const target = getChoiceTarget(choice);
         if (target) {
-          const key = `${storylet.id}:${target}:target`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            list.push({ from: storylet.id, to: target, invalid: !ids.has(target), kind: "target" });
+          const exists = storylets.some((s) => s.id === target);
+          result.push({ from: storylet.id, to: target, kind: "target", invalid: !exists });
+        }
+        // Arc step: next_key → resolve via track_id:key
+        const nextKey = (choice as StoryletChoice & { next_key?: string }).next_key;
+        if (nextKey && storylet.track_id) {
+          const resolvedId = stepKeyToId.get(`${storylet.track_id}:${nextKey}`);
+          if (resolvedId) {
+            result.push({ from: storylet.id, to: resolvedId, kind: "arc_step", invalid: false });
           }
         }
-
-        // next_key edges (arc FSM advance via choice)
-        if (choice.next_key && storylet.track_id) {
-          const toId = stepKeyToId.get(`${storylet.track_id}:${choice.next_key}`);
-          if (toId && toId !== storylet.id && toId !== target) {
-            const key = `${storylet.id}:${toId}:arc_step`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              list.push({ from: storylet.id, to: toId, invalid: !ids.has(toId), kind: "arc_step" });
-            }
-          }
-        }
-
-        // precludes edges — choice blocks a future storylet
+        // Preclusions
         const precludes = (choice as StoryletChoice & { precludes?: string[] }).precludes ?? [];
         precludes.forEach((slug) => {
-          const toId = slugToId[slug];
-          if (toId && toId !== storylet.id) {
-            const key = `${storylet.id}:${toId}:precludes`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              list.push({ from: storylet.id, to: toId, invalid: false, kind: "precludes" });
-            }
+          const precludedId = slugToId[slug];
+          if (precludedId) {
+            result.push({ from: storylet.id, to: precludedId, kind: "precludes", invalid: false });
           }
         });
       });
-
-      // default_next_key edges (storylet-level fallback advance)
-      if (storylet.default_next_key && storylet.track_id) {
-        const toId = stepKeyToId.get(`${storylet.track_id}:${storylet.default_next_key}`);
-        if (toId && toId !== storylet.id) {
-          const key = `${storylet.id}:${toId}:arc_default`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            list.push({ from: storylet.id, to: toId, invalid: !ids.has(toId), kind: "arc_default" });
-          }
+      // Arc default
+      const defaultNext = storylet.default_next_key;
+      if (defaultNext && storylet.track_id) {
+        const resolvedId = stepKeyToId.get(`${storylet.track_id}:${defaultNext}`);
+        if (resolvedId) {
+          result.push({ from: storylet.id, to: resolvedId, kind: "arc_default", invalid: false });
         }
       }
     });
-    return list;
+    return result;
   }, [storylets, slugToId, stepKeyToId]);
 
   const incomingCounts = useMemo(() => {
@@ -312,19 +387,80 @@ export function GraphView({
   };
 
   const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (connectingMode) return; // Don't start pan drag in connect mode
     dragRef.current = { x: event.clientX - offset.x, y: event.clientY - offset.y };
   };
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!dragRef.current) return;
-    setOffset({
-      x: event.clientX - dragRef.current.x,
-      y: event.clientY - dragRef.current.y,
-    });
-  };
+  const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (dragRef.current) {
+      setOffset({
+        x: event.clientX - dragRef.current.x,
+        y: event.clientY - dragRef.current.y,
+      });
+      return;
+    }
+    // In connect mode with a source selected, track cursor for preview line
+    if (connectingMode && connectingSourceId && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const canvasX = (event.clientX - rect.left - offset.x) / scale;
+      const canvasY = (event.clientY - rect.top - offset.y) / scale;
+      setCursorPos({ x: canvasX, y: canvasY });
+    }
+  }, [connectingMode, connectingSourceId, offset.x, offset.y, scale]);
 
   const handleMouseUp = () => {
     dragRef.current = null;
+  };
+
+  const handleNodeClick = (storylet: Storylet) => {
+    if (!connectingMode) {
+      // Normal selection
+      onSelectStorylet(storylet);
+      trackEvent({ event_type: "graph_node_selected", payload: { id: storylet.id } });
+      return;
+    }
+
+    // Connect mode
+    if (!connectingSourceId) {
+      // First click: set source
+      if (storylet.choices.length === 0) return; // Can't connect from a node with no choices
+      setConnectingSourceId(storylet.id);
+      onSelectStorylet(storylet);
+    } else if (storylet.id === connectingSourceId) {
+      // Clicked same node: deselect source
+      setConnectingSourceId(null);
+      setCursorPos(null);
+    } else {
+      // Second click: set target and show modal
+      setPendingTargetId(storylet.id);
+      setShowChoiceModal(true);
+    }
+  };
+
+  const handleModalConnect = (choiceId: string) => {
+    if (connectingSourceId && pendingTargetId) {
+      onConnectChoice?.(connectingSourceId, choiceId, pendingTargetId);
+      // Also call onRetargetChoice for immediate local update
+      onRetargetChoice(choiceId, pendingTargetId);
+    }
+    // Reset connecting state but stay in connect mode for chaining
+    setShowChoiceModal(false);
+    setPendingTargetId(null);
+    setConnectingSourceId(null);
+    setCursorPos(null);
+  };
+
+  const handleModalCancel = () => {
+    setShowChoiceModal(false);
+    setPendingTargetId(null);
+  };
+
+  const exitConnectMode = () => {
+    setConnectingMode(false);
+    setConnectingSourceId(null);
+    setCursorPos(null);
+    setShowChoiceModal(false);
+    setPendingTargetId(null);
   };
 
   const canvasSize = useMemo(() => {
@@ -340,10 +476,24 @@ export function GraphView({
     };
   }, [nodePositions]);
 
+  const sourceStorylet = connectingSourceId
+    ? storylets.find((s) => s.id === connectingSourceId) ?? null
+    : null;
+  const targetStorylet = pendingTargetId
+    ? storylets.find((s) => s.id === pendingTargetId) ?? null
+    : null;
+
   return (
     <div className="space-y-4">
+      {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        <span>Drag to pan · Scroll to zoom · Columns = narrative stream</span>
+        <span>
+          {connectingMode
+            ? connectingSourceId
+              ? `Click a target node (source: ${sourceStorylet?.title ?? "..."})`
+              : "Click a source node to start connecting..."
+            : "Drag to pan · Scroll to zoom · Columns = narrative stream"}
+        </span>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={onCreateNode}>
             Add node
@@ -357,6 +507,13 @@ export function GraphView({
             }
           >
             Set start node
+          </Button>
+          <Button
+            variant={connectingMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => (connectingMode ? exitConnectMode() : setConnectingMode(true))}
+          >
+            {connectingMode ? "Cancel connect" : "Connect mode"}
           </Button>
         </div>
       </div>
@@ -395,7 +552,10 @@ export function GraphView({
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <div
-          className="relative h-[540px] overflow-hidden rounded-md border border-slate-200 bg-white"
+          ref={containerRef}
+          className={`relative h-[540px] overflow-hidden rounded-md border border-slate-200 bg-white ${
+            connectingMode ? "cursor-crosshair" : ""
+          }`}
           onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -434,6 +594,9 @@ export function GraphView({
                 </marker>
                 <marker id="arrow-arc-default" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
                   <path d="M0,0 L6,3 L0,6 Z" fill="#14b8a6" />
+                </marker>
+                <marker id="arrow-connect" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L6,3 L0,6 Z" fill="#22c55e" />
                 </marker>
               </defs>
               {edges.map((edge, idx) => {
@@ -501,6 +664,21 @@ export function GraphView({
                   />
                 );
               })}
+              {/* Preview line in connect mode */}
+              {connectingMode && connectingSourceId && cursorPos && nodePositions[connectingSourceId] && (
+                <line
+                  x1={nodePositions[connectingSourceId].x + NODE_WIDTH / 2}
+                  y1={nodePositions[connectingSourceId].y + NODE_HEIGHT / 2}
+                  x2={cursorPos.x}
+                  y2={cursorPos.y}
+                  stroke="#22c55e"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  opacity={0.7}
+                  markerEnd="url(#arrow-connect)"
+                  pointerEvents="none"
+                />
+              )}
             </svg>
 
             {storylets.map((storylet) => {
@@ -514,6 +692,7 @@ export function GraphView({
               const orphan = !incomingCounts[storylet.id];
               const deadEnd = outgoingCounts[storylet.id] === 0;
               const isEntry = entrySet.has(storylet.id);
+              const isConnectSource = connectingSourceId === storylet.id;
               const missingLinks = storylet.choices.some(
                 (choice) => {
                   const t = getChoiceTarget(choice);
@@ -535,14 +714,15 @@ export function GraphView({
                   key={storylet.id}
                   className={`absolute rounded-md border px-3 py-2 text-left shadow-sm ${color} ${
                     selected ? "ring-2 ring-slate-700" : ""
+                  } ${
+                    isConnectSource ? "ring-2 ring-green-500 ring-offset-2" : ""
+                  } ${
+                    connectingMode && connectingSourceId && !isConnectSource ? "hover:ring-2 hover:ring-green-300" : ""
                   }`}
                   style={{ width: NODE_WIDTH, height: NODE_HEIGHT, left: pos.x, top: pos.y }}
-                  onClick={() => {
-                    onSelectStorylet(storylet);
-                    trackEvent({
-                      event_type: "graph_node_selected",
-                      payload: { id: storylet.id },
-                    });
+                  onClick={(e) => {
+                    if (connectingMode) e.stopPropagation();
+                    handleNodeClick(storylet);
                   }}
                 >
                   <div className="flex items-center justify-between">
@@ -558,7 +738,7 @@ export function GraphView({
                   </div>
                   <div className="text-xs text-slate-600 truncate">{storylet.slug}</div>
                   <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-slate-500">
-                    {isEntry && <span className="rounded bg-white/60 px-1">Start</span>}
+                    {isEntry && <span className="rounded bg-green-200/70 px-1 text-green-800 font-medium">Start</span>}
                     {orphan && <span className="rounded bg-white/60 px-1">Orphan</span>}
                     {deadEnd && <span className="rounded bg-white/60 px-1">Dead-end</span>}
                     {missingLinks && <span className="rounded bg-red-100 px-1 text-red-700">Bad link</span>}
@@ -569,6 +749,7 @@ export function GraphView({
           </div>
         </div>
 
+        {/* Right panel */}
         <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
           <h3 className="text-sm font-semibold text-slate-800">
             Selected node
@@ -719,6 +900,17 @@ export function GraphView({
           </div>
         </div>
       </div>
+
+      {/* Choice picker modal */}
+      {showChoiceModal && sourceStorylet && targetStorylet && (
+        <ChoicePickerModal
+          sourceStorylet={sourceStorylet}
+          targetStorylet={targetStorylet}
+          allStorylets={storylets}
+          onConnect={handleModalConnect}
+          onCancel={handleModalCancel}
+        />
+      )}
     </div>
   );
 }

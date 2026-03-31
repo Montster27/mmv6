@@ -111,6 +111,17 @@ export function useStoryletsAPI() {
     [createStorylet]
   );
 
+  const setGameEntry = useCallback(
+    async (storyletId: string): Promise<{ ok: boolean; error?: string }> => {
+      const result = await apiRequest("/api/admin/storylets/set-entry", {
+        method: "POST",
+        body: JSON.stringify({ storyletId }),
+      });
+      return { ok: result.ok, error: result.error };
+    },
+    []
+  );
+
   return {
     storylets,
     setStorylets,
@@ -121,5 +132,6 @@ export function useStoryletsAPI() {
     createStorylet,
     cloneStorylet,
     deleteStorylet,
+    setGameEntry,
   };
 }

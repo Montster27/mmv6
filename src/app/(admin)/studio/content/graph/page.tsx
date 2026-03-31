@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
@@ -23,7 +23,7 @@ type ViewMode = "storylets" | "arcs";
 
 export default function GraphPage() {
   const router = useRouter();
-  const { loadStorylets, saveStorylet } = useStoryletsAPI();
+  const { loadStorylets, saveStorylet, setGameEntry } = useStoryletsAPI();
   const { loadArcDefinitions, arcDefinitions, arcDefinitionSteps } = useArcsAPI();
 
   const [storylets, setStorylets] = useState<Storylet[]>([]);
@@ -35,6 +35,11 @@ export default function GraphPage() {
     loadArcDefinitions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const entryNodeIds = useMemo(
+    () => storylets.filter((s) => s.tags?.includes("game_entry")).map((s) => s.id),
+    [storylets]
+  );
 
   function handleRetarget(choiceId: string, targetId: string, session: Session) {
     const affected = storylets.find((s) => s.choices.some((c) => c.id === choiceId));
@@ -57,6 +62,24 @@ export default function GraphPage() {
         ),
       }))
     );
+  }
+
+  async function handleSetStartNode(storyletId: string) {
+    await setGameEntry(storyletId);
+    // Optimistic update: move game_entry tag to the target
+    setStorylets((prev) =>
+      prev.map((s) => ({
+        ...s,
+        tags:
+          s.id === storyletId
+            ? [...(s.tags ?? []).filter((t) => t !== "game_entry"), "game_entry"]
+            : (s.tags ?? []).filter((t) => t !== "game_entry"),
+      }))
+    );
+  }
+
+  function handleConnectChoice(sourceId: string, choiceId: string, targetId: string, session: Session) {
+    handleRetarget(choiceId, targetId, session);
   }
 
   return (
@@ -100,6 +123,11 @@ export default function GraphPage() {
               onSelectStorylet={setSelected}
               onRetargetChoice={(choiceId, targetId) =>
                 handleRetarget(choiceId, targetId, session)
+              }
+              entryNodeIds={entryNodeIds}
+              onSetStartNode={handleSetStartNode}
+              onConnectChoice={(sourceId, choiceId, targetId) =>
+                handleConnectChoice(sourceId, choiceId, targetId, session)
               }
               onJumpToEditor={(storylet) =>
                 router.push(`/studio/content/storylets?id=${storylet.id}`)

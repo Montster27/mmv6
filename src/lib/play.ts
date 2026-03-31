@@ -162,6 +162,28 @@ export async function fetchStoryletBySlug(
   return validated.value;
 }
 
+export async function fetchGameEntryStorylet(): Promise<Storylet | null> {
+  const { data, error } = await supabase
+    .from("storylets")
+    .select("id,slug,title,body,choices,tags,is_active,requirements,weight")
+    .contains("tags", ["game_entry"])
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to fetch game entry storylet", error);
+    return null;
+  }
+  if (!data) return null;
+  const row = coerceStoryletRow(data);
+  const validated = validateStorylet(row);
+  if (!validated.ok) {
+    console.warn("Invalid game entry storylet; skipping", validated.errors);
+    return null;
+  }
+  return validated.value;
+}
+
 export function toChoices(storylet: Storylet | any): StoryletChoice[] {
   if (Array.isArray(storylet?.choices)) {
     return storylet.choices as StoryletChoice[];
