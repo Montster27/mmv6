@@ -64,7 +64,7 @@ V16MMV/mmv/
 ---
 
 ## Current Milestone
-**Phase A — "It Runs"** (~95% complete per Cowork audit, March 2026)
+Orientation passage design complete. Passage map in progress. Day 0 content exists (7 storylets + new Room 214). Days 1-3 need building.
 
 ## What's Done
 - Core storylet engine running (schema, evaluation, branching)
@@ -84,6 +84,9 @@ V16MMV/mmv/
 - Collision calendar for Week 1: NOT STARTED — listed under "Needs Breakdown" in TASKS.md as "Map remaining Arc One storylets"
 
 ## What's Next (probable, pending review)
+- Build orientation passage map (visual, in Obsidian)
+- Review content complexity — decide whether conversational nodes or simpler flag-based branching is the right approach
+- Playtest revised Day 0 before expanding
 - Phase A polish pass: period vocab audit, preclusion logic review
 - Fill gaps in collision calendar (which NPCs appear when/where in Week 1)
 - Phase B planning: second arc segments for roommate + academic streams
@@ -98,6 +101,11 @@ V16MMV/mmv/
 - claude.ai serves as PM across all environments (decided 2026-03-31)
 - Cowork Project created for Obsidian vault access (decided 2026-03-31)
 - DECISIONS.md has only 1 entry (Jan 2026 — "Phase One scope lock") — many decisions are unrecorded
+- Game opens in dorm not quad. Orientation is Days 0-3 before classes. (decided 2026-03-31)
+- ARPANET terminal introduced Day 2-3 (decided 2026-03-31)
+- Mini-games distributed across all days (decided 2026-03-31)
+- Financial starting position randomized (decided 2026-03-31)
+- "Passage" as working term for storylet collections (decided 2026-03-31)
 
 ## Active NPCs
 | NPC | Stream | Status |
