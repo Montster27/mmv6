@@ -107,6 +107,7 @@ import { useBootstrap } from "@/hooks/queries/useBootstrap";
 import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { TrackStoryletCard } from "@/components/play/TrackStoryletCard";
+import { DialogueNodeView } from "@/components/play/DialogueNodeView";
 import { SleepCard } from "@/components/play/SleepCard";
 import { SegmentTransitionCard } from "@/components/play/SegmentTransitionCard";
 import { getBridgeText } from "@/lib/segmentBridge";
@@ -3018,14 +3019,31 @@ export default function PlayPage() {
                                 <h3 className="font-heading text-xl font-bold leading-snug text-primary">
                                   {currentStorylet.title}
                                 </h3>
-                                <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">
-                                  {displayBody}
-                                </p>
+                                {!currentStorylet.nodes?.length && (
+                                  <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">
+                                    {displayBody}
+                                  </p>
+                                )}
                               </div>
 
-                              {/* Choices */}
+                              {/* Choices — flat (no nodes) or conversational node walk */}
                               {(!selectedChoiceId || savingChoice) && (() => {
                                 const choices = toChoices(currentStorylet);
+
+                                // ── Conversational node rendering ──────────────
+                                if (currentStorylet.nodes?.length) {
+                                  return (
+                                    <DialogueNodeView
+                                      preamble={displayBody}
+                                      nodes={currentStorylet.nodes}
+                                      choices={choices}
+                                      onChoice={handleChoice}
+                                      disabled={savingChoice}
+                                    />
+                                  );
+                                }
+
+                                // ── Flat prose + choices (existing) ───────────
                                 const RESOURCE_LABELS: Record<string, string> = {
                                   cashOnHand: "cash",
                                   knowledge: "knowledge",

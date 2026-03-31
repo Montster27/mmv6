@@ -124,12 +124,46 @@ export type StoryletChoice = {
   };
 };
 
+// ── Conversational node system ───────────────────────────────────────────────
+
+export type MicroChoice = {
+  id: string;
+  /** 3-8 words. Dialogue in quotes, actions as physical verbs. */
+  label: string;
+  /** Target node id, "choices" to show terminal choices, or "exit" to end. */
+  next: string;
+  /** Local flag set when this micro-choice is taken (persists only during node walk). */
+  sets_flag?: string;
+  set_npc_memory?: Record<string, Record<string, boolean>>;
+  relational_effect?: Record<string, Record<string, number>>;
+  identity_tags?: string[];
+};
+
+export type DialogueNode = {
+  id: string;
+  /** 1-4 sentences max. */
+  text: string;
+  /** NPC id when this node is spoken by an NPC. Absent = narrator. */
+  speaker?: string;
+  /** Gate: node is skipped if condition not met. */
+  condition?: {
+    flag?: string;
+  };
+  /** If present: show these micro-choices. If absent: show "Continue" auto-advance. */
+  micro_choices?: MicroChoice[];
+  /** Auto-advance target when no micro_choices. "choices" or null = show terminal choices. */
+  next?: string;
+};
+
 export type Storylet = {
   id: string;
   slug: string;
   title: string;
   body: string;
   choices: StoryletChoice[];
+  /** Optional conversational node tree. When present, renders as interactive dialogue
+   *  instead of a flat prose block + choices. */
+  nodes?: DialogueNode[] | null;
   is_active: boolean;
   created_at?: string;
   tags?: string[];
