@@ -415,7 +415,7 @@ export async function getOrCreateDailyRun(
         // 2. Load storylets for these tracks
         const { data: storyletRows, error: storyletRowsError } = await supabase
           .from("storylets")
-          .select("id,slug,track_id,storylet_key,order_index,title,body,choices,default_next_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours,is_conflict")
+          .select("id,slug,track_id,storylet_key,order_index,title,body,choices,nodes,default_next_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours,is_conflict")
           .in("track_id", trackIds)
           .order("order_index");
 
@@ -433,6 +433,7 @@ export async function getOrCreateDailyRun(
           title: r.title,
           body: r.body,
           choices: Array.isArray(r.choices) ? r.choices : [],
+          nodes: Array.isArray(r.nodes) ? r.nodes : null,
           default_next_key: r.default_next_key ?? null,
           due_offset_days: r.due_offset_days ?? 0,
           expires_after_days: r.expires_after_days ?? 0,
@@ -531,6 +532,7 @@ export async function getOrCreateDailyRun(
           title: due.storylet.title,
           body: due.storylet.body,
           options: due.storylet.choices,
+          nodes: due.storylet.nodes ?? null,
           expires_on_day: due.expires_on_day,
           introduces_npc: due.storylet.introduces_npc,
           segment: due.storylet.segment ?? null,

@@ -6,6 +6,7 @@ import type { StoryletChoice } from "@/types/storylets";
 import { TRACK_LABELS, type TrackKey } from "@/types/tracks";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
+import { DialogueNodeView } from "@/components/play/DialogueNodeView";
 import { resolveNpcTokens, type RelationshipState } from "@/lib/relationships";
 
 type MoneyBand = "tight" | "okay" | "comfortable";
@@ -174,8 +175,21 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
         )}
       </div>
 
-      {/* Body */}
-      <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{resolve(storylet.body)}</p>
+      {/* Body or conversational nodes */}
+      {storylet.nodes && storylet.nodes.length > 0 && !displayedOption ? (
+        <DialogueNodeView
+          preamble={resolve(storylet.body)}
+          nodes={storylet.nodes}
+          choices={storylet.options}
+          onChoice={(choiceId) => {
+            const option = storylet.options.find((o) => o.id === choiceId);
+            if (option) handleChoice(option);
+          }}
+          disabled={choosing || disabled}
+        />
+      ) : (
+        <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{resolve(storylet.body)}</p>
+      )}
 
       {/* Post-choice result */}
       {displayedOption && (
@@ -222,8 +236,8 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
         </div>
       )}
 
-      {/* Options */}
-      {!displayedOption && (
+      {/* Options — only shown when there are no conversational nodes */}
+      {!displayedOption && !(storylet.nodes && storylet.nodes.length > 0) && (
         <div className="flex flex-col gap-2">
           {storylet.options.map((option) => {
             const moneyLocked = !meetsMoneyRequirement(moneyBand, option.money_requirement);

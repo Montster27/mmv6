@@ -140,7 +140,7 @@ export type TrackProgress = {
 // Track storylet — a Storylet with required track membership fields
 // ---------------------------------------------------------------------------
 
-import type { Storylet } from "./storylets";
+import type { DialogueNode, Storylet } from "./storylets";
 
 export type TrackStoryletRow = Storylet & {
   track_id: string;
@@ -171,6 +171,8 @@ export type TrackStorylet = {
   title: string;
   body: string;
   options: StoryletChoice[];
+  /** Conversational node tree. When present, renders as interactive dialogue. */
+  nodes?: DialogueNode[] | null;
   expires_on_day: number;
   introduces_npc?: string[];
   segment?: "morning" | "afternoon" | "evening" | "night" | null;
