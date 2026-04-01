@@ -76,11 +76,17 @@ export async function POST(request: Request) {
   }
 
   // --- 2. Load the current storylet ---
+  // With pool-based selection, the storylet being resolved may be next_key_override
+  // (when served via the override path) rather than current_storylet_key.
+  // Use the override key if set; fall back to current_storylet_key for pool-scan results.
+  const effectiveStoryletKey: string =
+    (progressRow.next_key_override as string | null) ?? progressRow.current_storylet_key;
+
   const { data: storyletRow, error: storyletErr } = await supabaseServer
     .from("storylets")
-    .select("id,track_id,storylet_key,choices,default_next_key,due_offset_days,expires_after_days")
+    .select("id,track_id,storylet_key,title,segment,choices,default_next_key,due_offset_days,expires_after_days")
     .eq("track_id", progressRow.track_id)
-    .eq("storylet_key", progressRow.current_storylet_key)
+    .eq("storylet_key", effectiveStoryletKey)
     .single();
 
   if (storyletErr || !storyletRow) {
@@ -186,6 +192,15 @@ export async function POST(request: Request) {
   }
 
   // --- 6. Advance track progress ---
+
+  // Record the just-resolved storylet in the resolved set.
+  // Use effectiveStoryletKey (= next_key_override ?? current_storylet_key) so the
+  // correct key is recorded regardless of whether this was served via override or pool.
+  const currentResolvedKeys: string[] = Array.isArray(progressRow.resolved_storylet_keys)
+    ? (progressRow.resolved_storylet_keys as string[])
+    : [];
+  const newResolvedKeys = [...currentResolvedKeys, effectiveStoryletKey];
+
   const nextKey: string | null =
     typeof chosenOption.next_key === "string"
       ? chosenOption.next_key
@@ -194,6 +209,7 @@ export async function POST(request: Request) {
           : null);
 
   if (nextKey) {
+    // A chain pointer exists — set override so this storylet is served next.
     const { data: nextStoryletRow } = await supabaseServer
       .from("storylets")
       .select("storylet_key,due_offset_days")
@@ -211,18 +227,50 @@ export async function POST(request: Request) {
         current_storylet_key: nextKey,
         storylet_due_day: nextDueDay,
         updated_day: day_index,
+        resolved_storylet_keys: newResolvedKeys,
+        next_key_override: nextKey,
       })
       .eq("id", progressId);
   } else {
-    // No next storylet → track complete
-    await supabaseServer
-      .from("track_progress")
-      .update({
-        state: "COMPLETED",
-        completed_day: day_index,
-        updated_day: day_index,
-      })
-      .eq("id", progressId);
+    // No chain pointer — check whether any unresolved content exists in the future.
+    // Load all active storylets for this track and filter in TypeScript to avoid
+    // complex PostgREST array exclusion syntax.
+    const { data: remainingStorylets } = await supabaseServer
+      .from("storylets")
+      .select("storylet_key,due_offset_days")
+      .eq("track_id", progressRow.track_id)
+      .eq("is_active", true);
+
+    const currentDayOffset = day_index - progressRow.started_day;
+    const hasFutureContent = (remainingStorylets ?? []).some(
+      (s) =>
+        !newResolvedKeys.includes(s.storylet_key) &&
+        (s.due_offset_days ?? 0) > currentDayOffset
+    );
+
+    if (hasFutureContent) {
+      // Stay ACTIVE — pool scan will surface future content when it becomes due.
+      await supabaseServer
+        .from("track_progress")
+        .update({
+          resolved_storylet_keys: newResolvedKeys,
+          next_key_override: null,
+          updated_day: day_index,
+        })
+        .eq("id", progressId);
+    } else {
+      // No future content — track complete.
+      await supabaseServer
+        .from("track_progress")
+        .update({
+          state: "COMPLETED",
+          completed_day: day_index,
+          updated_day: day_index,
+          resolved_storylet_keys: newResolvedKeys,
+          next_key_override: null,
+        })
+        .eq("id", progressId);
+    }
   }
 
   // --- 7. Activate a new track if the choice triggers one ---
@@ -289,7 +337,7 @@ export async function POST(request: Request) {
     event_type: "STORYLET_RESOLVED",
     track_id: progressRow.track_id,
     track_progress_id: progressId,
-    step_key: progressRow.current_storylet_key,
+    step_key: effectiveStoryletKey,
     option_key,
     meta: {
       next_key: nextKey ?? null,
@@ -298,10 +346,87 @@ export async function POST(request: Request) {
     },
   });
 
+  // --- 9. Update playthrough log ---
+  void updatePlaythroughLog(supabaseServer as any, user.id, day_index, {
+    storyletTitle: (storyletRow as any).title ?? effectiveStoryletKey,
+    trackId: progressRow.track_id,
+    segment: (storyletRow as any).segment ?? null,
+    choiceLabel: typeof (chosenOption as any).label === "string"
+      ? (chosenOption as any).label
+      : option_key,
+  });
+
   return NextResponse.json({
     ok: true,
     next_key: nextKey ?? null,
     activated_track: activatedTrackKey,
     resource_deltas: resourceResult?.deltas ?? null,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Playthrough log helper
+// ---------------------------------------------------------------------------
+
+interface LogEntry {
+  n: number;
+  title: string;
+  track: string;
+  day: number;
+  segment: string | null;
+  choice: string;
+  ts: string;
+}
+
+async function updatePlaythroughLog(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  userId: string,
+  dayIndex: number,
+  info: {
+    storyletTitle: string;
+    trackId: string;
+    segment: string | null;
+    choiceLabel: string;
+  }
+) {
+  try {
+    // Look up the track key for a human-readable name
+    const { data: trackRow } = await supabase
+      .from("tracks")
+      .select("key")
+      .eq("id", info.trackId)
+      .maybeSingle();
+    const trackKey: string = trackRow?.key ?? info.trackId;
+
+    // Read current entries (reset if day 0 = new playthrough)
+    const { data: logRow } = await supabase
+      .from("playthrough_log")
+      .select("entries")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const prior: LogEntry[] =
+      dayIndex === 0 ? [] : ((logRow?.entries as LogEntry[]) ?? []);
+
+    const entry: LogEntry = {
+      n: prior.length + 1,
+      title: info.storyletTitle,
+      track: trackKey,
+      day: dayIndex,
+      segment: info.segment,
+      choice: info.choiceLabel,
+      ts: new Date().toISOString(),
+    };
+
+    await supabase.from("playthrough_log").upsert({
+      user_id: userId,
+      entries: [...prior, entry],
+      ...(dayIndex === 0 ? { started_at: new Date().toISOString() } : {}),
+      updated_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    // Non-fatal — don't break the resolve response
+    console.error("[track-resolve] playthrough log update failed", err);
+  }
 }
