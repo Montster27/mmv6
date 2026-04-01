@@ -10,7 +10,7 @@
 
 ---
 
-## Current Chain State (post all migrations through 20260401000002)
+## Current Chain State (post all migrations through 20260401000003)
 
 ### ROOMMATE TRACK
 
@@ -33,6 +33,7 @@ s_d1_first_morning  [morning, Day 1]
 ```
 
 **State after Day 1 morning:** roommate track COMPLETED. No Day 2+ content.
+*(unchanged by 20260401000003 — roommate track already reached Day 1)*
 
 ---
 
@@ -60,11 +61,22 @@ s_d1_lunch_floor  [afternoon, Day 0]
 s_d1_evening_choice  [evening, Day 0]
   storylet_key:    evening_choice
   due_offset_days: 0
-  default_next_key: NULL
+  default_next_key: hall_morning  ← wired in 20260401000003
   choices:
     go_to_party  → no next_key (precludes: s_d1_evening_cards, s_d1_evening_union — slugs don't exist)
     go_to_cards  → no next_key (precludes: s_d1_evening_party, s_d1_evening_union — slugs don't exist)
     go_to_union  → no next_key (precludes: s_d1_evening_party, s_d1_evening_cards — slugs don't exist)
+  → [default_next_key] → s_d1_hall_morning
+
+s_d1_hall_morning  [morning, Day 1]  — NEW in 20260401000003
+  storylet_key:    hall_morning
+  order_index:     4
+  due_offset_days: 1  → due on started_day + 1
+  segment:         morning
+  expires_after_days: 7
+  default_next_key: NULL
+  choices:         head_downstairs (no per-choice next_key)
+  nodes:           keith_morning (MC: heading_now → going_together, maybe_later → going_solo) → react_together/react_solo → hallway_beat → choices
   → NULL → track COMPLETED
 
 s_d1_bench_glenn  [morning, Day 0]  — DISABLED (is_active = false), order_index = 4
@@ -72,7 +84,8 @@ s_d1_bench_glenn  [morning, Day 0]  — DISABLED (is_active = false), order_inde
   but no chain pointer exists so it will never appear regardless.
 ```
 
-**State after Day 0 evening:** belonging track COMPLETED. No Day 1+ content.
+**State after Day 1 morning:** belonging track COMPLETED. No Day 2+ content.
+*(20260401000003 extended chain from Day 0 evening to Day 1 morning)*
 
 ---
 
@@ -84,13 +97,27 @@ buildInitialTrackProgress → s_d1_admin_errand (order_index = 0, due = Day 0)
 s_d1_admin_errand  [morning, Day 0]
   storylet_key:    admin_errand
   due_offset_days: 0
-  default_next_key: NULL
+  default_next_key: advisor_visit  ← wired in 20260401000003
   choices:
     full_meal_plan / standard_meal_plan / minimum_meal_plan (no per-choice next_key)
+  → [default_next_key] → s_d1_advisor_visit
+
+s_d1_advisor_visit  [afternoon, Day 1]  — NEW in 20260401000003
+  storylet_key:    advisor_visit
+  order_index:     1
+  due_offset_days: 1  → due on started_day + 1
+  segment:         afternoon
+  expires_after_days: 7
+  default_next_key: NULL
+  choices:
+    lean_cs        → identity: [achieve, risk], stress +1
+    lean_humanities → identity: [achieve], stress 0
+    defer          → identity: [safety], stress -1
   → NULL → track COMPLETED
 ```
 
-**State after Day 0 morning:** academic track COMPLETED immediately.
+**State after Day 1 afternoon:** academic track COMPLETED. No Day 2+ content.
+*(20260401000003 extended chain from Day 0 morning to Day 1 afternoon)*
 
 ---
 
@@ -118,7 +145,7 @@ These exist in the DB but are unreachable via the track engine:
 | Engine term | Calendar meaning | Content currently built |
 |-------------|-----------------|------------------------|
 | Day 0 (due_offset=0) | Arrival day: morning → afternoon → evening | room_214, dorm_hallmates, lunch_floor, evening_choice, admin_errand |
-| Day 1 (due_offset=1) | First full orientation day: morning | first_morning |
+| Day 1 (due_offset=1) | First full orientation day: morning + afternoon | first_morning, hall_morning, advisor_visit |
 | Day 2 (due_offset=2) | Orientation Day 2 | nothing |
 | Day 3 (due_offset=3) | Orientation Day 3 | nothing |
 
@@ -152,29 +179,28 @@ Day 0
   dorm_hallmates → lunch_floor → evening_choice ✓ (fully wired)
 
 Day 1
-  evening_choice ends with default_next_key = NULL → COMPLETED.
-  NEEDED: a Day 1 belonging beat (orientation hall? first campus social?)
-  Must be chained from evening_choice OR the track restarts (not currently possible).
-
-  PROBLEM: once evening_choice resolves with NULL, the belonging track is COMPLETED
-  and cannot surface new storylets. Day 1 belonging content requires evening_choice
-  to chain into it, OR a separate track activation mechanism.
+  evening_choice → hall_morning ✓ (wired in 20260401000003)
+  hall_morning → NULL → COMPLETED
 
 Day 2–3
-  Same issue. No path forward unless evening_choice gains a next_key.
+  No content built. hall_morning needs a default_next_key for Day 2+ content.
+  NEEDED: a Day 2 belonging beat (orientation social? floor dynamic shift?)
+  Must be on BELONGING track with due_offset_days = 2.
 ```
 
 ### ACADEMIC TRACK
 
 ```
 Day 0
-  admin_errand → NULL → COMPLETED immediately.
-  NEEDED: chain from admin_errand to the next academic beat.
+  admin_errand → advisor_visit ✓ (wired in 20260401000003)
 
-Day 1–3
-  No academic storylets built for Days 1–3. First class is Day 4+ (classes begin).
-  Orientation-specific academic beats (advisor meeting, course registration) need
-  due_offset_days = 1–3 and must be chained from admin_errand.
+Day 1
+  advisor_visit (afternoon) → NULL → COMPLETED
+
+Day 2–3
+  No content built. advisor_visit needs a default_next_key for Day 2+ content.
+  NEEDED: a Day 2–3 academic beat (first class prep? syllabus pickup?)
+  Must be on ACADEMIC track with due_offset_days = 2 or 3.
 ```
 
 ### MONEY / OPPORTUNITY / HOME TRACKS
@@ -194,20 +220,19 @@ how the engine actually works. Each flag describes the conflict and the implicat
 
 ---
 
-### FLAG 1 — Belonging track COMPLETES on Day 0; no Day 1+ path
+### FLAG 1 — ~~Belonging track COMPLETES on Day 0; no Day 1+ path~~ RESOLVED
 
-**Where:** `s_d1_evening_choice`, `default_next_key = NULL`
-**Engine behavior:** `state = COMPLETED` after evening_choice resolves. COMPLETED tracks never surface again.
-**Conflict with design:** STORYLINE_MAP expects ongoing belonging storylets through Week 4. These are unreachable once the track COMPLETES.
-**Fix required:** evening_choice must chain into Day 1 content via `default_next_key`. That Day 1 storylet needs `due_offset_days = 1`. Then Day 1 chains to Day 2, etc. Every gap in the chain kills the track permanently.
+**Fixed in:** `20260401000003_day1_content_and_chain_forward.sql`
+`evening_choice.default_next_key = 'hall_morning'` — belonging track now reaches Day 1 morning.
+**Remaining:** hall_morning still terminates with NULL. Day 2+ belonging content still unbuilt.
 
 ---
 
-### FLAG 2 — Academic track COMPLETES on Day 0; all future academic content unreachable
+### FLAG 2 — ~~Academic track COMPLETES on Day 0; all future academic content unreachable~~ RESOLVED
 
-**Where:** `s_d1_admin_errand`, `default_next_key = NULL`
-**Engine behavior:** Academic track COMPLETEs after the meal plan choice. All future academic storylets (first class, office hours, paper due) are on this track and need to be chained from admin_errand.
-**Fix required:** admin_errand needs `default_next_key` pointing to the next academic beat.
+**Fixed in:** `20260401000003_day1_content_and_chain_forward.sql`
+`admin_errand.default_next_key = 'advisor_visit'` — academic track now reaches Day 1 afternoon.
+**Remaining:** advisor_visit still terminates with NULL. Day 2+ academic content still unbuilt.
 
 ---
 
@@ -284,17 +309,19 @@ BELONGING TRACK
     → choice next_key: lunch_floor
   Day 0 afternoon: lunch_floor (order=2, due=0) ────────────────────────────── ✓
     → default_next_key: evening_choice
-  Day 0 evening:   evening_choice (order=3, due=0) ─────────────────────────── ✓ (wired, but...)
-    → default_next_key: [Day 1 belonging beat, NOT BUILT] (due=1)  ←── BROKEN: currently NULL
-  Day 1:           [belonging beat, NOT BUILT] (due=1)
-    → default_next_key: [Day 2 belonging beat, NOT BUILT] (due=2)
+  Day 0 evening:   evening_choice (order=3, due=0) ─────────────────────────── ✓
+    → default_next_key: hall_morning  ✓ (wired in 20260401000003)
+  Day 1 morning:   hall_morning (order=4, due=1) ───────────────────────────── ✓
+    → default_next_key: [Day 2 belonging beat, NOT BUILT]  ←── terminates here
   Day 2:           [orientation social / belonging beat, NOT BUILT] (due=2)
     → default_next_key: [Day 3 beat, NOT BUILT] (due=3)
 
 ACADEMIC TRACK
-  Day 0 morning:   admin_errand (order=0, due=0) ───────────────────────────── ✓ (wired, but...)
-    → default_next_key: [Day 1-3 academic beat, NOT BUILT] (due=1–3) ←── BROKEN: currently NULL
-  Day 1–3:         [NOT BUILT] — advisor, course add/drop, orientation session
+  Day 0 morning:   admin_errand (order=0, due=0) ───────────────────────────── ✓
+    → default_next_key: advisor_visit  ✓ (wired in 20260401000003)
+  Day 1 afternoon: advisor_visit (order=1, due=1) ──────────────────────────── ✓
+    → default_next_key: [Day 2–3 academic beat, NOT BUILT]  ←── terminates here
+  Day 2–3:         [NOT BUILT] — course add/drop, first class prep
   Day 4+:          [first_class beat, NOT BUILT]
 
 MONEY TRACK
@@ -318,4 +345,5 @@ HOME TRACK
 `20260330000002_fix_day1_track_wiring.sql`, `20260331000001_add_room_214_opening.sql`,
 `20260331000002_fix_day1_sequencing.sql`, `20260331100000_rewrite_room_214_conversational.sql`,
 `20260401000001_first_morning_and_hallmates_fix.sql`, `20260401000002_fix_roommate_chain.sql`,
+`20260401000003_day1_content_and_chain_forward.sql`,
 `docs/ENGINE-SPEC.md`, `docs/CONTENT-INVENTORY.md`, `HANDOFF.md`, `docs/STORYLINE_MAP.md`*
