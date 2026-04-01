@@ -6,7 +6,7 @@ import {
   type ResourceSnapshot,
 } from "@/core/resources/resourceDelta";
 import { recordResourceTrace } from "@/core/resources/resourceTrace";
-import type { ResourceDelta } from "@/domain/arcs/types";
+import type { ResourceDelta } from "@/core/resources/resourceDelta";
 
 type ResourceApplyOptions = {
   source?: string;

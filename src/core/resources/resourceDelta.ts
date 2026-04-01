@@ -15,6 +15,15 @@ export type ResourceDeltaInput = {
   resources?: Record<string, number>;
 };
 
+/**
+ * Resource delta for applying changes to player resources.
+ * Kept here (moved from domain/arcs/types.ts) as the canonical location.
+ */
+export type ResourceDelta = {
+  resources?: Partial<Record<ResourceKey, number>>;
+  skill_points?: number;
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
