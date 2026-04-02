@@ -2237,44 +2237,51 @@ export default function PlayPage() {
         ] as any;
 
         if (relationshipEvents.length > 0) {
-          const { next: nextRelationships, logs } = applyRelationshipEvents(
-            relationshipsState,
-            relationshipEvents,
-            { storylet_slug: beat.track_key, choice_id: option.id }
-          );
-          await updateRelationships(userId, nextRelationships, dayIndex);
-          if (dailyState) {
-            setDailyState({ ...dailyState, relationships: nextRelationships });
-          }
-          // Log each relationship change
-          logs.forEach((entry) => {
-            const flagChanged =
-              typeof entry.delta.met === "boolean" ||
-              typeof entry.delta.knows_name === "boolean" ||
-              typeof entry.delta.knows_face === "boolean";
-            const payload = {
-              user_id: userId,
-              day: dayIndex,
-              event_type: "REL_DELTA",
-              track_id: null,
-              track_progress_id: beat.progress_id,
-              step_key: null,
-              option_key: option.id,
-              delta: entry.delta,
-              meta: {
-                storylet_slug: beat.track_key,
-                choice_id: option.id,
-                npc_id: entry.npc_id,
-                kind: flagChanged ? "npc_memory" : "relational",
-                before: entry.before,
-                after: entry.after,
-              },
-            };
-            supabase.from("choice_log").insert(payload);
-            if (relationshipDebugEnabled) {
-              setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
+          // Non-fatal: relationship updates are best-effort.
+          // Wrap in try-catch so a Supabase error here never prevents the
+          // UI from marking the beat resolved and showing the dismiss card.
+          try {
+            const { next: nextRelationships, logs } = applyRelationshipEvents(
+              relationshipsState,
+              relationshipEvents,
+              { storylet_slug: beat.track_key, choice_id: option.id }
+            );
+            await updateRelationships(userId, nextRelationships, dayIndex);
+            if (dailyState) {
+              setDailyState({ ...dailyState, relationships: nextRelationships });
             }
-          });
+            // Log each relationship change
+            logs.forEach((entry) => {
+              const flagChanged =
+                typeof entry.delta.met === "boolean" ||
+                typeof entry.delta.knows_name === "boolean" ||
+                typeof entry.delta.knows_face === "boolean";
+              const payload = {
+                user_id: userId,
+                day: dayIndex,
+                event_type: "REL_DELTA",
+                track_id: null,
+                track_progress_id: beat.progress_id,
+                step_key: null,
+                option_key: option.id,
+                delta: entry.delta,
+                meta: {
+                  storylet_slug: beat.track_key,
+                  choice_id: option.id,
+                  npc_id: entry.npc_id,
+                  kind: flagChanged ? "npc_memory" : "relational",
+                  before: entry.before,
+                  after: entry.after,
+                },
+              };
+              supabase.from("choice_log").insert(payload);
+              if (relationshipDebugEnabled) {
+                setRelDebugEvents((prev) => [payload as any, ...prev].slice(0, 50));
+              }
+            });
+          } catch (relErr) {
+            console.error("[track-storylet-choice] relationship update failed (non-fatal):", relErr);
+          }
         }
       }
 

@@ -175,20 +175,22 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
         )}
       </div>
 
-      {/* Body or conversational nodes */}
-      {storylet.nodes && storylet.nodes.length > 0 && !displayedOption ? (
-        <DialogueNodeView
-          preamble={resolve(storylet.body)}
-          nodes={storylet.nodes}
-          choices={storylet.options}
-          onChoice={(choiceId) => {
-            const option = storylet.options.find((o) => o.id === choiceId);
-            if (option) handleChoice(option);
-          }}
-          disabled={choosing || disabled}
-        />
-      ) : (
-        <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{resolve(storylet.body)}</p>
+      {/* Body or conversational nodes — hidden on dismiss cards (resolvedOption from parent) */}
+      {!resolvedOption && (
+        storylet.nodes && storylet.nodes.length > 0 && !displayedOption ? (
+          <DialogueNodeView
+            preamble={resolve(storylet.body)}
+            nodes={storylet.nodes}
+            choices={storylet.options}
+            onChoice={(choiceId) => {
+              const option = storylet.options.find((o) => o.id === choiceId);
+              if (option) handleChoice(option);
+            }}
+            disabled={choosing || disabled}
+          />
+        ) : (
+          <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{resolve(storylet.body)}</p>
+        )
       )}
 
       {/* Post-choice result */}
