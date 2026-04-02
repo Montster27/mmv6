@@ -347,9 +347,14 @@ export async function POST(request: Request) {
   });
 
   // --- 9. Update playthrough log ---
-  void updatePlaythroughLog(supabaseServer as any, user.id, day_index, {
+  // Detect new run: room_214 is always the first storylet, so resolving it with
+  // an empty resolved-keys list means a fresh playthrough just started.
+  const isNewRun =
+    effectiveStoryletKey === "room_214" && currentResolvedKeys.length === 0;
+  await updatePlaythroughLog(supabaseServer as any, user.id, isNewRun, {
     storyletTitle: (storyletRow as any).title ?? effectiveStoryletKey,
     trackId: progressRow.track_id,
+    dayIndex: day_index,
     segment: (storyletRow as any).segment ?? null,
     choiceLabel: typeof (chosenOption as any).label === "string"
       ? (chosenOption as any).label
@@ -382,10 +387,11 @@ async function updatePlaythroughLog(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   userId: string,
-  dayIndex: number,
+  isNewRun: boolean,
   info: {
     storyletTitle: string;
     trackId: string;
+    dayIndex: number;
     segment: string | null;
     choiceLabel: string;
   }
@@ -399,7 +405,7 @@ async function updatePlaythroughLog(
       .maybeSingle();
     const trackKey: string = trackRow?.key ?? info.trackId;
 
-    // Read current entries (reset if day 0 = new playthrough)
+    // Read current entries — reset to [] when a new playthrough starts
     const { data: logRow } = await supabase
       .from("playthrough_log")
       .select("entries")
@@ -407,24 +413,47 @@ async function updatePlaythroughLog(
       .maybeSingle();
 
     const prior: LogEntry[] =
-      dayIndex === 0 ? [] : ((logRow?.entries as LogEntry[]) ?? []);
+      isNewRun ? [] : ((logRow?.entries as LogEntry[]) ?? []);
 
     const entry: LogEntry = {
       n: prior.length + 1,
       title: info.storyletTitle,
       track: trackKey,
-      day: dayIndex,
+      day: info.dayIndex,
       segment: info.segment,
       choice: info.choiceLabel,
       ts: new Date().toISOString(),
     };
 
+    const allEntries: LogEntry[] = [...prior, entry];
+
     await supabase.from("playthrough_log").upsert({
       user_id: userId,
-      entries: [...prior, entry],
-      ...(dayIndex === 0 ? { started_at: new Date().toISOString() } : {}),
+      entries: allEntries,
+      ...(isNewRun ? { started_at: new Date().toISOString() } : {}),
       updated_at: new Date().toISOString(),
     });
+
+    // In local dev, also write a markdown file for easy inspection.
+    // Skipped on Vercel where the runtime filesystem is read-only.
+    if (!process.env.VERCEL) {
+      const { writeFileSync } = await import("fs");
+      const { join } = await import("path");
+      const lines: string[] = [
+        "# Latest Playthrough",
+        `Generated: ${new Date().toISOString()}`,
+        "",
+      ];
+      for (const e of allEntries) {
+        const meta = [e.track, `Day ${e.day}${e.segment ? ` ${e.segment}` : ""}`].join(", ");
+        lines.push(`${e.n}. **${e.title}** (${meta})`);
+        lines.push(`   → Choice: "${e.choice}"`);
+        lines.push(`   _${e.ts}_`);
+        lines.push("");
+      }
+      const filePath = join(process.cwd(), "docs", "PLAYTHROUGH-LOG.md");
+      writeFileSync(filePath, lines.join("\n"), "utf8");
+    }
   } catch (err) {
     // Non-fatal — don't break the resolve response
     console.error("[track-resolve] playthrough log update failed", err);
