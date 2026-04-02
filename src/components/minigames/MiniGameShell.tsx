@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { MiniGameType, MiniGameResult } from "@/types/storylets";
 
@@ -74,15 +74,24 @@ export default function MiniGameShell({
 
   const difficulty = getAdaptiveDifficulty(gameType);
 
+  const hasCalledComplete = useRef(false);
+
   const handleComplete = useCallback(
     (gameResult: MiniGameResult) => {
+      // Guard: only call onComplete once per game instance.
+      // CapsGame's held-key issue can fire onComplete multiple times;
+      // this ref prevents duplicate API calls.
+      if (hasCalledComplete.current) return;
+      hasCalledComplete.current = true;
+
       recordDifficultyResult(gameType, gameResult.won);
       setResult(gameResult);
       setFinished(true);
-      // Brief pause so player sees the result, then bubble up
-      setTimeout(() => {
-        onComplete(gameResult);
-      }, 1500);
+      // Call onComplete immediately — the parent overlay (activeMiniGame) keeps
+      // the result visible until the API response arrives. No delay needed here;
+      // a 1500ms window created a race condition where the stale closure captured
+      // in this setTimeout could call onComplete after activeMiniGame was cleared.
+      onComplete(gameResult);
     },
     [gameType, onComplete]
   );

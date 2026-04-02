@@ -222,6 +222,10 @@ export default function CapsGame({
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Ignore key-repeat events — holding space down would call flick() multiple
+      // times before phaseRef updates, spawning multiple setInterval chains and
+      // potentially calling onComplete more than once.
+      if (e.repeat) return;
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
         if (phaseRef.current === "ready") {
