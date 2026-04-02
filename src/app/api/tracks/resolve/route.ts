@@ -141,10 +141,13 @@ export async function POST(request: Request) {
 
   if (newTrackState) {
     // Update track_progress.track_state
-    await supabaseServer
+    const { error: stateErr } = await supabaseServer
       .from("track_progress")
       .update({ track_state: newTrackState, branch_key: newTrackState, updated_day: day_index })
       .eq("id", progressId);
+    if (stateErr) {
+      console.error("[track-resolve] Failed to update track_state:", stateErr);
+    }
 
     // Also update daily_states.stream_states for backward compatibility
     const { data: trackRow } = await supabaseServer
@@ -208,6 +211,22 @@ export async function POST(request: Request) {
           ? storyletRow.default_next_key
           : null);
 
+  // --- Deduplication guard: if effectiveStoryletKey is already resolved, bail ---
+  // This prevents double-resolution when the client fires the resolve call twice
+  // (e.g. mini-game completion race, stale card re-render).
+  if (currentResolvedKeys.includes(effectiveStoryletKey)) {
+    console.warn(
+      `[track-resolve] Storylet "${effectiveStoryletKey}" already in resolved_storylet_keys — skipping duplicate resolve.`
+    );
+    return NextResponse.json({
+      ok: true,
+      next_key: null,
+      activated_track: null,
+      resource_deltas: null,
+      duplicate: true,
+    });
+  }
+
   if (nextKey) {
     // A chain pointer exists — set override so this storylet is served next.
     const { data: nextStoryletRow } = await supabaseServer
@@ -221,7 +240,7 @@ export async function POST(request: Request) {
       ? progressRow.started_day + (nextStoryletRow.due_offset_days ?? 1)
       : day_index + 1;
 
-    await supabaseServer
+    const { error: updateErr } = await supabaseServer
       .from("track_progress")
       .update({
         current_storylet_key: nextKey,
@@ -231,6 +250,11 @@ export async function POST(request: Request) {
         next_key_override: nextKey,
       })
       .eq("id", progressId);
+
+    if (updateErr) {
+      console.error("[track-resolve] Failed to advance track_progress (next_key path):", updateErr);
+      return NextResponse.json({ error: "Failed to update track progress" }, { status: 500 });
+    }
   } else {
     // No chain pointer — check whether any unresolved content exists in the future.
     // Load all active storylets for this track and filter in TypeScript to avoid
@@ -250,7 +274,7 @@ export async function POST(request: Request) {
 
     if (hasFutureContent) {
       // Stay ACTIVE — pool scan will surface future content when it becomes due.
-      await supabaseServer
+      const { error: updateErr } = await supabaseServer
         .from("track_progress")
         .update({
           resolved_storylet_keys: newResolvedKeys,
@@ -258,9 +282,14 @@ export async function POST(request: Request) {
           updated_day: day_index,
         })
         .eq("id", progressId);
+
+      if (updateErr) {
+        console.error("[track-resolve] Failed to update track_progress (pool-stay path):", updateErr);
+        return NextResponse.json({ error: "Failed to update track progress" }, { status: 500 });
+      }
     } else {
       // No future content — track complete.
-      await supabaseServer
+      const { error: updateErr } = await supabaseServer
         .from("track_progress")
         .update({
           state: "COMPLETED",
@@ -270,6 +299,11 @@ export async function POST(request: Request) {
           next_key_override: null,
         })
         .eq("id", progressId);
+
+      if (updateErr) {
+        console.error("[track-resolve] Failed to complete track_progress:", updateErr);
+        return NextResponse.json({ error: "Failed to update track progress" }, { status: 500 });
+      }
     }
   }
 

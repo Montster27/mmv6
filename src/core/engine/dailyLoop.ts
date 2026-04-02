@@ -450,7 +450,7 @@ export async function getOrCreateDailyRun(
         // 3. Load or create track progress for this user
         const { data: progressRows } = await supabase
           .from("track_progress")
-          .select("id,user_id,track_id,state,current_storylet_key,storylet_due_day,defer_count,track_state,started_day,updated_day,completed_day,failure_reason,branch_key")
+          .select("id,user_id,track_id,state,current_storylet_key,storylet_due_day,defer_count,track_state,started_day,updated_day,completed_day,failure_reason,branch_key,resolved_storylet_keys,next_key_override")
           .eq("user_id", userId)
           .in("track_id", trackIds);
 
@@ -468,6 +468,8 @@ export async function getOrCreateDailyRun(
           completed_day: r.completed_day ?? null,
           failure_reason: r.failure_reason ?? null,
           branch_key: r.branch_key ?? null,
+          resolved_storylet_keys: Array.isArray(r.resolved_storylet_keys) ? r.resolved_storylet_keys : [],
+          next_key_override: (r.next_key_override as string | null) ?? null,
         }));
 
         // 4. Ensure progress exists for every track that has storylets but no progress yet.
@@ -484,7 +486,7 @@ export async function getOrCreateDailyRun(
             const { data: inserted } = await supabase
               .from("track_progress")
               .insert(toInsert)
-              .select("id,user_id,track_id,state,current_storylet_key,storylet_due_day,defer_count,track_state,started_day,updated_day,completed_day,failure_reason,branch_key");
+              .select("id,user_id,track_id,state,current_storylet_key,storylet_due_day,defer_count,track_state,started_day,updated_day,completed_day,failure_reason,branch_key,resolved_storylet_keys,next_key_override");
             progress = [
               ...progress,
               ...(inserted ?? []).map((r) => ({
@@ -501,12 +503,35 @@ export async function getOrCreateDailyRun(
                 completed_day: r.completed_day ?? null,
                 failure_reason: r.failure_reason ?? null,
                 branch_key: r.branch_key ?? null,
+                resolved_storylet_keys: Array.isArray(r.resolved_storylet_keys) ? r.resolved_storylet_keys : [],
+                next_key_override: (r.next_key_override as string | null) ?? null,
               })),
             ];
           }
         }
 
-        // 5. Select due storylets and format for DailyRun
+        // 5. Load resolved choice option_keys per track (for requires_choice gating).
+        // choice_log.option_key stores the choice "id" value from the storylet JSON.
+        // Scoped per track — cross-track gating is a future extension.
+        const resolvedChoicesByTrack = new Map<string, Set<string>>();
+        if (progress.length > 0) {
+          const { data: choiceLogs } = await supabase
+            .from("choice_log")
+            .select("track_id,option_key")
+            .eq("user_id", userId)
+            .in("track_id", trackIds)
+            .eq("event_type", "STORYLET_RESOLVED")
+            .not("option_key", "is", null);
+
+          for (const log of choiceLogs ?? []) {
+            if (!log.track_id || !log.option_key) continue;
+            const set = resolvedChoicesByTrack.get(log.track_id) ?? new Set<string>();
+            set.add(log.option_key as string);
+            resolvedChoicesByTrack.set(log.track_id, set);
+          }
+        }
+
+        // 6. Select due storylets and format for DailyRun
         const currentSeg = dayStateRaw?.current_segment ?? 'morning';
         const hoursLeft = dayStateRaw?.hours_remaining ?? 16;
         console.log("[daily-run] selectTrackStorylets input:", {
@@ -524,6 +549,7 @@ export async function getOrCreateDailyRun(
           tracks,
           currentSegment: currentSeg,
           hoursRemaining: hoursLeft,
+          resolvedChoicesByTrack,
         });
         console.log("[daily-run] selectTrackStorylets returned", dueStorylets.length, "storylets:", dueStorylets.map(d => d.storylet.slug));
         trackStorylets = dueStorylets.map((due) => ({

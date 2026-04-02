@@ -134,6 +134,13 @@ export type TrackProgress = {
   completed_day?: number | null;
   failure_reason?: string | null;
   branch_key?: string | null;
+  /** Keys of storylets the user has already resolved on this track. */
+  resolved_storylet_keys: string[];
+  /**
+   * When set, serve this storylet next (bypasses pool scan for one turn).
+   * Used to preserve next_key chains within the pool-based engine.
+   */
+  next_key_override: string | null;
 };
 
 // ---------------------------------------------------------------------------

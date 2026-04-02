@@ -23,19 +23,78 @@ type SelectTrackStoryletsArgs = {
    * is_conflict=true bypass segment filtering and surface immediately.
    */
   hoursRemaining?: number;
+  /**
+   * Map of track_id → Set of option_key strings the player has picked on that track.
+   * Sourced from choice_log. Used to evaluate requires_choice requirements.
+   * Track-scoped: a choice on one track cannot gate a storylet on a different track.
+   */
+  resolvedChoicesByTrack?: Map<string, Set<string>>;
 };
 
 /** Hours remaining threshold below which conflict storylets bypass segment gating. */
 const CONFLICT_THRESHOLD = 4;
 
 /**
- * Return the track storylets that are due (and not yet expired) for today.
+ * Evaluate a storylet's requirements against the player's resolved choices on
+ * the same track.
  *
- * A storylet is due when:
- *   progress.storylet_due_day <= dayIndex <= progress.storylet_due_day + storylet.expires_after_days
+ * Supported requirement types:
+ *   requires_choice: string  — the player must have previously picked a choice
+ *     with that option_key on this track.
+ *
+ * Unknown requirement keys pass (forward-compatible).
+ *
+ * NOTE: requirements are track-scoped. Cross-track gating is a future extension.
+ */
+function meetsRequirements(
+  storylet: TrackStoryletRow,
+  resolvedChoices: Set<string>
+): boolean {
+  const reqs = storylet.requirements as Record<string, unknown> | null | undefined;
+  if (!reqs || typeof reqs !== "object" || Object.keys(reqs).length === 0) return true;
+
+  if (typeof reqs.requires_choice === "string") {
+    return resolvedChoices.has(reqs.requires_choice);
+  }
+
+  return true;
+}
+
+/**
+ * Check whether a storylet passes the segment filter.
+ * Conflict storylets bypass gating when time is tight.
+ */
+function passesSegmentFilter(
+  storylet: TrackStoryletRow,
+  currentSegment: string | undefined,
+  timeTight: boolean
+): boolean {
+  if (Boolean(storylet.is_conflict) && timeTight) return true;
+  if (currentSegment && storylet.segment) {
+    return storylet.segment === currentSegment;
+  }
+  return true;
+}
+
+/**
+ * Return the track storylets that are due (and not yet expired/resolved) for today.
+ *
+ * Pool-based selection:
+ *   For each ACTIVE track, if next_key_override is set, serve that storylet first
+ *   (bypassing the pool scan). Otherwise, scan all storylets on the track and return
+ *   the most urgent eligible one (earliest expiry).
+ *
+ * A storylet is eligible when:
+ *   - NOT in progress.resolved_storylet_keys
+ *   - is_active = true
+ *   - started_day + due_offset_days <= dayIndex <= that + expires_after_days
+ *   - segment matches (or is null, or storylet is_conflict with time tight)
+ *   - requirements are met
  *
  * Results are sorted most-urgent first (earliest expiry day) so that
  * storylets about to expire are surfaced before fresh ones.
+ * At most one storylet per track is returned (the most urgent).
+ * Global cap: maxStorylets (default 2).
  */
 export function selectTrackStorylets({
   dayIndex,
@@ -45,14 +104,18 @@ export function selectTrackStorylets({
   maxStorylets = 2,
   currentSegment,
   hoursRemaining,
+  resolvedChoicesByTrack = new Map(),
 }: SelectTrackStoryletsArgs): DueStorylet[] {
   const timeTight = typeof hoursRemaining === "number" && hoursRemaining < CONFLICT_THRESHOLD;
   const trackMap = new Map(tracks.map((t) => [t.id, t]));
 
-  // Build a lookup keyed by "track_id:storylet_key"
-  const storyletByKey = new Map(
-    storylets.map((s) => [`${s.track_id}:${s.storylet_key}`, s])
-  );
+  // Pre-index storylets by track_id for efficient pool scans
+  const storyletsByTrack = new Map<string, TrackStoryletRow[]>();
+  for (const s of storylets) {
+    const arr = storyletsByTrack.get(s.track_id) ?? [];
+    arr.push(s);
+    storyletsByTrack.set(s.track_id, arr);
+  }
 
   const due: DueStorylet[] = [];
 
@@ -62,26 +125,80 @@ export function selectTrackStorylets({
     const track = trackMap.get(prog.track_id);
     if (!track || !track.is_enabled) continue;
 
-    const storylet = storyletByKey.get(`${prog.track_id}:${prog.current_storylet_key}`);
-    if (!storylet) continue;
+    const resolvedKeys = new Set(prog.resolved_storylet_keys);
+    const resolvedChoices = resolvedChoicesByTrack.get(prog.track_id) ?? new Set<string>();
+    const trackStorylets = storyletsByTrack.get(prog.track_id) ?? [];
 
-    const dueDay = prog.storylet_due_day;
-    const expiresOnDay = dueDay + storylet.expires_after_days;
+    // -------------------------------------------------------------------------
+    // Priority override: if next_key_override is set, serve that storylet next.
+    // This preserves explicit chains (next_key on a choice / default_next_key).
+    // -------------------------------------------------------------------------
+    if (prog.next_key_override) {
+      // Safety: if the override points to an already-resolved storylet, clear
+      // it and fall through to the pool scan instead of re-serving it.
+      if (resolvedKeys.has(prog.next_key_override)) {
+        // Fall through to pool scan — override is stale
+      } else {
+        const overrideStorylet = trackStorylets.find(
+          (s) => s.storylet_key === prog.next_key_override
+        );
 
-    if (dayIndex < dueDay || dayIndex > expiresOnDay) continue;
+        if (overrideStorylet) {
+          const dueDay = prog.started_day + overrideStorylet.due_offset_days;
+          const expiresOnDay = dueDay + overrideStorylet.expires_after_days;
 
-    // Conflict storylets bypass segment gating when time budget is tight.
-    const isConflict = Boolean(storylet.is_conflict);
-    if (isConflict && timeTight) {
-      // Always surface
-    } else if (currentSegment && storylet.segment) {
-      if (storylet.segment !== currentSegment) continue;
+          if (dayIndex < dueDay) {
+            // Override is set but not yet due — wait; don't fall through to pool
+            continue;
+          }
+
+          if (dayIndex <= expiresOnDay) {
+            // Override is due and not expired — apply segment filter
+            if (passesSegmentFilter(overrideStorylet, currentSegment, timeTight)) {
+              due.push({ progress: prog, storylet: overrideStorylet, track, expires_on_day: expiresOnDay });
+            }
+            // Whether it passes segment or not, don't also scan pool for this track
+            continue;
+          }
+
+          // Override expired — fall through to pool scan
+        }
+        // Override storylet not found — fall through to pool scan
+      }
     }
 
-    due.push({ progress: prog, storylet, track, expires_on_day: expiresOnDay });
+    // -------------------------------------------------------------------------
+    // Pool scan: find the most urgent eligible storylet on this track.
+    // -------------------------------------------------------------------------
+    let bestCandidate: DueStorylet | null = null;
+
+    for (const storylet of trackStorylets) {
+      // Skip already resolved
+      if (resolvedKeys.has(storylet.storylet_key)) continue;
+      // Skip inactive
+      if (!storylet.is_active) continue;
+
+      const dueDay = prog.started_day + storylet.due_offset_days;
+      const expiresOnDay = dueDay + storylet.expires_after_days;
+
+      if (dayIndex < dueDay) continue;
+      if (dayIndex > expiresOnDay) continue;
+
+      if (!meetsRequirements(storylet, resolvedChoices)) continue;
+      if (!passesSegmentFilter(storylet, currentSegment, timeTight)) continue;
+
+      const candidate: DueStorylet = { progress: prog, storylet, track, expires_on_day: expiresOnDay };
+      if (!bestCandidate || expiresOnDay < bestCandidate.expires_on_day) {
+        bestCandidate = candidate;
+      }
+    }
+
+    if (bestCandidate) {
+      due.push(bestCandidate);
+    }
   }
 
-  // Most urgent (soonest to expire) first
+  // Most urgent (soonest to expire) first across all tracks
   due.sort((a, b) => a.expires_on_day - b.expires_on_day);
 
   return due.slice(0, maxStorylets);
@@ -90,6 +207,8 @@ export function selectTrackStorylets({
 /**
  * Build the track_progress rows to insert when Chapter One begins.
  * One progress row per track, all starting at the given day.
+ * Sets next_key_override to the first storylet so it's served via the override
+ * path on first load (identical behaviour to the old chain-based system).
  */
 export function buildInitialTrackProgress(
   userId: string,
@@ -106,6 +225,8 @@ export function buildInitialTrackProgress(
   defer_count: number;
   started_day: number;
   updated_day: number;
+  resolved_storylet_keys: string[];
+  next_key_override: string;
 }> {
   const result = [];
 
@@ -128,6 +249,8 @@ export function buildInitialTrackProgress(
       defer_count: 0,
       started_day: startedDay,
       updated_day: startedDay,
+      resolved_storylet_keys: [],
+      next_key_override: first.storylet_key,
     });
   }
 

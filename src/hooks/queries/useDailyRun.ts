@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 type DailyRunOptions = {
   experiments: Record<string, string>;
@@ -23,5 +23,10 @@ export function useDailyRun(
     },
     enabled: options.enabled ?? !!userId,
     staleTime: Infinity,
+    // Keep previous data while a new queryKey (refreshTick change) is loading.
+    // Without this, data becomes undefined between refreshes, which triggers the
+    // useEffect that clears resolvedTrackStoryletIds — creating a render window
+    // where a just-resolved storylet card can flash back with choice buttons.
+    placeholderData: keepPreviousData,
   });
 }
