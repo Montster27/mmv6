@@ -2031,14 +2031,16 @@ export default function PlayPage() {
       if (!activeMiniGame) return;
       const pending = activeMiniGame.pendingTrackStorylet;
       const { choiceId } = activeMiniGame;
-      setActiveMiniGame(null);
 
       if (pending && trackStoryletChoiceRef.current) {
-        // Track storylet path: resume handleTrackStoryletChoice (mini_game guard
-        // won't fire again because activeMiniGame is now null).
+        // Track storylet path: keep activeMiniGame set (overlay stays up) while
+        // the resolve API call is in progress. handleTrackStoryletChoice will
+        // clear it once the call completes, so both state changes land in the
+        // same React batch — no flash of the un-resolved card in between.
         trackStoryletChoiceRef.current(pending.storylet, pending.option);
       } else {
-        // Legacy storylet path: re-invoke handleChoice.
+        // Legacy storylet path: clear overlay then re-invoke handleChoice.
+        setActiveMiniGame(null);
         handleChoice(choiceId);
       }
     },
@@ -2339,7 +2341,10 @@ export default function PlayPage() {
 
       const newResolved = new Set([...resolvedTrackStoryletIds, beat.progress_id]);
       setResolvedTrackStoryletIds(newResolved);
-      // Keep this beat visible until the user dismisses it via the Continue button
+      // Keep this beat visible until the user dismisses it via the Continue button.
+      // Also clear the mini-game overlay here (if active) so both state changes
+      // land in the same React batch — prevents the un-resolved card flashing back.
+      setActiveMiniGame(null);
       setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: resolvedOption }]);
 
       // Only mark day complete when all beats are resolved AND no more steps are queued
@@ -2370,6 +2375,8 @@ export default function PlayPage() {
         } else {
           toast("Something went wrong. Please try again.", { variant: "destructive" });
         }
+        // Clear mini-game overlay on failure so it doesn't get stuck
+        setActiveMiniGame(null);
         setSavingChoice(false);
       }
     },
