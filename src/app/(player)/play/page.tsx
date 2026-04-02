@@ -456,11 +456,19 @@ export default function PlayPage() {
     () => dailyRunQuery.data?.trackStorylets ?? [],
     [dailyRunQuery.data?.trackStorylets]
   );
-  // Clear resolved IDs when fresh track storylet data arrives
+  // Clear resolved IDs when fresh track storylet data arrives.
+  // IMPORTANT: only depend on trackStorylets reference — NOT allocationSaved
+  // or other state. Adding extra deps caused spurious resets that cleared
+  // resolvedTrackStoryletIds while stale trackStorylets data still contained
+  // the just-resolved storylet, making it flash back with choice buttons.
   useEffect(() => {
     setResolvedTrackStoryletIds(new Set());
+  }, [dailyRunQuery.data?.trackStorylets]);
+
+  // Separate effect for allocation gating — must not reset resolvedTrackStoryletIds.
+  useEffect(() => {
     if (allocationSaved) setAwaitingAllocation(false);
-  }, [dailyRunQuery.data?.trackStorylets, allocationSaved]);
+  }, [allocationSaved]);
   const relationshipsState = useMemo(
     () => chapterOneState?.relationships ?? {},
     [chapterOneState?.relationships]
@@ -2355,7 +2363,8 @@ export default function PlayPage() {
       setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: resolvedOption }]);
 
       // Only mark day complete when all beats are resolved AND no more steps are queued
-      const hasMoreSteps = resBody.next_step_key != null;
+      // NOTE: API returns "next_key" (not "next_step_key") — field name was mismatched.
+      const hasMoreSteps = resBody.next_key != null;
       if (
         chapterOneMode &&
         userId &&
