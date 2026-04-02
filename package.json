@@ -11,7 +11,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "arcflow": "node scripts/arcFlow/run.mjs",
-    "simulate": "tsx scripts/simulate-run.ts"
+    "simulate": "tsx scripts/simulate-run.ts",
+    "log": "node scripts/pull-playthrough-log.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
