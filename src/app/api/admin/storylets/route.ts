@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   const admin = getAdminClient();
   let query = admin
     .from("storylets")
-    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body,requirements,introduces_npc,arc_id,step_key,order_index,due_offset_days,expires_after_days,default_next_step_key");
+    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body,requirements,introduces_npc,arc_id,step_key,order_index,due_offset_days,expires_after_days,default_next_key");
 
   if (active === "true") {
     query = query.eq("is_active", true);
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
       order_index: payload.order_index ?? null,
       due_offset_days: payload.due_offset_days ?? null,
       expires_after_days: payload.expires_after_days ?? null,
-      default_next_step_key: payload.default_next_step_key ?? null,
+      default_next_key: payload.default_next_key ?? null,
     })
     .select("id")
     .maybeSingle();

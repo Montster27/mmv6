@@ -55,7 +55,7 @@ export async function PUT(
       order_index: payload.order_index,
       due_offset_days: payload.due_offset_days,
       expires_after_days: payload.expires_after_days,
-      default_next_step_key: payload.default_next_step_key ?? null,
+      default_next_key: payload.default_next_step_key ?? null,
       choices,
       updated_at: new Date().toISOString(),
     })

@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   let query = admin
     .from("storylets")
     .select(
-      "id,arc_id,step_key,order_index,title,body,choices,default_next_step_key,due_offset_days,expires_after_days"
+      "id,arc_id,step_key,order_index,title,body,choices,default_next_key,due_offset_days,expires_after_days"
     )
     .not("arc_id", "is", null);
 
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     // choices in the unified model; expose as both names
     options: row.choices ?? [],
     choices: row.choices ?? [],
-    default_next_step_key: row.default_next_step_key,
+    default_next_step_key: row.default_next_key,
     due_offset_days: row.due_offset_days,
     expires_after_days: row.expires_after_days,
   }));

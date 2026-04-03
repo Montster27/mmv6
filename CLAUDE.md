@@ -28,8 +28,9 @@
 
 1. Read `TASKS.md` to understand current priorities and what's in progress
 2. Read this file for project rules
-3. For content work, also read `agents/content-creator/CLAUDE.md`
-4. Use Plan Mode (Shift+Tab) before making changes — propose a plan, get approval, then execute
+3. Before writing any migration, read `docs/CONTENT-RULES.md`
+4. For content work, also read `agents/content-creator/CLAUDE.md`
+5. Use Plan Mode (Shift+Tab) before making changes — propose a plan, get approval, then execute
 
 ---
 

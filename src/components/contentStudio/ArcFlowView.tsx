@@ -14,6 +14,9 @@ type ArcOption = {
   id?: string;
   option_key?: string;
   label?: string;
+  /** Engine-canonical chain pointer (preferred). */
+  next_key?: string;
+  /** Legacy alias — read as fallback for old content. */
   next_step_key?: string;
   energy_cost?: number;
   sets_stream_state?: { stream: string; state: string };
@@ -102,7 +105,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
     return map;
   }, [layout]);
 
-  // Compute non-sequential (branching) edges from choices' next_step_key and default_next_step_key
+  // Compute non-sequential (branching) edges from choices' next_key and default_next_step_key
   const branchEdges = useMemo(() => {
     const edges: Array<{
       arcId: string;
@@ -115,11 +118,12 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
 
     layout.forEach(({ arc, steps, y }) => {
       steps.forEach((step, idx) => {
-        // Check each option for next_step_key
+        // Check each option for next_key (preferred) or next_step_key (legacy fallback)
         const options = step.options as ArcOption[];
         options.forEach((opt) => {
-          if (!opt.next_step_key) return;
-          const target = stepKeyToIndex.get(`${arc.id}:${opt.next_step_key}`);
+          const nk = opt.next_key ?? opt.next_step_key;
+          if (!nk) return;
+          const target = stepKeyToIndex.get(`${arc.id}:${nk}`);
           if (!target || target.idx === idx + 1) return; // sequential = already drawn
           const key = `${arc.id}:${idx}:${target.idx}:choice`;
           if (seen.has(key)) return;
@@ -127,7 +131,7 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
           edges.push({ arcId: arc.id, fromIdx: idx, toIdx: target.idx, y, kind: "choice" });
         });
 
-        // Check default_next_step_key
+        // Check default_next_step_key (arc-steps API maps default_next_key → this field)
         if (step.default_next_step_key) {
           const target = stepKeyToIndex.get(`${arc.id}:${step.default_next_step_key}`);
           if (target && target.idx !== idx + 1) {
@@ -372,9 +376,9 @@ export function ArcFlowView({ arcDefinitions, arcSteps }: ArcFlowViewProps) {
                       {opt.energy_cost !== undefined && opt.energy_cost !== 0 && (
                         <span className="text-slate-400">energy: {opt.energy_cost}</span>
                       )}
-                      {opt.next_step_key && (
+                      {(opt.next_key ?? opt.next_step_key) && (
                         <span className="rounded bg-indigo-50 px-1 text-indigo-600">
-                          → {opt.next_step_key}
+                          → {opt.next_key ?? opt.next_step_key}
                         </span>
                       )}
                       {opt.sets_stream_state && (

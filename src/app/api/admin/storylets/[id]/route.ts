@@ -101,7 +101,7 @@ export async function PUT(
       order_index: payload.order_index ?? null,
       due_offset_days: payload.due_offset_days ?? null,
       expires_after_days: payload.expires_after_days ?? null,
-      default_next_step_key: payload.default_next_step_key ?? null,
+      default_next_key: payload.default_next_key ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", resolvedParams.id);

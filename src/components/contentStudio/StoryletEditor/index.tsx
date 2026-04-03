@@ -22,7 +22,7 @@ interface StoryletEditorProps {
   onDelete?: () => Promise<void>;
   onCancel?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
-  /** Called when user wants to create a new storylet linked by next_step_key. */
+  /** Called when user wants to create a new storylet linked by default_next_key. */
   onCreateLinkedStorylet?: (stepKey: string) => void;
   saving?: boolean;
   saveError?: string | null;
