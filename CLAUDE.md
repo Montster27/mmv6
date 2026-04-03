@@ -169,6 +169,81 @@ Confirmed games: Memory Cards, Caps, Sorting (bartender skin). More TBD.
 
 ---
 
+## Testing Process
+
+Claude Code cannot reliably run browser-based playtests (auth walls, PATH issues, Chrome MCP disconnects). Do NOT attempt to playtest by launching a dev server and clicking through the UI. Instead, use this tiered approach:
+
+### Tier 1: SQL Verification (always do this)
+After any content/wiring change, verify the DB state directly via Supabase `execute_sql`:
+
+```sql
+-- 1. Confirm storylet field values are correct
+SELECT storylet_key, is_active, default_next_key, requirements, segment, due_offset_days
+FROM storylets WHERE storylet_key IN ('the_storylets_you_changed');
+
+-- 2. Simulate pool scan: what would the engine select for a given track/day/segment?
+--    This mirrors selectTrackStorylets.ts logic.
+SELECT s.storylet_key, s.requirements, s.segment, s.due_offset_days, s.is_active
+FROM storylets s
+JOIN tracks t ON s.track_id = t.id
+WHERE t.key = 'THE_TRACK'
+  AND s.is_active = true
+  AND s.due_offset_days <= TARGET_DAY_OFFSET
+  AND (TARGET_DAY_OFFSET <= s.due_offset_days + s.expires_after_days)
+  AND (s.segment = 'TARGET_SEGMENT' OR s.segment IS NULL)
+ORDER BY (s.due_offset_days + s.expires_after_days) ASC;
+
+-- 3. Check for competing ungated storylets (the hall_morning bug pattern)
+--    Any row with empty requirements in a segment where gated content should win is a bug.
+SELECT storylet_key, requirements, segment, due_offset_days
+FROM storylets
+WHERE track_id = (SELECT id FROM tracks WHERE key = 'THE_TRACK')
+  AND is_active = true
+  AND due_offset_days = TARGET_DAY
+  AND segment = 'TARGET_SEGMENT';
+
+-- 4. After a reset, check track_progress and choice_log are clean
+SELECT * FROM track_progress WHERE user_id = 'USER_ID';
+SELECT * FROM choice_log WHERE user_id = 'USER_ID';
+```
+
+### Tier 2: Engine Unit Tests (for logic changes)
+When changing `selectTrackStorylets.ts` or `dailyLoop.ts`:
+```bash
+npx vitest run --reporter verbose
+```
+Write a focused test if no existing test covers the scenario.
+
+### Tier 3: Simulated Playthrough via SQL (for full-flow verification)
+To verify a multi-step sequence without a browser:
+
+```sql
+-- Step 1: Get the user ID
+SELECT id FROM auth.users LIMIT 1;
+
+-- Step 2: Reset the save (delete player state, re-init daily_states)
+-- Use the same deletes as src/app/api/run/reset/route.ts
+
+-- Step 3: After reset, init track_progress via buildInitialTrackProgress logic
+-- or just load the game once in the browser to trigger auto-init
+
+-- Step 4: Walk through the sequence by checking what the engine would serve,
+-- then manually inserting choice_log entries and updating track_progress
+-- to simulate the player's choices.
+
+-- Step 5: After simulating the choice, verify pool scan would select the right next storylet.
+```
+
+### Tier 4: Browser Playtest (ask the user)
+For visual/UI verification or full end-to-end confirmation, **ask the user** to playtest in the browser and report back. Provide them:
+1. What to click (specific choices)
+2. What to look for (expected storylet title on the next screen)
+3. Ask them to share the playthrough log (`docs/PLAYTHROUGH-LOG.md` or `SELECT entries FROM playthrough_log`)
+
+**Never** spend more than one attempt trying to get browser automation working. If it fails, fall back to Tier 1-3 and ask the user for Tier 4.
+
+---
+
 ## Verification Checklist
 
 Before considering any content or code change complete:

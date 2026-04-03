@@ -1,7 +1,6 @@
 # MMV Handoff Brief
 > Context bridge for claude.ai, Claude Code, and Cowork sessions.
-> Copy this file to the repo root at V16MMV/mmv/HANDOFF.md
-> **Last updated:** 2026-03-31 (verified against TASKS.md and codebase by Claude Code)
+> **Last updated:** 2026-04-03 (verified against TASKS.md, live DB, and codebase by Claude Code)
 
 ---
 
@@ -32,17 +31,6 @@ world. Target audience: adults 55+. Multiplayer/social elements planned for late
 | **Assets** | `Documents/MMV/_assets/` (once consolidated) | Cowork | Investor decks, logos, promo videos |
 | **Archive** | `Documents/_archive/mmv-legacy/` (once cleaned up) | None — cold storage | V6–V12 old versions |
 
-### Key Obsidian vault paths
-```
-Obsidian Vault/
-├── Master mmv/           ← game design docs, phase plans (1-9+)
-│   └── current/V12/      ← phase specs (may be outdated — verify against TASKS.md)
-├── AmsterFlow/            ← pivot module spec, entrepreneurship research
-├── MMV/
-│   └── dev/               ← dev notes, status snapshots, UI design options
-└── [other teaching/research docs]
-```
-
 ### Key repo paths
 ```
 V16MMV/mmv/
@@ -50,6 +38,10 @@ V16MMV/mmv/
 ├── TASKS.md               ← live task board
 ├── HANDOFF.md             ← this file
 ├── docs/
+│   ├── CONTENT-RULES.md   ← chain vs pool placement rules (authoritative)
+│   ├── CHAIN-MAP.md       ← current chain wiring + flags
+│   ├── ENGINE-SPEC.md     ← engine behavior spec (partially outdated — see note)
+│   ├── CONTENT-INVENTORY.md ← storylet inventory (outdated — see live DB below)
 │   ├── DECISIONS.md       ← design rationale (needs population!)
 │   └── [other docs]
 ├── agents/
@@ -64,65 +56,179 @@ V16MMV/mmv/
 ---
 
 ## Current Milestone
-Orientation passage design complete. Passage map in progress. Day 0 content exists (7 storylets + new Room 214). Days 1-3 need building.
+**Milestone A — "It Runs"** is ~95% complete. The engine supports both chain mode and pool mode (with `requires_choice` gating). Day 0 content is fully wired. Day 1 has morning-after pool storylets and roommate/academic chain endpoints. Days 2-3 need building.
+
+---
+
+## Live DB State (as of 2026-04-03)
+
+### Active Storylets (10 total)
+
+| storylet_key | Track | Segment | Day | Mode | Gates/Chains |
+|-------------|-------|---------|-----|------|--------------|
+| `room_214` | roommate | morning | 0 | CHAIN | → `first_morning` |
+| `first_morning` | roommate | morning | 1 | CHAIN | → NULL (track completes) |
+| `dorm_hallmates` | belonging | morning | 0 | CHAIN | choices → `lunch_floor` |
+| `lunch_floor` | belonging | afternoon | 0 | CHAIN | → `evening_choice` |
+| `evening_choice` | belonging | evening | 0 | CHAIN end | → NULL (pool takes over) |
+| `morning_after_party` | belonging | morning | 1 | POOL | requires_choice: `go_to_party` |
+| `morning_after_cards` | belonging | morning | 1 | POOL | requires_choice: `go_to_cards` |
+| `morning_after_union` | belonging | morning | 1 | POOL | requires_choice: `go_to_union` |
+| `advisor_visit` | academic | afternoon | 1 | CHAIN end | → NULL (track completes) |
+| `money_reality_check` | money | evening | 4 | POOL | no gate |
+
+### Inactive/Disabled Storylets (5)
+
+| storylet_key | Track | Why disabled |
+|-------------|-------|-------------|
+| `hall_morning` | belonging | Superseded by morning_after_* pool variants (deactivated 2026-04-03) |
+| `dorm_roommate` | roommate | Superseded by room_214 conversational rewrite |
+| `roommate_moment` | roommate | Legacy content |
+| `orientation_fair` | belonging | Not yet written — placeholder |
+| `cal_midnight_knock` | belonging | Not yet written — placeholder |
+
+### Deleted Storylets
+
+| storylet_key | When | Why |
+|-------------|------|-----|
+| `bench_glenn` | 2026-04-02 | Orphaned; Contact scene needs redesign before re-adding |
+
+### Track Status
+
+| Track | Storylets | Content reaches | Status |
+|-------|-----------|----------------|--------|
+| **roommate** | 2 active | Day 1 morning → COMPLETED | Needs Day 2+ content |
+| **belonging** | 5 active (3 chain + 3 pool, one fires per run) | Day 1 morning → COMPLETED | Needs Day 2+ content |
+| **academic** | 1 active | Day 1 afternoon → COMPLETED | admin_errand was deleted/missing; advisor_visit is first storylet. Needs Day 2+ content |
+| **money** | 1 active | Day 4 evening (money_reality_check) | First money beat exists but no chain-in |
+| **opportunity** | 0 | — | Silent — no progress row created |
+| **home** | 0 | — | Silent — no progress row created |
+
+### NPC Registry (11 NPCs)
+
+| NPC ID | Display Name | Introduced In | Notes |
+|--------|-------------|---------------|-------|
+| `npc_roommate_scott` | Scott | room_214 | Roommate |
+| `npc_contact_glenn` | Glenn | *(needs scene)* | The Contact — bench_glenn deleted, needs new storylet |
+| `npc_floor_doug` | Doug | dorm_hallmates | Social organizer |
+| `npc_floor_mike` | Mike | dorm_hallmates | Studious, careful |
+| `npc_floor_keith` | Keith | dorm_hallmates | Farm background |
+| `npc_anderson_bryce` | Bryce | *(never via introduces_npc)* | Party host — named in evening_choice body only |
+| `npc_floor_peterson` | Peterson | *(never via introduces_npc)* | Card game host — named in morning_after_cards only |
+| `npc_prof_marsh` | Marsh | — | English lecturer — no storylet yet |
+| `npc_studious_priya` | Priya | — | Sociology section — no storylet yet |
+| `npc_ambiguous_jordan` | Jordan | — | Mystery character — no storylet yet |
+| `npc_parent_voice` | your parent | — | Hallway phone — no storylet yet |
+
+---
 
 ## What's Done
-- Core storylet engine running (schema, evaluation, branching)
-- Scott roommate stream (renamed from Dana/Danny): first night + weekend morning storylets (verified in migrations + code)
-- Contact character (Wren) defined and seeded
-- Mysterious stranger / Fruit Loops intro encounter written
-- Supabase migrations for Phase A content
-- NPC system architecture (relationship tracking, memory, location awareness)
-- Content creator agent pipeline (3-stage: schema → period check → style)
-- mmv-content-builder skill (well-rated, used in both Code and Cowork)
-- CLAUDE.md project bible (excellent quality per Code audit)
-- TASKS.md milestone tracker (structured, but "In Progress" may be stale)
+
+### Engine (Milestone A — complete)
+- Core storylet engine: schema, evaluation, branching, save/load
+- **Dual-mode selection**: chain (next_key_override) AND pool (requires_choice gating)
+- Pool scan with `meetsRequirements()` — track-scoped requires_choice evaluation
+- Three-segment time system (morning/afternoon/evening)
+- Resource system: energy, stress, cashOnHand, knowledge, socialLeverage, physicalResilience
+- Track state transitions (sets_track_state)
+- Playthrough log (auto-records to `playthrough_log` table + `docs/PLAYTHROUGH-LOG.md`)
+- Mini-game framework: MiniGameShell + 3 games (snake, caps, memory)
+- Adaptive difficulty tracker (session-level, 0.2–0.9)
+- Content Studio: collision view, NPC registry, preview simulator, choice editor
+- Welcome/new game screen, save system, NPC name resolution
+- 80s preppy design system, storylet UX polish
+
+### Content (Day 0-1)
+- Day 0 chain: room_214 → dorm_hallmates → lunch_floor → evening_choice (3 mini-games)
+- Day 1 morning: first_morning (roommate), morning_after_* pool variants (belonging)
+- Day 1 afternoon: advisor_visit (academic)
+- Day 4: money_reality_check (money track entry point)
+
+### Docs & Tooling
+- CLAUDE.md project bible with testing process (4-tier: SQL → vitest → SQL simulation → ask user)
+- CONTENT-RULES.md: authoritative chain/pool placement rules
+- CHAIN-MAP.md, ENGINE-SPEC.md, CONTENT-INVENTORY.md
+- Content creator agent (3-stage pipeline)
+- 5 Claude Code skills: `/new-storylet`, `/audit-content`, `/new-npc`, `/new-mini-game`, `/sync-board`
+
+---
 
 ## What's In Progress
-- TASKS.md says "nothing currently in progress" — this is accurate as of 2026-03-31
-- Spider NPC encounter: DONE — introduced in s_evening_cards (Miguel's room card game), drafted 2026-03-23
-- Collision calendar for Week 1: NOT STARTED — listed under "Needs Breakdown" in TASKS.md as "Map remaining Arc One storylets"
+
+- **hall_morning bug fix** — deactivated hall_morning (ungated pool storylet beating gated morning-after scenes). Migration applied. Awaiting user browser playtest to confirm morning_after_party fires on Day 2. (2026-04-03)
+
+---
 
 ## What's Next (probable, pending review)
-- Build orientation passage map (visual, in Obsidian)
-- Review content complexity — decide whether conversational nodes or simpler flag-based branching is the right approach
-- Playtest revised Day 0 before expanding
-- Phase A polish pass: period vocab audit, preclusion logic review
-- Fill gaps in collision calendar (which NPCs appear when/where in Week 1)
-- Phase B planning: second arc segments for roommate + academic streams
-- Investor deck refresh (current deck predates the working content system)
 
-## Recent Decisions (known)
-- Reveal song: Gangsta's Paradise (confirmed — in docs/CONTACT_AND_REVEAL.md and CLAUDE.md)
-- Terminal choices are permanent — no undo mechanic
-- Mini-games deferred to Phase B
-- Content lives in Supabase migrations, not flat files
-- Obsidian vault = design brain; repo = built content (decided 2026-03-31)
-- claude.ai serves as PM across all environments (decided 2026-03-31)
-- Cowork Project created for Obsidian vault access (decided 2026-03-31)
-- DECISIONS.md has only 1 entry (Jan 2026 — "Phase One scope lock") — many decisions are unrecorded
-- Game opens in dorm not quad. Orientation is Days 0-3 before classes. (decided 2026-03-31)
-- ARPANET terminal introduced Day 2-3 (decided 2026-03-31)
-- Mini-games distributed across all days (decided 2026-03-31)
-- Financial starting position randomized (decided 2026-03-31)
-- "Passage" as working term for storylet collections (decided 2026-03-31)
+### Immediate (complete Milestone A)
+1. **User playtests Day 0 → Day 1** — confirm morning-after scenes fire correctly after evening choice
+2. **Fix admin_errand** — storylet is missing from DB (deleted somewhere). Either re-create or accept advisor_visit as academic track entry point
+3. **Fix bench_glenn / Contact scene** — deleted as orphan, but the Contact reveal is a critical narrative beat. Needs: design decision on when/where it fires, then new storylet on correct track
+4. **Add Bryce and Peterson to introduces_npc** on relevant storylets
 
-## Active NPCs
-| NPC | Stream | Status |
-|-----|--------|--------|
-| Scott | Roommate | Renamed from Dana → Scott (men's dorm rule). NPC ID: npc_roommate_scott |
-| Miguel | ? | Referenced in notes |
-| Spider | Money | DONE — introduced in s_evening_cards. Nickname-only, real name unknown. |
-| Wren | Contact/Mystery | Defined and seeded |
-| Professor Marsh | Academic | Referenced |
-| Karen | ? | Referenced |
-| Pat | ? | Referenced |
-| Mysterious Stranger | MMV Mystery arc | Fruit Loops encounter written |
+### Next milestone work (Milestone B — "It Squeezes")
+5. **Map remaining Arc One storylets** — gap analysis for Days 2-14
+6. **Build Day 2-3 content** — extend all active tracks past their current COMPLETED endpoints
+7. **Implement runtime preclusion** — walk precludes field, permanently lock out storylets
+8. **Fill opportunity and home tracks** — at least one entry storylet each
+9. **Build batch content validator** — CLI script for schema/NPC/period checks
 
-## Six Narrative Streams
-1. **Roommate** — Scott (was Dana/Danny), dorm life, first relationships
+---
+
+## Recent Decisions
+
+| Date | Decision | Context |
+|------|----------|---------|
+| 2026-04-03 | **hall_morning deactivated** | Ungated pool storylet was beating gated morning-after variants. Fix: disable it; pool scan now only serves the correct choice-gated variant. |
+| 2026-04-03 | **Testing process: 4-tier, no browser automation** | Claude Code cannot reliably run browser playtests (auth, PATH, Chrome MCP issues). Process: Tier 1 SQL verification → Tier 2 vitest → Tier 3 SQL simulation → Tier 4 ask user. Added to CLAUDE.md. |
+| 2026-04-02 | **evening_choice.default_next_key set to NULL** | Was pointing to hall_morning, which made it a chain (bypassing pool scan). Set to NULL so pool scan finds morning-after variants via requires_choice. |
+| 2026-04-02 | **Pool-based morning-after storylets added** | Three belonging track pool storylets gated by requires_choice (go_to_party/cards/union). First use of pool mode in the game. |
+| 2026-04-02 | **bench_glenn deleted** | Orphaned storylet with no track_id and no chain references. Contact scene needs complete redesign before re-adding. |
+| 2026-04-02 | **Legacy column sync** | default_next_step_key synced with default_next_key across all storylets. Admin API now writes default_next_key directly. |
+| 2026-04-01 | **Day 1 content added** | first_morning (roommate), hall_morning (belonging — later superseded), advisor_visit (academic). Extended all three tracks to Day 1. |
+| 2026-03-31 | Game opens in dorm not quad. Orientation is Days 0-3 before classes. |
+| 2026-03-31 | Obsidian vault = design brain; repo = built content. claude.ai = PM. |
+| 2026-03-24 | Terminology unified: streams/arcs → Tracks, beats/steps → Storylets. |
+
+---
+
+## Engine Model (quick reference)
+
+### Two selection modes
+1. **Chain mode**: storylet served via `next_key_override` on `track_progress`. Set when a prior storylet's choice has `next_key` or the storylet has `default_next_key`.
+2. **Pool mode**: storylet served via pool scan when `next_key_override` is NULL. Filtered by: is_active, due_offset_days window, segment, `meetsRequirements()` (requires_choice).
+
+### Key constraint: CONTENT-RULES.md
+A storylet is **either chained OR pooled**. Never both. If anything chains to it, the pool will never reach it. See `docs/CONTENT-RULES.md` for the full 10-rule spec.
+
+### ENGINE-SPEC.md accuracy note
+ENGINE-SPEC.md says "requirements not read by track engine" (§2). **This is now outdated.** The pool scan in `selectTrackStorylets.ts` reads `requirements.requires_choice` via `meetsRequirements()`. The pool scan also checks `is_active`. Both were added in the pool-mode implementation (2026-04-01/02).
+
+---
+
+## Known Issues
+
+| # | Issue | Severity | Status |
+|---|-------|----------|--------|
+| 1 | **ENGINE-SPEC.md outdated** — says requirements not read by track engine; they are now | Medium | Needs update |
+| 2 | **CONTENT-INVENTORY.md outdated** — lists 7 storylets; there are now 10 active + 5 inactive | Medium | Needs regeneration |
+| 3 | **CHAIN-MAP.md partially outdated** — still shows evening_choice → hall_morning chain; that's been broken (evening_choice.default_next_key = NULL, hall_morning deactivated) | Medium | Needs update |
+| 4 | **admin_errand missing from DB** — referenced in docs but not in live storylets table | High | Investigate: was it deleted? Need to verify migration history |
+| 5 | **Contact scene (Glenn) has no storylet** — bench_glenn deleted, no replacement written | High | Design decision needed: when/where does the Contact reveal fire? |
+| 6 | **Bryce and Peterson never formally introduced** — in registry, named in text, but no introduces_npc | Low | Add to relevant storylets |
+| 7 | **precludes arrays reference non-existent slugs** — evening_choice choices preclude slugs that don't exist | Medium | Preclusion not yet implemented; fix when it is |
+| 8 | **DECISIONS.md nearly empty** — only 1 entry despite months of development | Low | Accumulate over time |
+| 9 | **first_morning.expires_after_days is NULL** — engine treats as 0, meaning it expires same day it's due | Medium | Should be 7 for orientation content |
+| 10 | **opportunity and home tracks have 0 storylets** — enabled but empty, no progress rows created | Medium | Need at least entry storylets |
+| 11 | **Duplicate skill** — mmv-content-builder in both repo and ~/.claude/skills/ | Low | Repo is canonical |
+
+---
+
+## Six Narrative Tracks
+1. **Roommate** — Scott, dorm life, first relationships
 2. **Academic** — Classes, professors, intellectual growth
-3. **Money** — Part-time work, Spider, financial pressure
+3. **Money** — Part-time work, financial pressure
 4. **Belonging** — Social groups, identity, fitting in
 5. **Opportunity** — Career hints, networking, future seeds
 6. **Home** — Family ties, homesickness, independence
@@ -160,16 +266,6 @@ Before we wrap:
 
 ---
 
-## Known Issues (from audits, March 2026)
-- [ ] Duplicate skill: mmv-content-builder in both repo and ~/.claude/skills/ — repo is canonical
-- [ ] Broken cross-skill refs: Cowork skill references non-existent /mnt/skills/ paths
-- [ ] DECISIONS.md nearly empty: Only 1 entry despite months of development
-- [ ] TASKS.md "In Progress" stale: Not updated at session boundaries
-- [x] Build/test permissions: npx vitest, npx tsc, npm run dev, npm run build added to settings.json allowlist (2026-03-31)
-- [ ] Legacy clutter: V6-V12 directories need archiving
-- [ ] Desktop: 300+ unorganized screenshots from dev sessions
-- [ ] Obsidian phase specs may be outdated: Master mmv/current/V12/ plans may not match current build
-
 ## Working Style Notes
 Monty's process is exploratory and prototype-driven. He often needs to see something
 before knowing what's next. PM approach: short build > look > decide cycles.
@@ -178,10 +274,6 @@ Mode varies by day: sometimes builds rough versions, sometimes asks for mockups,
 sometimes writes narrative to see if it feels right. Match the energy.
 
 ## Other Active Projects
-- **ArmsterFlow** — React+Vite+Supabase "pivot kit" teaching tool (skeletal CLAUDE.md needs expansion)
-- **AmsterFlow** — Older Next.js version, likely superseded. Has pivot module spec in Obsidian.
+- **ArmsterFlow** — React+Vite+Supabase "pivot kit" teaching tool
+- **AmsterFlow** — Older Next.js version, likely superseded
 - **Teaching** — MADE program courses, UAE game dev students, "Applied AI" master's course design
-
----
-
-> All ⚠️ items verified and resolved on 2026-03-31 by Claude Code against TASKS.md and codebase.
