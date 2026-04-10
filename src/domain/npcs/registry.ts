@@ -10,9 +10,16 @@ export type NpcEntry = {
 export const NPC_REGISTRY: NpcEntry[] = [
   // ── Day 1 Core NPCs ──
   {
-    id: "npc_roommate_scott",
+    id: "npc_roommate_dana",
+    name: "Dana",
+    short_intro:
+      "Dana, your roommate — already set up when you arrived, Tigers pennant on the wall, quiet",
+  },
+  {
+    id: "npc_ra_scott",
     name: "Scott",
-    short_intro: "Scott, your roommate — already set up when you arrived, easy smile, says yes to everything",
+    short_intro:
+      "Scott, your RA — clipboard, easy smile, says yes to everything",
   },
   {
     id: "npc_contact_glenn",
@@ -48,22 +55,68 @@ export const NPC_REGISTRY: NpcEntry[] = [
   {
     id: "npc_prof_marsh",
     name: "Marsh",
-    short_intro: "Prof. Marsh, your English lecturer — known for calling on people who look unprepared",
+    short_intro:
+      "Prof. Marsh, your English lecturer — known for calling on people who look unprepared",
   },
   {
     id: "npc_studious_priya",
     name: "Priya",
-    short_intro: "Priya, from your sociology section — always three readings ahead, rarely wastes words",
+    short_intro:
+      "Priya, from your sociology section — always three readings ahead, rarely wastes words",
   },
   {
     id: "npc_ambiguous_jordan",
     name: "Jordan",
-    short_intro: "Jordan, someone you keep running into — their angle isn't clear yet",
+    short_intro:
+      "Jordan, someone you keep running into — their angle isn't clear yet",
   },
   {
     id: "npc_parent_voice",
     name: "your parent",
     short_intro: "Your parent — the voice on the other end of the hallway phone",
+  },
+  // ── Week 2 NPCs ──
+  {
+    id: "npc_prof_heller",
+    name: "Heller",
+    short_intro:
+      "Prof. Heller, sociology — says things that sound offhand and are not",
+  },
+  {
+    id: "npc_ta_tomas",
+    name: "Tomas",
+    short_intro:
+      "Tomas, Heller's TA — grading at the side desk, pen moving in a steady rhythm",
+  },
+  {
+    id: "npc_librarian_doerr",
+    name: "Mrs. Doerr",
+    short_intro:
+      "Mrs. Doerr, head librarian — has a system for the returns cart and explains it twice",
+  },
+  {
+    id: "npc_dining_terry",
+    name: "Terry",
+    short_intro:
+      "Terry — works the kitchen, not a student, does not ask your name",
+  },
+  {
+    id: "npc_grounds_vince",
+    name: "Vince",
+    short_intro:
+      "Vince, a sophomore on the grounds crew — headphones on, Walkman clipped to his belt",
+  },
+  {
+    id: "npc_econ_rebecca",
+    name: "Rebecca",
+    short_intro:
+      "Rebecca Chen, economics department — watches you work without turning a page",
+  },
+  {
+    id: "npc_study_wes",
+    name: "Wes",
+    short_intro:
+      "Wes, a sophomore from Connecticut — knows more than he lets on about the Peloponnesian War",
   },
 ];
 
