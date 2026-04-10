@@ -2568,6 +2568,9 @@ export default function PlayPage() {
       if (!userId) return;
       if (stage !== "complete") return;
       if (alreadyCompletedToday) return;
+      // In chapterOneMode, only mark complete after the sleep card —
+      // otherwise empty segments cause premature day advancement.
+      if (chapterOneMode && !sleepCardDone) return;
       try {
         await markDailyComplete(userId, dayIndex);
         incrementGroupObjective(2, "daily_complete").catch(() => {});
@@ -2579,7 +2582,7 @@ export default function PlayPage() {
     if (USE_DAILY_LOOP_ORCHESTRATOR) {
       markCompleteIfNeeded();
     }
-  }, [stage, alreadyCompletedToday, userId, dayIndex]);
+  }, [stage, alreadyCompletedToday, userId, dayIndex, chapterOneMode, sleepCardDone]);
 
   // chapterOneMode edge case: player returns to page after resolving all beats in a
   // previous session. Server returns trackStorylets=[] but markDailyComplete was never
@@ -2597,13 +2600,16 @@ export default function PlayPage() {
     if (alreadyCompletedToday) return;
     if (!dailyRunDataLoaded) return; // wait for data to load
     if (trackStorylets.length > 0) return; // beats still pending
+    // In chapterOneMode, don't auto-complete until the player has gone through the
+    // sleep card — otherwise empty segments trigger premature day advancement.
+    if (!sleepCardDone) return;
     // Only auto-complete when the user has done something this session, or when
     // the server already signalled there are no beats due (stage === "complete").
     if (resolvedTrackStoryletIds.size === 0 && stage !== "complete") return;
     markDailyComplete(userId, dayIndex).catch(console.error);
     incrementGroupObjective(2, "daily_complete").catch(() => {});
     setRefreshTick((t) => t + 1);
-  }, [chapterOneMode, trackStorylets.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage]);
+  }, [chapterOneMode, trackStorylets.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage, sleepCardDone]);
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">

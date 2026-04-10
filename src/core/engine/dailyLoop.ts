@@ -572,11 +572,15 @@ export async function getOrCreateDailyRun(
 
   // In chapterOneMode: if track storylets are available the stage must not be "complete"
   // so the client renders them instead of the "Daily complete" screen.
+  // When no storylets match the current segment but the day still has hours left,
+  // keep stage as "storylet_1" so the client shows the SegmentTransitionCard
+  // instead of auto-completing the day.
+  const dayDone = (dayStateRaw?.current_segment ?? 'morning') === 'night' || (dayStateRaw?.hours_remaining ?? 16) <= 0;
   const resolvedStage: typeof stage =
     chapterOneMode && trackStorylets.length > 0 && !cadence.alreadyCompletedToday
       ? "storylet_1"
       : chapterOneMode && trackStorylets.length === 0 && !cadence.alreadyCompletedToday
-      ? "complete"
+      ? (dayDone ? "complete" : "storylet_1")
       : stage;
 
   const { weekStart, weekEnd } = computeWeekWindow(dayIndex);
