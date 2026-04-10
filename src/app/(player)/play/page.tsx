@@ -1559,19 +1559,9 @@ export default function PlayPage() {
     return new Map(toChoices(currentStorylet).map((choice) => [choice.id, choice.label]));
   }, [currentStorylet]);
 
-  // Ambient audio — plays diegetic sound for storylets that have it (e.g., clock radio in Room 214)
-  const activeAudioKey = useMemo(() => {
-    // Chapter one track mode: use the first unresolved track storylet's title
-    if (chapterOneMode && trackStorylets.length > 0) {
-      const unresolved = trackStorylets.find(
-        (ts) => !resolvedTrackStoryletIds.has(ts.progress_id)
-      );
-      if (unresolved) return unresolved.title;
-    }
-    // Legacy mode: use the current storylet slug
-    return currentStorylet?.slug ?? currentStorylet?.title ?? null;
-  }, [chapterOneMode, trackStorylets, resolvedTrackStoryletIds, currentStorylet]);
-  useStoryletAudio(activeAudioKey);
+  // Ambient audio — Pastime Paradise plays once when the game starts (Day 1, first storylet)
+  const shouldPlayIntroAudio = stage === "storylet_1" && dayIndex === 1;
+  useStoryletAudio("/assets/audio/paradise.wav", shouldPlayIntroAudio);
 
   useEffect(() => {
     setSelectedChoiceId(null);
