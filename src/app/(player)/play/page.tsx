@@ -2605,6 +2605,29 @@ export default function PlayPage() {
     setRefreshTick((t) => t + 1);
   }, [chapterOneMode, trackStorylets.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage, sleepCardDone]);
 
+  // Auto-advance through empty segments: if there are no storylets for the
+  // current segment and it's not yet night, skip ahead automatically instead
+  // of making the player click through dead time.
+  useEffect(() => {
+    if (!USE_DAILY_LOOP_ORCHESTRATOR) return;
+    if (!chapterOneMode) return;
+    if (loading) return;
+    if (!dailyRunDataLoaded) return;
+    if (trackStorylets.length > 0) return;
+    if (pendingDismissalBeats.length > 0) return;
+    if (sleepCardDone) return;
+    if (alreadyCompletedToday) return;
+    const seg = dayState?.current_segment;
+    if (seg === 'night') return;
+    if ((dayState?.hours_remaining ?? 16) <= 0) return;
+
+    const timer = setTimeout(() => {
+      handleAdvanceSegment();
+    }, 400);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapterOneMode, loading, dailyRunDataLoaded, trackStorylets.length, pendingDismissalBeats.length, sleepCardDone, alreadyCompletedToday, dayState?.current_segment, dayState?.hours_remaining]);
+
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
           <div className="flex items-center justify-between">
