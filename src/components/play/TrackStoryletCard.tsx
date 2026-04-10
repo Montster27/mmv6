@@ -33,6 +33,8 @@ type TrackStoryletCardProps = {
   onChoice: (storylet: TrackStorylet, option: StoryletChoice) => Promise<void>;
   disabled?: boolean;
   onDismiss?: () => void;
+  /** Override text for the dismiss button (e.g., "Continue to afternoon →") */
+  dismissLabel?: string;
   resolvedOption?: StoryletChoice;
   moneyBand?: MoneyBand | null;
   relationships?: Record<string, RelationshipState> | null;
@@ -131,7 +133,7 @@ function meetsMoneyRequirement(
   return playerRank >= requiredRank;
 }
 
-export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDismiss, resolvedOption, moneyBand, relationships, resources }: TrackStoryletCardProps) {
+export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDismiss, dismissLabel, resolvedOption, moneyBand, relationships, resources }: TrackStoryletCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -231,7 +233,7 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
                 onClick={onDismiss}
                 className="rounded border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5 active:bg-primary/10 transition"
               >
-                Continue
+                {dismissLabel ?? "Continue"}
               </button>
             </div>
           )}

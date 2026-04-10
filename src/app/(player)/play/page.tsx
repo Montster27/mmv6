@@ -3381,18 +3381,42 @@ export default function PlayPage() {
                         Today&apos;s Moments
                       </h2>
                       {/* Resolved beats awaiting user dismissal (shown first so reaction text is prominent) */}
-                      {pendingDismissalBeats.map(({ beat, chosenOption }) => (
-                        <TrackStoryletCard
-                          key={beat.progress_id}
-                          storylet={beat}
-                          dayIndex={dayIndex}
-                          onChoice={handleTrackStoryletChoice}
-                          disabled
-                          resolvedOption={chosenOption}
-                          onDismiss={() => handleDismissTrackStorylet(beat)}
-                          relationships={relationshipsState}
-                        />
-                      ))}
+                      {pendingDismissalBeats.map(({ beat, chosenOption }) => {
+                        // If this is the last pending beat and all storylets are resolved,
+                        // merge the dismiss and segment-advance into one click.
+                        const isLastPending = pendingDismissalBeats.length === 1;
+                        const allResolved = trackStorylets.every(
+                          (b) => resolvedTrackStoryletIds.has(b.progress_id)
+                        );
+                        const segmentDone = isLastPending && allResolved;
+                        const currentSeg = (dayState?.current_segment ?? "morning") as Segment;
+                        const canAdvance =
+                          segmentDone &&
+                          currentSeg !== "night" &&
+                          (dayState?.hours_remaining ?? 16) > 0;
+                        const nextSeg = canAdvance
+                          ? SEGMENT_ORDER[SEGMENT_ORDER.indexOf(currentSeg) + 1]
+                          : null;
+
+                        return (
+                          <TrackStoryletCard
+                            key={beat.progress_id}
+                            storylet={beat}
+                            dayIndex={dayIndex}
+                            onChoice={handleTrackStoryletChoice}
+                            disabled
+                            resolvedOption={chosenOption}
+                            onDismiss={() => {
+                              handleDismissTrackStorylet(beat);
+                              if (canAdvance) handleAdvanceSegment();
+                            }}
+                            dismissLabel={
+                              nextSeg ? `Continue to ${nextSeg} →` : undefined
+                            }
+                            relationships={relationshipsState}
+                          />
+                        );
+                      })}
                       {/* Unresolved track storylets */}
                       {trackStorylets
                         .filter((b) => !resolvedTrackStoryletIds.has(b.progress_id))
