@@ -175,6 +175,7 @@ export type DueStorylet = {
 export type TrackStorylet = {
   progress_id: string;
   track_key: string;
+  storylet_key: string;
   title: string;
   body: string;
   options: StoryletChoice[];

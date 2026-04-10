@@ -50,6 +50,7 @@ export async function POST(request: Request) {
   }
 
   const progressId = (payload as Record<string, unknown>).progress_id;
+  const clientStoryletKey = (payload as Record<string, unknown>).storylet_key as string | undefined;
   const { option_key, day_index } = payload as {
     option_key?: string;
     day_index?: number;
@@ -76,11 +77,13 @@ export async function POST(request: Request) {
   }
 
   // --- 2. Load the current storylet ---
-  // With pool-based selection, the storylet being resolved may be next_key_override
-  // (when served via the override path) rather than current_storylet_key.
-  // Use the override key if set; fall back to current_storylet_key for pool-scan results.
+  // Pool-based selection may serve a storylet that differs from current_storylet_key
+  // (which only tracks chain-based progression). Trust the client-provided storylet_key
+  // when available, falling back to the override/current chain for older clients.
   const effectiveStoryletKey: string =
-    (progressRow.next_key_override as string | null) ?? progressRow.current_storylet_key;
+    clientStoryletKey
+    ?? (progressRow.next_key_override as string | null)
+    ?? progressRow.current_storylet_key;
 
   const { data: storyletRow, error: storyletErr } = await supabaseServer
     .from("storylets")
@@ -227,8 +230,11 @@ export async function POST(request: Request) {
     });
   }
 
+  // Verify next_key target exists on the SAME track before using it as a chain pointer.
+  // Cross-track references (e.g. default_next_key pointing to another track's storylet)
+  // would contaminate next_key_override and break pool-scan resolution.
+  let validNextKey: string | null = null;
   if (nextKey) {
-    // A chain pointer exists — set override so this storylet is served next.
     const { data: nextStoryletRow } = await supabaseServer
       .from("storylets")
       .select("storylet_key,due_offset_days")
@@ -236,29 +242,34 @@ export async function POST(request: Request) {
       .eq("storylet_key", nextKey)
       .maybeSingle();
 
-    const nextDueDay = nextStoryletRow
-      ? progressRow.started_day + (nextStoryletRow.due_offset_days ?? 1)
-      : day_index + 1;
+    if (nextStoryletRow) {
+      validNextKey = nextKey;
+      const nextDueDay = progressRow.started_day + (nextStoryletRow.due_offset_days ?? 1);
 
-    const { error: updateErr } = await supabaseServer
-      .from("track_progress")
-      .update({
-        current_storylet_key: nextKey,
-        storylet_due_day: nextDueDay,
-        updated_day: day_index,
-        resolved_storylet_keys: newResolvedKeys,
-        next_key_override: nextKey,
-      })
-      .eq("id", progressId);
+      const { error: updateErr } = await supabaseServer
+        .from("track_progress")
+        .update({
+          current_storylet_key: nextKey,
+          storylet_due_day: nextDueDay,
+          updated_day: day_index,
+          resolved_storylet_keys: newResolvedKeys,
+          next_key_override: nextKey,
+        })
+        .eq("id", progressId);
 
-    if (updateErr) {
-      console.error("[track-resolve] Failed to advance track_progress (next_key path):", updateErr);
-      return NextResponse.json({ error: "Failed to update track progress" }, { status: 500 });
+      if (updateErr) {
+        console.error("[track-resolve] Failed to advance track_progress (next_key path):", updateErr);
+        return NextResponse.json({ error: "Failed to update track progress" }, { status: 500 });
+      }
+    } else {
+      console.warn(
+        `[track-resolve] next_key "${nextKey}" not found on track ${progressRow.track_id} — treating as pool mode`
+      );
     }
-  } else {
-    // No chain pointer — check whether any unresolved content exists in the future.
-    // Load all active storylets for this track and filter in TypeScript to avoid
-    // complex PostgREST array exclusion syntax.
+  }
+
+  if (!validNextKey) {
+    // No valid chain pointer — check whether any unresolved content exists in the future.
     const { data: remainingStorylets } = await supabaseServer
       .from("storylets")
       .select("storylet_key,due_offset_days")
@@ -374,7 +385,7 @@ export async function POST(request: Request) {
     step_key: effectiveStoryletKey,
     option_key,
     meta: {
-      next_key: nextKey ?? null,
+      next_key: validNextKey ?? null,
       ...(activatedTrackKey ? { activated_track: activatedTrackKey } : {}),
       ...(resourceResult ? { resource_deltas: resourceResult.deltas } : {}),
     },
@@ -397,7 +408,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    next_key: nextKey ?? null,
+    next_key: validNextKey ?? null,
     activated_track: activatedTrackKey,
     resource_deltas: resourceResult?.deltas ?? null,
   });

@@ -555,6 +555,7 @@ export async function getOrCreateDailyRun(
         trackStorylets = dueStorylets.map((due) => ({
           progress_id: due.progress.id,
           track_key: due.track.key,
+          storylet_key: due.storylet.storylet_key,
           title: due.storylet.title,
           body: due.storylet.body,
           options: due.storylet.choices,

@@ -2227,6 +2227,7 @@ export default function PlayPage() {
         },
         body: JSON.stringify({
           progress_id: beat.progress_id,
+          storylet_key: beat.storylet_key,
           option_key: option.id,
           day_index: dayIndex,
         }),
@@ -2409,6 +2410,9 @@ export default function PlayPage() {
         // Clear mini-game overlay on failure so it doesn't get stuck
         setActiveMiniGame(null);
         setSavingChoice(false);
+        // Re-throw so TrackStoryletCard's catch block clears chosenOption
+        // and restores the choice buttons instead of showing a stuck outcome card.
+        throw e;
       }
     },
     [dayIndex, resolvedTrackStoryletIds, trackStorylets, chapterOneMode, userId, relationshipsState, dailyState, relationshipDebugEnabled, chapterOneState, allocationSaved, dayState, setDayState, activeMiniGame, toast]
