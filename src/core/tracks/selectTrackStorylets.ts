@@ -29,6 +29,12 @@ type SelectTrackStoryletsArgs = {
    * Track-scoped: a choice on one track cannot gate a storylet on a different track.
    */
   resolvedChoicesByTrack?: Map<string, Set<string>>;
+  /**
+   * Set of skill_id strings the player has trained (status='trained').
+   * Used to evaluate requires_skill on storylet-level requirements (pool gating).
+   * Phase 2: binary check only (trained or not); min_level ignored.
+   */
+  trainedSkillIds?: Set<string>;
 };
 
 /** Hours remaining threshold below which conflict storylets bypass segment gating. */
@@ -36,25 +42,37 @@ const CONFLICT_THRESHOLD = 4;
 
 /**
  * Evaluate a storylet's requirements against the player's resolved choices on
- * the same track.
+ * the same track and trained skills.
  *
  * Supported requirement types:
  *   requires_choice: string  — the player must have previously picked a choice
  *     with that option_key on this track.
+ *   requires_skill: { skill_id: string; min_level?: number }  — the player must
+ *     have trained this skill. Phase 2: binary only (min_level ignored).
  *
  * Unknown requirement keys pass (forward-compatible).
  *
- * NOTE: requirements are track-scoped. Cross-track gating is a future extension.
+ * NOTE: requires_choice is track-scoped. requires_skill is global (skills are not
+ * track-scoped). Cross-track choice gating is a future extension.
  */
 function meetsRequirements(
   storylet: TrackStoryletRow,
-  resolvedChoices: Set<string>
+  resolvedChoices: Set<string>,
+  trainedSkillIds: Set<string> = new Set()
 ): boolean {
   const reqs = storylet.requirements as Record<string, unknown> | null | undefined;
   if (!reqs || typeof reqs !== "object" || Object.keys(reqs).length === 0) return true;
 
   if (typeof reqs.requires_choice === "string") {
-    return resolvedChoices.has(reqs.requires_choice);
+    if (!resolvedChoices.has(reqs.requires_choice)) return false;
+  }
+
+  // Phase 2: storylet-level skill gating (pool gating)
+  if (reqs.requires_skill && typeof reqs.requires_skill === "object") {
+    const skillReq = reqs.requires_skill as { skill_id?: string; min_level?: number };
+    if (typeof skillReq.skill_id === "string") {
+      if (!trainedSkillIds.has(skillReq.skill_id)) return false;
+    }
   }
 
   return true;
@@ -105,6 +123,7 @@ export function selectTrackStorylets({
   currentSegment,
   hoursRemaining,
   resolvedChoicesByTrack = new Map(),
+  trainedSkillIds = new Set(),
 }: SelectTrackStoryletsArgs): DueStorylet[] {
   const timeTight = typeof hoursRemaining === "number" && hoursRemaining < CONFLICT_THRESHOLD;
   const trackMap = new Map(tracks.map((t) => [t.id, t]));
@@ -184,7 +203,7 @@ export function selectTrackStorylets({
       if (dayIndex < dueDay) continue;
       if (dayIndex > expiresOnDay) continue;
 
-      if (!meetsRequirements(storylet, resolvedChoices)) continue;
+      if (!meetsRequirements(storylet, resolvedChoices, trainedSkillIds)) continue;
       if (!passesSegmentFilter(storylet, currentSegment, timeTight)) continue;
 
       const candidate: DueStorylet = { progress: prog, storylet, track, expires_on_day: expiresOnDay };

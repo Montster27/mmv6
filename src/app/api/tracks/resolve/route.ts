@@ -10,6 +10,7 @@ import {
 } from "@/core/resources/applyResourcesServer";
 import { resourceLabel } from "@/core/resources/resourceMap";
 import type { ResourceKey } from "@/core/resources/resourceKeys";
+import { tickPracticeCredit } from "@/core/skills/practice";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -372,6 +373,24 @@ export async function POST(request: Request) {
       }
     } catch (err) {
       console.error("[track-resolve] Failed to activate track", trackActivated, err);
+    }
+  }
+
+  // --- 7.5. Diegetic-practice hook (Phase 2) ---
+  // If the choice has practices_skills, subtract training time from the active skill.
+  const practicesSkills = chosenOption.practices_skills as string[] | undefined;
+  if (Array.isArray(practicesSkills) && practicesSkills.length > 0) {
+    try {
+      await tickPracticeCredit(
+        supabaseServer as Parameters<typeof tickPracticeCredit>[0],
+        user.id,
+        practicesSkills,
+        new Date(),
+        { storylet_key: effectiveStoryletKey, choice_id: option_key! }
+      );
+    } catch (err) {
+      // Non-fatal — don't break the resolve response
+      console.error("[track-resolve] practice credit failed", err);
     }
   }
 

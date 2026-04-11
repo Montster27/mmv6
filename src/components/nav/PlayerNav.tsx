@@ -7,6 +7,7 @@ import { signOut } from "@/lib/auth";
 
 const navItems = [
   { href: "/play", label: "Play" },
+  { href: "/skills", label: "Skills" },
   { href: "/journal", label: "Journal" },
   { href: "/theory", label: "Theoryboard" },
   { href: "/group", label: "Group" },

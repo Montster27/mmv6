@@ -47,8 +47,19 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
   const identityTags = Array.isArray(obj.identity_tags)
     ? (obj.identity_tags as string[])
     : undefined;
-  const skillModifier = isString(obj.skill_modifier)
-    ? obj.skill_modifier
+  const skillModifier =
+    obj.skill_modifier && typeof obj.skill_modifier === "object" && !Array.isArray(obj.skill_modifier)
+      ? (obj.skill_modifier as { skill_id: string; effect: "unlock_variant" | "soften" })
+      : undefined;
+  const requiresSkill =
+    obj.requires_skill && typeof obj.requires_skill === "object" && !Array.isArray(obj.requires_skill)
+      ? (obj.requires_skill as { skill_id: string; min_level?: number })
+      : undefined;
+  const reactionWithSkill = isString(obj.reaction_with_skill)
+    ? obj.reaction_with_skill
+    : undefined;
+  const practicesSkills = Array.isArray(obj.practices_skills)
+    ? (obj.practices_skills as string[])
     : undefined;
   const precludes = Array.isArray(obj.precludes)
     ? (obj.precludes as string[])
@@ -87,6 +98,9 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     events_emitted: eventsEmitted,
     identity_tags: identityTags,
     skill_modifier: skillModifier,
+    requires_skill: requiresSkill,
+    reaction_with_skill: reactionWithSkill,
+    practices_skills: practicesSkills,
     precludes,
     relational_effects: relationalEffects,
     set_npc_memory: setNpcMemory,

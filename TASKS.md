@@ -80,6 +80,60 @@
 - [ ] **Add "Echoes" stream** — 7th stream for time-travel content. `Priority: Medium` `Category: Design`
 - [ ] **Wire evening three-way preclusion** — cards precludes caps + SUB, etc. `Priority: Medium` `Category: Content`
 
+### Time Model — Phased Rollout (decided 2026-04-10)
+> Load-bearing system. Five phases, each independently playtestable. Critical path: 1 → 2 → 4 → 5, with 3 in parallel to 2.
+
+**Phase 1 — Skill Queue, Standalone** `Priority: High`
+- [x] **P1.1 Sandbox subset of skills** — 10 Tier 1 skills seeded: critical_analysis, close_reading, active_listening, small_talk, running_endurance, manual_dexterity, creative_writing, musical_ear, tool_proficiency, budgeting. `Category: Design`
+- [x] **P1.2 Placeholder parabolic curve** — `src/core/skills/curve.ts`. Tier 1=4h, Tier 2=24h, Tier 3=168h. `NEXT_PUBLIC_SKILL_TIME_SCALE` env var for compression. `Category: Design`
+- [x] **P1.3 Build skill queue engine** — `src/core/skills/queue.ts`. Pure functions: startTraining, queueNext, tick, cancelQueued. DB-level partial unique indexes enforce 1 active + 1 queued. `Category: Engine`
+- [x] **P1.4 Login queue-check UI** — `SkillQueueCheck` component. Shows completed skills, active countdown, queued skill, skill picker grouped by domain. `Category: UI`
+- [x] **P1.5 Character sheet: trained skills display** — `SkillsPanel` component + `/skills` page in player nav. Read-only trained list + live training countdown. `Category: UI`
+- [ ] **P1.6 Playtest — does the queue produce the daily-ritual pull?** 7–10 real days, 2 testers. `Category: Testing`
+
+**Phase 2 — Skills Matter in Storylets** `Priority: High`
+- [x] **P2.1 Wire skills into storylet resolver** — `meetsRequirements()` checks `requires_skill` (storylet-level pool gating). `dailyLoop.ts` filters choices by `requires_skill` (choice-level hiding) and swaps `reaction_text` with `reaction_with_skill` when `skill_modifier` matches trained skills. `selectTrackStorylets` accepts `trainedSkillIds` param. `Category: Engine`
+- [x] **P2.2 Retrofit 5 Week 1-2 storylets** — glenn_pastime_paradise (musical_ear modifier), lunch_floor (small_talk modifier + practice), heller_lecture (critical_analysis gated choice + practice), evening_choice (active_listening modifier + practice), money_reality_check (budgeting modifier + practice). No Herald/writing storylet exists — substituted money track. `Category: Content`
+- [x] **P2.3 Diegetic-practice hook** — `tickPracticeCredit()` in `src/core/skills/practice.ts`. Subtracts `PRACTICE_CREDIT_SECONDS` (env var, default 900s = 15min) from active training skill's `completes_at`. Only accelerates currently active skill. Audit log: `skill_practice_events` table. Called from resolve route after choice processing. `Category: Engine`
+- [ ] **P2.4 Playtest — do skills visibly matter, does the unification feel like one system?** `Category: Testing`
+
+**Phase 3 — Daily Harvest (Bare Version)** `Priority: High`
+> Runs in parallel to Phase 2 if writing bandwidth allows.
+- [ ] **P3.1 Harvest pool schema + infra** — tagged templates, era/state filtering, one-per-login, no debt. `Category: Engine`
+- [ ] **P3.2 First 30 harvest templates** — Claude drafts via three-stage pipeline, Monty edits. Mix of dream fragments, letters from home, Usenet posts, floor-phone messages. Voice-setting batch. `Category: Content`
+- [ ] **P3.3 Login flow: queue check → harvest → optional play button** `Category: UI`
+- [ ] **P3.4 Weak-version real-date texture** — harvest pool filters on real calendar month. `Category: Engine`
+- [ ] **P3.5 Playtest — does a 90-second login feel like a visit or a chore?** `Category: Testing`
+
+**Phase 4 — Routine-Week Mode (MVP)** `Priority: High`
+- [ ] **P4.1 Activity menu system** — 6 standing activities authored for Week 2 as test bed. `Category: Engine`
+- [ ] **P4.2 Weekly time budget + per-activity deposit math** `Category: Engine`
+- [ ] **P4.3 Interruption system** — three triggers: gate threshold trips, calendar beats, NPC patience timers. `Category: Engine`
+- [ ] **P4.4 UI mode switch** — daily-slot view ↔ weekly-calendar view on interruption. `Category: UI`
+- [ ] **P4.5 Playtest — does routine mode feel like texture or a cutscene?** High risk phase — be ready to pause if it feels hollow. `Category: Testing`
+
+**Phase 5 — Curve Tuning + Resource Integration** `Priority: Medium`
+- [ ] **P5.1 Tune parabolic curve** with real playtest data from P1–P4. `Category: Design`
+- [ ] **P5.2 Integrate energy + money bands** into routine-week schedules. `Category: Engine`
+- [ ] **P5.3 Divergence verification** — study-heavy vs social-heavy Week 3 produce meaningfully different outputs. `Category: Testing`
+- [ ] **P5.4 Montage/elision tier at chapter seams** — prose template between arcs. `Category: Content`
+- [ ] **P5.5 Absence guardrail test** — 10-day disappearance returns to welcome, not scolding. `Category: Testing`
+
+**Explicitly deferred past Phase 5:** Usenet multiplayer backbone, sync events + proxy, strong-version real-date events, life-experience/romance content layer, 50-year arc map. All live in the Brainstorm Queue below.
+
+### Deferred — Brainstorm Queue (pre-build design work)
+> Items identified as needing design resolution before implementation. Do NOT build until brainstormed and specced.
+
+- [ ] **BRAINSTORM: Low-stakes "life experience" content layer** — optional scripted content (romance tracks, life vignettes) for players who want more scripted texture without meaningful mechanical impact. Open questions: coexistence with crystallizer model without diluting preclusion; authorship; procedural-with-variables vs bespoke; opt-out gating; feeds harvest pool or lives separately. `Priority: Medium` `Category: Design`
+- [ ] **BRAINSTORM: Optional romance track design** — tied to above but distinct. Romance as opt-in scripted arc rather than emergent crystallizer. Interaction with crystallizer streams. Shared vs dedicated NPCs. Multiplayer implications. `Priority: Medium` `Category: Design`
+- [ ] **BRAINSTORM: Medium-version diegetic/real-time compression** — compression ratio (e.g. 1 real day = 1 diegetic routine-week) between authored beats. Architecture should support turning on later even if weak version ships first. `Priority: Medium` `Category: Design`
+- [ ] **BRAINSTORM: Strong-version real-date events** — post-launch. Once-a-year in-game events pegged to real dates (e.g. NYE 1983/84 on real Dec 31). Only works with active playerbase. `Priority: Low` `Category: Design`
+- [ ] **BRAINSTORM: Sync multiplayer events + proxy system** — later-dev. Scheduled events require players online OR designate a proxy. Open questions: proxy consent, permissions, in-fiction feel, abuse prevention. `Priority: Low` `Category: Design`
+- [ ] **BRAINSTORM: Usenet as async multiplayer backbone** — DECIDED as primary async connection layer. Needs spec: post propagation between players, board structure, Knower discovery through traces, moderation, NPC/player post mixing. `Priority: Medium` `Category: Design`
+- [ ] **BRAINSTORM: Five-minute login UX flow** — worth trying. Needs prototype spec: exact sequence, always-present vs conditional content, first-login-of-day vs subsequent, mobile vs desktop. `Priority: Medium` `Category: Design`
+- [ ] **BRAINSTORM: Parabolic skill cost curve** — mathematical spec. Tier 1 (114 base) cheap and fast (~4 real hours fastest). Tier 2 (25 composites) noticeably harder. Tier 3 (8 masters) near-impossible single-run. Curve shape, real-time ranges, interaction with diegetic practice. `Priority: High` `Category: Design`
+- [ ] **BRAINSTORM: 50-year arc map at chapter resolution** — high-level map of authored density across 5 chapters × ~10 years each. Where are collision stretches, routine+montage stretches, crystallizers. `Priority: Medium` `Category: Design`
+
 ---
 
 ## In Progress

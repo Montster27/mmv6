@@ -20,6 +20,20 @@ const IDENTITY_TAG_SUGGESTIONS = [
   "risk", "safety", "people", "achievement", "confront", "avoid",
 ];
 
+/** Tier 1 skill definitions (sorted by domain). */
+const SKILL_OPTIONS: { value: string; label: string; domain: string }[] = [
+  { value: "critical_analysis", label: "Critical Analysis", domain: "Academic" },
+  { value: "close_reading", label: "Close Reading", domain: "Academic" },
+  { value: "creative_writing", label: "Creative Writing", domain: "Creative" },
+  { value: "musical_ear", label: "Musical Ear", domain: "Creative" },
+  { value: "manual_dexterity", label: "Manual Dexterity", domain: "Physical" },
+  { value: "running_endurance", label: "Running Endurance", domain: "Physical" },
+  { value: "budgeting", label: "Budgeting", domain: "Practical" },
+  { value: "active_listening", label: "Active Listening", domain: "Social" },
+  { value: "small_talk", label: "Small Talk", domain: "Social" },
+  { value: "tool_proficiency", label: "Tool Proficiency", domain: "Technical" },
+];
+
 const RELATIONSHIP_EVENT_TYPES = [
   "INTRODUCED_SELF", "SHARED_MEAL", "SMALL_KINDNESS", "SHOWED_UP",
   "CONFIDED_IN", "REPAIR_ATTEMPT", "OVERHEARD_NAME", "NOTICED_FACE",
@@ -334,7 +348,8 @@ export function ChoiceEditor({
     choice.time_cost,
     choice.energy_cost,
     choice.requires_resource?.key,
-    choice.costs_resource?.key
+    choice.costs_resource?.key,
+    choice.requires_skill?.skill_id
   );
 
   const navCount = countSet(
@@ -357,11 +372,15 @@ export function ChoiceEditor({
     choice.events_emitted?.length ? true : undefined
   );
 
+  const skillCount = countSet(
+    choice.requires_skill?.skill_id,
+    choice.skill_modifier?.skill_id,
+    choice.practices_skills?.length ? true : undefined
+  );
+
   const narrativeCount = countSet(
     choice.identity_tags?.length ? true : undefined,
     choice.precludes?.length ? true : undefined,
-    choice.skill_modifier,
-    choice.skill_requirement,
     choice.sets_expired_opportunity,
     choice.reaction_text_conditions?.length ? true : undefined
   );
@@ -438,13 +457,25 @@ export function ChoiceEditor({
               </select>
             </label>
             <label className="text-xs text-slate-600">
-              Skill requirement
-              <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
-                value={choice.skill_requirement ?? ""}
-                placeholder="e.g. assertiveness"
-                onChange={(e) => onChange({ skill_requirement: e.target.value || undefined })}
-              />
+              Skill requirement (gate — choice hidden without skill)
+              <select
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                value={choice.requires_skill?.skill_id ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    requires_skill: e.target.value
+                      ? { skill_id: e.target.value, min_level: 1 }
+                      : undefined,
+                  })
+                }
+              >
+                <option value="">None</option>
+                {SKILL_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label} ({s.domain})
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -533,34 +564,23 @@ export function ChoiceEditor({
             />
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="text-xs text-slate-600">
-              Skill modifier (boosted by this choice)
-              <input
-                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm font-mono"
-                value={choice.skill_modifier ?? ""}
-                placeholder="e.g. practicalHustle"
-                onChange={(e) => onChange({ skill_modifier: e.target.value || undefined })}
-              />
-            </label>
-            <label className="text-xs text-slate-600">
-              Sets expired opportunity
-              <select
-                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-                value={choice.sets_expired_opportunity ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    sets_expired_opportunity: (e.target.value as "academic" | "social" | "financial") || undefined,
-                  })
-                }
-              >
-                <option value="">None</option>
-                <option value="academic">Academic</option>
-                <option value="social">Social</option>
-                <option value="financial">Financial</option>
-              </select>
-            </label>
-          </div>
+          <label className="block text-xs text-slate-600">
+            Sets expired opportunity
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+              value={choice.sets_expired_opportunity ?? ""}
+              onChange={(e) =>
+                onChange({
+                  sets_expired_opportunity: (e.target.value as "academic" | "social" | "financial") || undefined,
+                })
+              }
+            >
+              <option value="">None</option>
+              <option value="academic">Academic</option>
+              <option value="social">Social</option>
+              <option value="financial">Financial</option>
+            </select>
+          </label>
 
           <div>
             <p className="text-xs font-medium text-slate-600 mb-1">
@@ -570,6 +590,147 @@ export function ChoiceEditor({
               conditions={choice.reaction_text_conditions}
               onChange={(conditions) => onChange({ reaction_text_conditions: conditions })}
             />
+          </div>
+        </div>
+      </details>
+
+      {/* Skills (Phase 2) — three distinct controls */}
+      <details open={skillCount > 0} className="rounded-md border border-emerald-200">
+        <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-emerald-700 hover:text-emerald-900 select-none">
+          Skills (Phase 2){skillCount > 0 && (
+            <span className="ml-2 font-normal text-emerald-400">({skillCount} set)</span>
+          )}
+        </summary>
+        <div className="px-3 pb-3 space-y-4">
+          {/* Skill Modifier */}
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-1">
+              Skill modifier <span className="text-slate-400">(flavor/softened outcome when player has this skill — choice is always visible)</span>
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="text-xs text-slate-600">
+                Skill
+                <select
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                  value={
+                    typeof choice.skill_modifier === "object" && choice.skill_modifier !== null
+                      ? (choice.skill_modifier as { skill_id: string }).skill_id
+                      : ""
+                  }
+                  onChange={(e) =>
+                    onChange({
+                      skill_modifier: e.target.value
+                        ? { skill_id: e.target.value, effect: "soften" as const }
+                        : undefined,
+                    })
+                  }
+                >
+                  <option value="">None</option>
+                  {SKILL_OPTIONS.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label} ({s.domain})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs text-slate-600">
+                Effect
+                <select
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                  value={
+                    typeof choice.skill_modifier === "object" && choice.skill_modifier !== null
+                      ? (choice.skill_modifier as { effect: string }).effect
+                      : "soften"
+                  }
+                  disabled={
+                    !(typeof choice.skill_modifier === "object" && choice.skill_modifier !== null &&
+                      (choice.skill_modifier as { skill_id: string }).skill_id)
+                  }
+                  onChange={(e) => {
+                    if (typeof choice.skill_modifier === "object" && choice.skill_modifier !== null) {
+                      onChange({
+                        skill_modifier: {
+                          ...(choice.skill_modifier as { skill_id: string; effect: string }),
+                          effect: e.target.value as "unlock_variant" | "soften",
+                        },
+                      });
+                    }
+                  }}
+                >
+                  <option value="soften">Soften</option>
+                  <option value="unlock_variant">Unlock variant</option>
+                </select>
+              </label>
+            </div>
+            {typeof choice.skill_modifier === "object" && choice.skill_modifier !== null &&
+              (choice.skill_modifier as { skill_id: string }).skill_id && (
+              <label className="mt-2 block text-xs text-slate-600">
+                Alternate reaction text (shown when player has the skill)
+                <textarea
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                  rows={4}
+                  value={choice.reaction_with_skill ?? ""}
+                  placeholder="Alternate prose when skill modifier is active..."
+                  onChange={(e) =>
+                    onChange({ reaction_with_skill: e.target.value || null })
+                  }
+                />
+              </label>
+            )}
+          </div>
+
+          {/* Practices Skills */}
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-1">
+              Practices skills <span className="text-slate-400">(in-fiction practice — accelerates active training for these skills)</span>
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {(choice.practices_skills ?? []).map((skillId) => {
+                const skill = SKILL_OPTIONS.find((s) => s.value === skillId);
+                return (
+                  <span
+                    key={skillId}
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700"
+                  >
+                    {skill?.label ?? skillId}
+                    <button
+                      type="button"
+                      className="text-emerald-400 hover:text-emerald-700 leading-none"
+                      onClick={() =>
+                        onChange({
+                          practices_skills: (choice.practices_skills ?? []).filter(
+                            (s) => s !== skillId
+                          ),
+                        })
+                      }
+                    >
+                      &times;
+                    </button>
+                  </span>
+                );
+              })}
+              <select
+                className="rounded-md border border-slate-200 px-2 py-0.5 text-xs text-slate-600"
+                value=""
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  const current = choice.practices_skills ?? [];
+                  if (!current.includes(e.target.value)) {
+                    onChange({ practices_skills: [...current, e.target.value] });
+                  }
+                  e.target.value = "";
+                }}
+              >
+                <option value="">+ Add skill...</option>
+                {SKILL_OPTIONS.filter(
+                  (s) => !(choice.practices_skills ?? []).includes(s.value)
+                ).map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label} ({s.domain})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </details>

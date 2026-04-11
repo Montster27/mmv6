@@ -232,6 +232,7 @@ export default function PlayPage() {
   );
   const experiments = useMemo(() => assignments, [assignments]);
   const servedStoryletsRef = useRef<string | null>(null);
+  const dayStateRef = useRef(dayState);
   const [showDevMenu, setShowDevMenu] = useState(() => getAppMode().testerMode);
   const [refreshTick, setRefreshTick] = useState(0);
   const [featureFlagsVersion, setFeatureFlagsVersion] = useState(0);
@@ -327,6 +328,9 @@ export default function PlayPage() {
       !!bootstrapUserId,
     refreshKey: refreshTick,
   });
+
+  // Keep dayStateRef in sync so async handlers always read the latest value
+  useEffect(() => { dayStateRef.current = dayState; }, [dayState]);
 
   useEffect(() => {
     if (bootstrapQuery.isError) {
@@ -972,17 +976,19 @@ export default function PlayPage() {
   type Segment = typeof SEGMENT_ORDER[number];
 
   const handleAdvanceSegment = async () => {
-    if (!dayState) return;
-    const current = (dayState.current_segment as Segment | undefined) ?? 'morning';
+    // Read from ref so async callers always get the latest state
+    const ds = dayStateRef.current ?? dayState;
+    if (!ds) return;
+    const current = (ds.current_segment as Segment | undefined) ?? 'morning';
     const idx = SEGMENT_ORDER.indexOf(current);
     const next: Segment = idx < 0 || idx >= SEGMENT_ORDER.length - 1
       ? SEGMENT_ORDER[0]
       : SEGMENT_ORDER[idx + 1];
-    const nextHours = Math.max(0, (dayState.hours_remaining ?? 16) - 4);
+    const nextHours = Math.max(0, (ds.hours_remaining ?? 16) - 4);
 
     // Optimistic local update
     setDayState({
-      ...dayState,
+      ...ds,
       current_segment: next,
       hours_remaining: nextHours,
     });
@@ -2411,10 +2417,13 @@ export default function PlayPage() {
   // Keep the ref in sync so handleMiniGameComplete can call it without circular deps
   trackStoryletChoiceRef.current = handleTrackStoryletChoice;
 
-  const handleDismissTrackStorylet = useCallback((beat: TrackStorylet) => {
+  const handleDismissTrackStorylet = useCallback((beat: TrackStorylet, skipRefresh = false) => {
     setPendingDismissalBeats((prev) => prev.filter((entry) => entry.beat.progress_id !== beat.progress_id));
-    // Keep resolved ID to prevent flash of old beat; cleared when fresh data arrives
-    setRefreshTick((t) => t + 1);
+    // Keep resolved ID to prevent flash of old beat; cleared when fresh data arrives.
+    // Skip the refresh when the caller will advance the segment — otherwise the
+    // premature re-fetch reads the old segment from the DB and overwrites the
+    // optimistic update, making the transition appear to do nothing.
+    if (!skipRefresh) setRefreshTick((t) => t + 1);
     // Clear bridge text once a beat has been interacted with
     setBridgeText(null);
   }, []);
@@ -3445,7 +3454,7 @@ export default function PlayPage() {
                             disabled
                             resolvedOption={chosenOption}
                             onDismiss={() => {
-                              handleDismissTrackStorylet(beat);
+                              handleDismissTrackStorylet(beat, canAdvance);
                               if (canAdvance) handleAdvanceSegment();
                             }}
                             dismissLabel={

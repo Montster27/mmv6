@@ -63,6 +63,7 @@ import { CHAPTER_ONE_LAST_DAY } from "@/core/chapter/constants";
 import { selectTrackStorylets, buildInitialTrackProgress } from "@/core/tracks/selectTrackStorylets";
 import { CHAPTER_ONE_TRACK_KEYS } from "@/types/tracks";
 import type { Track, TrackProgress, TrackStoryletRow, TrackStorylet } from "@/types/tracks";
+import type { StoryletChoice } from "@/types/storylets";
 import { supabase } from "@/lib/supabase/browser";
 import type { DailyRun, DailyRunStage } from "@/types/dailyRun";
 
@@ -510,7 +511,17 @@ export async function getOrCreateDailyRun(
           }
         }
 
-        // 5. Load resolved choice option_keys per track (for requires_choice gating).
+        // 5a. Load player's trained skills (Phase 2 — skill gating + modifiers)
+        const { data: trainedSkillRows } = await supabase
+          .from("player_skills")
+          .select("skill_id")
+          .eq("user_id", userId)
+          .eq("status", "trained");
+        const trainedSkillIds = new Set(
+          (trainedSkillRows ?? []).map((r: { skill_id: string }) => r.skill_id)
+        );
+
+        // 5b. Load resolved choice option_keys per track (for requires_choice gating).
         // choice_log.option_key stores the choice "id" value from the storylet JSON.
         // Scoped per track — cross-track gating is a future extension.
         const resolvedChoicesByTrack = new Map<string, Set<string>>();
@@ -550,15 +561,46 @@ export async function getOrCreateDailyRun(
           currentSegment: currentSeg,
           hoursRemaining: hoursLeft,
           resolvedChoicesByTrack,
+          trainedSkillIds,
         });
         console.log("[daily-run] selectTrackStorylets returned", dueStorylets.length, "storylets:", dueStorylets.map(d => d.storylet.slug));
+
+        // Phase 2: filter choices by requires_skill and annotate skill_modifier
+        function processChoicesForSkills(
+          choices: StoryletChoice[],
+          playerTrainedSkills: Set<string>
+        ): StoryletChoice[] {
+          return choices
+            .filter((choice) => {
+              // Hide choices where requires_skill is not met (binary: trained or not)
+              if (choice.requires_skill?.skill_id) {
+                return playerTrainedSkills.has(choice.requires_skill.skill_id);
+              }
+              return true;
+            })
+            .map((choice) => {
+              // Annotate skill_modifier: swap reaction_text when modifier is active
+              if (
+                choice.skill_modifier?.skill_id &&
+                playerTrainedSkills.has(choice.skill_modifier.skill_id) &&
+                choice.reaction_with_skill
+              ) {
+                return {
+                  ...choice,
+                  reaction_text: choice.reaction_with_skill,
+                };
+              }
+              return choice;
+            });
+        }
+
         trackStorylets = dueStorylets.map((due) => ({
           progress_id: due.progress.id,
           track_key: due.track.key,
           storylet_key: due.storylet.storylet_key,
           title: due.storylet.title,
           body: due.storylet.body,
-          options: due.storylet.choices,
+          options: processChoicesForSkills(due.storylet.choices, trainedSkillIds),
           nodes: due.storylet.nodes ?? null,
           expires_on_day: due.expires_on_day,
           introduces_npc: due.storylet.introduces_npc,

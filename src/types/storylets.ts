@@ -88,6 +88,8 @@ export type StoryletChoice = {
   outcome_type?: "success" | "fail" | "neutral";
   // ── Narrative / social ────────────────────────────────────────────────────
   reaction_text?: string | null;
+  /** Alternate reaction text shown when the player has the skill from skill_modifier. */
+  reaction_with_skill?: string | null;
   reaction_text_conditions?: Array<{
     if: Record<string, unknown>;
     text: string;
@@ -100,7 +102,27 @@ export type StoryletChoice = {
     magnitude?: number;
   }>;
   identity_tags?: string[];
-  skill_modifier?: string;
+  // ── Skill system (Phase 2) ────────────────────────────────────────────────
+  /**
+   * Gate: player must have this skill trained to see this choice.
+   * Hidden (not grayed) when unmet — consistent with requires_choice behavior.
+   * min_level exists for forward-compatibility; Phase 2 treats all as binary (trained or not).
+   */
+  requires_skill?: { skill_id: string; min_level?: number };
+  /**
+   * When the player has this skill trained, the choice gains flavor or softened outcome.
+   * The choice is always visible regardless. When active, reaction_with_skill replaces
+   * reaction_text if provided.
+   */
+  skill_modifier?: { skill_id: string; effect: "unlock_variant" | "soften" };
+  /**
+   * Skill IDs that this choice represents practicing in-fiction.
+   * When selected, subtracts PRACTICE_CREDIT_SECONDS from the matching active training skill.
+   * Only accelerates the currently active skill — queued or trained skills are unaffected.
+   */
+  practices_skills?: string[];
+  // ── Legacy skill fields (pre-Phase 2, not read by engine) ─────────────────
+  /** @deprecated Use requires_skill instead */
   skill_requirement?: string;
   /** Skill web: grow skills when this choice is taken. */
   skill_growth?: Array<{ skill: string; increment: number }>;
