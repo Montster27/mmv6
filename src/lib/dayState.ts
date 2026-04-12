@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/browser";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PlayerDayState } from "@/types/dayState";
 import { resolveEndOfDay } from "@/core/sim/endOfDay";
 import type { Allocation } from "@/core/sim/allocationEffects";
@@ -29,9 +30,10 @@ function clamp(value: number, min: number, max: number) {
 
 export async function fetchDayState(
   userId: string,
-  dayIndex: number
+  dayIndex: number,
+  client: SupabaseClient = supabase
 ): Promise<PlayerDayState | null> {
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("player_day_state")
     .select(
       "user_id,day_index,energy,stress,money,study_progress,social_capital,health,total_study,total_work,total_social,total_health,total_fun,allocation_hash,pre_allocation_energy,pre_allocation_stress,pre_allocation_money,pre_allocation_study_progress,pre_allocation_social_capital,pre_allocation_health,resolved_at,end_energy,end_stress,next_energy,next_stress,current_segment,hours_remaining,hours_committed,created_at,updated_at"
@@ -82,11 +84,12 @@ export async function fetchDayState(
 
 export async function createDayStateFromPrevious(
   userId: string,
-  dayIndex: number
+  dayIndex: number,
+  client: SupabaseClient = supabase
 ): Promise<PlayerDayState> {
   let source = null as PlayerDayState | null;
   if (dayIndex > 0) {
-    source = await fetchDayState(userId, dayIndex - 1).catch(() => null);
+    source = await fetchDayState(userId, dayIndex - 1, client).catch(() => null);
   }
 
   const baseEnergy =
@@ -128,7 +131,7 @@ export async function createDayStateFromPrevious(
     updated_at: new Date().toISOString(),
   };
 
-  const { error: insertError } = await supabase
+  const { error: insertError } = await client
     .from("player_day_state")
     .insert(insertPayload);
 
@@ -139,7 +142,7 @@ export async function createDayStateFromPrevious(
     }
   }
 
-  const created = await fetchDayState(userId, dayIndex);
+  const created = await fetchDayState(userId, dayIndex, client);
   if (!created) {
     throw new Error("Failed to create day state.");
   }
@@ -149,16 +152,17 @@ export async function createDayStateFromPrevious(
 
 export async function ensureDayStateUpToDate(
   userId: string,
-  dayIndex: number
+  dayIndex: number,
+  client: SupabaseClient = supabase
 ): Promise<PlayerDayState> {
-  const existing = await fetchDayState(userId, dayIndex);
+  const existing = await fetchDayState(userId, dayIndex, client);
   if (existing) return existing;
 
   try {
-    return await createDayStateFromPrevious(userId, dayIndex);
+    return await createDayStateFromPrevious(userId, dayIndex, client);
   } catch (error) {
     if ((error as { code?: string })?.code === "23505") {
-      const retry = await fetchDayState(userId, dayIndex);
+      const retry = await fetchDayState(userId, dayIndex, client);
       if (retry) return retry;
     }
     throw error;
@@ -177,11 +181,15 @@ function normalizeAllocation(raw: unknown): Allocation | null {
   };
 }
 
-export async function finalizeDay(userId: string, dayIndex: number): Promise<void> {
-  const dayState = await ensureDayStateUpToDate(userId, dayIndex);
+export async function finalizeDay(
+  userId: string,
+  dayIndex: number,
+  client: SupabaseClient = supabase
+): Promise<void> {
+  const dayState = await ensureDayStateUpToDate(userId, dayIndex, client);
   if (dayState.resolved_at) return;
 
-  const { data: allocationRow, error: allocationError } = await supabase
+  const { data: allocationRow, error: allocationError } = await client
     .from("time_allocations")
     .select("allocation")
     .eq("user_id", userId)
@@ -200,7 +208,7 @@ export async function finalizeDay(userId: string, dayIndex: number): Promise<voi
     stress: dayState.stress,
     allocation,
   });
-  const unresolvedTensions = await fetchUnresolvedTensions(userId, dayIndex);
+  const unresolvedTensions = await fetchUnresolvedTensions(userId, dayIndex, client);
   const penalized = applyTensionPenalties({
     nextEnergy: resolved.nextEnergy,
     nextStress: resolved.nextStress,
@@ -208,8 +216,8 @@ export async function finalizeDay(userId: string, dayIndex: number): Promise<voi
   });
 
   if (dayIndex >= 2) {
-    const postureRow = await fetchPosture(userId, dayIndex);
-    const { data: bank, error: bankError } = await supabase
+    const postureRow = await fetchPosture(userId, dayIndex, client);
+    const { data: bank, error: bankError } = await client
       .from("skill_bank")
       .select("user_id,available_points,cap,last_awarded_day_index")
       .eq("user_id", userId)
@@ -223,7 +231,7 @@ export async function finalizeDay(userId: string, dayIndex: number): Promise<voi
 
     const currentBank =
       bank ??
-      (await supabase
+      (await client
         .from("skill_bank")
         .insert({
           user_id: userId,
@@ -250,7 +258,7 @@ export async function finalizeDay(userId: string, dayIndex: number): Promise<voi
         const award = Math.min(baseAward, 2);
         const nextAvailable = currentBank.available_points + award;
 
-        const { error: awardError } = await supabase
+        const { error: awardError } = await client
           .from("skill_bank")
           .update({
             available_points: nextAvailable,
@@ -270,7 +278,7 @@ export async function finalizeDay(userId: string, dayIndex: number): Promise<voi
     }
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await client
     .from("player_day_state")
     .update({
       resolved_at: new Date().toISOString(),

@@ -3,9 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Storylet } from "@/types/storylets";
 import type { DailyState } from "@/types/daily";
 
-vi.mock("@/lib/cadence", () => ({
-  ensureCadenceUpToDate: vi.fn(),
-}));
+vi.mock("@/lib/supabase/browser", () => {
+  const mockMaybeSingle = vi.fn().mockResolvedValue({ data: { day_index: 2 }, error: null });
+  const mockLimit = vi.fn(() => ({ maybeSingle: mockMaybeSingle }));
+  const mockEq = vi.fn(() => ({ limit: mockLimit }));
+  const mockSelect = vi.fn(() => ({ eq: mockEq }));
+  const mockSupabase = {
+    from: vi.fn(() => ({ select: mockSelect })),
+    _mockMaybeSingle: mockMaybeSingle,
+  };
+  return { supabase: mockSupabase, supabaseBrowser: mockSupabase };
+});
 vi.mock("@/lib/play", () => ({
   fetchDailyState: vi.fn(),
   fetchTimeAllocation: vi.fn(),
@@ -61,7 +69,7 @@ vi.mock("@/lib/dailyInteractions", () => ({
   upsertPosture: vi.fn(),
 }));
 vi.mock("@/lib/dayState", () => ({
-  ensureDayStateUpToDate: vi.fn(),
+  fetchDayState: vi.fn(),
 }));
 vi.mock("@/lib/cohorts", () => ({
   ensureUserInCohort: vi.fn(),
@@ -99,7 +107,7 @@ vi.mock("@/lib/worldState", () => ({
   getOrComputeWeeklySnapshot: vi.fn(),
 }));
 
-import { ensureCadenceUpToDate } from "@/lib/cadence";
+import { supabase } from "@/lib/supabase/browser";
 import {
   fetchDailyState,
   fetchTimeAllocation,
@@ -122,7 +130,7 @@ import {
   fetchSkillBank,
   fetchTensions,
 } from "@/lib/dailyInteractions";
-import { ensureDayStateUpToDate } from "@/lib/dayState";
+import { fetchDayState } from "@/lib/dayState";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
 import { listFactions } from "@/lib/factions";
@@ -217,12 +225,9 @@ beforeEach(() => {
     hypothesesCount: 0,
     topVector: null,
   });
-  vi.mocked(ensureCadenceUpToDate).mockResolvedValue({
-    dayIndex: 2,
-    alreadyCompletedToday: false,
-  });
+  // supabase.from("daily_states") read returns day_index: 2 (set in mock factory)
   vi.mocked(fetchDailyState).mockResolvedValue(dailyState);
-  vi.mocked(ensureDayStateUpToDate).mockResolvedValue(dayState);
+  vi.mocked(fetchDayState).mockResolvedValue(dayState);
   vi.mocked(fetchTimeAllocation).mockResolvedValue({
     study: 20,
     work: 20,
@@ -386,10 +391,9 @@ describe("daily loop validation", () => {
   });
 
   it("applies directive payoff once after completion", async () => {
-    vi.mocked(ensureCadenceUpToDate).mockResolvedValue({
-      dayIndex: 8,
-      alreadyCompletedToday: false,
-    });
+    // Override the supabase mock to return day_index: 8 for this test
+    const mockSb = supabase as unknown as { _mockMaybeSingle: ReturnType<typeof vi.fn> };
+    mockSb._mockMaybeSingle.mockResolvedValueOnce({ data: { day_index: 8 }, error: null });
     vi.mocked(fetchStaleDirectiveForCohort).mockResolvedValue({
       id: "d1",
       cohort_id: "c1",

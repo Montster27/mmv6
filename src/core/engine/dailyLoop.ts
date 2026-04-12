@@ -1,4 +1,5 @@
-import { ensureCadenceUpToDate } from "@/lib/cadence";
+// ensureCadenceUpToDate removed — day advancement is now exclusively sleep-driven
+// via /api/day/advance-day. No wall-clock auto-advance.
 import { runsForTodayPair, computeStage } from "@/core/engine/dailyLoop.utils";
 import {
   fetchDailyState,
@@ -54,7 +55,7 @@ import {
   fetchTensions,
   upsertPosture,
 } from "@/lib/dailyInteractions";
-import { ensureDayStateUpToDate } from "@/lib/dayState";
+import { fetchDayState } from "@/lib/dayState";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { getChapterOneState } from "@/core/chapter/state";
 import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
@@ -117,8 +118,18 @@ export async function getOrCreateDailyRun(
     };
   }
 
-  const cadence = await ensureCadenceUpToDate(userId);
-  const dayIndex = cadence.dayIndex;
+  // Read-only: day advancement happens exclusively via /api/day/advance-day
+  const { data: dailyStateRow } = await supabase
+    .from("daily_states")
+    .select("day_index,last_day_completed,last_day_index_completed")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+  if (!dailyStateRow) throw new Error("No daily state found for user.");
+  const dayIndex = dailyStateRow.day_index;
+  const alreadyCompletedToday =
+    dailyStateRow.last_day_completed === todayUtc &&
+    dailyStateRow.last_day_index_completed === dayIndex;
 
   const featureFlags = getFeatureFlags();
   if (featureFlags.skills) {
@@ -139,7 +150,7 @@ export async function getOrCreateDailyRun(
     skillsRaw,
   ] = await Promise.all([
     fetchDailyState(userId),
-    ensureDayStateUpToDate(userId, dayIndex).catch(() => null),
+    fetchDayState(userId, dayIndex),
     fetchTimeAllocation(userId, dayIndex),
     fetchTodayRuns(userId, dayIndex),
     fetchTodayStoryletCandidates(seasonContext.currentSeason.season_index),
@@ -150,6 +161,12 @@ export async function getOrCreateDailyRun(
     featureFlags.skills ? fetchSkillLevels(userId) : Promise.resolve(null),
     // Note: we fetch recent history separately below.
   ]);
+  if (!dayStateRaw) {
+    throw new Error(
+      `player_day_state missing for day ${dayIndex}. ` +
+      `This row should have been created by /api/day/advance-day or /api/run/reset.`
+    );
+  }
   let dayState = dayStateRaw;
   const skillBank = featureFlags.skills ? skillBankRaw : null;
   const allocations = featureFlags.skills ? allocationsRaw : [];
@@ -357,7 +374,7 @@ export async function getOrCreateDailyRun(
   const baseStage = computeStage(
     Boolean(allocation) || (chapterOneMode && !featureFlags.resources),
     runsForPair.length,
-    cadence.alreadyCompletedToday,
+    alreadyCompletedToday,
     // In chapterOneMode legacy storylets are replaced by arc beats — always treat as
     // having content so computeStage never short-circuits to "complete" prematurely.
     chapterOneMode ? true : hasStorylets,
@@ -366,7 +383,7 @@ export async function getOrCreateDailyRun(
     funPulseDone
   );
   const stage =
-    !cadence.alreadyCompletedToday && setupNeeded ? "setup" : baseStage;
+    !alreadyCompletedToday && setupNeeded ? "setup" : baseStage;
 
   const chapterOneState = chapterOneMode ? getChapterOneState(daily ?? null) : null;
 
@@ -709,9 +726,9 @@ export async function getOrCreateDailyRun(
     // In routine_schedule mode, force storylet_1 so the client renders the calendar
     gameMode === "routine_schedule"
       ? "storylet_1"
-      : chapterOneMode && trackStorylets.length > 0 && !cadence.alreadyCompletedToday
+      : chapterOneMode && trackStorylets.length > 0 && !alreadyCompletedToday
       ? "storylet_1"
-      : chapterOneMode && trackStorylets.length === 0 && !cadence.alreadyCompletedToday
+      : chapterOneMode && trackStorylets.length === 0 && !alreadyCompletedToday
       ? (dayDone ? "complete" : "storylet_1")
       : stage;
 

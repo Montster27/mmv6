@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/browser";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DailyPosture,
   DailyTension,
@@ -33,9 +34,10 @@ export async function fetchTensions(
 
 export async function fetchUnresolvedTensions(
   userId: string,
-  dayIndex: number
+  dayIndex: number,
+  client: SupabaseClient = supabase
 ): Promise<Array<{ key: string; severity?: number | null }>> {
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("daily_tensions")
     .select("key,severity")
     .eq("user_id", userId)
@@ -234,9 +236,10 @@ export async function upsertSkillBank(skillBank: SkillBank): Promise<void> {
 
 export async function fetchPosture(
   userId: string,
-  dayIndex: number
+  dayIndex: number,
+  client: SupabaseClient = supabase
 ): Promise<DailyPosture | null> {
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("daily_posture")
     .select("user_id,day_index,posture,created_at")
     .eq("user_id", userId)

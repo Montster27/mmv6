@@ -3,9 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Storylet, StoryletRun } from "@/types/storylets";
 import type { DailyState } from "@/types/daily";
 
-vi.mock("@/lib/cadence", () => ({
-  ensureCadenceUpToDate: vi.fn(),
-}));
+vi.mock("@/lib/supabase/browser", () => {
+  const mockSupabase = {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          limit: vi.fn(() => ({
+            maybeSingle: vi.fn().mockResolvedValue({ data: { day_index: 2 }, error: null }),
+          })),
+        })),
+      })),
+    })),
+  };
+  return { supabase: mockSupabase, supabaseBrowser: mockSupabase };
+});
 vi.mock("@/lib/play", () => ({
   fetchDailyState: vi.fn(),
   fetchTimeAllocation: vi.fn(),
@@ -40,7 +51,7 @@ vi.mock("@/lib/dailyInteractions", () => ({
   upsertPosture: vi.fn(),
 }));
 vi.mock("@/lib/dayState", () => ({
-  ensureDayStateUpToDate: vi.fn(),
+  fetchDayState: vi.fn(),
 }));
 vi.mock("@/lib/cohorts", () => ({
   ensureUserInCohort: vi.fn(),
@@ -100,7 +111,7 @@ vi.mock("@/lib/featureFlags", () => ({
   })),
 }));
 
-import { ensureCadenceUpToDate } from "@/lib/cadence";
+import { supabase } from "@/lib/supabase/browser";
 import {
   fetchDailyState,
   fetchTimeAllocation,
@@ -123,7 +134,7 @@ import {
   fetchSkillBank,
   fetchTensions,
 } from "@/lib/dailyInteractions";
-import { ensureDayStateUpToDate } from "@/lib/dayState";
+import { fetchDayState } from "@/lib/dayState";
 import { ensureUserInCohort } from "@/lib/cohorts";
 import { listActiveInitiativesCatalog } from "@/lib/content/initiatives";
 import { listFactions } from "@/lib/factions";
@@ -251,12 +262,9 @@ beforeEach(() => {
     hypothesesCount: 0,
     topVector: null,
   });
-  vi.mocked(ensureCadenceUpToDate).mockResolvedValue({
-    dayIndex: 2,
-    alreadyCompletedToday: false,
-  });
+  // supabase.from("daily_states") read returns day_index: 2 (set in mock factory)
   vi.mocked(fetchDailyState).mockResolvedValue(dailyState);
-  vi.mocked(ensureDayStateUpToDate).mockResolvedValue(dayState);
+  vi.mocked(fetchDayState).mockResolvedValue(dayState);
   vi.mocked(fetchTimeAllocation).mockResolvedValue({
     study: 20,
     work: 20,

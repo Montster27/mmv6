@@ -25,7 +25,7 @@ import { ReflectionSection } from "@/components/play/ReflectionSection";
 import { ChapterOneReflection } from "@/components/play/ChapterOneReflection";
 import { TesterFeedback } from "@/components/play/TesterFeedback";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
-import { ensureCadenceUpToDate } from "@/lib/cadence";
+// ensureCadenceUpToDate removed — day advancement is now sleep-driven via /api/day/advance-day
 import { trackEvent } from "@/lib/events";
 import { supabase } from "@/lib/supabase/browser";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
@@ -119,6 +119,7 @@ import { getBridgeText } from "@/lib/segmentBridge";
 import type { Segment as BridgeSegment } from "@/lib/segmentBridge";
 import type { TrackStorylet } from "@/types/tracks";
 import type { StoryletChoice } from "@/types/storylets";
+import { useQueryClient } from "@tanstack/react-query";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -239,6 +240,7 @@ export default function PlayPage() {
   const dayStateRef = useRef(dayState);
   const [showDevMenu, setShowDevMenu] = useState(() => getAppMode().testerMode);
   const [refreshTick, setRefreshTick] = useState(0);
+  const queryClient = useQueryClient();
   const [featureFlagsVersion, setFeatureFlagsVersion] = useState(0);
   const [devLoading, setDevLoading] = useState(false);
   const [devError, setDevError] = useState<string | null>(null);
@@ -799,13 +801,9 @@ export default function PlayPage() {
           setLoading(false);
           return;
         }
-        // Skip stale placeholder data during refetch — preserves optimistic
-        // segment updates from handleAdvanceSegment and prevents the auto-advance
-        // loop where stale data overwrites the optimistic segment, triggering
-        // another auto-advance → setRefreshTick → new query → repeat forever.
-        if (dailyRunQuery.isFetching) {
-          return;
-        }
+        // Note: isFetching guard removed. With no optimistic updates in
+        // handleAdvanceSegment/handleSleep, stale placeholder data is harmless
+        // (just displays old state briefly until refetch completes).
       }
       setLoading(true);
       setError(null);
@@ -901,13 +899,23 @@ export default function PlayPage() {
           }
 
         } else {
-          const cadence = await ensureCadenceUpToDate(bootstrapUserId);
+          // Legacy non-orchestrator path (USE_DAILY_LOOP_ORCHESTRATOR is always true)
+          const { data: cadenceRow } = await supabase
+            .from("daily_states")
+            .select("day_index,last_day_completed,last_day_index_completed")
+            .eq("user_id", bootstrapUserId)
+            .limit(1)
+            .maybeSingle();
+          const cadenceDayIndex = cadenceRow?.day_index ?? 1;
+          const cadenceCompleted =
+            cadenceRow?.last_day_completed === new Date().toISOString().slice(0, 10) &&
+            cadenceRow?.last_day_index_completed === cadenceDayIndex;
           setDailyProgress({
-            dayIndexState: cadence.dayIndex,
-            alreadyCompletedToday: cadence.alreadyCompletedToday,
+            dayIndexState: cadenceDayIndex,
+            alreadyCompletedToday: cadenceCompleted,
             seasonContext: null,
           });
-          const day = cadence.dayIndex;
+          const day = cadenceDayIndex;
           const [ds, existingAllocation, existingRuns, candidates] = await Promise.all([
             fetchDailyState(bootstrapUserId),
             fetchTimeAllocation(bootstrapUserId, day),
@@ -915,7 +923,7 @@ export default function PlayPage() {
             fetchTodayStoryletCandidates(),
           ]);
           if (ds) {
-            setDailyState({ ...ds, day_index: cadence.dayIndex });
+            setDailyState({ ...ds, day_index: cadenceDayIndex });
             setDayState({
               energy: ds.energy,
               stress: ds.stress,
@@ -973,7 +981,7 @@ export default function PlayPage() {
 
           const allocationExists = Boolean(existingAllocation);
           setStage(
-            cadence.alreadyCompletedToday
+            cadenceCompleted
               ? "complete"
               : allocationExists
               ? "storylet_1"
@@ -995,7 +1003,6 @@ export default function PlayPage() {
     experimentsReady,
     dailyRunQuery.data,
     dailyRunQuery.isLoading,
-    dailyRunQuery.isFetching,
     dailyRunQuery.isError,
     refreshTick,
   ]);
@@ -1028,72 +1035,67 @@ export default function PlayPage() {
   type Segment = typeof SEGMENT_ORDER[number];
 
   const handleAdvanceSegment = async () => {
-    // Read from ref so async callers always get the latest state
+    // Compute next segment locally for bridge text only
     const ds = dayStateRef.current ?? dayState;
     if (!ds) return;
     const current = (ds.current_segment as Segment | undefined) ?? 'morning';
     const idx = SEGMENT_ORDER.indexOf(current);
-    const next: Segment = idx < 0 || idx >= SEGMENT_ORDER.length - 1
-      ? SEGMENT_ORDER[0]
-      : SEGMENT_ORDER[idx + 1];
-    const nextHours = Math.max(0, (ds.hours_remaining ?? 16) - 4);
-
-    // Optimistic local update
-    setDayState({
-      ...ds,
-      current_segment: next,
-      hours_remaining: nextHours,
-    });
-    setBridgeText(getBridgeText(next as BridgeSegment));
+    if (idx >= 0 && idx < SEGMENT_ORDER.length - 1) {
+      setBridgeText(getBridgeText(SEGMENT_ORDER[idx + 1] as BridgeSegment));
+    }
     setSleepCardDone(false);
 
-    // Persist segment change to DB so the daily run query uses it
+    // Server-authoritative segment advance (conditional UPDATE prevents double-advance)
     const { data: sessionData } = await supabase.auth.getSession();
-    const uid = sessionData?.session?.user?.id;
-    if (uid && dayIndex) {
-      await supabase
-        .from("player_day_state")
-        .update({
-          current_segment: next,
-          hours_remaining: nextHours,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", uid)
-        .eq("day_index", dayIndex);
+    const token = sessionData?.session?.access_token;
+    if (!token) return;
+
+    const res = await fetch("/api/day/advance-segment", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (res.status === 409) {
+      // Segment already advanced (double-click / two tabs). Just refetch.
+      await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
+      return;
+    }
+    if (!res.ok) {
+      console.error("Failed to advance segment", res.status);
+      return;
     }
 
-    // Re-trigger daily run fetch with new segment
-    setRefreshTick((tick) => tick + 1);
+    // Refetch to get fresh state from server (no optimistic update)
+    await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
   };
 
   const handleSleep = async () => {
     setSleepCardDone(true);
     try {
-      // 1. Finalize the current day (mark complete, compute carry-over stats)
-      if (userId) {
-        await markDailyComplete(userId, dayIndex);
-        setAlreadyCompletedToday(true);
-      }
-      // 2. Advance the game day_index (in-game day, not wall-clock)
+      // Server-authoritative day advance: finalize + create next day + increment day_index
       const { data: sessionData } = await supabase.auth.getSession();
-      const uid = sessionData?.session?.user?.id;
-      if (uid) {
-        const nextDay = dayIndex + 1;
-        await supabase
-          .from("daily_states")
-          .update({
-            day_index: nextDay,
-            last_day_completed: null,
-            last_day_index_completed: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", uid);
+      const token = sessionData?.session?.access_token;
+      if (!token) return;
+
+      const res = await fetch("/api/day/advance-day", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 409) {
+        // Day already advanced (double-click / two tabs). Just refetch.
+        setSleepCardDone(false);
+        await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
+        return;
       }
-      // 3. Reset sleep state and refresh to load the new day
+      if (!res.ok) throw new Error("Failed to advance day");
+
       setSleepCardDone(false);
-      setRefreshTick((tick) => tick + 1);
+      // Refetch to get fresh state for the new day
+      await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
     } catch (e) {
       console.error("Failed to advance day via sleep", e);
+      setSleepCardDone(false);
     }
   };
 
