@@ -54,6 +54,8 @@ const ROLE_TAGS: Record<string, string> = {
   npc_ambiguous_jordan: "acquaintance",
   npc_contact_glenn: "contact",
   npc_parent_voice: "family",
+  npc_floor_spider: "floormate",
+  npc_herald_karen: "editor",
 };
 
 export const ALL_YEAR_ONE_NPCS = [
@@ -65,6 +67,8 @@ export const ALL_YEAR_ONE_NPCS = [
   "npc_ambiguous_jordan",
   "npc_contact_glenn",
   "npc_parent_voice",
+  "npc_floor_spider",
+  "npc_herald_karen",
 ] as const;
 
 export type YearOneNpcId = typeof ALL_YEAR_ONE_NPCS[number];
@@ -199,6 +203,20 @@ export function ensureRelationshipDefaults(
     knows_face: true,
     role_tag: "family",
     relationship: 7,
+  });
+  ensure("npc_floor_spider", {
+    met: false,
+    knows_name: false,
+    knows_face: false,
+    role_tag: "floormate",
+    relationship: 5,
+  });
+  ensure("npc_herald_karen", {
+    met: false,
+    knows_name: false,
+    knows_face: false,
+    role_tag: "editor",
+    relationship: 5,
   });
 
   return { next, changed };
@@ -352,6 +370,8 @@ const NPC_DISPLAY_NAMES: Record<string, string> = {
   npc_ambiguous_jordan: "Jordan",
   npc_contact_glenn: "Glenn",
   npc_parent_voice: "your parent",
+  npc_floor_spider: "Spider",
+  npc_herald_karen: "Karen",
 };
 
 /**
@@ -367,6 +387,8 @@ const NPC_FACE_TEXT: Record<string, string> = {
   npc_ambiguous_jordan: "the person from orientation",
   npc_contact_glenn: "the guy from the quad",
   npc_parent_voice: "your parent",
+  npc_floor_spider: "the kid they call Spider",
+  npc_herald_karen: "the woman from the Herald",
 };
 
 /**
@@ -382,6 +404,8 @@ const NPC_STRANGER_TEXT: Record<string, string> = {
   npc_ambiguous_jordan: "someone you haven't met",
   npc_contact_glenn: "an upperclassman with old eyes",
   npc_parent_voice: "your parent",
+  npc_floor_spider: "a quiet kid from the floor",
+  npc_herald_karen: "a woman with a clipboard and deadline energy",
 };
 
 export function renderNpcName(

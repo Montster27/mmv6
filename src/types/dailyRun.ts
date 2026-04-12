@@ -13,6 +13,11 @@ import type { AlignmentEvent, Faction } from "./factions";
 import type { PlayerDayState } from "./dayState";
 import type { ChapterOneState } from "@/core/chapter/types";
 import type { TrackStorylet } from "./tracks";
+import type {
+  RoutineActivity,
+  RoutineWeekState,
+  PlayerScheduleSelection,
+} from "./routine";
 
 export type DailyRunStage =
   | "setup"
@@ -143,6 +148,19 @@ export type DailyRun = {
   chapterOneState?: ChapterOneState;
   /** Track storylets due today (one per track, up to 2 shown). */
   trackStorylets?: TrackStorylet[];
+
+  // ── Phase 4: Routine-Week Mode ──
+
+  /** Game mode: 'daily' for storylet-per-segment, 'routine_schedule' for weekly calendar. */
+  gameMode?: "daily" | "routine_schedule";
+  /** Available activities for the weekly calendar (routine_schedule mode only). */
+  routineActivities?: RoutineActivity[];
+  /** Current routine week state. */
+  routineWeekState?: RoutineWeekState;
+  /** Committed schedule for this week. */
+  committedSchedule?: PlayerScheduleSelection[];
+  /** Interruption transition card text + target storylet. */
+  interruptionCard?: { text: string; storylet_key: string } | null;
   lastCheck?: import("./checks").CheckResult | null;
   seasonResetNeeded?: boolean;
   newSeasonIndex?: number;

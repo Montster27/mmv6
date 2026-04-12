@@ -510,4 +510,3 @@ function FilterPill({
     </button>
   );
 }
-

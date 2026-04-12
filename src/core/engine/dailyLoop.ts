@@ -59,7 +59,9 @@ import { getFeatureFlags } from "@/lib/featureFlags";
 import { getChapterOneState } from "@/core/chapter/state";
 import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
 import { computeMorale } from "@/core/resources/resourceDelta";
-import { CHAPTER_ONE_LAST_DAY } from "@/core/chapter/constants";
+import { CHAPTER_ONE_LAST_DAY, ROUTINE_MODE_START_DAY } from "@/core/chapter/constants";
+import { computeWeekStart } from "@/core/routine/constants";
+import type { RoutineActivity, RoutineWeekState, PlayerScheduleSelection } from "@/types/routine";
 import { selectTrackStorylets, buildInitialTrackProgress } from "@/core/tracks/selectTrackStorylets";
 import { CHAPTER_ONE_TRACK_KEYS } from "@/types/tracks";
 import type { Track, TrackProgress, TrackStoryletRow, TrackStorylet } from "@/types/tracks";
@@ -613,6 +615,90 @@ export async function getOrCreateDailyRun(
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Routine-week mode detection (Phase 4)
+  // ---------------------------------------------------------------------------
+  let gameMode: "daily" | "routine_schedule" = "daily";
+  let routineActivities: RoutineActivity[] | undefined;
+  let routineWeekState: RoutineWeekState | undefined;
+  let committedSchedule: PlayerScheduleSelection[] | undefined;
+  let interruptionCard: { text: string; storylet_key: string } | null = null;
+
+  if (chapterOneMode && dayIndex >= ROUTINE_MODE_START_DAY) {
+    const routineWeekStart = computeWeekStart(dayIndex);
+
+    // Load routine_week_state for this week
+    const { data: rwsRow } = await supabase
+      .from("routine_week_state")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("diegetic_week_start", routineWeekStart)
+      .maybeSingle();
+
+    if (rwsRow) {
+      routineWeekState = rwsRow as RoutineWeekState;
+
+      if (routineWeekState.status === "interrupted" && routineWeekState.interruption_storylet_key) {
+        // Player is mid-interruption — show the interruption storylet in daily mode.
+        // The interruption card text gives a one-sentence transition.
+        gameMode = "daily";
+        interruptionCard = {
+          text: routineWeekState.interruption_reason === "calendar_beat"
+            ? "Something comes up that needs your attention."
+            : routineWeekState.interruption_reason === "gate_threshold"
+            ? "A relationship has shifted. Someone wants to talk."
+            : "Someone you haven't seen in a while tracks you down.",
+          storylet_key: routineWeekState.interruption_storylet_key,
+        };
+      } else if (routineWeekState.status === "committed") {
+        // Week is committed and ticking — stay in daily mode while tick runs
+        // (the tick API advances day-by-day; the client calls /api/routine/tick lazily)
+        gameMode = "daily";
+      } else if (routineWeekState.status === "completed") {
+        // Week completed — next week needs scheduling
+        const nextWeekStart = routineWeekStart + 7;
+        const { data: nextRws } = await supabase
+          .from("routine_week_state")
+          .select("status")
+          .eq("user_id", userId)
+          .eq("diegetic_week_start", nextWeekStart)
+          .maybeSingle();
+
+        if (!nextRws) {
+          // No state for next week — player needs to schedule
+          gameMode = "routine_schedule";
+        }
+      }
+    } else {
+      // No routine_week_state for this week — player needs to schedule
+      gameMode = "routine_schedule";
+    }
+
+    // When in scheduling mode, load available activities
+    if (gameMode === "routine_schedule") {
+      const { data: activityRows } = await supabase
+        .from("routine_activities")
+        .select("*")
+        .eq("is_active", true)
+        .order("half_day_cost", { ascending: true });
+
+      routineActivities = (activityRows ?? []) as RoutineActivity[];
+    }
+
+    // Load committed schedule if exists
+    if (routineWeekState && (routineWeekState.status === "committed" || routineWeekState.status === "interrupted")) {
+      const { data: schedRows } = await supabase
+        .from("player_routine_schedules")
+        .select("activity_key")
+        .eq("user_id", userId)
+        .eq("diegetic_week_start", routineWeekState.diegetic_week_start);
+
+      committedSchedule = (schedRows ?? []).map((r) => ({
+        activity_key: (r as { activity_key: string }).activity_key,
+      }));
+    }
+  }
+
   // In chapterOneMode: if track storylets are available the stage must not be "complete"
   // so the client renders them instead of the "Daily complete" screen.
   // When no storylets match the current segment but the day still has hours left,
@@ -620,7 +706,10 @@ export async function getOrCreateDailyRun(
   // instead of auto-completing the day.
   const dayDone = (dayStateRaw?.current_segment ?? 'morning') === 'night' || (dayStateRaw?.hours_remaining ?? 16) <= 0;
   const resolvedStage: typeof stage =
-    chapterOneMode && trackStorylets.length > 0 && !cadence.alreadyCompletedToday
+    // In routine_schedule mode, force storylet_1 so the client renders the calendar
+    gameMode === "routine_schedule"
+      ? "storylet_1"
+      : chapterOneMode && trackStorylets.length > 0 && !cadence.alreadyCompletedToday
       ? "storylet_1"
       : chapterOneMode && trackStorylets.length === 0 && !cadence.alreadyCompletedToday
       ? (dayDone ? "complete" : "storylet_1")
@@ -716,6 +805,12 @@ export async function getOrCreateDailyRun(
       : null,
     chapterOneState: chapterOneState ?? undefined,
     trackStorylets: trackStorylets.length > 0 ? trackStorylets : undefined,
+    // Phase 4: Routine-Week Mode
+    gameMode,
+    routineActivities,
+    routineWeekState,
+    committedSchedule,
+    interruptionCard,
     seasonResetNeeded,
     newSeasonIndex: seasonResetNeeded ? currentSeasonIndex : undefined,
     seasonRecap: seasonResetNeeded ? seasonRecap : undefined,

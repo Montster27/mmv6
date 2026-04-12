@@ -490,4 +490,3 @@ function getSourceInlineDetail(src: NpcSource): string | null {
       return null;
   }
 }
-

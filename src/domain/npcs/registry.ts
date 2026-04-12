@@ -118,6 +118,19 @@ export const NPC_REGISTRY: NpcEntry[] = [
     short_intro:
       "Wes, a sophomore from Connecticut — knows more than he lets on about the Peloponnesian War",
   },
+  // ── Routine-Mode NPCs (Phase 4) ──
+  {
+    id: "npc_floor_spider",
+    name: "Spider",
+    short_intro:
+      "Spider — nobody uses his real name, quiet until the cards come out",
+  },
+  {
+    id: "npc_herald_karen",
+    name: "Karen",
+    short_intro:
+      "Karen Szymanski, Herald editor — clipboard, deadline energy, Student Union 204",
+  },
 ];
 
 export function getNpcEntry(id: string): NpcEntry | undefined {

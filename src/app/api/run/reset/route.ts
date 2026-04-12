@@ -74,6 +74,8 @@ export async function POST(request: Request) {
     supabaseServer.from("player_day_state").delete().eq("user_id", userId),
     supabaseServer.from("events").delete().eq("user_id", userId),
     supabaseServer.from("user_anomalies").delete().eq("user_id", userId),
+    supabaseServer.from("player_routine_schedules").delete().eq("user_id", userId),
+    supabaseServer.from("routine_week_state").delete().eq("user_id", userId),
     supabaseServer
       .from("social_actions")
       .delete()

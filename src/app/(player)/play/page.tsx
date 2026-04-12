@@ -111,6 +111,10 @@ import { TrackStoryletCard } from "@/components/play/TrackStoryletCard";
 import { DialogueNodeView } from "@/components/play/DialogueNodeView";
 import { SleepCard } from "@/components/play/SleepCard";
 import { SegmentTransitionCard } from "@/components/play/SegmentTransitionCard";
+import { WeeklyCalendar } from "@/components/play/WeeklyCalendar";
+import { InterruptionTransitionCard } from "@/components/play/InterruptionTransitionCard";
+import { RoutineWeekSummary } from "@/components/play/RoutineWeekSummary";
+import { computeWeekStart } from "@/core/routine/constants";
 import { getBridgeText } from "@/lib/segmentBridge";
 import type { Segment as BridgeSegment } from "@/lib/segmentBridge";
 import type { TrackStorylet } from "@/types/tracks";
@@ -461,6 +465,46 @@ export default function PlayPage() {
     () => dailyRunQuery.data?.trackStorylets ?? [],
     [dailyRunQuery.data?.trackStorylets]
   );
+  // ── Phase 4: Routine-Week Mode data ──
+  const gameMode = dailyRunQuery.data?.gameMode ?? "daily";
+  const routineActivities = dailyRunQuery.data?.routineActivities;
+  const routineWeekState = dailyRunQuery.data?.routineWeekState;
+  const committedSchedule = dailyRunQuery.data?.committedSchedule;
+  const interruptionCard = dailyRunQuery.data?.interruptionCard;
+  const routineWeekStart = useMemo(() => computeWeekStart(dayIndex), [dayIndex]);
+
+  const handleRoutineCommit = useCallback(async (activityKeys: string[]) => {
+    if (!userId) return;
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    if (!token) return;
+    const res = await fetch("/api/routine/commit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ week_start: routineWeekStart, activity_keys: activityKeys }),
+    });
+    if (res.ok) {
+      setRefreshTick((t) => t + 1);
+    }
+  }, [userId, routineWeekStart]);
+
+  const handleRoutineResume = useCallback(async () => {
+    if (!userId || !routineWeekState) return;
+    const token = (await supabase.auth.getSession()).data.session?.access_token;
+    if (!token) return;
+    const res = await fetch("/api/routine/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ week_start: routineWeekState.diegetic_week_start }),
+    });
+    if (res.ok) {
+      setRefreshTick((t) => t + 1);
+    }
+  }, [userId, routineWeekState]);
+
+  const handlePlanNextWeek = useCallback(() => {
+    setRefreshTick((t) => t + 1);
+  }, []);
+
   // Clear resolved IDs when fresh track storylet data arrives.
   // IMPORTANT: only depend on trackStorylets reference — NOT allocationSaved
   // or other state. Adding extra deps caused spurious resets that cleared
@@ -3419,8 +3463,35 @@ export default function PlayPage() {
                     </div>
                   )}
 
+                  {/* ── Phase 4: Routine-Week Mode ── */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR && gameMode === "routine_schedule" && routineActivities && (
+                    <WeeklyCalendar
+                      activities={routineActivities}
+                      weekStart={routineWeekStart}
+                      onCommit={handleRoutineCommit}
+                      playerFlags={(dailyState?.skill_flags as Record<string, boolean>) ?? {}}
+                    />
+                  )}
+
+                  {USE_DAILY_LOOP_ORCHESTRATOR && gameMode === "daily" && interruptionCard && (
+                    <InterruptionTransitionCard
+                      text={interruptionCard.text}
+                      onContinue={handleRoutineResume}
+                    />
+                  )}
+
+                  {USE_DAILY_LOOP_ORCHESTRATOR && routineWeekState?.status === "completed" && committedSchedule && routineActivities && (
+                    <RoutineWeekSummary
+                      weekStart={routineWeekState.diegetic_week_start}
+                      schedule={committedSchedule}
+                      activities={routineActivities}
+                      onPlanNext={handlePlanNextWeek}
+                    />
+                  )}
+
                   {USE_DAILY_LOOP_ORCHESTRATOR &&
                     chapterOneMode &&
+                    gameMode === "daily" &&
                     !activeMiniGame?.pendingTrackStorylet &&
                     (trackStorylets.length > 0 || pendingDismissalBeats.length > 0) && (
                     <section className="space-y-3">

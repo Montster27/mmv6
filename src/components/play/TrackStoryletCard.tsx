@@ -256,6 +256,7 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
                 key={option.id}
                 onClick={() => !locked && handleChoice(option)}
                 disabled={choosing || disabled || locked}
+                aria-label={option.label}
                 className={`rounded border-2 px-4 py-2.5 text-left text-sm transition
                   ${locked
                     ? "border-border/40 bg-muted text-foreground/40 cursor-not-allowed"
