@@ -799,6 +799,13 @@ export default function PlayPage() {
           setLoading(false);
           return;
         }
+        // Skip stale placeholder data during refetch — preserves optimistic
+        // segment updates from handleAdvanceSegment and prevents the auto-advance
+        // loop where stale data overwrites the optimistic segment, triggering
+        // another auto-advance → setRefreshTick → new query → repeat forever.
+        if (dailyRunQuery.isFetching) {
+          return;
+        }
       }
       setLoading(true);
       setError(null);
@@ -988,6 +995,7 @@ export default function PlayPage() {
     experimentsReady,
     dailyRunQuery.data,
     dailyRunQuery.isLoading,
+    dailyRunQuery.isFetching,
     dailyRunQuery.isError,
     refreshTick,
   ]);
@@ -1060,8 +1068,32 @@ export default function PlayPage() {
 
   const handleSleep = async () => {
     setSleepCardDone(true);
-    await handleFastForward();
-    setSleepCardDone(false);
+    try {
+      // 1. Finalize the current day (mark complete, compute carry-over stats)
+      if (userId) {
+        await markDailyComplete(userId, dayIndex);
+        setAlreadyCompletedToday(true);
+      }
+      // 2. Advance the game day_index (in-game day, not wall-clock)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData?.session?.user?.id;
+      if (uid) {
+        const nextDay = dayIndex + 1;
+        await supabase
+          .from("daily_states")
+          .update({
+            day_index: nextDay,
+            last_day_completed: null,
+            last_day_index_completed: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", uid);
+      }
+      // 3. Refresh to load the new day
+      setRefreshTick((tick) => tick + 1);
+    } catch (e) {
+      console.error("Failed to advance day via sleep", e);
+    }
   };
 
   const handleStayUp = () => {
