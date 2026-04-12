@@ -55,7 +55,7 @@ import {
   fetchTensions,
   upsertPosture,
 } from "@/lib/dailyInteractions";
-import { fetchDayState } from "@/lib/dayState";
+import { fetchDayState, createDayStateFromPrevious } from "@/lib/dayState";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { getChapterOneState } from "@/core/chapter/state";
 import type { ResourceSnapshot } from "@/core/resources/resourceDelta";
@@ -161,13 +161,10 @@ export async function getOrCreateDailyRun(
     featureFlags.skills ? fetchSkillLevels(userId) : Promise.resolve(null),
     // Note: we fetch recent history separately below.
   ]);
-  if (!dayStateRaw) {
-    throw new Error(
-      `player_day_state missing for day ${dayIndex}. ` +
-      `This row should have been created by /api/day/advance-day or /api/run/reset.`
-    );
-  }
-  let dayState = dayStateRaw;
+  // If player_day_state is missing (e.g. reached this day via pre-refactor code),
+  // create it lazily. This does NOT advance day_index — it just creates the row
+  // for the current day with morning defaults.
+  let dayState = dayStateRaw ?? await createDayStateFromPrevious(userId, dayIndex);
   const skillBank = featureFlags.skills ? skillBankRaw : null;
   const allocations = featureFlags.skills ? allocationsRaw : [];
   const skills = featureFlags.skills ? skillsRaw : null;

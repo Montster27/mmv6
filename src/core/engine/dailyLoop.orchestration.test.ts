@@ -52,6 +52,7 @@ vi.mock("@/lib/dailyInteractions", () => ({
 }));
 vi.mock("@/lib/dayState", () => ({
   fetchDayState: vi.fn(),
+  createDayStateFromPrevious: vi.fn(),
 }));
 vi.mock("@/lib/cohorts", () => ({
   ensureUserInCohort: vi.fn(),
