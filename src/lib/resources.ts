@@ -95,8 +95,6 @@ export async function applyResourceDelta(
     user_id: userId,
     day: dayIndex,
     event_type: "RESOURCE_APPLIED",
-    arc_id: options.arcId ?? null,
-    arc_instance_id: options.arcInstanceId ?? null,
     step_key: options.stepKey ?? null,
     option_key: options.optionKey ?? null,
     delta: { resources: applied, skill_points: delta.skill_points ?? 0 },
