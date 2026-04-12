@@ -1089,7 +1089,8 @@ export default function PlayPage() {
           })
           .eq("user_id", uid);
       }
-      // 3. Refresh to load the new day
+      // 3. Reset sleep state and refresh to load the new day
+      setSleepCardDone(false);
       setRefreshTick((tick) => tick + 1);
     } catch (e) {
       console.error("Failed to advance day via sleep", e);
