@@ -185,8 +185,25 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        Preview runs in a sandbox. It does not touch player data.
+      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 flex items-center justify-between gap-3">
+        <span>Preview runs in a sandbox. It does not touch player data.</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-xs text-slate-500">Jump to:</label>
+          <select
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs max-w-[280px]"
+            value={currentId ?? ""}
+            onChange={(e) => {
+              if (e.target.value) setCurrentId(e.target.value);
+            }}
+          >
+            <option value="" disabled>Select storylet...</option>
+            {storylets.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title} ({s.slug})
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">

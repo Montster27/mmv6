@@ -223,6 +223,16 @@ export function StoryletEditor({
               Cancel
             </button>
           )}
+          {!isNew && (
+            <a
+              href={`/studio/content/preview?storylet=${draft.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-md border border-indigo-300 px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50"
+            >
+              Preview
+            </a>
+          )}
           <div className="flex items-center gap-2">
             <button
               type="button"
