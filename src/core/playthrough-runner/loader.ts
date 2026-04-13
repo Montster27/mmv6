@@ -32,14 +32,15 @@ export async function loadStorylets(): Promise<TrackStoryletRow[]> {
         "weight,requirements,introduces_npc,is_conflict,nodes,created_at"
     );
   if (error) throw new Error(`Failed to load storylets: ${error.message}`);
-  cachedStorylets = (data ?? []).map((row) => ({
+  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  cachedStorylets = rows.map((row) => ({
     ...row,
     choices: Array.isArray(row.choices) ? row.choices : [],
-    due_offset_days: row.due_offset_days ?? 0,
-    expires_after_days: row.expires_after_days ?? 2,
-    order_index: row.order_index ?? 0,
-    track_id: row.track_id ?? "",
-    storylet_key: row.storylet_key ?? row.slug,
+    due_offset_days: (row.due_offset_days as number | null) ?? 0,
+    expires_after_days: (row.expires_after_days as number | null) ?? 2,
+    order_index: (row.order_index as number | null) ?? 0,
+    track_id: (row.track_id as string | null) ?? "",
+    storylet_key: (row.storylet_key as string | null) ?? (row.slug as string),
   })) as TrackStoryletRow[];
   return cachedStorylets;
 }

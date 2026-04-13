@@ -169,7 +169,7 @@ export class PlaythroughHarness {
     const rawDeltas = collectChoiceResourceDeltas(choice);
     if (Object.keys(rawDeltas).length > 0) {
       await applyResourceDeltas(
-        db as Parameters<typeof applyResourceDeltas>[0],
+        db as unknown as Parameters<typeof applyResourceDeltas>[0],
         this.userId,
         this.dayIndex,
         rawDeltas
@@ -405,7 +405,7 @@ export class PlaythroughHarness {
    */
   async getResource(name: string): Promise<number> {
     const snapshot = await getResourceSnapshot(
-      db as Parameters<typeof getResourceSnapshot>[0],
+      db as unknown as Parameters<typeof getResourceSnapshot>[0],
       this.userId,
       this.dayIndex
     );
