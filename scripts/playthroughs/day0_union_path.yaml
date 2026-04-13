@@ -1,0 +1,49 @@
+name: day0_union_path
+description: >
+  Union path through Day 0 → verifies pool gate serves morning_after_union.
+  Same Day 0 chain as party path, diverges at evening_choice → go_to_union.
+
+steps:
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: expect_storylet_available
+    storylet_key: room_214
+
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: noncommittal
+
+  # ── Day 0 Afternoon ────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: focus_on_food
+
+  # ── Day 0 Evening ──────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_union
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 1 Morning — Pool assertions ────────────────────────────────────
+  - type: expect_storylet_available
+    storylet_key: morning_after_union
+    served_by: pool
+
+  - type: expect_storylet_not_available
+    storylet_key: morning_after_party
+
+  - type: expect_storylet_not_available
+    storylet_key: morning_after_cards
+
+  - type: expect_storylet_available
+    storylet_key: first_morning
+    served_by: chain

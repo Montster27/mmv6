@@ -1,0 +1,243 @@
+{
+  "daily_states": {
+    "id": "37e33057-9f44-4af3-ae77-1037a7151a51",
+    "day_index": 1,
+    "energy": 100,
+    "stress": 0,
+    "vectors": {},
+    "updated_at": "2026-04-12T17:28:47.674608+00:00",
+    "start_date": "2026-04-12",
+    "last_day_completed": null,
+    "last_day_index_completed": null,
+    "life_pressure_state": {},
+    "energy_level": "high",
+    "money_band": "okay",
+    "skill_flags": {},
+    "npc_memory": {},
+    "expired_opportunities": [],
+    "replay_intention": {},
+    "arc_one_reflection_done": false,
+    "relationships": {},
+    "preclusion_gates": [],
+    "stream_states": {}
+  },
+  "player_day_state": [
+    {
+      "day_index": 1,
+      "energy": 100,
+      "stress": 0,
+      "money": 0,
+      "study_progress": 0,
+      "social_capital": 0,
+      "health": 50,
+      "created_at": "2026-04-12T17:28:47.84629+00:00",
+      "updated_at": "2026-04-12T17:28:51.423+00:00",
+      "allocation_hash": null,
+      "pre_allocation_energy": null,
+      "pre_allocation_stress": null,
+      "resolved_at": null,
+      "end_energy": null,
+      "end_stress": null,
+      "next_energy": null,
+      "next_stress": null,
+      "total_study": 0,
+      "total_work": 0,
+      "total_social": 0,
+      "total_health": 0,
+      "total_fun": 0,
+      "pre_allocation_money": null,
+      "pre_allocation_study_progress": null,
+      "pre_allocation_social_capital": null,
+      "pre_allocation_health": null,
+      "current_segment": "afternoon",
+      "hours_remaining": 12,
+      "hours_committed": 0
+    }
+  ],
+  "track_progress": [
+    {
+      "id": "f35736f1-1970-4edc-befc-c94f68fbf8ba",
+      "track_id": "e40e9452-c2e4-47e5-bc64-210e5233a955",
+      "state": "ACTIVE",
+      "current_storylet_key": "first_morning",
+      "storylet_due_day": 2,
+      "defer_count": 0,
+      "started_day": 1,
+      "updated_day": 1,
+      "completed_day": null,
+      "failure_reason": null,
+      "created_at": "2026-04-12T17:28:47.974762+00:00",
+      "updated_at": "2026-04-12T17:28:47.974762+00:00",
+      "branch_key": null,
+      "track_state": null,
+      "resolved_storylet_keys": [
+        "room_214"
+      ],
+      "next_key_override": "first_morning"
+    },
+    {
+      "id": "945eda42-ca73-418b-8d5a-1b9e53d63847",
+      "track_id": "b420acd7-b726-44ba-907b-b91fd6056ca5",
+      "state": "ACTIVE",
+      "current_storylet_key": "glenn_pastime_paradise",
+      "storylet_due_day": 1,
+      "defer_count": 0,
+      "started_day": 1,
+      "updated_day": 1,
+      "completed_day": null,
+      "failure_reason": null,
+      "created_at": "2026-04-12T17:28:47.974762+00:00",
+      "updated_at": "2026-04-12T17:28:47.974762+00:00",
+      "branch_key": null,
+      "track_state": null,
+      "resolved_storylet_keys": [
+        "glenn_pastime_paradise"
+      ],
+      "next_key_override": null
+    },
+    {
+      "id": "b7e6ee1a-fb77-4348-bb45-672c01d4ce32",
+      "track_id": "be972bf2-3d74-496c-aac3-49ae041d1192",
+      "state": "ACTIVE",
+      "current_storylet_key": "evening_choice",
+      "storylet_due_day": 1,
+      "defer_count": 0,
+      "started_day": 1,
+      "updated_day": 1,
+      "completed_day": null,
+      "failure_reason": null,
+      "created_at": "2026-04-12T17:28:47.974762+00:00",
+      "updated_at": "2026-04-12T17:28:47.974762+00:00",
+      "branch_key": null,
+      "track_state": null,
+      "resolved_storylet_keys": [
+        "dorm_hallmates",
+        "lunch_floor"
+      ],
+      "next_key_override": "evening_choice"
+    },
+    {
+      "id": "8478586e-e33b-42e7-8190-26c626a0501e",
+      "track_id": "bc2dfe37-232a-4175-a955-27276c358df1",
+      "state": "ACTIVE",
+      "current_storylet_key": "money_reality_check",
+      "storylet_due_day": 5,
+      "defer_count": 0,
+      "started_day": 1,
+      "updated_day": 1,
+      "completed_day": null,
+      "failure_reason": null,
+      "created_at": "2026-04-12T17:28:47.974762+00:00",
+      "updated_at": "2026-04-12T17:28:47.974762+00:00",
+      "branch_key": null,
+      "track_state": null,
+      "resolved_storylet_keys": [],
+      "next_key_override": "money_reality_check"
+    },
+    {
+      "id": "df17aa54-ef24-457d-be6d-14b30f0264a0",
+      "track_id": "0d3659f4-d457-4251-841e-f96a83aa0f9d",
+      "state": "ACTIVE",
+      "current_storylet_key": "advisor_visit",
+      "storylet_due_day": 2,
+      "defer_count": 0,
+      "started_day": 1,
+      "updated_day": 1,
+      "completed_day": null,
+      "failure_reason": null,
+      "created_at": "2026-04-12T17:28:47.974762+00:00",
+      "updated_at": "2026-04-12T17:28:47.974762+00:00",
+      "branch_key": null,
+      "track_state": null,
+      "resolved_storylet_keys": [],
+      "next_key_override": "advisor_visit"
+    },
+    {
+      "id": "c3532b70-0869-45c7-92e7-e633b7b30b2e",
+      "track_id": "92c692ff-9919-401d-b915-ae06f8267d27",
+      "state": "ACTIVE",
+      "current_storylet_key": "pay_phone_line",
+      "storylet_due_day": 8,
+      "defer_count": 0,
+      "started_day": 1,
+      "updated_day": 1,
+      "completed_day": null,
+      "failure_reason": null,
+      "created_at": "2026-04-12T17:28:47.974762+00:00",
+      "updated_at": "2026-04-12T17:28:47.974762+00:00",
+      "branch_key": null,
+      "track_state": null,
+      "resolved_storylet_keys": [],
+      "next_key_override": "pay_phone_line"
+    }
+  ],
+  "choice_log": [
+    {
+      "id": "d78602df-fcf1-48e8-824b-b01d7ad275fc",
+      "day": 1,
+      "event_type": "STORYLET_RESOLVED",
+      "track_id": "e40e9452-c2e4-47e5-bc64-210e5233a955",
+      "track_progress_id": "f35736f1-1970-4edc-befc-c94f68fbf8ba",
+      "step_key": "room_214",
+      "offer_id": null,
+      "option_key": "head_out",
+      "delta": {},
+      "meta": {
+        "next_key": "first_morning"
+      },
+      "created_at": "2026-04-12T17:28:48.667282+00:00"
+    },
+    {
+      "id": "818bc7ba-ab7f-4449-8516-c4fa5f7ae65f",
+      "day": 1,
+      "event_type": "STORYLET_RESOLVED",
+      "track_id": "be972bf2-3d74-496c-aac3-49ae041d1192",
+      "track_progress_id": "b7e6ee1a-fb77-4348-bb45-672c01d4ce32",
+      "step_key": "dorm_hallmates",
+      "offer_id": null,
+      "option_key": "lunch_first",
+      "delta": {},
+      "meta": {
+        "next_key": "lunch_floor"
+      },
+      "created_at": "2026-04-12T17:28:49.593869+00:00"
+    },
+    {
+      "id": "5579f13d-6c37-425e-8104-8591e3a93896",
+      "day": 1,
+      "event_type": "STORYLET_RESOLVED",
+      "track_id": "b420acd7-b726-44ba-907b-b91fd6056ca5",
+      "track_progress_id": "945eda42-ca73-418b-8d5a-1b9e53d63847",
+      "step_key": "glenn_pastime_paradise",
+      "offer_id": null,
+      "option_key": "head_to_evening",
+      "delta": {},
+      "meta": {
+        "next_key": null
+      },
+      "created_at": "2026-04-12T17:28:51.10385+00:00"
+    },
+    {
+      "id": "6116851e-e5f6-40b4-b4ce-df3bd5bf5791",
+      "day": 1,
+      "event_type": "STORYLET_RESOLVED",
+      "track_id": "be972bf2-3d74-496c-aac3-49ae041d1192",
+      "track_progress_id": "b7e6ee1a-fb77-4348-bb45-672c01d4ce32",
+      "step_key": "lunch_floor",
+      "offer_id": null,
+      "option_key": "laugh_with_doug",
+      "delta": {},
+      "meta": {
+        "next_key": "evening_choice"
+      },
+      "created_at": "2026-04-12T17:28:52.024451+00:00"
+    }
+  ],
+  "player_skills": [],
+  "_meta": {
+    "script_name": "glenn_directive_people",
+    "created_at": "2026-04-12T17:28:52.311Z",
+    "day_index": 1,
+    "segment": "afternoon"
+  }
+}

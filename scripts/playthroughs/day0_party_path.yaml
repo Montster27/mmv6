@@ -1,0 +1,69 @@
+name: day0_party_path
+description: >
+  Party path through Day 0 → verifies pool gate serves morning_after_party.
+  Full chain: room_214 → dorm_hallmates → lunch_floor → evening_choice(party)
+  → sleep → morning_after_party (pool, requires_choice gate).
+
+steps:
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: expect_storylet_available
+    storylet_key: room_214
+    at: {day: 0, segment: morning, track: roommate}
+
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: expect_storylet_available
+    storylet_key: dorm_hallmates
+    at: {day: 0, segment: morning, track: belonging}
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon ────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: lunch_floor
+    served_by: chain
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  # ── Day 0 Evening ──────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: evening_choice
+    served_by: chain
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_party
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 1 Morning — Pool assertions ────────────────────────────────────
+  - type: expect_storylet_available
+    storylet_key: morning_after_party
+    served_by: pool
+
+  - type: expect_storylet_not_available
+    storylet_key: morning_after_cards
+
+  - type: expect_storylet_not_available
+    storylet_key: morning_after_union
+
+  # first_morning (roommate) should also be available
+  - type: expect_storylet_available
+    storylet_key: first_morning
+    served_by: chain
+
+  - type: expect_resource
+    name: energy
+    op: gte
+    value: 3

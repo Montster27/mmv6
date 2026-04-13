@@ -1,0 +1,41 @@
+name: glenn_knowledge_from_fixture
+description: >
+  Same as glenn_directive_knowledge but starts from the after_glenn_directive_people
+  fixture (Day 0 afternoon, Glenn beat 1 done, lunch_floor done).
+  Demonstrates fixture composition via `extends`.
+  Picks up at afternoon → evening → sleep → Day 1 → terminal_first_visit.
+
+extends: fixtures/after_glenn_directive_people.snapshot.json
+
+steps:
+  # ── Day 0 Evening (continuing from fixture at afternoon) ────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_party
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 1 Morning ──────────────────────────────────────────────────────
+  - type: expect_storylet_available
+    storylet_key: first_morning
+
+  - type: expect_storylet_available
+    storylet_key: morning_after_party
+
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  - type: choose
+    storylet_key: morning_after_party
+    choice_id: continue_morning
+
+  # ── Day 1 Afternoon — terminal_first_visit via pool ────────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: terminal_first_visit
+    served_by: pool

@@ -1,0 +1,37 @@
+name: glenn_directive_people
+description: >
+  Glenn beat 1 flow. Resolves glenn_pastime_paradise in Day 0 afternoon.
+  Verifies opportunity track enters pool mode after head_to_evening.
+  NOTE: Full directive testing requires choose_node (future step type)
+  to simulate the node walk that sets directive flags.
+
+steps:
+  # ── Day 0 Morning — clear morning storylets ────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — Glenn appears ────────────────────────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: glenn_pastime_paradise
+    at: {segment: afternoon, track: opportunity}
+
+  # lunch_floor also available (belonging chain)
+  - type: expect_storylet_available
+    storylet_key: lunch_floor
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+
+  # After resolving, opportunity track should be in pool mode
+  # (default_next_key is NULL → no chain → pool takes over)
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug

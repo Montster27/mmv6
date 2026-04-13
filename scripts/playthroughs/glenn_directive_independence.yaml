@@ -1,0 +1,76 @@
+name: glenn_directive_independence
+description: >
+  Glenn all 3 beats through to glenn_the_walk at Day 5+.
+  Tests the full opportunity track chain: pastime_paradise → terminal_first_visit
+  → glenn_the_walk. Each served via pool (no chain between them).
+  NOTE: requires_flag not enforced — all gates pass regardless of flags.
+
+steps:
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — Glenn beat 1 ─────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  # ── Day 0 Evening ──────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_party
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 1: resolve morning then terminal_first_visit ────────────────────
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  - type: choose
+    storylet_key: morning_after_party
+    choice_id: continue_morning
+
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: terminal_first_visit
+
+  - type: choose
+    storylet_key: terminal_first_visit
+    choice_id: leave_terminal
+
+  # ── Advance to Day 5+ for glenn_the_walk ────────────────────────────────
+  - type: advance_segment
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+
+  # Now at Day 5 morning — glenn_the_walk should be available
+  - type: expect_storylet_available
+    storylet_key: glenn_the_walk
+    served_by: pool

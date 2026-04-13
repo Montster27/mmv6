@@ -1,6 +1,6 @@
 # MMV Handoff Brief
 > Context bridge for claude.ai, Claude Code, and Cowork sessions.
-> **Last updated:** 2026-04-03 (verified against TASKS.md, live DB, and codebase by Claude Code)
+> **Last updated:** 2026-04-12 (verified against TASKS.md, live DB, and codebase by Claude Code)
 
 ---
 
@@ -56,13 +56,13 @@ V16MMV/mmv/
 ---
 
 ## Current Milestone
-**Milestone A — "It Runs"** is ~95% complete. The engine supports both chain mode and pool mode (with `requires_choice` gating). Day 0 content is fully wired. Day 1 has morning-after pool storylets and roommate/academic chain endpoints. Days 2-3 need building.
+**Milestone A — "It Runs"** is complete. The engine supports chain mode, pool mode (with `requires_choice` gating), skill queue, skills-in-storylets, routine-week mode, and server-authoritative day advancement. Content runs through Day 7+. Routine-week mode activates at Day 7.
 
 ---
 
-## Live DB State (as of 2026-04-03)
+## Live DB State (as of 2026-04-12)
 
-### Active Storylets (10 total)
+### Active Storylets (10+ total)
 
 | storylet_key | Track | Segment | Day | Mode | Gates/Chains |
 |-------------|-------|---------|-----|------|--------------|
@@ -104,7 +104,18 @@ V16MMV/mmv/
 | **opportunity** | 0 | — | Silent — no progress row created |
 | **home** | 0 | — | Silent — no progress row created |
 
-### NPC Registry (11 NPCs)
+### New DB Tables (Phase 1-4)
+
+| Table | Purpose | Added |
+|-------|---------|-------|
+| `skill_definitions` | 10 Tier 1 skill catalog | Phase 1 (2026-04-10) |
+| `player_skills` | Per-user skill queue (1 active, 1 queued, N trained) | Phase 1 (2026-04-10) |
+| `skill_practice_events` | Audit log for diegetic practice credit | Phase 2 (2026-04-11) |
+| `routine_activities` | Standing activity catalog (6 seeded) | Phase 4 (2026-04-12) |
+| `player_routine_schedules` | Per-user committed weekly schedules | Phase 4 (2026-04-12) |
+| `routine_week_state` | Per-user weekly state machine | Phase 4 (2026-04-12) |
+
+### NPC Registry (13 NPCs)
 
 | NPC ID | Display Name | Introduced In | Notes |
 |--------|-------------|---------------|-------|
@@ -115,6 +126,8 @@ V16MMV/mmv/
 | `npc_floor_keith` | Keith | dorm_hallmates | Farm background |
 | `npc_anderson_bryce` | Bryce | *(never via introduces_npc)* | Party host — named in evening_choice body only |
 | `npc_floor_peterson` | Peterson | *(never via introduces_npc)* | Card game host — named in morning_after_cards only |
+| `npc_floor_spider` | Spider | evening_choice (cards path) | Nickname-only floormate, sharp at cards |
+| `npc_herald_karen` | Karen | *(routine-week content)* | Herald editor, writing track |
 | `npc_prof_marsh` | Marsh | — | English lecturer — no storylet yet |
 | `npc_studious_priya` | Priya | — | Sociology section — no storylet yet |
 | `npc_ambiguous_jordan` | Jordan | — | Mystery character — no storylet yet |
@@ -162,11 +175,86 @@ V16MMV/mmv/
 - **No Herald/writing storylet** exists in Week 1-2. Substituted money_reality_check (budgeting). Flag for PR.
 - **Status:** Built, migration applied, awaiting playtest (P2.4).
 
-### Content (Day 0-1)
+### Routine-Week Mode (Phase 4 — built 2026-04-12)
+- **DB:** 3 new tables — `routine_activities` (6 seeded standing activities), `player_routine_schedules` (committed weekly slot assignments), `routine_week_state` (per-user weekly state machine with status enum: `pending | committed | active | interrupted | completed`)
+- **Seeded activities (6):** morning_run, library_study, herald_writing, dining_commons_social, pickup_basketball, campus_job
+- **UI:** `WeeklyCalendar` component — weekly grid view for slot assignment. Activates when `day_index >= 7` (start of Week 2)
+- **Deposit system:** Per-activity deposits applied on schedule commit (skill XP, energy effects, money effects)
+- **Interruption system:** Three triggers — gate threshold trips, calendar beats, NPC patience timers. Interruptions break out of routine mode back to storylet mode
+- **Types:** `src/types/routine.ts` — RoutineActivity, PlayerRoutineSchedule, RoutineWeekState, RoutineDeposit
+- **NPCs added:** `npc_floor_spider` (Spider — card sharp), `npc_herald_karen` (Karen — Herald editor)
+- **Status:** Built, migration applied, awaiting playtest (P4.5).
+
+### Day Lifecycle Refactor (built 2026-04-12)
+- **Architectural invariant:** Only `/api/day/advance-segment` and `/api/day/advance-day` may write to `daily_states.day_index` or `player_day_state.current_segment`. No client-side mutations.
+- **New endpoints:**
+  - `POST /api/day/advance-segment` — atomic segment advance with conditional UPDATE (`WHERE current_segment = $current`). Returns 409 on race.
+  - `POST /api/day/advance-day` — finalize + create next day + increment day_index with conditional UPDATE (`WHERE day_index = $current`). Returns 409 on race.
+- **`ensureCadenceUpToDate` removed entirely** — day advancement is exclusively sleep-driven. No wall-clock catch-up.
+- **`getOrCreateDailyRun` made read-only** — replaced `ensureDayStateUpToDate` with `fetchDayState`. Falls back to `createDayStateFromPrevious` if row missing (handles pre-refactor state).
+- **Client simplified** — `handleAdvanceSegment` and `handleSleep` in `play/page.tsx` await server response, then `queryClient.refetchQueries`. No hand-rolled optimistic `setDayState`. No `setRefreshTick` after mutations.
+- **Concurrency control** — conditional UPDATEs prevent double-advance from two tabs or double-clicks.
+- **SupabaseClient DI** — `finalizeDay`, `createDayStateFromPrevious`, `fetchDayState`, `fetchUnresolvedTensions`, `fetchPosture` all accept optional `client` parameter (defaults to browser client) so server endpoints can pass `supabaseServer`.
+- **Bugs fixed (5):**
+  1. Infinite auto-advance loop (Day 1) — optimistic `setDayState` + init effect race
+  2. `choice_log` 400 (Day 3) — stale `arc_id`/`arc_instance_id` columns
+  3. Sleep not advancing (Day 3→4) — `handleSleep` called admin-only endpoint
+  4. Permanent blank screen (Day 4) — `sleepCardDone` never reset
+  5. "Failed to load play state" (Day 7) — hard assert on missing `player_day_state` row
+- **Status:** Deployed and verified through Day 7+.
+
+### Content (Day 0-7+)
 - Day 0 chain: room_214 → dorm_hallmates → lunch_floor → evening_choice (3 mini-games)
 - Day 1 morning: first_morning (roommate), morning_after_* pool variants (belonging)
 - Day 1 afternoon: advisor_visit (academic)
 - Day 4: money_reality_check (money track entry point)
+- Day 7+: routine-week mode activates (weekly calendar, standing activities)
+
+### Playthrough Runner (built 2026-04-12)
+Headless Node-only test runner that executes scripted choice sequences against the real MMV engine. Converts 15-minute manual click-throughs into sub-second vitest runs.
+
+**Location:** `src/core/playthrough-runner/`
+- `types.ts` — discriminated union step types, script/fixture/failure types
+- `client.ts` — service-role Supabase client (reads `.env.local`)
+- `loader.ts` — loads tracks, storylets, choice_log from DB (cached per run)
+- `harness.ts` — `PlaythroughHarness` class: test user lifecycle, choose, advanceSegment, sleep, snapshotState
+- `executor.ts` — YAML script loader, step dispatcher, failure formatter
+- `cli.ts` — CLI entry point (single script, `--all`, `--snapshot`)
+- `playthrough.test.ts` — vitest integration (globs all scripts)
+
+**Scripts:** `scripts/playthroughs/` (9 scripts)
+| Script | What it tests |
+|--------|---------------|
+| `day0_party_path` | Full Day 0 → go_to_party → morning_after_party via pool |
+| `day0_cards_path` | Full Day 0 → go_to_cards → morning_after_cards via pool |
+| `day0_union_path` | Full Day 0 → go_to_union → morning_after_union via pool |
+| `glenn_directive_people` | Glenn beat 1 — pastime_paradise resolves, pool mode enters |
+| `glenn_directive_knowledge` | Glenn beats 1+2 — terminal_first_visit via pool at Day 1 |
+| `glenn_directive_independence` | Glenn all 3 beats through Day 5+ → glenn_the_walk |
+| `glenn_miss_path` | Skip Glenn — override persists, blocks pool scan |
+| `glenn_knowledge_from_fixture` | Same as knowledge but starts from fixture (`extends`) |
+| `cross_track_chain_regression` | Prevents cross-track chain contamination (evening_choice on opportunity track) |
+
+**Fixtures:** `scripts/playthroughs/fixtures/` (4 snapshots)
+- `after_fresh_day0_start.snapshot.json` — pristine Day 0 morning
+- `after_day0_party_path.snapshot.json` — after full party path, Day 1 morning
+- `after_day0_cards_path.snapshot.json` — after full cards path, Day 1 morning
+- `after_glenn_directive_people.snapshot.json` — after Glenn beat 1, Day 0 afternoon
+
+**Invocation:**
+```bash
+npm run playthrough scripts/playthroughs/day0_party_path.yaml  # single script
+npm run playthrough:all                                         # all scripts
+npm run playthrough:snapshot scripts/playthroughs/X.yaml        # run + save fixture
+npm run playthrough:test                                        # vitest integration
+```
+
+**Architecture notes:**
+- Invokes `selectTrackStorylets()` directly — no HTTP, no browser
+- Replicates `/api/tracks/resolve` logic for choose (resource deltas, track state, same-track validation)
+- Real Supabase with service role key; creates/deletes auth users per script (CASCADE teardown)
+- `requires_flag` is NOT enforced by engine — Glenn storylets using it pass regardless (known limitation)
+- Same-track validation in both engine and harness prevents cross-track chain bugs even with bad DB data
 
 ### Docs & Tooling
 - CLAUDE.md project bible with testing process (4-tier: SQL → vitest → SQL simulation → ask user)
@@ -181,24 +269,24 @@ V16MMV/mmv/
 
 - **Phase 1 playtest (P1.6)** — Skill queue built and deployed. Needs 7–10 real days with 2 testers. Set `NEXT_PUBLIC_SKILL_TIME_SCALE=0.01` in Vercel env vars for compressed testing.
 - **Phase 2 playtest (P2.4)** — Skills wired into storylets: 5 retrofits, diegetic practice hook, Content Studio controls. Set `PRACTICE_CREDIT_SECONDS` env var to tune practice credit (default 900 = 15 min). Awaiting playtest.
-- **hall_morning bug fix** — deactivated hall_morning (ungated pool storylet beating gated morning-after scenes). Migration applied. Awaiting user browser playtest to confirm morning_after_party fires on Day 2. (2026-04-03)
+- **Phase 4 playtest (P4.5)** — Routine-week mode built. Needs browser testing at Day 7+ to confirm weekly calendar loads, schedule commit works, deposits apply, and interruptions fire.
 
 ---
 
 ## What's Next (probable, pending review)
 
-### Immediate (complete Milestone A)
-1. **User playtests Day 0 → Day 1** — confirm morning-after scenes fire correctly after evening choice
-2. **Fix admin_errand** — storylet is missing from DB (deleted somewhere). Either re-create or accept advisor_visit as academic track entry point
-3. **Fix bench_glenn / Contact scene** — deleted as orphan, but the Contact reveal is a critical narrative beat. Needs: design decision on when/where it fires, then new storylet on correct track
-4. **Add Bryce and Peterson to introduces_npc** on relevant storylets
+### Immediate (playtesting)
+1. **Playtest Day 0 → Day 7+** — full walkthrough confirming: morning-after scenes, day advancement, skill queue, routine-week mode activation
+2. **Phase 3 (Daily Harvest)** — harvest pool schema, 30 templates, login flow. Runs parallel to content work.
+3. **Merge `time_skill` branch to `main`** — all phases 1-4 are on this branch
 
 ### Next milestone work (Milestone B — "It Squeezes")
-5. **Map remaining Arc One storylets** — gap analysis for Days 2-14
-6. **Build Day 2-3 content** — extend all active tracks past their current COMPLETED endpoints
-7. **Implement runtime preclusion** — walk precludes field, permanently lock out storylets
-8. **Fill opportunity and home tracks** — at least one entry storylet each
-9. **Build batch content validator** — CLI script for schema/NPC/period checks
+4. **Map remaining Arc One storylets** — gap analysis for Days 2-14
+5. **Build Day 2-3 content** — extend all active tracks past their current COMPLETED endpoints
+6. **Implement runtime preclusion** — walk precludes field, permanently lock out storylets
+7. **Fill opportunity and home tracks** — at least one entry storylet each
+8. **Build batch content validator** — CLI script for schema/NPC/period checks
+9. **Fix bench_glenn / Contact scene** — deleted as orphan, needs design decision on when/where it fires
 
 ---
 
@@ -206,6 +294,10 @@ V16MMV/mmv/
 
 | Date | Decision | Context |
 |------|----------|---------|
+| 2026-04-12 | **Day advancement is exclusively sleep-driven** | `ensureCadenceUpToDate` (wall-clock) removed entirely. Day advances only when player clicks sleep. No "catch up" after absence. If a player is away 3 days, they return to the day they last slept on. Correct for narrative game. |
+| 2026-04-12 | **Server-authoritative day lifecycle invariant** | Only `/api/day/advance-segment` and `/api/day/advance-day` may write to `daily_states.day_index` or `player_day_state.current_segment`. Conditional UPDATEs for concurrency. No hand-rolled optimistic updates on client. |
+| 2026-04-12 | **Phase 4 routine-week mode built** | 3 new tables, 6 seeded activities, WeeklyCalendar UI, deposit system, interruption triggers. Activates at Day 7. 2 NPCs added: Spider, Karen. |
+| 2026-04-12 | **5 day-advancement bugs fixed** | Infinite loop, choice_log 400, sleep not advancing, blank screen, missing day state. All structural — caused by scattered client-side day mutations. Refactor prevents recurrence. |
 | 2026-04-11 | **Phase 2 skills-in-storylets built** | 5 storylets retrofitted with skill gates/modifiers/practice credits. Diegetic practice hook accelerates active training. Audit table for tuning. Content Studio updated with 3 skill controls. No Herald storylet — substituted money_reality_check. |
 | 2026-04-10 | **Phase 1 skill queue built** | 10 Tier 1 skills, real-time wall-clock queue (1 active + 1 queued), lazy tick on fetch, /skills page added to player nav. Skills standalone — no storylet impact yet. Branch: `time_skill`. |
 | 2026-04-03 | **hall_morning deactivated** | Ungated pool storylet was beating gated morning-after variants. Fix: disable it; pool scan now only serves the correct choice-gated variant. |
@@ -213,7 +305,6 @@ V16MMV/mmv/
 | 2026-04-02 | **evening_choice.default_next_key set to NULL** | Was pointing to hall_morning, which made it a chain (bypassing pool scan). Set to NULL so pool scan finds morning-after variants via requires_choice. |
 | 2026-04-02 | **Pool-based morning-after storylets added** | Three belonging track pool storylets gated by requires_choice (go_to_party/cards/union). First use of pool mode in the game. |
 | 2026-04-02 | **bench_glenn deleted** | Orphaned storylet with no track_id and no chain references. Contact scene needs complete redesign before re-adding. |
-| 2026-04-02 | **Legacy column sync** | default_next_step_key synced with default_next_key across all storylets. Admin API now writes default_next_key directly. |
 | 2026-04-01 | **Day 1 content added** | first_morning (roommate), hall_morning (belonging — later superseded), advisor_visit (academic). Extended all three tracks to Day 1. |
 | 2026-03-31 | Game opens in dorm not quad. Orientation is Days 0-3 before classes. |
 | 2026-03-31 | Obsidian vault = design brain; repo = built content. claude.ai = PM. |
@@ -225,13 +316,19 @@ V16MMV/mmv/
 
 ### Two selection modes
 1. **Chain mode**: storylet served via `next_key_override` on `track_progress`. Set when a prior storylet's choice has `next_key` or the storylet has `default_next_key`.
-2. **Pool mode**: storylet served via pool scan when `next_key_override` is NULL. Filtered by: is_active, due_offset_days window, segment, `meetsRequirements()` (requires_choice).
+2. **Pool mode**: storylet served via pool scan when `next_key_override` is NULL. Filtered by: is_active, due_offset_days window, segment, `meetsRequirements()` (requires_choice, requires_skill).
+
+### Day lifecycle (server-authoritative)
+- `POST /api/day/advance-segment` — advances morning→afternoon→evening. Conditional UPDATE prevents double-advance.
+- `POST /api/day/advance-day` — finalizes current day + creates next day state + increments day_index. Conditional UPDATE prevents double-advance.
+- `getOrCreateDailyRun()` in `dailyLoop.ts` is **read-only** — never writes to day_index or current_segment.
+- Day advancement is sleep-driven only. No wall-clock catch-up.
 
 ### Key constraint: CONTENT-RULES.md
 A storylet is **either chained OR pooled**. Never both. If anything chains to it, the pool will never reach it. See `docs/CONTENT-RULES.md` for the full 10-rule spec.
 
 ### ENGINE-SPEC.md accuracy note
-ENGINE-SPEC.md says "requirements not read by track engine" (§2). **This is now outdated.** The pool scan in `selectTrackStorylets.ts` reads `requirements.requires_choice` via `meetsRequirements()`. The pool scan also checks `is_active`. Both were added in the pool-mode implementation (2026-04-01/02).
+ENGINE-SPEC.md says "requirements not read by track engine" (§2). **This is now outdated.** The pool scan in `selectTrackStorylets.ts` reads `requirements.requires_choice` and `requires_skill` via `meetsRequirements()`. The pool scan also checks `is_active`. Both were added in the pool-mode implementation (2026-04-01/02).
 
 ---
 
@@ -239,17 +336,17 @@ ENGINE-SPEC.md says "requirements not read by track engine" (§2). **This is now
 
 | # | Issue | Severity | Status |
 |---|-------|----------|--------|
-| 1 | **ENGINE-SPEC.md outdated** — says requirements not read by track engine; they are now | Medium | Needs update |
-| 2 | **CONTENT-INVENTORY.md outdated** — lists 7 storylets; there are now 10 active + 5 inactive | Medium | Needs regeneration |
-| 3 | **CHAIN-MAP.md partially outdated** — still shows evening_choice → hall_morning chain; that's been broken (evening_choice.default_next_key = NULL, hall_morning deactivated) | Medium | Needs update |
-| 4 | **admin_errand missing from DB** — referenced in docs but not in live storylets table | High | Investigate: was it deleted? Need to verify migration history |
-| 5 | **Contact scene (Glenn) has no storylet** — bench_glenn deleted, no replacement written | High | Design decision needed: when/where does the Contact reveal fire? |
-| 6 | **Bryce and Peterson never formally introduced** — in registry, named in text, but no introduces_npc | Low | Add to relevant storylets |
-| 7 | **precludes arrays reference non-existent slugs** — evening_choice choices preclude slugs that don't exist | Medium | Preclusion not yet implemented; fix when it is |
-| 8 | **DECISIONS.md nearly empty** — only 1 entry despite months of development | Low | Accumulate over time |
-| 9 | **first_morning.expires_after_days is NULL** — engine treats as 0, meaning it expires same day it's due | Medium | Should be 7 for orientation content |
-| 10 | **opportunity and home tracks have 0 storylets** — enabled but empty, no progress rows created | Medium | Need at least entry storylets |
-| 11 | **Duplicate skill** — mmv-content-builder in both repo and ~/.claude/skills/ | Low | Repo is canonical |
+| 1 | **ENGINE-SPEC.md outdated** — says requirements not read by track engine; they are now (requires_choice + requires_skill) | Medium | Needs update |
+| 2 | **CONTENT-INVENTORY.md outdated** — lists 7 storylets; there are now 10+ active + 5 inactive | Medium | Needs regeneration |
+| 3 | **CHAIN-MAP.md partially outdated** — still shows evening_choice → hall_morning chain; that's been broken | Medium | Needs update |
+| 4 | **Contact scene (Glenn) has no storylet** — bench_glenn deleted, no replacement written | High | Design decision needed: when/where does the Contact reveal fire? |
+| 5 | **Bryce and Peterson never formally introduced** — in registry, named in text, but no introduces_npc | Low | Add to relevant storylets |
+| 6 | **precludes arrays reference non-existent slugs** — evening_choice choices preclude slugs that don't exist | Medium | Preclusion not yet implemented; fix when it is |
+| 7 | **first_morning.expires_after_days is NULL** — engine treats as 0, meaning it expires same day it's due | Medium | Should be 7 for orientation content |
+| 8 | **opportunity and home tracks have 0 storylets** — enabled but empty, no progress rows created | Medium | Need at least entry storylets |
+| 9 | **`time_skill` branch not yet merged to `main`** — all Phase 1-4 work lives on this branch | High | Merge after playtest |
+| 10 | **Phase 1-4 playtests outstanding** — skill queue, skills-in-storylets, routine-week all built but not playtested | High | Block content work until verified |
+| 11 | **`requires_flag` not enforced by engine** — `meetsRequirements()` only checks `requires_choice` and `requires_skill`. Unknown keys like `requires_flag` silently pass. Glenn storylets use this. | Medium | Surfaced by playthrough runner |
 
 ---
 

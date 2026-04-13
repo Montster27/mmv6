@@ -12,7 +12,11 @@
     "test": "vitest run",
     "arcflow": "node scripts/arcFlow/run.mjs",
     "simulate": "tsx scripts/simulate-run.ts",
-    "log": "node scripts/pull-playthrough-log.mjs"
+    "log": "node scripts/pull-playthrough-log.mjs",
+    "playthrough": "npx tsx src/core/playthrough-runner/cli.ts",
+    "playthrough:all": "npx tsx src/core/playthrough-runner/cli.ts --all",
+    "playthrough:snapshot": "npx tsx src/core/playthrough-runner/cli.ts --snapshot",
+    "playthrough:test": "vitest run src/core/playthrough-runner/playthrough.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
@@ -28,12 +32,14 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.23",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
+    "js-yaml": "^4.1.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.14",
     "typescript": "^5",

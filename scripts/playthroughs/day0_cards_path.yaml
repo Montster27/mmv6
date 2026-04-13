@@ -1,0 +1,49 @@
+name: day0_cards_path
+description: >
+  Cards path through Day 0 → verifies pool gate serves morning_after_cards.
+  Same Day 0 chain as party path, diverges at evening_choice → go_to_cards.
+
+steps:
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: expect_storylet_available
+    storylet_key: room_214
+
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon ────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: catch_keiths_eye
+
+  # ── Day 0 Evening ──────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 1 Morning — Pool assertions ────────────────────────────────────
+  - type: expect_storylet_available
+    storylet_key: morning_after_cards
+    served_by: pool
+
+  - type: expect_storylet_not_available
+    storylet_key: morning_after_party
+
+  - type: expect_storylet_not_available
+    storylet_key: morning_after_union
+
+  - type: expect_storylet_available
+    storylet_key: first_morning
+    served_by: chain

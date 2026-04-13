@@ -1,0 +1,8 @@
+name: fresh_day0_start
+description: >
+  Empty script — produces a fixture snapshot of pristine Day 0 morning state.
+  Used as a base for scripts that want to skip the init phase.
+
+steps:
+  - type: expect_storylet_available
+    storylet_key: room_214

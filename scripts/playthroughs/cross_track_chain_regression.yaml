@@ -1,0 +1,64 @@
+name: cross_track_chain_regression
+description: >
+  Verifies glenn_pastime_paradise.default_next_key=NULL does not silently
+  chain into evening_choice (which is on the belonging track).
+  After resolving glenn_pastime_paradise, the opportunity track must enter
+  pool mode (next_key_override=null), not chain to a cross-track storylet.
+  The bug that already bit: evening_choice.default_next_key was once set
+  to hall_morning, bypassing pool scan. This regression test prevents
+  similar cross-track chain contamination.
+
+steps:
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — Resolve Glenn ─────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+
+  # After resolving glenn: opportunity track should NOT serve evening_choice.
+  # evening_choice is on belonging track — cross-track chain is a bug.
+  - type: expect_storylet_not_available
+    storylet_key: evening_choice
+
+  # lunch_floor (belonging chain) should still be available
+  - type: expect_storylet_available
+    storylet_key: lunch_floor
+    served_by: chain
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  # ── Day 0 Evening — evening_choice is belonging-track chain ─────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: evening_choice
+    served_by: chain
+    at: {track: belonging}
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_party
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # Opportunity track should serve terminal_first_visit via pool
+  # (not evening_choice — that was belonging track's storylet)
+  - type: expect_storylet_not_available
+    storylet_key: evening_choice
+
+  - type: expect_storylet_available
+    storylet_key: morning_after_party
+    served_by: pool

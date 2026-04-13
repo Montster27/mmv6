@@ -1,0 +1,61 @@
+name: glenn_miss_path
+description: >
+  Skip Glenn entirely. Never resolve glenn_pastime_paradise.
+  Verifies the opportunity track override persists (glenn_pastime_paradise
+  stays as next_key_override, blocking pool scan for terminal_first_visit).
+  glenn_the_walk should NOT fire because the override hasn't been cleared.
+
+steps:
+  # ── Day 0 Morning — resolve morning storylets but skip Glenn ────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — Glenn is available but we skip it ─────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: glenn_pastime_paradise
+
+  # Choose lunch_floor instead (belonging chain)
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  # ── Day 0 Evening ──────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_party
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 1: Glenn override should persist, blocking pool scan ────────────
+  # glenn_pastime_paradise is afternoon-only, so at morning it's filtered
+  # by segment but the override still blocks the pool for this track.
+  - type: expect_storylet_not_available
+    storylet_key: terminal_first_visit
+
+  - type: expect_storylet_not_available
+    storylet_key: glenn_the_walk
+
+  # At afternoon, glenn_pastime_paradise reappears (override still set)
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  - type: choose
+    storylet_key: morning_after_party
+    choice_id: continue_morning
+
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: glenn_pastime_paradise
+    served_by: chain

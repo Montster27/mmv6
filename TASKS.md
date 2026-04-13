@@ -1,8 +1,8 @@
 # MMV — Task Board
 
-> Last updated: 2026-03-24
-> Current milestone: **A — "It Runs"**
-> Current branch: `main`
+> Last updated: 2026-04-12
+> Current milestone: **A — "It Runs"** (complete, awaiting playtest)
+> Current branch: `time_skill` (7 commits ahead of main)
 
 ---
 
@@ -106,10 +106,10 @@
 - [ ] **P3.5 Playtest — does a 90-second login feel like a visit or a chore?** `Category: Testing`
 
 **Phase 4 — Routine-Week Mode (MVP)** `Priority: High`
-- [ ] **P4.1 Activity menu system** — 6 standing activities authored for Week 2 as test bed. `Category: Engine`
-- [ ] **P4.2 Weekly time budget + per-activity deposit math** `Category: Engine`
-- [ ] **P4.3 Interruption system** — three triggers: gate threshold trips, calendar beats, NPC patience timers. `Category: Engine`
-- [ ] **P4.4 UI mode switch** — daily-slot view ↔ weekly-calendar view on interruption. `Category: UI`
+- [x] **P4.1 Activity menu system** — 6 standing activities authored for Week 2 as test bed. `routine_activities` table + seed data. `Category: Engine`
+- [x] **P4.2 Weekly time budget + per-activity deposit math** — `player_routine_schedules` table, deposit system (skill XP, energy, money effects). `Category: Engine`
+- [x] **P4.3 Interruption system** — three triggers: gate threshold trips, calendar beats, NPC patience timers. `routine_week_state` table with status enum. `Category: Engine`
+- [x] **P4.4 UI mode switch** — WeeklyCalendar component, activates at day_index >= 7. `Category: UI`
 - [ ] **P4.5 Playtest — does routine mode feel like texture or a cutscene?** High risk phase — be ready to pause if it feels hollow. `Category: Testing`
 
 **Phase 5 — Curve Tuning + Resource Integration** `Priority: Medium`
@@ -138,7 +138,10 @@
 
 ## In Progress
 
-*(nothing currently in progress)*
+- **P1.6 Playtest** — Skill queue awaiting 7-10 day real-time test with 2 testers
+- **P2.4 Playtest** — Skills-in-storylets awaiting browser test
+- **P4.5 Playtest** — Routine-week mode awaiting browser test at Day 7+
+- **Merge `time_skill` to `main`** — after playtests pass
 
 ---
 
@@ -225,6 +228,21 @@
 - [x] **Updated Studio components** — ArcPanel, ChoiceEditor, ChoiceList, GraphView, PreviewSimulator all using track_id, storylet_key, sets_track_state, default_next_key. `Category: Engine`
 - [x] **Renamed arcOne → chapter** — src/core/arcOne/ → src/core/chapter/, ArcOneState → ChapterOneState, arcOneMode → chapterOneMode, arcOneStreams.ts → chapterStreams.ts. 118 occurrences across 20 files. `Category: Engine`
 
+### Day Lifecycle Refactor (2026-04-12)
+- [x] **Server-authoritative day advancement** — `/api/day/advance-segment` and `/api/day/advance-day` endpoints with conditional UPDATEs. `Category: Engine`
+- [x] **Remove `ensureCadenceUpToDate`** — wall-clock day sync removed entirely. Day advances only on sleep. `Category: Engine`
+- [x] **Make `getOrCreateDailyRun` read-only** — replaced `ensureDayStateUpToDate` with `fetchDayState` + lazy fallback. `Category: Engine`
+- [x] **Client-side simplification** — `handleAdvanceSegment` and `handleSleep` await server, use `queryClient.refetchQueries`. No optimistic updates. `Category: Engine`
+- [x] **SupabaseClient DI** — `finalizeDay`, `createDayStateFromPrevious`, `fetchDayState`, etc. accept optional `client` param for server use. `Category: Engine`
+- [x] **Fix 5 sequential bugs** — infinite loop, choice_log 400, sleep not advancing, blank screen, missing day state. `Category: Engine`
+
+### Routine-Week Mode (Phase 4 — built 2026-04-12)
+- [x] **3 new DB tables** — `routine_activities`, `player_routine_schedules`, `routine_week_state` with RLS. `Category: Engine`
+- [x] **6 seeded activities** — morning_run, library_study, herald_writing, dining_commons_social, pickup_basketball, campus_job. `Category: Content`
+- [x] **WeeklyCalendar UI** — weekly grid, activates at Day 7. `Category: UI`
+- [x] **Deposit + interruption systems** — skill XP / energy / money deposits; gate-trip / calendar / NPC-patience triggers. `Category: Engine`
+- [x] **2 NPCs added** — `npc_floor_spider` (Spider), `npc_herald_karen` (Karen). Added to NPC registry. `Category: Content`
+
 ### Snake Mini-Game Enhancement (2026-03-24)
 - [x] **3-try system for snake game** — maxAttempts prop (default 3), lives counter in HUD, retry screen between attempts, instructions on first load. `Category: Engine`
 
@@ -238,7 +256,7 @@
 
 | Milestone | Name | Key Deliverable | Status |
 |-----------|------|-----------------|--------|
-| A | "It Runs" | Game loop works with existing storylets. Play Day 1. | **~95% — engine + time system merged, needs opening content** |
+| A | "It Runs" | Game loop works with existing storylets. Play Day 7+. | **Complete — awaiting playtest** |
 | B | "It Squeezes" | Every slot has competing options. Two runs diverge. | Not started |
 | C | "It Breathes" | Energy, money, skill create ambient pressure. | Not started |
 | D | "They Remember" | NPCs respond to player history. | Not started |
@@ -249,11 +267,14 @@
 
 ## Notes
 
-- **Milestone A is nearly complete.** Engine + time system merged. Mini-game framework built. Day 1 fully wired: hallway → room 212 → quad reveal (Wren) → dining hall → floor meeting → evening choice (caps/cards/SUB). Placeholders removed. Remaining: test the full playthrough, polish transitions.
-- **Evening events designed and drafted.** Caps (Cal's party), cards (Miguel's room + Spider), SUB arcade. All three have prose, choice architecture, and mini-game integration points. Need: SQL migrations to seed into DB.
-- **Mini-game framework is live.** MiniGameShell + 3 game components (snake, caps, memory). Wired into play page via StoryletChoice.mini_game field. Adaptive difficulty tracking per game type.
-- **Gender rule:** Protagonist male. All dorm-floor NPCs and RA are male (men's dorm, 1983). Female NPCs exist on campus (classrooms, library, events, Pemberton Hall). Sandra renamed to Scott.
-- **New NPC: Spider** — nickname-only floormate, real name unknown. Quiet, sharp at card games. Introduced in s_evening_cards.
-- **Art assets needed:** caps game sprites (bottles, cap, flick animation), memory card back texture, towel background. Pixel art, 16px grid, limited palette.
+- **Milestone A is complete.** Engine, skills (Phase 1+2), routine-week (Phase 4), and day lifecycle refactor all built. Full walkthrough Day 0→7+ awaiting playtest.
+- **All Phase 1-4 work is on `time_skill` branch** — 7 commits ahead of main. Merge after playtest.
+- **Day lifecycle refactor (2026-04-12)** was the largest structural change. Fixed 5 sequential bugs by consolidating day advancement into 2 server-authoritative endpoints. `ensureCadenceUpToDate` removed — day advances only on sleep.
+- **Key new API endpoints:** `/api/day/advance-segment`, `/api/day/advance-day` — both use conditional UPDATEs for concurrency control (409 on double-advance).
+- **Key new DB tables (Phase 4):** `routine_activities`, `player_routine_schedules`, `routine_week_state`. Plus Phase 1-2 tables: `skill_definitions`, `player_skills`, `skill_practice_events`.
+- **Gender rule:** Protagonist male. All dorm-floor NPCs and RA are male (men's dorm, 1983). Female NPCs exist on campus.
+- **New NPCs:** Spider (`npc_floor_spider`) — card sharp. Karen (`npc_herald_karen`) — Herald editor.
+- **Art assets needed:** caps game sprites, memory card back texture, towel background. Pixel art, 16px grid, limited palette.
+- **Key env vars for testing:** `NEXT_PUBLIC_SKILL_TIME_SCALE=0.01` (compress training), `PRACTICE_CREDIT_SECONDS=900` (practice credit per choice).
 - **Claude Code skills available:** `/new-storylet`, `/audit-content`, `/new-npc`, `/new-mini-game`, `/sync-board`
 - **Session isolation matters.** One Claude Code session per focused task.

@@ -1,0 +1,59 @@
+name: glenn_directive_knowledge
+description: >
+  Glenn beats 1+2. Resolves glenn_pastime_paradise, then advances to Day 1
+  and verifies terminal_first_visit is available via pool scan.
+  NOTE: requires_flag is not enforced by engine — terminal_first_visit
+  appears regardless of flag state. This is a known limitation.
+
+steps:
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — Glenn beat 1 ─────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  # ── Day 0 Evening ──────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_party
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 1 Morning ──────────────────────────────────────────────────────
+  - type: expect_storylet_available
+    storylet_key: first_morning
+
+  - type: expect_storylet_available
+    storylet_key: morning_after_party
+
+  # ── Day 1 Afternoon — terminal_first_visit should appear via pool ──────
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  - type: choose
+    storylet_key: morning_after_party
+    choice_id: continue_morning
+
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: terminal_first_visit
+    served_by: pool
