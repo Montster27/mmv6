@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
+import { useArcsAPI } from "@/hooks/contentStudio/useArcsAPI";
 import type { Storylet } from "@/types/storylets";
 
 const PreviewSimulator = dynamic(
@@ -20,10 +21,12 @@ function PreviewContent() {
   const storyletId = searchParams.get("storylet");
 
   const { loadStorylets } = useStoryletsAPI();
+  const { arcDefinitions, loadArcDefinitions } = useArcsAPI();
   const [storylets, setStorylets] = useState<Storylet[]>([]);
 
   useEffect(() => {
     loadStorylets({ active: "true" }).then(setStorylets);
+    loadArcDefinitions();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -36,7 +39,7 @@ function PreviewContent() {
     <AuthGate>
       {() => (
         <div className="h-full overflow-auto p-4">
-          <PreviewSimulator storylets={storylets} defaultStorylet={defaultStorylet} />
+          <PreviewSimulator storylets={storylets} defaultStorylet={defaultStorylet} arcDefinitions={arcDefinitions} />
         </div>
       )}
     </AuthGate>

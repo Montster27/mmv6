@@ -5,6 +5,7 @@ import type { Storylet, StoryletChoice } from "@/types/storylets";
 import {
   DEFAULT_STREAM_STATES,
   STREAM_LABELS,
+  TRACK_KEY_TO_STREAM_ID,
   type StreamId,
   type StreamStates,
 } from "@/types/chapterStreams";
@@ -12,9 +13,12 @@ import { trackEvent } from "@/lib/events";
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
+type ArcDef = { id: string; key: string; title: string };
+
 type PreviewSimulatorProps = {
   storylets: Storylet[];
   defaultStorylet: Storylet | null;
+  arcDefinitions?: ArcDef[];
 };
 
 type SimState = {
@@ -75,6 +79,36 @@ function resolveNextStorylet(
   return null;
 }
 
+/** Collect all storylet IDs reachable from the current storylet's choices + default_next_key. */
+function getReachableIds(current: Storylet | null, allStorylets: Storylet[]): Set<string> {
+  const ids = new Set<string>();
+  if (!current) return ids;
+
+  for (const choice of current.choices) {
+    if (choice.targetStoryletId) ids.add(choice.targetStoryletId);
+    if (choice.next_key) {
+      const match = allStorylets.find((s) => s.storylet_key === choice.next_key);
+      if (match) ids.add(match.id);
+    }
+  }
+
+  if (current.default_next_key) {
+    const match = allStorylets.find((s) => s.storylet_key === current.default_next_key);
+    if (match) ids.add(match.id);
+  }
+
+  return ids;
+}
+
+/** Resolve a track UUID to a human-readable label. */
+function buildTrackLabel(trackId: string, arcDefs: ArcDef[]): string {
+  const def = arcDefs.find((a) => a.id === trackId);
+  if (!def) return `Track ${trackId.slice(0, 8)}`;
+  const streamId = TRACK_KEY_TO_STREAM_ID[def.key];
+  if (streamId) return STREAM_LABELS[streamId];
+  return def.title || def.key;
+}
+
 function clamp(value: number) {
   return Math.max(0, Math.min(100, value));
 }
@@ -95,7 +129,7 @@ function initialState(firstId: string | null): SimState {
 
 // ── component ─────────────────────────────────────────────────────────────────
 
-export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulatorProps) {
+export function PreviewSimulator({ storylets, defaultStorylet, arcDefinitions = [] }: PreviewSimulatorProps) {
   const [currentId, setCurrentId] = useState<string | null>(
     defaultStorylet?.id ?? storylets[0]?.id ?? null
   );
@@ -210,6 +244,44 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
     }));
   }, [current, simState.precluded]);
 
+  // Grouped dropdown: reachable first, then by track, then standalone
+  const dropdownGroups = useMemo(() => {
+    const reachableIds = getReachableIds(current, storylets);
+    const reachable: Storylet[] = [];
+    const byTrack: Record<string, Storylet[]> = {};
+    const standalone: Storylet[] = [];
+
+    for (const s of storylets) {
+      if (reachableIds.has(s.id)) {
+        reachable.push(s);
+        continue;
+      }
+      if (s.track_id) {
+        (byTrack[s.track_id] ??= []).push(s);
+      } else {
+        standalone.push(s);
+      }
+    }
+
+    // Sort each track group by order_index
+    for (const group of Object.values(byTrack)) {
+      group.sort((a, b) => (a.order_index ?? 999) - (b.order_index ?? 999));
+    }
+    standalone.sort((a, b) => a.title.localeCompare(b.title));
+
+    // Sort track groups by stream label order
+    const STREAM_ORDER: StreamId[] = ["roommate", "academic", "money", "belonging", "opportunity", "home"];
+    const trackEntries = Object.entries(byTrack).sort(([idA], [idB]) => {
+      const defA = arcDefinitions.find((a) => a.id === idA);
+      const defB = arcDefinitions.find((a) => a.id === idB);
+      const sA = defA ? STREAM_ORDER.indexOf(TRACK_KEY_TO_STREAM_ID[defA.key]) : 999;
+      const sB = defB ? STREAM_ORDER.indexOf(TRACK_KEY_TO_STREAM_ID[defB.key]) : 999;
+      return (sA === -1 ? 999 : sA) - (sB === -1 ? 999 : sB);
+    });
+
+    return { reachable, trackEntries, standalone };
+  }, [storylets, current, arcDefinitions]);
+
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 flex items-center justify-between gap-3">
@@ -217,18 +289,40 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
         <div className="flex items-center gap-2 shrink-0">
           <label className="text-xs text-slate-500">Jump to:</label>
           <select
-            className="rounded-md border border-slate-300 px-2 py-1 text-xs max-w-[280px]"
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs max-w-[340px]"
             value={currentId ?? ""}
             onChange={(e) => {
               if (e.target.value) setCurrentId(e.target.value);
             }}
           >
             <option value="" disabled>Select storylet...</option>
-            {storylets.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title} ({s.slug})
-              </option>
+            {dropdownGroups.reachable.length > 0 && (
+              <optgroup label="Next from here">
+                {dropdownGroups.reachable.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {"\u2192"} {s.title} ({s.storylet_key ?? s.slug})
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {dropdownGroups.trackEntries.map(([trackId, group]) => (
+              <optgroup key={trackId} label={buildTrackLabel(trackId, arcDefinitions)}>
+                {group.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.id === currentId ? "\u25CF " : ""}{s.title} ({s.storylet_key ?? s.slug})
+                  </option>
+                ))}
+              </optgroup>
             ))}
+            {dropdownGroups.standalone.length > 0 && (
+              <optgroup label="Standalone">
+                {dropdownGroups.standalone.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.id === currentId ? "\u25CF " : ""}{s.title} ({s.slug})
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
       </div>
