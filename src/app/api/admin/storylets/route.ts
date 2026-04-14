@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   const admin = getAdminClient();
   let query = admin
     .from("storylets")
-    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body,requirements,introduces_npc,arc_id,step_key,order_index,due_offset_days,expires_after_days,default_next_key");
+    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body,requirements,introduces_npc,arc_id,step_key,order_index,due_offset_days,expires_after_days,default_next_key,track_id,storylet_key,segment,nodes");
 
   if (active === "true") {
     query = query.eq("is_active", true);

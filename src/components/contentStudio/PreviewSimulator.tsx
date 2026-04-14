@@ -44,8 +44,35 @@ function getPhaseTag(storylet: Storylet) {
   return tag ? tag.replace("phase:", "") : "";
 }
 
-function getChoiceTarget(choice: StoryletChoice): string | null {
-  return choice.targetStoryletId ?? null;
+/**
+ * Resolve the next storylet ID from a choice, checking all navigation paths:
+ * 1. targetStoryletId — direct jump by UUID
+ * 2. next_key — advance within same track by storylet_key
+ * 3. (fallback) storylet.default_next_key — used when choice specifies neither
+ */
+function resolveNextStorylet(
+  choice: StoryletChoice,
+  currentStorylet: Storylet | null,
+  allStorylets: Storylet[]
+): string | null {
+  // 1. Direct target by ID
+  if (choice.targetStoryletId) return choice.targetStoryletId;
+
+  // 2. next_key — find storylet by storylet_key
+  if (choice.next_key) {
+    const match = allStorylets.find((s) => s.storylet_key === choice.next_key);
+    if (match) return match.id;
+  }
+
+  // 3. Fallback to storylet-level default_next_key
+  if (currentStorylet?.default_next_key) {
+    const match = allStorylets.find(
+      (s) => s.storylet_key === currentStorylet.default_next_key
+    );
+    if (match) return match.id;
+  }
+
+  return null;
 }
 
 function clamp(value: number) {
@@ -142,9 +169,9 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
       }
 
       // phase
-      const target = getChoiceTarget(choice);
-      const nextStorylet = target
-        ? storylets.find((s) => s.id === target) ?? null
+      const targetId = resolveNextStorylet(choice, current, storylets);
+      const nextStorylet = targetId
+        ? storylets.find((s) => s.id === targetId) ?? null
         : null;
       next.phase = nextStorylet
         ? getPhaseTag(nextStorylet) || prev.phase
@@ -153,8 +180,8 @@ export function PreviewSimulator({ storylets, defaultStorylet }: PreviewSimulato
       return next;
     });
 
-    const target = getChoiceTarget(choice);
-    if (target) setCurrentId(target);
+    const targetId = resolveNextStorylet(choice, current, storylets);
+    if (targetId) setCurrentId(targetId);
 
     trackEvent({
       event_type: "preview_choice_taken",
