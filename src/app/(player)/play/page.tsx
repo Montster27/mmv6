@@ -467,6 +467,13 @@ export default function PlayPage() {
     () => dailyRunQuery.data?.trackStorylets ?? [],
     [dailyRunQuery.data?.trackStorylets]
   );
+  // Visible = not yet resolved client-side. Use this for UI gating (transition
+  // cards, auto-advance) so stale query data doesn't hide the segment advance
+  // when all beats have been resolved but the refetch hasn't landed yet.
+  const visibleTrackCount = useMemo(
+    () => trackStorylets.filter((b) => !resolvedTrackStoryletIds.has(b.progress_id)).length,
+    [trackStorylets, resolvedTrackStoryletIds]
+  );
   // ── Phase 4: Routine-Week Mode data ──
   const gameMode = dailyRunQuery.data?.gameMode ?? "daily";
   const routineActivities = dailyRunQuery.data?.routineActivities;
@@ -614,7 +621,7 @@ export default function PlayPage() {
   const showDailyComplete =
     (USE_DAILY_LOOP_ORCHESTRATOR &&
       stage === "complete" &&
-      trackStorylets.length === 0 &&
+      visibleTrackCount === 0 &&
       !awaitingAllocation &&
       !(chapterOneMode && pendingDismissalBeats.length > 0) &&
       !(chapterOneMode && !sleepCardDone)) ||
@@ -1654,6 +1661,44 @@ export default function PlayPage() {
     setPendingAdvanceTarget(null);
   }, [currentStorylet?.id]);
 
+  // ── Micro-choice persistent effects (node walk) ─────────────────────────
+  // Called by DialogueNodeView when a micro-choice carries set_npc_memory,
+  // relational_effect, or identity_tags. Effects commit immediately — not
+  // deferred to terminal choice resolution.
+  const handleMicroEffects = useCallback(
+    async (effects: {
+      set_npc_memory?: Record<string, Record<string, boolean>>;
+      relational_effect?: Record<string, Record<string, number>>;
+      identity_tags?: string[];
+    }) => {
+      if (!userId) return;
+      const events: RelationshipEvent[] = [
+        ...mapLegacyRelationalEffects(effects.relational_effect),
+        ...mapLegacyNpcKnowledge(effects.set_npc_memory),
+      ];
+      if (events.length > 0) {
+        const { next: nextRelationships } = applyRelationshipEvents(
+          relationshipsState,
+          events,
+          { storylet_slug: currentStorylet?.slug ?? "", choice_id: "micro_choice" }
+        );
+        await updateRelationships(userId, nextRelationships, dayIndex);
+        if (dailyState) {
+          setDailyState({ ...dailyState, relationships: nextRelationships });
+        }
+      }
+      const tags = effects.identity_tags ?? [];
+      if (tags.length > 0 && chapterOneState) {
+        const nextLp = bumpLifePressure(chapterOneState.lifePressureState, tags);
+        await updateLifePressureState(userId, nextLp);
+        if (dailyState) {
+          setDailyState({ ...dailyState, life_pressure_state: nextLp });
+        }
+      }
+    },
+    [userId, relationshipsState, currentStorylet, dayIndex, dailyState, chapterOneState]
+  );
+
   const handleChoice = async (choiceId: string) => {
     if (!userId || !currentStorylet) return;
     if (pendingReactionText) return;
@@ -2681,7 +2726,7 @@ export default function PlayPage() {
     if (loading) return;
     if (alreadyCompletedToday) return;
     if (!dailyRunDataLoaded) return; // wait for data to load
-    if (trackStorylets.length > 0) return; // beats still pending
+    if (visibleTrackCount > 0) return; // beats still pending
     // In chapterOneMode, don't auto-complete until the player has gone through the
     // sleep card — otherwise empty segments trigger premature day advancement.
     if (!sleepCardDone) return;
@@ -2691,17 +2736,20 @@ export default function PlayPage() {
     markDailyComplete(userId, dayIndex).catch(console.error);
     incrementGroupObjective(2, "daily_complete").catch(() => {});
     setRefreshTick((t) => t + 1);
-  }, [chapterOneMode, trackStorylets.length, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage, sleepCardDone]);
+  }, [chapterOneMode, visibleTrackCount, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage, sleepCardDone]);
 
   // Auto-advance through empty segments: if there are no storylets for the
   // current segment and it's not yet night, skip ahead automatically instead
   // of making the player click through dead time.
+  // Uses visibleTrackCount (filtered by resolvedTrackStoryletIds) instead of
+  // raw trackStorylets.length so that stale query data doesn't block the
+  // advance when all beats have been resolved client-side.
   useEffect(() => {
     if (!USE_DAILY_LOOP_ORCHESTRATOR) return;
     if (!chapterOneMode) return;
     if (loading) return;
     if (!dailyRunDataLoaded) return;
-    if (trackStorylets.length > 0) return;
+    if (visibleTrackCount > 0) return;
     if (pendingDismissalBeats.length > 0) return;
     if (sleepCardDone) return;
     if (alreadyCompletedToday) return;
@@ -2714,7 +2762,7 @@ export default function PlayPage() {
     }, 400);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapterOneMode, loading, dailyRunDataLoaded, trackStorylets.length, pendingDismissalBeats.length, sleepCardDone, alreadyCompletedToday, dayState?.current_segment, dayState?.hours_remaining]);
+  }, [chapterOneMode, loading, dailyRunDataLoaded, visibleTrackCount, pendingDismissalBeats.length, sleepCardDone, alreadyCompletedToday, dayState?.current_segment, dayState?.hours_remaining]);
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
@@ -2736,7 +2784,7 @@ export default function PlayPage() {
                 {dayState?.stress ?? dailyState?.stress ?? "—"}
               </p>
               {/* In chapterOneMode hide the legacy stage copy while beats are pending */}
-              {(!chapterOneMode || (trackStorylets.length === 0 && pendingDismissalBeats.length === 0)) && (
+              {(!chapterOneMode || (visibleTrackCount === 0 && pendingDismissalBeats.length === 0)) && (
                 <div className="mt-2 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground/80">
                     {getDailyStageCopy(stage).title}
@@ -3187,6 +3235,7 @@ export default function PlayPage() {
                                       nodes={currentStorylet.nodes}
                                       choices={choices}
                                       onChoice={handleChoice}
+                                      onMicroEffects={handleMicroEffects}
                                       disabled={savingChoice}
                                     />
                                   );
@@ -3596,7 +3645,7 @@ export default function PlayPage() {
 
                   {/* Segment transition card — morning/afternoon/evening done, advance to next */}
                   {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode &&
-                    trackStorylets.length === 0 && pendingDismissalBeats.length === 0 &&
+                    visibleTrackCount === 0 && pendingDismissalBeats.length === 0 &&
                     !sleepCardDone &&
                     dayState?.current_segment !== 'night' &&
                     (dayState?.hours_remaining ?? 16) > 0 && (
@@ -3610,7 +3659,7 @@ export default function PlayPage() {
                   {/* Sleep card — shown at end of night when no beats remain */}
                   {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode &&
                     (dayState?.current_segment === 'night' || (dayState?.hours_remaining ?? 16) <= 0) &&
-                    trackStorylets.length === 0 && pendingDismissalBeats.length === 0 &&
+                    visibleTrackCount === 0 && pendingDismissalBeats.length === 0 &&
                     !sleepCardDone && (
                     <SleepCard
                       dayIndex={dayIndex}
