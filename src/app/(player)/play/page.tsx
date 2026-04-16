@@ -1047,39 +1047,53 @@ export default function PlayPage() {
   const SEGMENT_ORDER = ['morning', 'afternoon', 'evening', 'night'] as const;
   type Segment = typeof SEGMENT_ORDER[number];
 
+  // Synchronous flag — set immediately when an advance starts so auto-advance
+  // doesn't fire a concurrent advance while the manual one is still in flight.
+  // isFetching (from React Query) isn't enough: it only becomes true AFTER the
+  // refetch starts, which happens AFTER the advance-segment POST completes
+  // (~100-300ms). The auto-advance timer (400ms) can fire in that gap.
+  const advanceInFlightRef = useRef(false);
+
   const handleAdvanceSegment = async () => {
-    // Compute next segment locally for bridge text only
-    const ds = dayStateRef.current ?? dayState;
-    if (!ds) return;
-    const current = (ds.current_segment as Segment | undefined) ?? 'morning';
-    const idx = SEGMENT_ORDER.indexOf(current);
-    if (idx >= 0 && idx < SEGMENT_ORDER.length - 1) {
-      setBridgeText(getBridgeText(SEGMENT_ORDER[idx + 1] as BridgeSegment));
-    }
-    setSleepCardDone(false);
+    if (advanceInFlightRef.current) return; // guard against concurrent calls
+    advanceInFlightRef.current = true;
 
-    // Server-authoritative segment advance (conditional UPDATE prevents double-advance)
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    if (!token) return;
+    try {
+      // Compute next segment locally for bridge text only
+      const ds = dayStateRef.current ?? dayState;
+      if (!ds) return;
+      const current = (ds.current_segment as Segment | undefined) ?? 'morning';
+      const idx = SEGMENT_ORDER.indexOf(current);
+      if (idx >= 0 && idx < SEGMENT_ORDER.length - 1) {
+        setBridgeText(getBridgeText(SEGMENT_ORDER[idx + 1] as BridgeSegment));
+      }
+      setSleepCardDone(false);
 
-    const res = await fetch("/api/day/advance-segment", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+      // Server-authoritative segment advance (conditional UPDATE prevents double-advance)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) return;
 
-    if (res.status === 409) {
-      // Segment already advanced (double-click / two tabs). Just refetch.
+      const res = await fetch("/api/day/advance-segment", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 409) {
+        // Segment already advanced (double-click / two tabs). Just refetch.
+        await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
+        return;
+      }
+      if (!res.ok) {
+        console.error("Failed to advance segment", res.status);
+        return;
+      }
+
+      // Refetch to get fresh state from server (no optimistic update)
       await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
-      return;
+    } finally {
+      advanceInFlightRef.current = false;
     }
-    if (!res.ok) {
-      console.error("Failed to advance segment", res.status);
-      return;
-    }
-
-    // Refetch to get fresh state from server (no optimistic update)
-    await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
   };
 
   const handleSleep = async () => {
