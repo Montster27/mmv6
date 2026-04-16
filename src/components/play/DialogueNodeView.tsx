@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { DialogueNode, MicroChoice, StoryletChoice } from "@/types/storylets";
+import { getNpcEntry } from "@/domain/npcs/registry";
 
 type DialogueNodeViewProps = {
   /** Preamble text (body + any NPC intro blurb prepended). Shown persistently at top. */
@@ -9,6 +10,12 @@ type DialogueNodeViewProps = {
   nodes: DialogueNode[];
   choices: StoryletChoice[];
   onChoice: (choiceId: string) => void;
+  /** Called when a micro-choice applies persistent NPC effects (memory / relational). */
+  onMicroEffects?: (effects: {
+    set_npc_memory?: Record<string, Record<string, boolean>>;
+    relational_effect?: Record<string, Record<string, number>>;
+    identity_tags?: string[];
+  }) => void;
   disabled?: boolean;
 };
 
@@ -23,11 +30,45 @@ type DialogueNodeViewProps = {
  *
  * Completed nodes fade into the background as the player advances.
  */
+/** Render a single node's text with speaker formatting. */
+function NodeText({
+  node,
+  className,
+}: {
+  node: DialogueNode;
+  className?: string;
+}) {
+  if (node.speaker && node.speaker !== "narrator") {
+    const entry = getNpcEntry(node.speaker);
+    // Fallback: extract last segment of NPC ID and capitalize (e.g. "npc_roommate_scott" → "Scott")
+    const fallbackName = node.speaker.split("_").pop();
+    const displayName =
+      entry?.name ??
+      (fallbackName ? fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1) : node.speaker);
+    return (
+      <div className={className}>
+        <p className="whitespace-pre-line text-[15px] italic leading-relaxed text-foreground/85">
+          &ldquo;{node.text}&rdquo;
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground/70">
+          &mdash; {displayName}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <p className={`whitespace-pre-line text-[15px] leading-relaxed text-foreground/85 ${className ?? ""}`}>
+      {node.text}
+    </p>
+  );
+}
+
 export function DialogueNodeView({
   preamble,
   nodes,
   choices,
   onChoice,
+  onMicroEffects,
   disabled,
 }: DialogueNodeViewProps) {
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(
@@ -83,9 +124,20 @@ export function DialogueNodeView({
 
   const handleMicroChoice = useCallback(
     (micro: MicroChoice) => {
+      // Apply persistent effects (NPC memory, relational, identity tags)
+      if (
+        onMicroEffects &&
+        (micro.set_npc_memory || micro.relational_effect || micro.identity_tags?.length)
+      ) {
+        onMicroEffects({
+          set_npc_memory: micro.set_npc_memory,
+          relational_effect: micro.relational_effect,
+          identity_tags: micro.identity_tags,
+        });
+      }
       advance(micro.next, micro.sets_flag);
     },
-    [advance]
+    [advance, onMicroEffects]
   );
 
   const handleContinue = useCallback(() => {
@@ -100,12 +152,8 @@ export function DialogueNodeView({
   // Filter terminal choices by flag gates
   const visibleChoices = showChoices
     ? choices.filter((c) => {
-        const req = (c as StoryletChoice & { requires_flag?: string })
-          .requires_flag;
-        const excl = (c as StoryletChoice & { excludes_flag?: string })
-          .excludes_flag;
-        if (req && !activeFlags.has(req)) return false;
-        if (excl && activeFlags.has(excl)) return false;
+        if (c.requires_flag && !activeFlags.has(c.requires_flag)) return false;
+        if (c.excludes_flag && activeFlags.has(c.excludes_flag)) return false;
         return true;
       })
     : [];
@@ -125,21 +173,16 @@ export function DialogueNodeView({
         const node = nodes.find((n) => n.id === id);
         if (!node) return null;
         return (
-          <p
-            key={id}
-            className="whitespace-pre-line text-sm leading-relaxed text-foreground/50"
-          >
-            {node.text}
-          </p>
+          <div key={id} className="opacity-50">
+            <NodeText node={node} className="text-sm" />
+          </div>
         );
       })}
 
       {/* Current active node */}
       {currentNode && (
         <div className="animate-in fade-in duration-150">
-          <p className="whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">
-            {currentNode.text}
-          </p>
+          <NodeText node={currentNode} />
           <div className="mt-3 space-y-2">
             {currentNode.micro_choices && currentNode.micro_choices.length > 0 ? (
               currentNode.micro_choices.map((micro) => (

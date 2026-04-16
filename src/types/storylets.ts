@@ -132,6 +132,11 @@ export type StoryletChoice = {
   relational_effects?: Record<string, Record<string, number>>;
   set_npc_memory?: Record<string, Record<string, boolean>>;
   condition?: Record<string, unknown>;
+  // ── Walk-flag gating (conversational node system) ─────────────────────────
+  /** Show this choice only if the named walk-local flag was set during the node walk. */
+  requires_flag?: string;
+  /** Hide this choice if the named walk-local flag was set during the node walk. */
+  excludes_flag?: string;
   // ── Mini-game trigger ──────────────────────────────────────────────────────
   /**
    * When present, selecting this choice launches a mini-game before resolving
