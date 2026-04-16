@@ -569,6 +569,8 @@ export async function getOrCreateDailyRun(
           currentSegment: currentSeg,
           hoursRemaining: hoursLeft,
         });
+        // Flat log so string appears verbatim in browser console (Object displayed collapsed)
+        console.log(`[daily-run-flat] dayIndex=${dayIndex} currentSeg=${currentSeg} hoursLeft=${hoursLeft} storylets=${trackStoryletRows.length} progress=[${progress.map(p => `${p.current_storylet_key}@d${p.storylet_due_day}/${p.state}/override=${p.next_key_override}/resolved=${JSON.stringify(p.resolved_storylet_keys)}`).join("|")}]`);
         const dueStorylets = selectTrackStorylets({
           dayIndex,
           progress,
