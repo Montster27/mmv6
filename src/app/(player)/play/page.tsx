@@ -2747,14 +2747,22 @@ export default function PlayPage() {
   // Auto-advance through empty segments: if there are no storylets for the
   // current segment and it's not yet night, skip ahead automatically instead
   // of making the player click through dead time.
-  // Uses visibleTrackCount (filtered by resolvedTrackStoryletIds) instead of
-  // raw trackStorylets.length so that stale query data doesn't block the
-  // advance when all beats have been resolved client-side.
+  //
+  // CRITICAL: gated on !isFetching. After a manual handleAdvanceSegment (e.g.
+  // from the dismiss+advance merged click), refetch is in flight and the
+  // trackStorylets data is still the OLD segment's (via keepPreviousData).
+  // Without this guard, the effect evaluates visibleTrackCount=0 against
+  // stale data, schedules a 400ms timer, and the timer fires BEFORE the
+  // refetch lands — triggering a second advance against the already-updated
+  // DB (morning→afternoon followed by afternoon→evening, cascading to night
+  // in ~1 second). The correct behavior: wait until the data for the new
+  // segment is settled, THEN decide whether there's content to show.
   useEffect(() => {
     if (!USE_DAILY_LOOP_ORCHESTRATOR) return;
     if (!chapterOneMode) return;
     if (loading) return;
     if (!dailyRunDataLoaded) return;
+    if (dailyRunQuery.isFetching) return; // wait for refetch to settle
     if (visibleTrackCount > 0) return;
     if (pendingDismissalBeats.length > 0) return;
     if (sleepCardDone) return;
@@ -2768,7 +2776,7 @@ export default function PlayPage() {
     }, 400);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapterOneMode, loading, dailyRunDataLoaded, visibleTrackCount, pendingDismissalBeats.length, sleepCardDone, alreadyCompletedToday, dayState?.current_segment, dayState?.hours_remaining]);
+  }, [chapterOneMode, loading, dailyRunDataLoaded, dailyRunQuery.isFetching, visibleTrackCount, pendingDismissalBeats.length, sleepCardDone, alreadyCompletedToday, dayState?.current_segment, dayState?.hours_remaining]);
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
