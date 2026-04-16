@@ -156,7 +156,6 @@ export function selectTrackStorylets({
       // Safety: if the override points to an already-resolved storylet, clear
       // it and fall through to the pool scan instead of re-serving it.
       if (resolvedKeys.has(prog.next_key_override)) {
-        console.log(`[override] ${track.key}: stale (${prog.next_key_override} already in resolved)`);
         // Fall through to pool scan — override is stale
       } else {
         const overrideStorylet = trackStorylets.find(
@@ -167,30 +166,23 @@ export function selectTrackStorylets({
           const dueDay = prog.started_day + overrideStorylet.due_offset_days;
           const expiresOnDay = dueDay + overrideStorylet.expires_after_days;
 
-          console.log(`[override] ${track.key}: ${prog.next_key_override} dueDay=${dueDay} expiresOnDay=${expiresOnDay} dayIndex=${dayIndex} seg=${overrideStorylet.segment} currentSeg=${currentSegment}`);
-
           if (dayIndex < dueDay) {
-            console.log(`[override] ${track.key}: not yet due (dayIndex=${dayIndex} < dueDay=${dueDay})`);
             // Override is set but not yet due — wait; don't fall through to pool
             continue;
           }
 
           if (dayIndex <= expiresOnDay) {
             // Override is due and not expired — apply segment filter
-            const passes = passesSegmentFilter(overrideStorylet, currentSegment, timeTight);
-            console.log(`[override] ${track.key}: in window, passesSegmentFilter=${passes}`);
-            if (passes) {
+            if (passesSegmentFilter(overrideStorylet, currentSegment, timeTight)) {
               due.push({ progress: prog, storylet: overrideStorylet, track, expires_on_day: expiresOnDay });
             }
             // Whether it passes segment or not, don't also scan pool for this track
             continue;
           }
 
-          console.log(`[override] ${track.key}: EXPIRED (dayIndex=${dayIndex} > expiresOnDay=${expiresOnDay})`);
           // Override expired — fall through to pool scan
-        } else {
-          console.log(`[override] ${track.key}: storylet "${prog.next_key_override}" NOT FOUND in trackStorylets (len=${trackStorylets.length})`);
         }
+        // Override storylet not found — fall through to pool scan
       }
     }
 
