@@ -303,6 +303,12 @@ export default function PlayPage() {
     count: number;
     handles: string[];
   } | null>(null);
+  // Stores the `storylet_key` of storylets the player has resolved this segment.
+  // NOT progress_id — one progress row (per-track) can surface multiple storylets
+  // across a day (e.g., dorm_hallmates in morning, lunch_floor in afternoon), and
+  // using progress_id here would filter lunch_floor out the moment dorm_hallmates
+  // resolved, because the same progress_id lingers in the set across the refetch
+  // window between segment advances.
   const [resolvedTrackStoryletIds, setResolvedTrackStoryletIds] = useState<Set<string>>(
     new Set()
   );
@@ -471,7 +477,7 @@ export default function PlayPage() {
   // cards, auto-advance) so stale query data doesn't hide the segment advance
   // when all beats have been resolved but the refetch hasn't landed yet.
   const visibleTrackCount = useMemo(
-    () => trackStorylets.filter((b) => !resolvedTrackStoryletIds.has(b.progress_id)).length,
+    () => trackStorylets.filter((b) => !resolvedTrackStoryletIds.has(b.storylet_key)).length,
     [trackStorylets, resolvedTrackStoryletIds]
   );
   // ── Phase 4: Routine-Week Mode data ──
@@ -2490,7 +2496,7 @@ export default function PlayPage() {
         });
       }
 
-      const newResolved = new Set([...resolvedTrackStoryletIds, beat.progress_id]);
+      const newResolved = new Set([...resolvedTrackStoryletIds, beat.storylet_key]);
       setResolvedTrackStoryletIds(newResolved);
       // Keep this beat visible until the user dismisses it via the Continue button.
       // Also clear the mini-game overlay here (if active) so both state changes
@@ -3588,7 +3594,7 @@ export default function PlayPage() {
                         // merge the dismiss and segment-advance into one click.
                         const isLastPending = pendingDismissalBeats.length === 1;
                         const allResolved = trackStorylets.every(
-                          (b) => resolvedTrackStoryletIds.has(b.progress_id)
+                          (b) => resolvedTrackStoryletIds.has(b.storylet_key)
                         );
                         const segmentDone = isLastPending && allResolved;
                         const currentSeg = (dayState?.current_segment ?? "morning") as Segment;
@@ -3621,7 +3627,7 @@ export default function PlayPage() {
                       })}
                       {/* Unresolved track storylets */}
                       {trackStorylets
-                        .filter((b) => !resolvedTrackStoryletIds.has(b.progress_id))
+                        .filter((b) => !resolvedTrackStoryletIds.has(b.storylet_key))
                         .map((ts) => (
                           <TrackStoryletCard
                             key={ts.progress_id}
