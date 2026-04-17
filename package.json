@@ -16,7 +16,13 @@
     "playthrough": "npx tsx src/core/playthrough-runner/cli.ts",
     "playthrough:all": "npx tsx src/core/playthrough-runner/cli.ts --all",
     "playthrough:snapshot": "npx tsx src/core/playthrough-runner/cli.ts --snapshot",
-    "playthrough:test": "vitest run src/core/playthrough-runner/playthrough.test.ts"
+    "playthrough:trace:write": "npx tsx src/core/playthrough-runner/cli.ts --write-trace --all",
+    "playthrough:trace:check": "npx tsx src/core/playthrough-runner/cli.ts --check-trace --all",
+    "playthrough:test": "vitest run src/core/playthrough-runner/playthrough.test.ts",
+    "playthrough:coverage": "npx tsx scripts/playthrough-coverage.ts",
+    "validate:content": "npx tsx scripts/validate-content.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
@@ -32,6 +38,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
     "@types/react": "^19",
