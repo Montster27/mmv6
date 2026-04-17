@@ -2758,39 +2758,14 @@ export default function PlayPage() {
     setRefreshTick((t) => t + 1);
   }, [chapterOneMode, visibleTrackCount, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage, sleepCardDone]);
 
-  // Auto-advance through empty segments: if there are no storylets for the
-  // current segment and it's not yet night, skip ahead automatically instead
-  // of making the player click through dead time.
-  //
-  // CRITICAL: gated on !isFetching. After a manual handleAdvanceSegment (e.g.
-  // from the dismiss+advance merged click), refetch is in flight and the
-  // trackStorylets data is still the OLD segment's (via keepPreviousData).
-  // Without this guard, the effect evaluates visibleTrackCount=0 against
-  // stale data, schedules a 400ms timer, and the timer fires BEFORE the
-  // refetch lands — triggering a second advance against the already-updated
-  // DB (morning→afternoon followed by afternoon→evening, cascading to night
-  // in ~1 second). The correct behavior: wait until the data for the new
-  // segment is settled, THEN decide whether there's content to show.
-  useEffect(() => {
-    if (!USE_DAILY_LOOP_ORCHESTRATOR) return;
-    if (!chapterOneMode) return;
-    if (loading) return;
-    if (!dailyRunDataLoaded) return;
-    if (dailyRunQuery.isFetching) return; // wait for refetch to settle
-    if (visibleTrackCount > 0) return;
-    if (pendingDismissalBeats.length > 0) return;
-    if (sleepCardDone) return;
-    if (alreadyCompletedToday) return;
-    const seg = dayState?.current_segment;
-    if (seg === 'night') return;
-    if ((dayState?.hours_remaining ?? 16) <= 0) return;
-
-    const timer = setTimeout(() => {
-      handleAdvanceSegment();
-    }, 400);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chapterOneMode, loading, dailyRunDataLoaded, dailyRunQuery.isFetching, visibleTrackCount, pendingDismissalBeats.length, sleepCardDone, alreadyCompletedToday, dayState?.current_segment, dayState?.hours_remaining]);
+  // Segment transitions are explicit player clicks (SegmentTransitionCard).
+  // Previously this effect auto-advanced through empty segments after a 400ms
+  // delay, but the timer fired with state captured at render time — creating
+  // a window where stale snapshots triggered cascading advances. The tradeoff
+  // is a tiny UX regression (player clicks a button to continue to afternoon
+  // even when there's no content) in exchange for eliminating an entire class
+  // of timing bugs. See commits 07c047d, 22b3b46, 9bbde1c for the patch chain
+  // that preceded this removal.
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
