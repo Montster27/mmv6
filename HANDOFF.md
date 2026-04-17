@@ -1,6 +1,6 @@
 # MMV Handoff Brief
 > Context bridge for claude.ai, Claude Code, and Cowork sessions.
-> **Last updated:** 2026-04-12 (verified against TASKS.md, live DB, and codebase by Claude Code)
+> **Last updated:** 2026-04-17 (verified via browser playtest with claude-in-chrome)
 
 ---
 
@@ -270,6 +270,7 @@ npm run playthrough:test                                        # vitest integra
 - **Phase 1 playtest (P1.6)** — Skill queue built and deployed. Needs 7–10 real days with 2 testers. Set `NEXT_PUBLIC_SKILL_TIME_SCALE=0.01` in Vercel env vars for compressed testing.
 - **Phase 2 playtest (P2.4)** — Skills wired into storylets: 5 retrofits, diegetic practice hook, Content Studio controls. Set `PRACTICE_CREDIT_SECONDS` env var to tune practice credit (default 900 = 15 min). Awaiting playtest.
 - **Phase 4 playtest (P4.5)** — Routine-week mode built. Needs browser testing at Day 7+ to confirm weekly calendar loads, schedule commit works, deposits apply, and interruptions fire.
+- **Conversational nodes playtest (T-1776329281008)** — PASSED. lunch_floor conv-nodes work. All 3 paths (Doug ally, Keith defender, Observer) tested. Flag-gating on terminal choices works. Gate passed: "conversation not friction." Week 2 content unblocked.
 
 ---
 
@@ -294,6 +295,7 @@ npm run playthrough:test                                        # vitest integra
 
 | Date | Decision | Context |
 |------|----------|---------|
+| 2026-04-17 | **Auto-advance timer removed; segment transitions are explicit clicks** | The 400ms setTimeout auto-advance effect fired with state captured at render time (stale closure). After dismiss+advance merged click, the timer raced against the advance-segment POST, causing segment cascades (morning → afternoon → evening → night in ~1 second, skipping lunch_floor). Fixed via: (1) `resolvedTrackStoryletIds` tracks `storylet_key` not `progress_id`, (2) `advanceInFlightRef` guards concurrent `handleAdvanceSegment` calls, (3) auto-advance useEffect deleted entirely. SegmentTransitionCard handles empty segments with an explicit click. Playwright integration test added to guard against regression. |
 | 2026-04-12 | **Day advancement is exclusively sleep-driven** | `ensureCadenceUpToDate` (wall-clock) removed entirely. Day advances only when player clicks sleep. No "catch up" after absence. If a player is away 3 days, they return to the day they last slept on. Correct for narrative game. |
 | 2026-04-12 | **Server-authoritative day lifecycle invariant** | Only `/api/day/advance-segment` and `/api/day/advance-day` may write to `daily_states.day_index` or `player_day_state.current_segment`. Conditional UPDATEs for concurrency. No hand-rolled optimistic updates on client. |
 | 2026-04-12 | **Phase 4 routine-week mode built** | 3 new tables, 6 seeded activities, WeeklyCalendar UI, deposit system, interruption triggers. Activates at Day 7. 2 NPCs added: Spider, Karen. |
