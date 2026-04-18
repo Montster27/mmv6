@@ -6,9 +6,10 @@ import { BasicFields } from "./BasicFields";
 import { RequirementsPanel } from "./RequirementsPanel";
 import { ChoiceList } from "./ChoiceList";
 import { ArcPanel } from "./ArcPanel";
+import { NodesEditor } from "./NodesEditor";
 import { ValidationPanel } from "../ValidationPanel";
 
-type Tab = "basic" | "requirements" | "choices" | "arc" | "raw";
+type Tab = "basic" | "requirements" | "choices" | "nodes" | "arc" | "raw";
 
 interface StoryletEditorProps {
   storylet: Storylet;
@@ -91,10 +92,12 @@ export function StoryletEditor({
     return () => document.removeEventListener("keydown", handler);
   }, [handleSave]);
 
+  const nodeCount = Array.isArray(draft.nodes) ? draft.nodes.length : 0;
   const tabs: { id: Tab; label: string }[] = [
     { id: "basic", label: "Basic" },
     { id: "requirements", label: "Requirements" },
     { id: "choices", label: `Choices (${draft.choices?.length ?? 0})` },
+    { id: "nodes", label: nodeCount > 0 ? `Nodes (${nodeCount})` : "Nodes" },
     { id: "arc", label: draft.track_id ? "Track \u25cf" : "Track" },
     { id: "raw", label: "Raw JSON" },
   ];
@@ -150,6 +153,13 @@ export function StoryletEditor({
             stepKeyOptions={stepKeyOptions}
             onChange={(choices) => patch({ choices })}
             onCreateLinkedStorylet={onCreateLinkedStorylet}
+          />
+        )}
+
+        {tab === "nodes" && (
+          <NodesEditor
+            nodes={draft.nodes}
+            onChange={(nodes) => patch({ nodes })}
           />
         )}
 

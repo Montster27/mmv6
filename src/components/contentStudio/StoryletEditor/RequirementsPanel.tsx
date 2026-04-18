@@ -4,13 +4,6 @@ import type { Storylet } from "@/types/storylets";
 import { TagEditor } from "../TagEditor";
 import { NPC_REGISTRY } from "@/domain/npcs/registry";
 
-const PHASE_OPTIONS = [
-  "intro_hook",
-  "guided_core_loop",
-  "reflection_arc",
-  "community_purpose",
-] as const;
-
 const RESOURCE_GATE_KEYS = [
   { key: "requires_cash_min", label: "Cash min" },
   { key: "requires_knowledge_min", label: "Knowledge min" },
@@ -119,24 +112,6 @@ export function RequirementsPanel({ storylet, onChange }: RequirementsPanelProps
           />
         </label>
       </div>
-
-      <label className="block text-xs text-slate-600">
-        Trigger phase
-        <select
-          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-          value={(req.trigger_phase as string | undefined) ?? ""}
-          onChange={(e) =>
-            onChange(setReq(storylet, "trigger_phase", e.target.value || undefined))
-          }
-        >
-          <option value="">Any phase</option>
-          {PHASE_OPTIONS.map((p) => (
-            <option key={p} value={p}>
-              {p.replace(/_/g, " ")}
-            </option>
-          ))}
-        </select>
-      </label>
 
       <label className="block text-xs text-slate-600">
         Max total runs

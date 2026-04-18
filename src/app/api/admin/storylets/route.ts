@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   const admin = getAdminClient();
   let query = admin
     .from("storylets")
-    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body,requirements,introduces_npc,arc_id,step_key,order_index,due_offset_days,expires_after_days,default_next_key,track_id,storylet_key,segment,nodes");
+    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body,requirements,introduces_npc,arc_id,step_key,order_index,due_offset_days,expires_after_days,default_next_key,track_id,storylet_key,segment,time_cost_hours,is_conflict,nodes");
 
   if (active === "true") {
     query = query.eq("is_active", true);
@@ -101,13 +101,21 @@ export async function POST(request: Request) {
       weight: draft.weight ?? 100,
       requirements: draft.requirements ?? {},
       introduces_npc: payload.introduces_npc ?? null,
-      // Arc membership fields
-      arc_id: payload.arc_id ?? null,
-      step_key: payload.step_key ?? null,
+      // Track membership fields (write both legacy and current columns)
+      arc_id: payload.track_id ?? payload.arc_id ?? null,
+      step_key: payload.storylet_key ?? payload.step_key ?? null,
+      track_id: payload.track_id ?? payload.arc_id ?? null,
+      storylet_key: payload.storylet_key ?? payload.step_key ?? null,
       order_index: payload.order_index ?? null,
       due_offset_days: payload.due_offset_days ?? null,
       expires_after_days: payload.expires_after_days ?? null,
       default_next_key: payload.default_next_key ?? null,
+      // Segment / time-budget fields
+      segment: payload.segment ?? null,
+      time_cost_hours: payload.time_cost_hours ?? null,
+      is_conflict: payload.is_conflict ?? false,
+      // Conversational nodes
+      nodes: payload.nodes ?? null,
     })
     .select("id")
     .maybeSingle();

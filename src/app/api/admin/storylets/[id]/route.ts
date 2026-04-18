@@ -95,13 +95,21 @@ export async function PUT(
       weight: draft.weight ?? 100,
       requirements: draft.requirements ?? {},
       introduces_npc: payload.introduces_npc ?? null,
-      // Arc membership fields
-      arc_id: payload.arc_id ?? null,
-      step_key: payload.step_key ?? null,
+      // Track membership fields (write both legacy and current columns)
+      arc_id: payload.track_id ?? payload.arc_id ?? null,
+      step_key: payload.storylet_key ?? payload.step_key ?? null,
+      track_id: payload.track_id ?? payload.arc_id ?? null,
+      storylet_key: payload.storylet_key ?? payload.step_key ?? null,
       order_index: payload.order_index ?? null,
       due_offset_days: payload.due_offset_days ?? null,
       expires_after_days: payload.expires_after_days ?? null,
       default_next_key: payload.default_next_key ?? null,
+      // Segment / time-budget fields
+      segment: payload.segment ?? null,
+      time_cost_hours: payload.time_cost_hours ?? null,
+      is_conflict: payload.is_conflict ?? false,
+      // Conversational nodes
+      nodes: payload.nodes ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", resolvedParams.id);
