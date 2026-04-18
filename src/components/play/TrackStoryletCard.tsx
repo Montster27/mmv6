@@ -188,6 +188,7 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
               const option = storylet.options.find((o) => o.id === choiceId);
               if (option) handleChoice(option);
             }}
+            relationships={relationships as Record<string, Record<string, unknown>> | null}
             disabled={choosing || disabled}
           />
         ) : (

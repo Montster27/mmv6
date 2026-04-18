@@ -16,8 +16,55 @@ type DialogueNodeViewProps = {
     relational_effect?: Record<string, Record<string, number>>;
     identity_tags?: string[];
   }) => void;
+  /** NPC relationship state — used to evaluate npc_memory conditions on nodes. */
+  relationships?: Record<string, Record<string, unknown>> | null;
   disabled?: boolean;
 };
+
+/**
+ * Evaluate a node's condition against walk flags and NPC relationship state.
+ * Returns true if the node should be shown (condition met or absent).
+ */
+function evaluateNodeCondition(
+  condition: DialogueNode["condition"],
+  flags: Set<string>,
+  relationships?: Record<string, Record<string, unknown>> | null
+): boolean {
+  if (!condition) return true;
+  if (condition.flag && !flags.has(condition.flag)) return false;
+  if (condition.npc_memory) {
+    const dotIdx = condition.npc_memory.indexOf(".");
+    if (dotIdx > 0) {
+      const npcId = condition.npc_memory.slice(0, dotIdx);
+      const key = condition.npc_memory.slice(dotIdx + 1);
+      if (!relationships?.[npcId]?.[key]) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Find the first node whose condition passes. Used for initial node selection
+ * so storylets with conditional entry nodes branch correctly.
+ */
+function findInitialNode(
+  nodes: DialogueNode[],
+  relationships?: Record<string, Record<string, unknown>> | null
+): string | null {
+  const emptyFlags = new Set<string>();
+  for (const node of nodes) {
+    if (evaluateNodeCondition(node.condition, emptyFlags, relationships)) {
+      return node.id;
+    }
+    if (node.next) {
+      const target = nodes.find((n) => n.id === node.next);
+      if (target && evaluateNodeCondition(target.condition, emptyFlags, relationships)) {
+        return target.id;
+      }
+    }
+  }
+  return nodes[0]?.id ?? null;
+}
 
 /**
  * Walks a conversational node tree before presenting terminal choices.
@@ -69,10 +116,11 @@ export function DialogueNodeView({
   choices,
   onChoice,
   onMicroEffects,
+  relationships,
   disabled,
 }: DialogueNodeViewProps) {
-  const [currentNodeId, setCurrentNodeId] = useState<string | null>(
-    nodes[0]?.id ?? null
+  const [currentNodeId, setCurrentNodeId] = useState<string | null>(() =>
+    findInitialNode(nodes, relationships)
   );
   const [activeFlags, setActiveFlags] = useState<Set<string>>(new Set());
   const [completedNodeIds, setCompletedNodeIds] = useState<string[]>([]);
@@ -108,8 +156,7 @@ export function DialogueNodeView({
       }
 
       // Check condition gate on the target node
-      if (nextNode.condition?.flag && !newFlags.has(nextNode.condition.flag)) {
-        // Condition not met — skip this node, advance to its next
+      if (!evaluateNodeCondition(nextNode.condition, newFlags, relationships)) {
         advance(nextNode.next, undefined);
         return;
       }

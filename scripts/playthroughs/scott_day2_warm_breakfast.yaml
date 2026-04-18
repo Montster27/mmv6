@@ -1,0 +1,40 @@
+name: scott_day2_warm_breakfast
+description: >
+  Day 0 warm conversation → Day 2 warm entry path → breakfast with Scott.
+  Tests: conditional entry node via npc_memory, scott_engaged flag gating,
+  SHARED_MEAL + SHOWED_UP events on breakfast terminal.
+  Fixture starts at day_index=2 morning with first_morning chained on roommate.
+  started_day=1, so due_offset_days=2 fires on day_index=3.
+extends: fixtures/after_day0_party_path.snapshot.json
+
+steps:
+  # Resolve first_morning (chained from room_214, blocks pool mode)
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  # Advance to Day 3 morning where scott_day2_morning becomes due
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+
+  # Day 3 morning — scott_day2_morning should be in the pool
+  - type: expect_storylet_available
+    storylet_key: scott_day2_morning
+    at: { day: 3, segment: morning, track: roommate }
+    served_by: pool
+
+  # Walk warm entry node → tell him about night (sets scott_engaged)
+  - type: choose_node
+    node_id: entry_warm
+    micro_choice_id: tell_him_about_night
+
+  # warm_engaged → offer to knock next time
+  - type: choose_node
+    node_id: warm_engaged
+    micro_choice_id: next_time
+
+  # Terminal: breakfast with Scott (requires scott_engaged, excludes was_brief)
+  - type: choose
+    storylet_key: scott_day2_morning
+    choice_id: breakfast_with_scott

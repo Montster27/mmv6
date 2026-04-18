@@ -174,7 +174,10 @@ export type DialogueNode = {
   speaker?: string;
   /** Gate: node is skipped if condition not met. */
   condition?: {
+    /** Walk-local flag must be set. */
     flag?: string;
+    /** NPC memory key must be truthy. Format: "npc_id.memory_key". */
+    npc_memory?: string;
   };
   /** If present: show these micro-choices. If absent: show "Continue" auto-advance. */
   micro_choices?: MicroChoice[];
