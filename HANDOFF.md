@@ -60,49 +60,24 @@ V16MMV/mmv/
 
 ---
 
-## Live DB State (as of 2026-04-12)
+## Live DB State (as of 2026-04-17)
 
-### Active Storylets (10+ total)
+### Active Storylets: 31 total (see `docs/GAP-ANALYSIS.md` for full matrix)
 
-| storylet_key | Track | Segment | Day | Mode | Gates/Chains |
-|-------------|-------|---------|-----|------|--------------|
-| `room_214` | roommate | morning | 0 | CHAIN | → `first_morning` |
-| `first_morning` | roommate | morning | 1 | CHAIN | → NULL (track completes) |
-| `dorm_hallmates` | belonging | morning | 0 | CHAIN | choices → `lunch_floor` |
-| `lunch_floor` | belonging | afternoon | 0 | CHAIN | → `evening_choice` |
-| `evening_choice` | belonging | evening | 0 | CHAIN end | → NULL (pool takes over) |
-| `morning_after_party` | belonging | morning | 1 | POOL | requires_choice: `go_to_party` |
-| `morning_after_cards` | belonging | morning | 1 | POOL | requires_choice: `go_to_cards` |
-| `morning_after_union` | belonging | morning | 1 | POOL | requires_choice: `go_to_union` |
-| `advisor_visit` | academic | afternoon | 1 | CHAIN end | → NULL (track completes) |
-| `money_reality_check` | money | evening | 4 | POOL | no gate |
+| Track | Active | Day range | Key storylets |
+|-------|--------|-----------|---------------|
+| **roommate** | 6 | 0–14 | room_214 (chain), first_morning, **scott_day2_morning** (pool, Day 2), dana_cereal, dana_letter_* (3 variants), tuesday_night_dana_movie |
+| **belonging** | 11 | 0–14 | dorm_hallmates→lunch_floor→evening_choice (chain), morning_after_* (3 pool), miguel_guitar, priya_dining_hall, doug_coach_story, tuesday_commitment, tuesday_night_study |
+| **academic** | 2 | 1, 8 | advisor_visit, heller_lecture |
+| **money** | 7 | 4–14 | money_reality_check, job_board, first_shift_* (4 variants), tuesday_night_shift |
+| **opportunity** | 4 | 0–14 | glenn_pastime_paradise, terminal_first_visit, glenn_the_walk, tuesday_night_terminal |
+| **home** | 1 | 7 | pay_phone_line |
 
 ### Inactive/Disabled Storylets (5)
-
-| storylet_key | Track | Why disabled |
-|-------------|-------|-------------|
-| `hall_morning` | belonging | Superseded by morning_after_* pool variants (deactivated 2026-04-03) |
-| `dorm_roommate` | roommate | Superseded by room_214 conversational rewrite |
-| `roommate_moment` | roommate | Legacy content |
-| `orientation_fair` | belonging | Not yet written — placeholder |
-| `cal_midnight_knock` | belonging | Not yet written — placeholder |
+Same as before: hall_morning, dorm_roommate, roommate_moment, orientation_fair, cal_midnight_knock.
 
 ### Deleted Storylets
-
-| storylet_key | When | Why |
-|-------------|------|-----|
-| `bench_glenn` | 2026-04-02 | Orphaned; Contact scene needs redesign before re-adding |
-
-### Track Status
-
-| Track | Storylets | Content reaches | Status |
-|-------|-----------|----------------|--------|
-| **roommate** | 2 active | Day 1 morning → COMPLETED | Needs Day 2+ content |
-| **belonging** | 5 active (3 chain + 3 pool, one fires per run) | Day 1 morning → COMPLETED | Needs Day 2+ content |
-| **academic** | 1 active | Day 1 afternoon → COMPLETED | admin_errand was deleted/missing; advisor_visit is first storylet. Needs Day 2+ content |
-| **money** | 1 active | Day 4 evening (money_reality_check) | First money beat exists but no chain-in |
-| **opportunity** | 0 | — | Silent — no progress row created |
-| **home** | 0 | — | Silent — no progress row created |
+Same as before: bench_glenn (2026-04-02).
 
 ### New DB Tables (Phase 1-4)
 
@@ -256,9 +231,44 @@ npm run playthrough:test                                        # vitest integra
 - `requires_flag` is NOT enforced by engine — Glenn storylets using it pass regardless (known limitation)
 - Same-track validation in both engine and harness prevents cross-track chain bugs even with bad DB data
 
+### scott_day2_morning Storylet (built 2026-04-17)
+- First Day 2 content, filling the Days 2-3 content desert on the roommate track
+- **Engine extension:** `DialogueNode.condition` now supports `npc_memory` checks (format: `"npc_id.memory_key"`)
+- `DialogueNodeView` evaluates npc_memory conditions on initial node selection and during advance transitions
+- Three conditional entry nodes branch on NPC memory from room_214: warm (started_warm), neutral (played_cool), absent (fallback)
+- Room_214 retrofitted: `brief` and `look_around` micro-choices now set `npc_roommate_scott.played_cool` NPC memory
+- Terminal gating uses `scott_engaged` walk flag (fallback for unsupported `requires_flag_mode:"any"`)
+- `read_scotts_note` persisted as FLAG_SET via `sets_flag` on terminal choice — future Day 4-5 callback will check it
+- Playthrough script: `scott_day2_warm_breakfast.yaml` — warm path → breakfast with Scott
+- 31 active storylets total (was 30)
+
+### requires_flag Enforcement (built 2026-04-17)
+- `meetsRequirements()` now checks `requires_flag` alongside `requires_choice` and `requires_skill`
+- Flag storage: `choice_log` with `event_type='FLAG_SET'`, track-scoped
+- Resolve route writes FLAG_SET entries when choice has `sets_flag` array
+- Playthrough runner harness updated to load/write flags
+- 3 new unit tests (invariant 6 additions)
+- Glenn chain fixed: `glenn_pastime_paradise` sets `glenn_gave_direction`, `terminal_first_visit` sets `found_terminal`
+
+### Runtime Preclusion (T-016, built 2026-04-17)
+- When a choice has `precludes: ["storylet_key", ...]`, those keys are appended to `daily_states.preclusion_gates`
+- Pool scan in `selectTrackStorylets()` skips precluded keys (cross-track)
+- Preclusion is permanent per run, cleared on game reset
+- `evening_choice` precludes fixed: phantom keys replaced with actual `morning_after_*` keys
+- 3 new unit tests (invariant 8)
+- No new tables — uses existing `preclusion_gates` JSONB column on `daily_states`
+
+### Gap Analysis (T-006, built 2026-04-17)
+- Full Day 0-14 coverage matrix at `docs/GAP-ANALYSIS.md`
+- 30 active storylets, 42% slot coverage, 26 empty slots
+- Critical gaps: Days 2-3 completely empty, academic/roommate dark Days 2-7
+- Preclusion math: 30% inaccessibility achievable with existing fork points
+- Issues found: Dana/Scott naming regression (5 storylets), 11 flag-gated storylets, Day 14 4-track pileup
+
 ### Docs & Tooling
 - CLAUDE.md project bible with testing process (4-tier: SQL → vitest → SQL simulation → ask user)
-- CONTENT-RULES.md: authoritative chain/pool placement rules
+- CONTENT-RULES.md: authoritative chain/pool placement rules (+ Rule 11 for conv nodes)
+- GAP-ANALYSIS.md: Day 0-14 coverage matrix, collision map, preclusion status
 - CHAIN-MAP.md, ENGINE-SPEC.md, CONTENT-INVENTORY.md
 - Content creator agent (3-stage pipeline)
 - 5 Claude Code skills: `/new-storylet`, `/audit-content`, `/new-npc`, `/new-mini-game`, `/sync-board`
@@ -295,6 +305,9 @@ npm run playthrough:test                                        # vitest integra
 
 | Date | Decision | Context |
 |------|----------|---------|
+| 2026-04-17 | **scott_day2_morning: npc_memory conditions on dialogue nodes** | Extended `DialogueNode.condition` to support `npc_memory` checks (format: `"npc_id.key"`). Entry nodes branch on NPC memory from prior storylets. Used Option A (single storylet with router-style fallthrough) over Option C (three pool variants) — cleaner, no pool gating issues, forward-looking for future conditional content. Terminal choice gating uses `scott_engaged` walk flag as fallback for unsupported `requires_flag_mode:"any"`. `read_scotts_note` persisted via `sets_flag` for future Day 4-5 callback. Room_214 retrofitted with `played_cool` NPC memory on non-warm paths. |
+| 2026-04-17 | **Runtime preclusion + requires_flag enforcement (T-016)** | `meetsRequirements()` now enforces `requires_flag` (track-scoped, stored as FLAG_SET events in choice_log). Preclusion writes to `daily_states.preclusion_gates` (cross-track, per-run). Pool scan filters precluded keys. Evening_choice phantom precludes fixed. Glenn chain wired with `sets_flag`. 37 unit tests, all 209 tests pass. |
+| 2026-04-17 | **Gap analysis completed (T-006)** | 30 active storylets across all 6 tracks (was reported as 10+). Coverage matrix at `docs/GAP-ANALYSIS.md`. Critical: Days 2-3 empty, home track has 1 storylet, Dana/Scott naming regression in 5 storylets. 30% inaccessibility achievable with 4 fork points once content fills gaps. |
 | 2026-04-17 | **Auto-advance timer removed; segment transitions are explicit clicks** | The 400ms setTimeout auto-advance effect fired with state captured at render time (stale closure). After dismiss+advance merged click, the timer raced against the advance-segment POST, causing segment cascades (morning → afternoon → evening → night in ~1 second, skipping lunch_floor). Fixed via: (1) `resolvedTrackStoryletIds` tracks `storylet_key` not `progress_id`, (2) `advanceInFlightRef` guards concurrent `handleAdvanceSegment` calls, (3) auto-advance useEffect deleted entirely. SegmentTransitionCard handles empty segments with an explicit click. Playwright integration test added to guard against regression. |
 | 2026-04-12 | **Day advancement is exclusively sleep-driven** | `ensureCadenceUpToDate` (wall-clock) removed entirely. Day advances only when player clicks sleep. No "catch up" after absence. If a player is away 3 days, they return to the day they last slept on. Correct for narrative game. |
 | 2026-04-12 | **Server-authoritative day lifecycle invariant** | Only `/api/day/advance-segment` and `/api/day/advance-day` may write to `daily_states.day_index` or `player_day_state.current_segment`. Conditional UPDATEs for concurrency. No hand-rolled optimistic updates on client. |
@@ -343,12 +356,14 @@ ENGINE-SPEC.md says "requirements not read by track engine" (§2). **This is now
 | 3 | **CHAIN-MAP.md partially outdated** — still shows evening_choice → hall_morning chain; that's been broken | Medium | Needs update |
 | 4 | **Contact scene (Glenn) has no storylet** — bench_glenn deleted, no replacement written | High | Design decision needed: when/where does the Contact reveal fire? |
 | 5 | **Bryce and Peterson never formally introduced** — in registry, named in text, but no introduces_npc | Low | Add to relevant storylets |
-| 6 | **precludes arrays reference non-existent slugs** — evening_choice choices preclude slugs that don't exist | Medium | Preclusion not yet implemented; fix when it is |
+| 6 | ~~**precludes arrays reference non-existent slugs**~~ | ~~Medium~~ | **FIXED 2026-04-17** — updated to real storylet keys + preclusion engine built |
 | 7 | **first_morning.expires_after_days is NULL** — engine treats as 0, meaning it expires same day it's due | Medium | Should be 7 for orientation content |
 | 8 | **opportunity and home tracks have 0 storylets** — enabled but empty, no progress rows created | Medium | Need at least entry storylets |
 | 9 | **`time_skill` branch not yet merged to `main`** — all Phase 1-4 work lives on this branch | High | Merge after playtest |
 | 10 | **Phase 1-4 playtests outstanding** — skill queue, skills-in-storylets, routine-week all built but not playtested | High | Block content work until verified |
-| 11 | **`requires_flag` not enforced by engine** — `meetsRequirements()` only checks `requires_choice` and `requires_skill`. Unknown keys like `requires_flag` silently pass. Glenn storylets use this. | Medium | Surfaced by playthrough runner |
+| 11 | ~~**`requires_flag` not enforced by engine**~~ | ~~Medium~~ | **FIXED 2026-04-17** — `meetsRequirements()` now checks `requires_flag`. Glenn chain wired with `sets_flag`. |
+| 12 | **Dana/Scott naming regression** — 5 newer storylets use "Dana" instead of canonical "Scott". NPC events reference `npc_roommate_dana`. | Medium | Needs migration (T-1776329281010) |
+| 13 | **11 storylets still need `sets_flag` wiring** — job_board, dana_cereal, tuesday_commitment choices need `sets_flag` to gate downstream content. Glenn is fixed; rest pending. | Medium | Content migration needed |
 
 ---
 
