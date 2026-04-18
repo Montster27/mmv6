@@ -5,26 +5,19 @@ import type { DialogueNode, MicroChoice, StoryletChoice } from "@/types/storylet
 import { getNpcEntry } from "@/domain/npcs/registry";
 
 type DialogueNodeViewProps = {
-  /** Preamble text (body + any NPC intro blurb prepended). Shown persistently at top. */
   preamble: string;
   nodes: DialogueNode[];
   choices: StoryletChoice[];
   onChoice: (choiceId: string) => void;
-  /** Called when a micro-choice applies persistent NPC effects (memory / relational). */
   onMicroEffects?: (effects: {
     set_npc_memory?: Record<string, Record<string, boolean>>;
     relational_effect?: Record<string, Record<string, number>>;
     identity_tags?: string[];
   }) => void;
-  /** NPC relationship state — used to evaluate npc_memory conditions on nodes. */
   relationships?: Record<string, Record<string, unknown>> | null;
   disabled?: boolean;
 };
 
-/**
- * Evaluate a node's condition against walk flags and NPC relationship state.
- * Returns true if the node should be shown (condition met or absent).
- */
 function evaluateNodeCondition(
   condition: DialogueNode["condition"],
   flags: Set<string>,
@@ -43,10 +36,6 @@ function evaluateNodeCondition(
   return true;
 }
 
-/**
- * Find the first node whose condition passes. Used for initial node selection
- * so storylets with conditional entry nodes branch correctly.
- */
 function findInitialNode(
   nodes: DialogueNode[],
   relationships?: Record<string, Record<string, unknown>> | null
@@ -66,18 +55,6 @@ function findInitialNode(
   return nodes[0]?.id ?? null;
 }
 
-/**
- * Walks a conversational node tree before presenting terminal choices.
- *
- * Flow:
- *   preamble → node[0] → micro-choices → next node → … → terminal choices
- *
- * Flags set by micro-choices are local to this walk and used to gate
- * terminal choices via requires_flag / excludes_flag on StoryletChoice.
- *
- * Completed nodes fade into the background as the player advances.
- */
-/** Render a single node's text with speaker formatting. */
 function NodeText({
   node,
   className,
@@ -87,24 +64,23 @@ function NodeText({
 }) {
   if (node.speaker && node.speaker !== "narrator") {
     const entry = getNpcEntry(node.speaker);
-    // Fallback: extract last segment of NPC ID and capitalize (e.g. "npc_roommate_scott" → "Scott")
     const fallbackName = node.speaker.split("_").pop();
     const displayName =
       entry?.name ??
       (fallbackName ? fallbackName.charAt(0).toUpperCase() + fallbackName.slice(1) : node.speaker);
     return (
       <div className={className}>
-        <p className="whitespace-pre-line text-[15px] italic leading-relaxed text-foreground/85">
+        <p className="whitespace-pre-line font-body text-[15px] italic leading-relaxed text-foreground/85">
           &ldquo;{node.text}&rdquo;
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground/70">
+        <p className="mt-1 font-stat text-xs text-muted-foreground/60 tracking-wide">
           &mdash; {displayName}
         </p>
       </div>
     );
   }
   return (
-    <p className={`whitespace-pre-line text-[15px] leading-relaxed text-foreground/85 ${className ?? ""}`}>
+    <p className={`whitespace-pre-line font-body text-[15px] leading-relaxed text-foreground/85 ${className ?? ""}`}>
       {node.text}
     </p>
   );
@@ -146,7 +122,6 @@ export function DialogueNodeView({
 
       const nextNode = nodes.find((n) => n.id === dest);
       if (!nextNode) {
-        // Unknown target — fall through to choices
         setCompletedNodeIds((prev) =>
           currentNodeId ? [...prev, currentNodeId] : prev
         );
@@ -155,7 +130,6 @@ export function DialogueNodeView({
         return;
       }
 
-      // Check condition gate on the target node
       if (!evaluateNodeCondition(nextNode.condition, newFlags, relationships)) {
         advance(nextNode.next, undefined);
         return;
@@ -171,7 +145,6 @@ export function DialogueNodeView({
 
   const handleMicroChoice = useCallback(
     (micro: MicroChoice) => {
-      // Apply persistent effects (NPC memory, relational, identity tags)
       if (
         onMicroEffects &&
         (micro.set_npc_memory || micro.relational_effect || micro.identity_tags?.length)
@@ -196,7 +169,6 @@ export function DialogueNodeView({
     ? nodes.find((n) => n.id === currentNodeId)
     : null;
 
-  // Filter terminal choices by flag gates
   const visibleChoices = showChoices
     ? choices.filter((c) => {
         if (c.requires_flag && !activeFlags.has(c.requires_flag)) return false;
@@ -205,22 +177,21 @@ export function DialogueNodeView({
       })
     : [];
 
-  // Fall back to all choices if flag-gating would leave nothing
   const shownChoices = visibleChoices.length > 0 ? visibleChoices : showChoices ? choices : [];
 
   return (
     <div className="space-y-4">
-      {/* Preamble — always visible */}
-      <p className="whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">
+      {/* Preamble */}
+      <p className="whitespace-pre-line font-body text-base leading-relaxed text-foreground/85 max-w-[42rem]">
         {preamble}
       </p>
 
-      {/* Completed nodes — de-emphasised narrative scroll */}
+      {/* Completed nodes — faded narrative scroll */}
       {completedNodeIds.map((id) => {
         const node = nodes.find((n) => n.id === id);
         if (!node) return null;
         return (
-          <div key={id} className="opacity-50">
+          <div key={id} className="opacity-40 border-l-2 border-border/30 pl-4">
             <NodeText node={node} className="text-sm" />
           </div>
         );
@@ -228,16 +199,17 @@ export function DialogueNodeView({
 
       {/* Current active node */}
       {currentNode && (
-        <div className="animate-in fade-in duration-150">
+        <div className="narrative-enter">
           <NodeText node={currentNode} />
           <div className="mt-3 space-y-2">
             {currentNode.micro_choices && currentNode.micro_choices.length > 0 ? (
-              currentNode.micro_choices.map((micro) => (
+              currentNode.micro_choices.map((micro, i) => (
                 <button
                   key={micro.id}
                   disabled={disabled}
                   onClick={() => handleMicroChoice(micro)}
-                  className="w-full rounded-lg border border-border/60 bg-muted/40 px-4 py-2.5 text-left text-sm text-foreground/80 transition-all hover:border-primary/40 hover:bg-primary/5 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="micro-choice-btn choice-enter"
+                  style={{ animationDelay: `${i * 0.06}s` }}
                 >
                   {micro.label}
                 </button>
@@ -246,9 +218,9 @@ export function DialogueNodeView({
               <button
                 disabled={disabled}
                 onClick={handleContinue}
-                className="rounded border border-border/40 px-3 py-1.5 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground/70 disabled:opacity-50"
+                className="rounded border border-border/40 px-3 py-1.5 text-xs font-stat text-muted-foreground transition hover:border-primary/30 hover:text-foreground/70 disabled:opacity-50"
               >
-                Continue →
+                Continue
               </button>
             )}
           </div>
@@ -257,16 +229,19 @@ export function DialogueNodeView({
 
       {/* Terminal choices */}
       {shownChoices.length > 0 && (
-        <div className="animate-in fade-in duration-150 space-y-2">
-          {shownChoices.map((choice) => (
-            <button
-              key={choice.id}
-              disabled={disabled}
-              onClick={() => onChoice(choice.id)}
-              className="w-full rounded-lg border-2 border-primary/25 bg-card px-4 py-3 text-left text-sm font-medium text-foreground transition-all hover:border-primary hover:bg-primary/5 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {choice.label}
-            </button>
+        <div className="space-y-3 narrative-enter">
+          {shownChoices.map((choice, i) => (
+            <div key={choice.id}>
+              {i > 0 && <div className="prep-divider" />}
+              <button
+                disabled={disabled}
+                onClick={() => onChoice(choice.id)}
+                className="choice-btn choice-enter"
+                style={{ animationDelay: `${i * 0.08}s` }}
+              >
+                {choice.label}
+              </button>
+            </div>
           ))}
         </div>
       )}

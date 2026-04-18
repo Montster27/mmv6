@@ -11,7 +11,6 @@ import { resolveNpcTokens, type RelationshipState } from "@/lib/relationships";
 
 type MoneyBand = "tight" | "okay" | "comfortable";
 
-/** Money band hierarchy — higher index = more money. */
 const MONEY_BAND_RANK: Record<string, number> = {
   tight: 0,
   okay: 1,
@@ -33,12 +32,10 @@ type TrackStoryletCardProps = {
   onChoice: (storylet: TrackStorylet, option: StoryletChoice) => Promise<void>;
   disabled?: boolean;
   onDismiss?: () => void;
-  /** Override text for the dismiss button (e.g., "Continue to afternoon →") */
   dismissLabel?: string;
   resolvedOption?: StoryletChoice;
   moneyBand?: MoneyBand | null;
   relationships?: Record<string, RelationshipState> | null;
-  /** Player's current resource levels — used to gate choices with requires_resource / costs_resource */
   resources?: ResourceSnapshot | null;
 };
 
@@ -90,17 +87,12 @@ function computeDeltas(option: StoryletChoice): Array<{ label: string; delta: nu
     .map(([k, v]) => ({ label: RESOURCE_LABELS[k] ?? k, delta: v }));
 }
 
-/**
- * Checks requires_resource gate AND whether costs_resource can be afforded.
- * Returns null if the choice is available, or a message explaining what's missing.
- */
 function checkResourceAvailability(
   option: StoryletChoice,
   resources: ResourceSnapshot | null | undefined
 ): string | null {
   if (!resources) return null;
 
-  // Check requires_resource gate
   const req = option.requires_resource;
   if (req?.key && typeof req.min === "number") {
     const current = (resources as Record<string, number | undefined>)[req.key] ?? 0;
@@ -110,7 +102,6 @@ function checkResourceAvailability(
     }
   }
 
-  // Check costs_resource affordability
   const cost = option.costs_resource;
   if (cost?.key && typeof cost.amount === "number") {
     const current = (resources as Record<string, number | undefined>)[cost.key] ?? 0;
@@ -163,21 +154,21 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
   const resolvedDeltas = displayedOption ? computeDeltas(displayedOption) : [];
 
   return (
-    <div className="rounded border-2 border-primary/20 bg-card px-4 py-4 prep-stripe-top shadow-sm">
+    <div className="rounded border-2 border-primary/20 bg-card px-5 py-5 prep-stripe-top shadow-warm-lg narrative-enter">
       {/* Header */}
-      <div className="mb-3 flex items-start justify-between gap-2">
+      <div className="mb-4 flex items-start justify-between gap-2">
         <div>
-          <span className="prep-label text-primary/60">{trackLabel}</span>
-          <h3 className="mt-0.5 text-lg font-bold text-primary font-heading">{storylet.title}</h3>
+          <span className="prep-label">{trackLabel}</span>
+          <h3 className="mt-1 text-xl font-bold text-primary font-heading leading-snug">{storylet.title}</h3>
         </div>
         {daysLeft <= 1 && (
-          <span className="shrink-0 rounded bg-accent border border-accent-foreground/20 px-2 py-0.5 text-xs font-medium text-accent-foreground">
+          <span className="shrink-0 rounded bg-accent border border-accent-foreground/20 px-2.5 py-1 text-xs font-semibold font-stat text-accent-foreground">
             Expires today
           </span>
         )}
       </div>
 
-      {/* Body or conversational nodes — hidden on dismiss cards (resolvedOption from parent) */}
+      {/* Body or conversational nodes */}
       {!resolvedOption && (
         storylet.nodes && storylet.nodes.length > 0 && !displayedOption ? (
           <DialogueNodeView
@@ -192,28 +183,30 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
             disabled={choosing || disabled}
           />
         ) : (
-          <p className="mb-4 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{resolve(storylet.body)}</p>
+          <p className="mb-5 font-body text-base leading-relaxed text-foreground/85 whitespace-pre-line max-w-[42rem] narrative-enter narrative-enter-delay-1">{resolve(storylet.body)}</p>
         )
       )}
 
       {/* Post-choice result */}
       {displayedOption && (
-        <div className="rounded border border-border/60 bg-muted px-3 py-3 text-sm space-y-2">
-          <p className="font-medium text-primary">✓ {resolve(displayedOption.label)}</p>
+        <div className="rounded border border-border/40 bg-muted/60 px-4 py-4 space-y-3 outcome-enter">
+          <p className="font-heading font-semibold text-primary text-[15px]">
+            {resolve(displayedOption.label)}
+          </p>
           {displayedOption.reaction_text && (
-            <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{resolve(displayedOption.reaction_text)}</p>
+            <p className="font-body text-[15px] text-foreground/80 leading-relaxed whitespace-pre-line">{resolve(displayedOption.reaction_text)}</p>
           )}
           {resolvedDeltas.length > 0 && (
-            <ul className="flex flex-wrap gap-2 text-xs font-stat">
+            <ul className="flex flex-wrap gap-2 pt-1">
               {resolvedDeltas.map(({ label, delta }) => {
                 const isGood = label === "stress" ? delta < 0 : delta > 0;
                 return (
                   <li
                     key={label}
-                    className={`rounded px-1.5 py-0.5 ${
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-stat font-medium ${
                       isGood
-                        ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : "bg-red-50 text-red-600 border border-red-200"
                     }`}
                   >
                     {delta > 0 ? "+" : ""}{delta} {label}
@@ -229,10 +222,10 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
             />
           </TesterOnly>
           {onDismiss && (
-            <div className="pt-1">
+            <div className="pt-2">
               <button
                 onClick={onDismiss}
-                className="rounded border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5 active:bg-primary/10 transition"
+                className="rounded border-2 border-primary/25 px-4 py-2 text-sm font-medium font-heading text-primary hover:bg-primary/5 hover:border-primary/40 active:bg-primary/10 transition-all"
               >
                 {dismissLabel ?? "Continue"}
               </button>
@@ -241,10 +234,10 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
         </div>
       )}
 
-      {/* Options — only shown when there are no conversational nodes */}
+      {/* Choices — only when no conversational nodes */}
       {!displayedOption && !(storylet.nodes && storylet.nodes.length > 0) && (
-        <div className="flex flex-col gap-2">
-          {storylet.options.map((option) => {
+        <div className="flex flex-col gap-3">
+          {storylet.options.map((option, i) => {
             const moneyLocked = !meetsMoneyRequirement(moneyBand, option.money_requirement);
             const resourceBlock = checkResourceAvailability(option, resources);
             const locked = moneyLocked || !!resourceBlock;
@@ -253,48 +246,49 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
               : resourceBlock;
             const previewDeltas = computeDeltas(option);
             return (
-              <button
-                key={option.id}
-                onClick={() => !locked && handleChoice(option)}
-                disabled={choosing || disabled || locked}
-                aria-label={option.label}
-                className={`rounded border-2 px-4 py-2.5 text-left text-sm transition
-                  ${locked
-                    ? "border-border/40 bg-muted text-foreground/40 cursor-not-allowed"
-                    : "border-primary/30 bg-card text-foreground hover:border-primary hover:bg-primary/5 active:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  }`}
-              >
-                <span className="block">{resolve(option.label)}</span>
-                {(previewDeltas.length > 0 || locked) && (
-                  <span className="mt-1 flex flex-wrap gap-1.5">
-                    {previewDeltas.map(({ label, delta }) => {
-                      const isGood = label === "stress" ? delta < 0 : delta > 0;
-                      return (
-                        <span
-                          key={label}
-                          className={`text-xs font-stat ${
-                            locked ? "text-foreground/30" :
-                            isGood ? "text-green-600 dark:text-green-400" :
-                            "text-red-500 dark:text-red-400"
-                          }`}
-                        >
-                          {delta > 0 ? "+" : ""}{delta} {label}
+              <div key={option.id}>
+                {i > 0 && <div className="prep-divider" />}
+                <button
+                  onClick={() => !locked && handleChoice(option)}
+                  disabled={choosing || disabled || locked}
+                  aria-label={option.label}
+                  className={`choice-btn choice-enter ${locked ? "choice-btn--locked" : ""}`}
+                  style={{ animationDelay: `${i * 0.08}s` }}
+                >
+                  <span className="block">{resolve(option.label)}</span>
+                  {(previewDeltas.length > 0 || locked) && (
+                    <span className="mt-1.5 flex flex-wrap gap-2">
+                      {previewDeltas.map(({ label, delta }) => {
+                        const isGood = label === "stress" ? delta < 0 : delta > 0;
+                        return (
+                          <span
+                            key={label}
+                            className={`text-xs font-stat ${
+                              locked ? "text-foreground/25" :
+                              isGood ? "text-green-600" :
+                              "text-red-500"
+                            }`}
+                          >
+                            {delta > 0 ? "+" : ""}{delta} {label}
+                          </span>
+                        );
+                      })}
+                      {locked && lockReason && (
+                        <span className="text-xs text-red-400/70 italic font-body">
+                          {lockReason}
                         </span>
-                      );
-                    })}
-                    {locked && lockReason && (
-                      <span className="text-xs text-red-400 italic">{lockReason}</span>
-                    )}
-                  </span>
-                )}
-              </button>
+                      )}
+                    </span>
+                  )}
+                </button>
+              </div>
             );
           })}
         </div>
       )}
 
       {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-3 text-sm text-red-600 font-body">{error}</p>
       )}
     </div>
   );

@@ -9,6 +9,7 @@ module.exports = {
   	extend: {
   		fontFamily: {
   			heading: ['var(--font-playfair)', 'Georgia', 'serif'],
+  			body:    ['var(--font-lora)', 'Georgia', 'serif'],
   			stat:    ['var(--font-space-mono)', '"Courier New"', 'monospace'],
   		},
   		borderRadius: {

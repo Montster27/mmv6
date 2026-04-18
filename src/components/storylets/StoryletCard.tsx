@@ -11,29 +11,34 @@ export function StoryletCard({ storylet, onSelectChoice, disabled }: Props) {
   const choices = toChoices(storylet);
 
   return (
-    <div className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-4">
+    <div className="rounded border-2 border-primary/20 bg-card px-5 py-5 prep-stripe-top shadow-warm-lg space-y-4">
       <div>
-        <p className="text-sm text-slate-600">Preview</p>
-        <h3 className="text-lg font-semibold text-slate-900">
+        <p className="prep-label">Preview</p>
+        <h3 className="mt-1 font-heading text-xl font-bold text-primary leading-snug">
           {storylet.title}
         </h3>
-        <p className="text-slate-700">{storylet.body}</p>
+        <p className="mt-3 font-body text-base leading-relaxed text-foreground/85 whitespace-pre-line max-w-[42rem]">
+          {storylet.body}
+        </p>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {choices.length > 0 ? (
-          choices.map((choice) => (
-            <button
-              key={choice.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => onSelectChoice?.(choice)}
-              className="w-full justify-start rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed"
-            >
-              {choice.label}
-            </button>
+          choices.map((choice, i) => (
+            <div key={choice.id}>
+              {i > 0 && <div className="prep-divider my-3" />}
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onSelectChoice?.(choice)}
+                className="choice-btn choice-enter"
+                style={{ animationDelay: `${i * 0.08}s` }}
+              >
+                {choice.label}
+              </button>
+            </div>
           ))
         ) : (
-          <p className="text-slate-600 text-sm">No choices available.</p>
+          <p className="text-muted-foreground text-sm italic">No choices available.</p>
         )}
       </div>
     </div>

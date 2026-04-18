@@ -11,11 +11,14 @@ body {
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-family: var(--font-playfair, Georgia, "Times New Roman", serif);
+  font-family: var(--font-lora, var(--font-playfair, Georgia, "Times New Roman", serif));
+  font-size: 16px;
+  line-height: 1.7;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-playfair, Georgia, serif);
+  line-height: 1.3;
 }
 
 * {
@@ -33,23 +36,57 @@ html {
   color-scheme: light;
 }
 
-/* ── Stat highlight pulse ───────────────────────────────────────────── */
-@keyframes highlight-pulse {
-  0%   { opacity: 0; }
-  40%  { opacity: 1; }
-  100% { opacity: 0; }
+/* ══════════════════════════════════════════════════════════════════════
+   PHASE 1 — Typography & Reading Experience
+   ══════════════════════════════════════════════════════════════════════ */
+
+.font-heading {
+  font-family: var(--font-playfair, Georgia, serif);
 }
 
-.stat-highlight {
-  animation: highlight-pulse 250ms ease-out;
+.font-body {
+  font-family: var(--font-lora, Georgia, serif);
 }
 
-/* ── 80s Preppy Design System ───────────────────────────────────────── */
+.font-stat {
+  font-family: var(--font-space-mono, "Courier New", monospace);
+}
 
-/*
- * Polo stripe — the three-color band (coral | navy | kelly green)
- * Used as a top-accent on cards and section headers.
- */
+.prose-narrative {
+  font-family: var(--font-lora, Georgia, serif);
+  font-size: 1rem;
+  line-height: 1.75;
+  max-width: 42rem;
+}
+
+.prep-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  font-family: var(--font-space-mono, "Courier New", monospace);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   PHASE 2 — Atmosphere & Texture
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Warm paper grain — fixed overlay on body */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.35;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
+
+/* Polo stripe — three-color band (coral | navy | kelly green) */
 .prep-stripe-top {
   border-top: 4px solid transparent;
   border-image: linear-gradient(
@@ -60,9 +97,7 @@ html {
   ) 1;
 }
 
-/*
- * Diagonal pinstripe — subtle background texture for muted panels.
- */
+/* Diagonal pinstripe — subtle background texture */
 .prep-pinstripe {
   background-image: repeating-linear-gradient(
     -45deg,
@@ -73,9 +108,7 @@ html {
   );
 }
 
-/*
- * Argyle diamond — decorative divider between choice options.
- */
+/* Dashed argyle divider between choices */
 .prep-divider {
   height: 1px;
   background: repeating-linear-gradient(
@@ -87,42 +120,433 @@ html {
   );
 }
 
-/*
- * Collegiate label — all-caps micro-label for section heads.
- */
-.prep-label {
-  font-size: 0.625rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: hsl(214 30% 48%);
-  font-family: var(--font-space-mono, "Courier New", monospace);
-}
-
-/*
- * Heading font — serif display.
- */
-.font-heading {
-  font-family: var(--font-playfair, Georgia, serif);
-}
-
-/*
- * Monospace stat display — for numbers, energy, stress, day counter.
- */
-.font-stat {
-  font-family: var(--font-space-mono, "Courier New", monospace);
-}
-
-/*
- * Pennant banner — left-pointing arrow shape for section flags.
- * Usage: add to a flex container with a colored bg.
- */
+/* Pennant banner — clip-path arrow shape */
 .prep-pennant {
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
   padding-right: 1.5rem;
 }
 
-/* ── CSS custom properties ──────────────────────────────────────────── */
+/* Warm card shadow — used on storylet and status cards */
+.shadow-warm {
+  box-shadow:
+    0 1px 3px rgba(27, 58, 92, 0.06),
+    0 4px 12px rgba(27, 58, 92, 0.04),
+    0 0 0 1px rgba(27, 58, 92, 0.03);
+}
+
+.shadow-warm-lg {
+  box-shadow:
+    0 2px 8px rgba(27, 58, 92, 0.08),
+    0 8px 24px rgba(27, 58, 92, 0.06),
+    0 0 0 1px rgba(27, 58, 92, 0.04);
+}
+
+/* ── Segment mood tints ────────────────────────────────────────────── */
+
+[data-segment="morning"] {
+  --segment-bg: 210 35% 97%;
+  --segment-accent: 210 45% 65%;
+  --segment-label: "Morning";
+}
+
+[data-segment="afternoon"] {
+  --segment-bg: 42 45% 96%;
+  --segment-accent: 43 65% 50%;
+  --segment-label: "Afternoon";
+}
+
+[data-segment="evening"] {
+  --segment-bg: 25 35% 94%;
+  --segment-accent: 14 65% 55%;
+  --segment-label: "Evening";
+}
+
+[data-segment="night"] {
+  --segment-bg: 220 30% 93%;
+  --segment-accent: 214 45% 40%;
+  --segment-label: "Night";
+}
+
+.segment-tinted {
+  background-color: hsl(var(--segment-bg, var(--background)));
+  transition: background-color 0.8s ease;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   PHASE 3 — Choice Presentation
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Choice button — the core interactive element */
+.choice-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.875rem 1.125rem;
+  border-radius: 0.25rem;
+  border: 2px solid hsl(var(--primary) / 0.2);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-family: var(--font-lora, Georgia, serif);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.15s ease;
+}
+
+.choice-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: hsl(var(--primary) / 0.5);
+  background: hsl(var(--primary) / 0.03);
+  box-shadow:
+    0 2px 8px rgba(27, 58, 92, 0.08),
+    0 4px 16px rgba(27, 58, 92, 0.04);
+}
+
+.choice-btn:active:not(:disabled) {
+  transform: translateY(0);
+  background: hsl(var(--primary) / 0.06);
+}
+
+.choice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Locked choice — dimmed with lock indicator */
+.choice-btn--locked {
+  border-color: hsl(var(--border) / 0.4);
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground) / 0.4);
+  cursor: not-allowed;
+}
+
+.choice-btn--locked:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: hsl(var(--border) / 0.4);
+  background: hsl(var(--muted));
+}
+
+/* Micro-choice — lighter weight, conversational */
+.micro-choice-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.625rem 1rem;
+  border-radius: 0.375rem;
+  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--muted) / 0.3);
+  color: hsl(var(--foreground) / 0.8);
+  font-family: var(--font-lora, Georgia, serif);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    border-color 0.2s ease,
+    background-color 0.15s ease;
+}
+
+.micro-choice-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: hsl(var(--primary) / 0.35);
+  background: hsl(var(--primary) / 0.04);
+}
+
+.micro-choice-btn:active:not(:disabled) {
+  transform: scale(0.995);
+}
+
+.micro-choice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   PHASE 4 — Game Chrome & Status
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Collegiate nav bar */
+.nav-collegiate {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(
+    to right,
+    hsl(14 73% 61%)   33%,
+    hsl(145 52% 30%)  33% 66%,
+    hsl(43 70% 48%)   66%
+  ) 1;
+}
+
+.nav-link {
+  font-family: var(--font-space-mono, "Courier New", monospace);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--primary-foreground) / 0.6);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.nav-link:hover {
+  color: hsl(var(--primary-foreground) / 0.9);
+  background: hsl(var(--primary-foreground) / 0.08);
+}
+
+.nav-link--active {
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--primary-foreground) / 0.12);
+  font-weight: 700;
+}
+
+/* Resource bar — colored fills */
+.resource-bar {
+  height: 0.5rem;
+  width: 100%;
+  border-radius: 999px;
+  background: hsl(var(--muted));
+  overflow: hidden;
+}
+
+.resource-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.resource-bar__fill--energy {
+  background: linear-gradient(90deg, hsl(145 52% 40%), hsl(145 52% 30%));
+}
+
+.resource-bar__fill--stress {
+  background: linear-gradient(90deg, hsl(14 65% 55%), hsl(0 62% 50%));
+}
+
+.resource-bar__fill--knowledge {
+  background: linear-gradient(90deg, hsl(214 50% 50%), hsl(214 55% 35%));
+}
+
+.resource-bar__fill--cash {
+  background: linear-gradient(90deg, hsl(43 70% 52%), hsl(43 65% 40%));
+}
+
+.resource-bar__fill--social {
+  background: linear-gradient(90deg, hsl(336 45% 55%), hsl(336 50% 45%));
+}
+
+.resource-bar__fill--resilience {
+  background: linear-gradient(90deg, hsl(155 40% 45%), hsl(155 45% 35%));
+}
+
+.resource-bar__fill--default {
+  background: hsl(var(--primary) / 0.6);
+}
+
+/* Game status bar */
+.game-status-bar {
+  background: hsl(var(--primary) / 0.05);
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  font-family: var(--font-space-mono, "Courier New", monospace);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   PHASE 5 — Transitions & Motion
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Stat highlight pulse — extended with color tint */
+@keyframes highlight-pulse {
+  0%   { opacity: 0; box-shadow: none; }
+  40%  { opacity: 1; }
+  100% { opacity: 0; box-shadow: none; }
+}
+
+.stat-highlight {
+  animation: highlight-pulse 400ms ease-out;
+}
+
+.stat-highlight--gain {
+  animation: highlight-pulse 400ms ease-out;
+  background-color: hsl(145 40% 94%);
+  border-color: hsl(145 40% 70%);
+}
+
+.stat-highlight--loss {
+  animation: highlight-pulse 400ms ease-out;
+  background-color: hsl(14 60% 95%);
+  border-color: hsl(14 50% 70%);
+}
+
+/* Narrative fade-in — for storylet body and segment transitions */
+@keyframes narrative-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.narrative-enter {
+  animation: narrative-fade-in 0.5s ease-out both;
+}
+
+.narrative-enter-delay-1 { animation-delay: 0.1s; }
+.narrative-enter-delay-2 { animation-delay: 0.25s; }
+.narrative-enter-delay-3 { animation-delay: 0.4s; }
+
+/* Choice reveal — staggered appearance */
+@keyframes choice-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.choice-enter {
+  animation: choice-reveal 0.3s ease-out both;
+}
+
+/* Post-choice outcome — smooth reveal */
+@keyframes outcome-reveal {
+  from {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+}
+
+.outcome-enter {
+  animation: outcome-reveal 0.4s ease-out both;
+  overflow: hidden;
+}
+
+/* Day rollover overlay */
+@keyframes day-rollover-enter {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.day-rollover {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  animation: day-rollover-enter 1.6s ease-in-out both;
+  pointer-events: none;
+}
+
+/* Segment transition fade */
+@keyframes segment-text-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.segment-text-enter {
+  animation: segment-text-reveal 0.6s ease-out both;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   PHASE 6 — Period Details
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* VHS scan line overlay — extremely subtle period texture */
+.vhs-overlay::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent      0px,
+    transparent      3px,
+    rgba(0,0,0,0.015) 3px,
+    rgba(0,0,0,0.015) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* Anomaly card — for time-travel / Contact moments */
+.card-anomaly {
+  position: relative;
+  border-color: hsl(var(--chart-5) / 0.3);
+  background:
+    linear-gradient(135deg, hsl(var(--card)) 0%, hsl(336 20% 96%) 100%);
+  overflow: hidden;
+}
+
+.card-anomaly::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0px,
+    transparent 2px,
+    hsl(336 40% 50% / 0.03) 2px,
+    hsl(336 40% 50% / 0.03) 4px
+  );
+}
+
+@keyframes anomaly-glitch {
+  0%, 94% { transform: translate(0); }
+  95%     { transform: translate(-1px, 1px); }
+  96%     { transform: translate(1px, -1px); }
+  97%     { transform: translate(0); }
+}
+
+.card-anomaly--glitch {
+  animation: anomaly-glitch 8s infinite;
+}
+
+/* Choice cursor — crosshair on hover for narrative weight */
+.choice-btn:hover:not(:disabled) {
+  cursor: pointer;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   CSS Custom Properties
+   ══════════════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {

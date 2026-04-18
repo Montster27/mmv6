@@ -3,24 +3,21 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
-const cardVariants = cva("rounded border-2", {
+const cardVariants = cva("rounded border-2 shadow-warm", {
   variants: {
     variant: {
-      // Cream card — standard surface
       default:
         "border-border bg-card",
-      // Striped highlight card — storylets, choices
       highlight:
-        "border-primary/20 bg-card prep-stripe-top shadow-sm",
-      // Pinstripe muted — sidebars, allocation panels
+        "border-primary/20 bg-card prep-stripe-top shadow-warm-lg",
       muted:
         "border-border/60 bg-muted prep-pinstripe",
-      // Soft mint — secondary info, stats
       mint:
         "border-secondary-foreground/20 bg-secondary",
-      // Coral tint — warnings, events, flags
       accent:
         "border-accent-foreground/20 bg-accent",
+      anomaly:
+        "card-anomaly border-2",
       success:
         "border-emerald-300 bg-emerald-50",
       warning:
@@ -30,7 +27,7 @@ const cardVariants = cva("rounded border-2", {
     },
     padding: {
       default: "px-4 py-3",
-      lg: "px-4 py-4",
+      lg: "px-5 py-5",
       sm: "px-3 py-2",
       none: "",
     },

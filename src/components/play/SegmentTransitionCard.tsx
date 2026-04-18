@@ -8,7 +8,7 @@ const NEXT_SEGMENT: Record<Segment, Segment> = {
   morning: 'afternoon',
   afternoon: 'evening',
   evening: 'night',
-  night: 'night', // handled by SleepCard, should not reach here
+  night: 'night',
 };
 
 const SEGMENT_FLAVOR: Record<Segment, { heading: string; body: string }> = {
@@ -36,32 +36,29 @@ type Props = {
   onAdvance: () => void;
 };
 
-/**
- * Shown when all arc beats for the current segment are resolved and it
- * is not yet night. Gives the player a narrative moment before the next
- * segment begins, rather than jumping straight to "Daily complete".
- */
 export function SegmentTransitionCard({ currentSegment, hoursRemaining, onAdvance }: Props) {
   const nextSegment = NEXT_SEGMENT[currentSegment];
   const flavor = SEGMENT_FLAVOR[nextSegment];
 
   return (
-    <div className="rounded border-2 border-primary/15 bg-card px-5 py-5 space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+    <div className="rounded border-2 border-primary/10 bg-card px-6 py-6 shadow-warm-lg space-y-4 narrative-enter">
+      <p className="prep-label segment-text-enter">
         {currentSegment} — done
       </p>
-      <p className="font-heading text-lg font-semibold text-foreground">
+      <h3 className="font-heading text-2xl font-bold text-foreground leading-snug segment-text-enter" style={{ animationDelay: '0.15s' }}>
         {flavor.heading}
-      </p>
+      </h3>
       {flavor.body && (
-        <p className="text-sm text-foreground/70 leading-relaxed">{flavor.body}</p>
+        <p className="font-body text-base text-foreground/70 leading-relaxed max-w-[36rem] segment-text-enter" style={{ animationDelay: '0.3s' }}>
+          {flavor.body}
+        </p>
       )}
-      <div className="flex items-center justify-between pt-1">
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {hoursRemaining}h remaining · {nextSegment} next
+      <div className="flex items-center justify-between pt-2 segment-text-enter" style={{ animationDelay: '0.45s' }}>
+        <span className="font-stat text-xs text-muted-foreground tabular-nums">
+          {hoursRemaining}h remaining
         </span>
-        <Button onClick={onAdvance} size="sm">
-          Continue to {nextSegment} →
+        <Button onClick={onAdvance} size="default">
+          Continue to {nextSegment}
         </Button>
       </div>
     </div>
