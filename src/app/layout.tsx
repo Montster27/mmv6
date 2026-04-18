@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display, Space_Mono } from "next/font/google";
+import { Inter, Playfair_Display, Space_Mono, Lora } from "next/font/google";
 import "./globals.css";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ToastProvider } from "@/components/ui/toast-provider";
@@ -23,6 +23,12 @@ const spaceMono = Space_Mono({
   display: "swap",
 });
 
+const lora = Lora({
+  subsets: ["latin"],
+  variable: "--font-lora",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Move My Value",
   description: "An 80s college life simulation",
@@ -35,7 +41,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${playfair.variable} ${spaceMono.variable}`}>
+      <body className={`${inter.variable} ${playfair.variable} ${spaceMono.variable} ${lora.variable}`}>
         <QueryProvider>
           <ToastProvider>
             {children}

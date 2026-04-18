@@ -36,7 +36,7 @@ type Props = {
   onSkillWebOpen?: () => void;
 };
 
-const HIGHLIGHT_MS = 250;
+const HIGHLIGHT_MS = 400;
 
 const clamp = (value: number, min = 0, max = 100) =>
   Math.min(max, Math.max(min, value));
@@ -51,29 +51,42 @@ function toVectors(raw: DailyState["vectors"]): SevenVectors {
   return {};
 }
 
-function bar(value?: number, highlight?: boolean) {
+const BAR_FILL_CLASS: Record<string, string> = {
+  energy: "resource-bar__fill resource-bar__fill--energy",
+  stress: "resource-bar__fill resource-bar__fill--stress",
+  knowledge: "resource-bar__fill resource-bar__fill--knowledge",
+  cashOnHand: "resource-bar__fill resource-bar__fill--cash",
+  socialLeverage: "resource-bar__fill resource-bar__fill--social",
+  physicalResilience: "resource-bar__fill resource-bar__fill--resilience",
+};
+
+function bar(value: number | undefined, key: string, highlight?: boolean) {
   if (typeof value !== "number") return null;
   const width = clamp(value);
-  const highlightClass = highlight ? "stat-highlight ring-2 ring-cyan-300/60" : "";
+  const fillClass = BAR_FILL_CLASS[key] ?? "resource-bar__fill resource-bar__fill--default";
+  const highlightClass = highlight
+    ? key === "stress"
+      ? "stat-highlight--loss"
+      : "stat-highlight--gain"
+    : "";
   return (
-    <div
-      className={`h-2 w-full rounded bg-slate-200 transition ${highlightClass}`}
-    >
+    <div className={`resource-bar ${highlightClass}`}>
       <div
-        className="h-2 rounded bg-slate-600 transition"
+        className={fillClass}
         style={{ width: `${width}%` }}
       />
     </div>
   );
 }
 
-function deltaBadge(delta?: number, highlight?: boolean) {
+function deltaBadge(delta?: number, isGain?: boolean) {
   if (typeof delta !== "number" || delta === 0) return null;
   const sign = delta > 0 ? "+" : "";
-  const highlightClass = highlight ? "text-cyan-700 stat-highlight" : "text-slate-600";
   return (
     <span
-      className={`ml-2 text-xs ${highlightClass}`}
+      className={`ml-2 text-xs font-stat font-medium ${
+        isGain ? "text-green-600" : "text-red-500"
+      }`}
     >
       {sign}
       {delta}
@@ -131,55 +144,47 @@ function ProgressPanelComponent({
   }, [lastAppliedDeltas]);
 
   return (
-    <aside className="rounded-md border border-slate-200 bg-white px-4 py-4 space-y-4">
-      <h2 className="text-sm font-semibold text-slate-800">
+    <aside className="rounded border-2 border-border/60 bg-card px-4 py-4 shadow-warm space-y-4">
+      <h2 className="prep-label">
         {scarcityMode ? "Energy & Stress" : "Resources"}
       </h2>
       <div
-        className="space-y-2"
+        className="space-y-3"
         onMouseEnter={onResourcesHoverStart}
         onMouseLeave={onResourcesHoverEnd}
       >
-        <div
-          className={`flex items-center justify-between text-sm ${
-            highlightEnergy
-              ? "text-slate-900 font-medium underline decoration-cyan-400/70 stat-highlight"
-              : "text-slate-700"
-          }`}
-        >
-          <span>{resourceLabel("energy")}</span>
-          <span>
-            {typeof energy === "number" ? energy : "—"}
-            {deltaBadge(lastAppliedDeltas?.energy, highlightEnergy)}
-          </span>
+        <div>
+          <div className="flex items-center justify-between text-sm text-foreground/80 mb-1">
+            <span className="font-body">{resourceLabel("energy")}</span>
+            <span className="font-stat text-xs">
+              {typeof energy === "number" ? energy : "\u2014"}
+              {deltaBadge(lastAppliedDeltas?.energy, (lastAppliedDeltas?.energy ?? 0) > 0)}
+            </span>
+          </div>
+          {bar(energy, "energy", highlightEnergy)}
         </div>
-        {bar(energy, highlightEnergy)}
-        <div
-          className={`flex items-center justify-between text-sm ${
-            highlightStress
-              ? "text-slate-900 font-medium underline decoration-cyan-400/70 stat-highlight"
-              : "text-slate-700"
-          }`}
-        >
-          <span>{resourceLabel("stress")}</span>
-          <span>
-            {typeof stress === "number" ? stress : "—"}
-            {deltaBadge(lastAppliedDeltas?.stress, highlightStress)}
-          </span>
+        <div>
+          <div className="flex items-center justify-between text-sm text-foreground/80 mb-1">
+            <span className="font-body">{resourceLabel("stress")}</span>
+            <span className="font-stat text-xs">
+              {typeof stress === "number" ? stress : "\u2014"}
+              {deltaBadge(lastAppliedDeltas?.stress, (lastAppliedDeltas?.stress ?? 0) < 0)}
+            </span>
+          </div>
+          {bar(stress, "stress", highlightStress)}
         </div>
-        {bar(stress, highlightStress)}
       </div>
 
       {scarcityMode ? (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-          <div className="flex items-center justify-between">
-            <span>Energy level</span>
-            <span className="capitalize">{energyLevel ?? deriveEnergyLevel(energy ?? 100)}</span>
+        <div className="rounded border border-border/40 bg-muted/50 px-3 py-2.5 text-sm">
+          <div className="flex items-center justify-between text-foreground/70">
+            <span className="font-body">Energy level</span>
+            <span className="font-stat text-xs capitalize">{energyLevel ?? deriveEnergyLevel(energy ?? 100)}</span>
           </div>
           <TesterOnly>
-            <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+            <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
               <span>Money band</span>
-              <span className="capitalize">
+              <span className="capitalize font-stat">
                 {dailyState?.money_band ?? "okay"}
               </span>
             </div>
@@ -188,61 +193,61 @@ function ProgressPanelComponent({
       ) : null}
 
       {!scarcityMode ? (
-        <div className="space-y-1 text-sm text-slate-700">
+        <div className="space-y-1.5 text-sm">
           {resourcesEnabled ? (
             <>
-              <div className="flex items-center justify-between">
-                <span>{resourceLabel("knowledge")}</span>
-                <span>{dayState?.knowledge ?? 0}</span>
+              <div className="flex items-center justify-between text-foreground/70">
+                <span className="font-body">{resourceLabel("knowledge")}</span>
+                <span className="font-stat text-xs">{dayState?.knowledge ?? 0}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span>{resourceLabel("cashOnHand")}</span>
-                <span>{dayState?.cashOnHand ?? 0}</span>
+              <div className="flex items-center justify-between text-foreground/70">
+                <span className="font-body">{resourceLabel("cashOnHand")}</span>
+                <span className="font-stat text-xs">{dayState?.cashOnHand ?? 0}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span>{resourceLabel("socialLeverage")}</span>
-                <span>{dayState?.socialLeverage ?? 0}</span>
+              <div className="flex items-center justify-between text-foreground/70">
+                <span className="font-body">{resourceLabel("socialLeverage")}</span>
+                <span className="font-stat text-xs">{dayState?.socialLeverage ?? 0}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span>{resourceLabel("physicalResilience")}</span>
-                <span>{dayState?.physicalResilience ?? 0}</span>
+              <div className="flex items-center justify-between text-foreground/70">
+                <span className="font-body">{resourceLabel("physicalResilience")}</span>
+                <span className="font-stat text-xs">{dayState?.physicalResilience ?? 0}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span>{resourceLabel("morale")}</span>
-                <span>{typeof morale === "number" ? morale : "—"}</span>
+              <div className="flex items-center justify-between text-foreground/70">
+                <span className="font-body">{resourceLabel("morale")}</span>
+                <span className="font-stat text-xs">{typeof morale === "number" ? morale : "\u2014"}</span>
               </div>
             </>
           ) : (
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground italic font-body">
               Your reserves shift quietly beneath the day.
             </p>
           )}
           {skillsEnabled ? (
             <>
-            <div className="flex items-center justify-between text-slate-600">
-              <span>{resourceLabel("skillPoints")}</span>
-              <span>
+            <div className="flex items-center justify-between text-foreground/60 pt-1">
+              <span className="font-body">{resourceLabel("skillPoints")}</span>
+              <span className="font-stat text-xs">
                 {typeof skillBank?.available_points === "number"
                   ? `${skillBank.available_points} / ${skillBank.cap}`
-                  : "—"}
+                  : "\u2014"}
               </span>
             </div>
-            <div className="mt-2 space-y-1 text-slate-600">
+            <div className="mt-2 space-y-1 text-foreground/60">
               <div className="flex items-center justify-between">
-                <span>{resourceLabel("focus")}</span>
-                <span>{skillLevels.focus}</span>
+                <span className="font-body">{resourceLabel("focus")}</span>
+                <span className="font-stat text-xs">{skillLevels.focus}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>{resourceLabel("memory")}</span>
-                <span>{skillLevels.memory}</span>
+                <span className="font-body">{resourceLabel("memory")}</span>
+                <span className="font-stat text-xs">{skillLevels.memory}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>{resourceLabel("networking")}</span>
-                <span>{skillLevels.networking}</span>
+                <span className="font-body">{resourceLabel("networking")}</span>
+                <span className="font-stat text-xs">{skillLevels.networking}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>{resourceLabel("grit")}</span>
-                <span>{skillLevels.grit}</span>
+                <span className="font-body">{resourceLabel("grit")}</span>
+                <span className="font-stat text-xs">{skillLevels.grit}</span>
               </div>
             </div>
           </>
@@ -256,11 +261,11 @@ function ProgressPanelComponent({
           onMouseEnter={onVectorsHoverStart}
           onMouseLeave={onVectorsHoverEnd}
         >
-          <p className="text-sm font-semibold text-slate-800">Vectors</p>
+          <p className="prep-label">Vectors</p>
           {vectorKeys.length === 0 ? (
-            <p className="text-sm text-slate-700">No vectors yet.</p>
+            <p className="text-sm text-muted-foreground italic font-body">No vectors yet.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {vectorKeys.map((key) => {
                 const value = vectors[key] ?? 0;
                 const delta = lastAppliedDeltas?.vectors?.[key];
@@ -268,21 +273,15 @@ function ProgressPanelComponent({
                   typeof highlight?.vectors?.[key] === "number" &&
                   highlight.vectors[key] !== 0;
                 return (
-                  <div key={key} className="space-y-1">
-                    <div
-                      className={`flex items-center justify-between text-sm ${
-                        highlightVector
-                          ? "text-slate-900 font-medium underline decoration-cyan-400/70 stat-highlight"
-                          : "text-slate-700"
-                      }`}
-                    >
-                      <span className="capitalize">{key}</span>
-                      <span>
+                  <div key={key}>
+                    <div className="flex items-center justify-between text-sm text-foreground/70 mb-1">
+                      <span className="capitalize font-body">{key}</span>
+                      <span className="font-stat text-xs">
                         {value}
-                        {deltaBadge(delta, highlightVector)}
+                        {deltaBadge(delta, (delta ?? 0) > 0)}
                       </span>
                     </div>
-                    {bar(value, highlightVector)}
+                    {bar(value, key, highlightVector)}
                   </div>
                 );
               })}
@@ -292,7 +291,7 @@ function ProgressPanelComponent({
       ) : null}
 
       {!scarcityMode ? (
-        <div className="text-sm text-slate-700 space-y-1">
+        <div className="text-sm text-muted-foreground font-body italic">
           <p>{summary}</p>
         </div>
       ) : null}
@@ -300,7 +299,7 @@ function ProgressPanelComponent({
       {onSkillWebOpen && (
         <button
           onClick={onSkillWebOpen}
-          className="w-full rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition"
+          className="w-full rounded border-2 border-primary/20 bg-card px-3 py-2 text-sm font-medium font-heading text-primary hover:bg-primary/5 hover:border-primary/30 transition-all"
         >
           Skill Web
         </button>

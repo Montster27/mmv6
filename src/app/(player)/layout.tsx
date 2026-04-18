@@ -16,10 +16,12 @@ export default function PlayerLayout({
       {(session) => (
         <QueryProvider>
           <SessionProvider session={session}>
-            <PlayerNav />
-            <main>
-              <ClientErrorBoundary>{children}</ClientErrorBoundary>
-            </main>
+            <div className="vhs-overlay min-h-screen">
+              <PlayerNav />
+              <main className="segment-tinted min-h-[calc(100vh-3rem)]">
+                <ClientErrorBoundary>{children}</ClientErrorBoundary>
+              </main>
+            </div>
           </SessionProvider>
         </QueryProvider>
       )}
