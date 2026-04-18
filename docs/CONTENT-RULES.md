@@ -220,6 +220,31 @@ ACADEMIC TRACK:
 
 ---
 
+## Rule 11: Conversational nodes — constraints for content authors.
+
+When a storylet uses `nodes` (a dialogue tree before terminal choices), the following limits apply:
+
+| Constraint | Limit | Why |
+|-----------|-------|-----|
+| Sentences per node | 4 max | Player should never scroll within a node |
+| Micro-choices per node | 2–4 | More = decision paralysis |
+| Depth before terminal choices | 2–4 micro-choice points | Deeper = storylet doing too much; split it |
+| Total node word budget | 200–350 words | Same total as the flat body it replaces |
+| NPC memory writes per walk | 2 max | Don't overload scenes with persistent state |
+| Identity tags on micro-choices | 0–1, usually 0 | Tags are for reflection; most conv moves aren't identity-defining |
+| Time/energy cost on micro-choices | NEVER | That's what terminal choices are for |
+| Preclusion on micro-choices | NEVER | Micro-choices shape tone, not life direction |
+
+**Micro-choices are cheap.** No time cost, no energy cost, no resource costs, no preclusion, no `next_key`, no `sets_track_state`, no outcomes. They set walk-local flags (via `sets_flag`) and optionally deposit NPC memory or relational effects. Terminal choices retain sole authority over track progression and resource changes.
+
+**Walk flags are ephemeral.** They exist only during the node walk and are used to gate terminal choices via `requires_flag` / `excludes_flag`. They do not persist after the storylet resolves.
+
+**Always leave at least one ungated terminal choice.** If all terminal choices have `requires_flag`, the player can be stranded when walk flags don't match. At least one terminal should always be visible.
+
+**Speaker formatting:** When a node has `speaker: "npc_roommate_scott"`, the text renders as italicized quoted dialogue with a small attribution line beneath (NPC display name from registry). No speaker (or `speaker: "narrator"`) renders as regular prose.
+
+---
+
 ## Anti-Pattern Summary
 
 | Anti-Pattern | Why It Breaks |

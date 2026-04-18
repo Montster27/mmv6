@@ -39,7 +39,7 @@ Defined in `src/lib/relationships.ts`.
 | `knows_name` | `boolean` | — | Whether the player has learned the NPC's name (can precede `met` if overheard). |
 | `knows_face` | `boolean` | — | Whether the player recognises the NPC by sight. |
 | `role_tag` | `string` | — | Static label describing the NPC's role (e.g. `roommate`, `professor`, `ra`). Set once on initialisation. |
-| `relationship` | `number` | 1–10 | General warmth/closeness score. Initialised at 5 (Dana starts at 6, parents at 7). Clamped by `clampRelationship`. |
+| `relationship` | `number` | 1–10 | General warmth/closeness score. Initialised at 5 (Scott starts at 6, parents at 7). Clamped by `clampRelationship`. |
 | `trust` | `number` | −3 to +3 | How much this NPC opens up to and relies on the player. Affects dialogue availability and certain storyline unlocks. |
 | `reliability` | `number` | −3 to +3 | Whether the NPC counts on the player to follow through. Affects whether the NPC asks the player for help or invites them to things. |
 | `emotionalLoad` | `number` | 0–3 | How much this NPC is leaning on the player emotionally. Higher values can trigger crisis storylines and increase energy cost of some choices. |
@@ -221,7 +221,7 @@ Relationship values can be read via `condition` path expressions to gate individ
   "id": "confide_back",
   "label": "Tell him something real",
   "condition": {
-    "path": "relationships.npc_roommate_dana.trust",
+    "path": "relationships.npc_roommate_scott.trust",
     "equals": 2
   }
 }

@@ -218,6 +218,21 @@
       "created_at": "2026-04-12T17:28:51.10385+00:00"
     },
     {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "day": 1,
+      "event_type": "FLAG_SET",
+      "track_id": "b420acd7-b726-44ba-907b-b91fd6056ca5",
+      "track_progress_id": null,
+      "step_key": "glenn_pastime_paradise",
+      "offer_id": null,
+      "option_key": "glenn_gave_direction",
+      "delta": {},
+      "meta": {
+        "source_choice": "head_to_evening"
+      },
+      "created_at": "2026-04-12T17:28:51.20000+00:00"
+    },
+    {
       "id": "6116851e-e5f6-40b4-b4ce-df3bd5bf5791",
       "day": 1,
       "event_type": "STORYLET_RESOLVED",

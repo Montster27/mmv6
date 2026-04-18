@@ -294,3 +294,46 @@ getOrCreateDailyRun()
 There is no queue scanning, no order_index-based sequencing after initialization, no day-based auto-discovery. Every storylet after the first in a track must be chained via `next_key` on a choice or `default_next_key` on the prior storylet.
 
 The only exception: the very first storylet in a track, set by `buildInitialTrackProgress()` using `order_index`. After that, `order_index` is irrelevant.
+
+---
+
+## 9. Conversational Node Walk
+
+A storylet with a non-null `nodes` column (jsonb array of `DialogueNode`) renders as an interactive dialogue tree before terminal choices.
+
+### Rendering flow
+
+```
+1. If storylet.nodes IS NULL → render as flat (body + choices). No change.
+
+2. Else:
+   a. Show storylet.body as preamble (1–3 sentences).
+   b. Start at nodes[0].
+   c. Render node: show text. If node has speaker (NPC id), render as
+      italicized quoted dialogue with small attribution line beneath.
+   d. If node has micro_choices → show as inline options.
+      On selection:
+        - apply sets_flag to walk-local flag set (in-memory only)
+        - apply set_npc_memory / relational_effect to persistent state (DB)
+        - navigate to micro_choice.next
+   e. If node has next (no micro_choices) → show "Continue" → node.next.
+   f. Repeat until next == "choices" or "exit".
+
+3. When next == "choices":
+   a. Filter terminal choices:
+      - hide if requires_flag not in walk flags
+      - hide if excludes_flag is in walk flags
+      - fallback: if filtering leaves zero choices, show all
+   b. Render remaining terminal choices as usual.
+
+4. When next == "exit":
+   a. Storylet ends. Resolve via default_next_key. No terminal choice logged.
+```
+
+### Invariants
+
+- Node walk emits NO `choice_log` rows. Only terminal choices log.
+- Node walk cannot write `next_key_override` or `sets_track_state`. Terminal choices retain sole authority over track progression.
+- Walk flags are in-memory only. They do not hit the DB.
+- NPC memory and relational effects from micro-choices commit immediately (not deferred).
+- `requires_flag` / `excludes_flag` on `StoryletChoice` are walk-local — not persisted, not read by the engine for pool gating.

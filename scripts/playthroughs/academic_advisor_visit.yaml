@@ -1,0 +1,60 @@
+name: academic_advisor_visit
+description: >
+  Tier 3 coverage backfill for the academic track.
+
+  advisor_visit is the first storylet on the academic track (order_index=1)
+  with due_offset_days=1, segment=afternoon, expires_after_days=7. With
+  started_day=1 that puts it eligible from Day 2 afternoon through Day 9.
+  It is served via chain override (next_key_override) on Day 2.
+
+  This regression test ensures the academic track wakes up on Day 2
+  afternoon and serves advisor_visit instead of silently skipping it —
+  the failure mode of the first_morning NULL-expiry bug class.
+
+steps:
+  # ── Day 1 Morning — clear the roommate/belonging chains ─────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 1 Afternoon ─────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: catch_keiths_eye
+
+  # ── Day 1 Evening ───────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+
+  # ── Sleep → Day 2 ───────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 2 Morning — clear first_morning chain so it doesn't compete ─────
+  - type: expect_storylet_available
+    storylet_key: first_morning
+    served_by: chain
+
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  # ── Day 2 Afternoon — advisor_visit on academic track (chain override) ──
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: advisor_visit
+    served_by: chain
+    at: {track: academic}
+
+  - type: choose
+    storylet_key: advisor_visit
+    choice_id: defer

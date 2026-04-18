@@ -1,0 +1,116 @@
+{
+  "script_name": "glenn_directive_people",
+  "total_steps": 7,
+  "entries": [
+    {
+      "step_index": 0,
+      "step_type": "choose",
+      "step_summary": "choose(room_214, head_out)",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "room_214",
+        "choice_id": "head_out",
+        "next_key": "first_morning",
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 1,
+      "step_type": "choose",
+      "step_summary": "choose(dorm_hallmates, lunch_first)",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "dorm_hallmates",
+        "choice_id": "lunch_first",
+        "next_key": "lunch_floor",
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 2,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 3,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(glenn_pastime_paradise)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "served_storylet_key": "glenn_pastime_paradise",
+        "served_by": "chain",
+        "track_key": "opportunity",
+        "expires_on_day": 8
+      }
+    },
+    {
+      "step_index": 4,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(lunch_floor)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "served_storylet_key": "lunch_floor",
+        "served_by": "chain",
+        "track_key": "belonging",
+        "expires_on_day": 8
+      }
+    },
+    {
+      "step_index": 5,
+      "step_type": "choose",
+      "step_summary": "choose(glenn_pastime_paradise, head_to_evening)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "storylet_key": "glenn_pastime_paradise",
+        "choice_id": "head_to_evening",
+        "next_key": null,
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 6,
+      "step_type": "choose",
+      "step_summary": "choose(lunch_floor, laugh_with_doug)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "storylet_key": "lunch_floor",
+        "choice_id": "laugh_with_doug",
+        "next_key": "evening_choice",
+        "track_completed": false
+      }
+    }
+  ]
+}

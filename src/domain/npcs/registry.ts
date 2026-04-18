@@ -10,10 +10,10 @@ export type NpcEntry = {
 export const NPC_REGISTRY: NpcEntry[] = [
   // ── Day 1 Core NPCs ──
   {
-    id: "npc_roommate_dana",
-    name: "Dana",
+    id: "npc_roommate_scott",
+    name: "Scott",
     short_intro:
-      "Dana, your roommate — already set up when you arrived, Tigers pennant on the wall, quiet",
+      "Scott, your roommate — already set up when you arrived, Tigers pennant on the wall, quiet",
   },
   {
     id: "npc_ra_scott",

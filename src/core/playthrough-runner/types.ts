@@ -42,8 +42,13 @@ export type SleepStep = {
   type: "sleep";
 };
 
-// Future step types — throw "not implemented" when encountered
-export type ChooseNodeStep = { type: "choose_node"; [key: string]: unknown };
+export type ChooseNodeStep = {
+  type: "choose_node";
+  /** Current node id — asserted for script correctness. */
+  node_id: string;
+  /** Which micro-choice to pick. */
+  micro_choice_id: string;
+};
 export type CommitRoutineStep = { type: "commit_routine"; [key: string]: unknown };
 export type AdvanceDayStep = { type: "advance_day"; [key: string]: unknown };
 
@@ -89,6 +94,37 @@ export type ScriptResult = {
   stepsRun: number;
   totalSteps: number;
   durationMs: number;
+};
+
+// ---------------------------------------------------------------------------
+// Deterministic step trace (for drift detection / golden-file comparison)
+// ---------------------------------------------------------------------------
+
+/**
+ * One observation per step. Omit any field that's N/A for the step type.
+ * Serialized to `scripts/playthroughs/traces/<script_name>.trace.json` and
+ * committed to git — unexpected diffs in PR review surface drift.
+ *
+ * Invariants:
+ *   - No wall-clock timestamps, no user_ids, no DB-generated ids.
+ *   - Deterministic given identical content + scripted steps.
+ */
+export type TraceEntry = {
+  step_index: number;
+  step_type: ScriptStep["type"];
+  step_summary: string;
+  state_before: {
+    day: number;
+    segment: string;
+    hours_remaining: number;
+  };
+  observed: Record<string, unknown>;
+};
+
+export type ScriptTrace = {
+  script_name: string;
+  total_steps: number;
+  entries: TraceEntry[];
 };
 
 // ---------------------------------------------------------------------------

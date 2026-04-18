@@ -51,8 +51,29 @@ export async function loadChoiceLog(
   const { data, error } = await db
     .from("choice_log")
     .select("track_id,option_key")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("event_type", "STORYLET_RESOLVED");
   if (error) throw new Error(`Failed to load choice_log: ${error.message}`);
+
+  const map = new Map<string, Set<string>>();
+  for (const row of data ?? []) {
+    if (!row.track_id || !row.option_key) continue;
+    const set = map.get(row.track_id) ?? new Set<string>();
+    set.add(row.option_key);
+    map.set(row.track_id, set);
+  }
+  return map;
+}
+
+export async function loadFlagLog(
+  userId: string
+): Promise<Map<string, Set<string>>> {
+  const { data, error } = await db
+    .from("choice_log")
+    .select("track_id,option_key")
+    .eq("user_id", userId)
+    .eq("event_type", "FLAG_SET");
+  if (error) throw new Error(`Failed to load flag_log: ${error.message}`);
 
   const map = new Map<string, Set<string>>();
   for (const row of data ?? []) {

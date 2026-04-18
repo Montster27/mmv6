@@ -1,0 +1,26 @@
+wing: mmv
+rooms:
+- name: agents
+  description: Files from agents/
+- name: content
+  description: Files from content/
+- name: documentation
+  description: Files from docs/
+- name: supabase
+  description: Files from supabase/
+- name: public
+  description: Files from public/
+- name: scripts
+  description: Files from scripts/
+- name: skills
+  description: Files from skills/
+- name: src
+  description: Files from src/
+- name: design
+  description: Files from assets/
+- name: frontend
+  description: Files from ui/
+- name: backend
+  description: Files from server/
+- name: general
+  description: Files that don't fit other rooms

@@ -8,7 +8,7 @@
 
 import { randomUUID } from "node:crypto";
 import { db } from "./client";
-import { loadTracks, loadStorylets, loadChoiceLog } from "./loader";
+import { loadTracks, loadStorylets, loadChoiceLog, loadFlagLog } from "./loader";
 import {
   selectTrackStorylets,
   buildInitialTrackProgress,
@@ -20,9 +20,20 @@ import {
 } from "@/core/resources/applyResourcesServer";
 import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 import type { Track, TrackStoryletRow, TrackProgress, DueStorylet } from "@/types/tracks";
+import type { DialogueNode, MicroChoice } from "@/types/storylets";
 import type { FixtureSnapshot } from "./types";
 
 const SEGMENT_ORDER = ["morning", "afternoon", "evening", "night"] as const;
+
+/** In-memory state for a node walk in progress. */
+type WalkState = {
+  storyletKey: string;
+  currentNodeId: string | null;
+  flags: Set<string>;
+  nodes: DialogueNode[];
+  /** Whether the walk has reached "choices" or "exit". */
+  terminal: "choices" | "exit" | null;
+};
 
 export class PlaythroughHarness {
   userId = "";
@@ -33,6 +44,9 @@ export class PlaythroughHarness {
 
   private tracks: Track[] = [];
   private storylets: TrackStoryletRow[] = [];
+
+  /** Active node walk (set by chooseNode, cleared by choose or sleep). */
+  walkState: WalkState | null = null;
 
   // -------------------------------------------------------------------------
   // Lifecycle
@@ -95,7 +109,10 @@ export class PlaythroughHarness {
       .select("*")
       .eq("user_id", this.userId);
 
-    const resolvedChoicesByTrack = await loadChoiceLog(this.userId);
+    const [resolvedChoicesByTrack, flagsByTrack] = await Promise.all([
+      loadChoiceLog(this.userId),
+      loadFlagLog(this.userId),
+    ]);
 
     const { data: skills } = await db
       .from("player_skills")
@@ -103,6 +120,17 @@ export class PlaythroughHarness {
       .eq("user_id", this.userId)
       .eq("status", "trained");
     const trainedSkillIds = new Set((skills ?? []).map((s) => s.skill_id as string));
+
+    const { data: dailyRow } = await db
+      .from("daily_states")
+      .select("preclusion_gates")
+      .eq("user_id", this.userId)
+      .maybeSingle();
+    const precludedKeys = new Set<string>(
+      Array.isArray(dailyRow?.preclusion_gates)
+        ? (dailyRow.preclusion_gates as string[])
+        : []
+    );
 
     return selectTrackStorylets({
       dayIndex: this.dayIndex,
@@ -113,6 +141,8 @@ export class PlaythroughHarness {
       hoursRemaining: this.hoursRemaining,
       resolvedChoicesByTrack,
       trainedSkillIds,
+      flagsByTrack,
+      precludedKeys,
     });
   }
 
@@ -286,7 +316,169 @@ export class PlaythroughHarness {
       meta: { next_key: validNextKey },
     });
 
+    // Write persistent flags (sets_flag on choice)
+    const setsFlag = choice.sets_flag as string[] | undefined;
+    if (Array.isArray(setsFlag) && setsFlag.length > 0) {
+      const flagInserts = setsFlag.map((flag) => ({
+        user_id: this.userId,
+        day: this.dayIndex,
+        event_type: "FLAG_SET",
+        track_id: storylet.track_id,
+        track_progress_id: progressRow.id,
+        step_key: storyletKey,
+        option_key: flag,
+        meta: { source_choice: choiceId },
+      }));
+      await db.from("choice_log").insert(flagInserts);
+    }
+
+    // Apply preclusion (permanently lock out named storylets for this run)
+    const precludes = choice.precludes as string[] | undefined;
+    if (Array.isArray(precludes) && precludes.length > 0) {
+      const { data: dailyRow } = await db
+        .from("daily_states")
+        .select("preclusion_gates")
+        .eq("user_id", this.userId)
+        .maybeSingle();
+
+      const current = Array.isArray(dailyRow?.preclusion_gates)
+        ? (dailyRow.preclusion_gates as string[])
+        : [];
+      const merged = [...new Set([...current, ...precludes])];
+
+      await db
+        .from("daily_states")
+        .update({ preclusion_gates: merged })
+        .eq("user_id", this.userId);
+    }
+
     return { nextKey: validNextKey, trackCompleted };
+  }
+
+  /**
+   * Walk a node tree: pick a micro-choice, apply its effects, advance.
+   * Call repeatedly until walkState.terminal is set, then switch to choose().
+   */
+  async chooseNode(
+    nodeId: string,
+    microChoiceId: string
+  ): Promise<{ nextNodeId: string | null; terminal: "choices" | "exit" | null }> {
+    // Initialize walk state if needed
+    if (!this.walkState) {
+      // Caller must ensure the storylet is known — find it from context
+      throw new Error(
+        `No active node walk. Use chooseNode only after a storylet with nodes is served.`
+      );
+    }
+    const ws = this.walkState;
+
+    if (ws.currentNodeId !== nodeId) {
+      throw new Error(
+        `Node walk at "${ws.currentNodeId}" but script asserts "${nodeId}"`
+      );
+    }
+
+    const node = ws.nodes.find((n) => n.id === nodeId);
+    if (!node) throw new Error(`Node "${nodeId}" not found in walk`);
+    if (!node.micro_choices?.length) {
+      throw new Error(`Node "${nodeId}" has no micro_choices`);
+    }
+
+    const micro = node.micro_choices.find((m) => m.id === microChoiceId);
+    if (!micro) {
+      const ids = node.micro_choices.map((m) => m.id).join(", ");
+      throw new Error(
+        `Micro-choice "${microChoiceId}" not found on node "${nodeId}". Available: [${ids}]`
+      );
+    }
+
+    // Apply walk-local flag
+    if (micro.sets_flag) {
+      ws.flags.add(micro.sets_flag);
+    }
+
+    // Apply persistent NPC effects
+    if (micro.set_npc_memory && Object.keys(micro.set_npc_memory).length > 0) {
+      const { data: daily } = await db
+        .from("daily_states")
+        .select("npc_memory")
+        .eq("user_id", this.userId)
+        .maybeSingle();
+      const current = (daily?.npc_memory as Record<string, Record<string, boolean>>) ?? {};
+      const merged = { ...current };
+      for (const [npcId, flags] of Object.entries(micro.set_npc_memory)) {
+        merged[npcId] = { ...(merged[npcId] ?? {}), ...flags };
+      }
+      await db
+        .from("daily_states")
+        .update({ npc_memory: merged, updated_at: new Date().toISOString() })
+        .eq("user_id", this.userId);
+    }
+
+    // Navigate to next
+    const dest = micro.next;
+    if (dest === "choices" || dest === "exit") {
+      ws.terminal = dest;
+      ws.currentNodeId = null;
+      return { nextNodeId: null, terminal: dest };
+    }
+
+    // Find next node, check condition gate
+    const nextNode = ws.nodes.find((n) => n.id === dest);
+    if (!nextNode) {
+      // Unknown target — fall through to choices
+      ws.terminal = "choices";
+      ws.currentNodeId = null;
+      return { nextNodeId: null, terminal: "choices" };
+    }
+
+    // Skip nodes whose condition is not met
+    if (nextNode.condition?.flag && !ws.flags.has(nextNode.condition.flag)) {
+      // Advance past this node to its next
+      ws.currentNodeId = nextNode.next ?? null;
+      if (!ws.currentNodeId || ws.currentNodeId === "choices") {
+        ws.terminal = "choices";
+        ws.currentNodeId = null;
+        return { nextNodeId: null, terminal: "choices" };
+      }
+      if (ws.currentNodeId === "exit") {
+        ws.terminal = "exit";
+        ws.currentNodeId = null;
+        return { nextNodeId: null, terminal: "exit" };
+      }
+      return { nextNodeId: ws.currentNodeId, terminal: null };
+    }
+
+    ws.currentNodeId = dest;
+    return { nextNodeId: dest, terminal: null };
+  }
+
+  /**
+   * Begin a node walk for a storylet. Called by the executor before choose_node steps.
+   */
+  beginNodeWalk(storyletKey: string): void {
+    const storylet = this.storylets.find((s) => s.storylet_key === storyletKey);
+    if (!storylet) throw new Error(`Storylet not found: ${storyletKey}`);
+
+    const nodes = storylet.nodes as DialogueNode[] | null;
+    if (!nodes?.length) {
+      throw new Error(`Storylet "${storyletKey}" has no nodes`);
+    }
+
+    this.walkState = {
+      storyletKey,
+      currentNodeId: nodes[0].id,
+      flags: new Set(),
+      nodes,
+      terminal: null,
+    };
+  }
+
+  /**
+   * Get the walk-local flags from the current node walk.
+   */
+  getWalkFlags(): Set<string> {
+    return this.walkState?.flags ?? new Set();
   }
 
   /**
@@ -511,6 +703,7 @@ export class PlaythroughHarness {
       npc_memory: {},
       relationships: {},
       expired_opportunities: [],
+      preclusion_gates: [],
       start_date: new Date().toISOString().slice(0, 10),
     });
 

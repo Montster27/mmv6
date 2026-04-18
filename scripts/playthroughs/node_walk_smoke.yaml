@@ -1,0 +1,43 @@
+name: node_walk_smoke
+description: >
+  Smoke test for the conversational node system. Walks the lunch_floor node tree
+  (salad-bar joke), picks the "laugh with Doug" micro-choice, then verifies that
+  the flag-gated terminal choice (laugh_with_doug) is reachable. Uses the
+  catch_keiths_eye terminal (ungated) to resolve — proves ungated choices remain
+  visible regardless of walk flags.
+
+steps:
+  # ── Day 0 Morning — reach lunch_floor via standard chain ──────────────
+  - type: expect_storylet_available
+    storylet_key: room_214
+
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — lunch_floor with node walk ──────────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: lunch_floor
+
+  # Walk the node tree: pick "laugh with Doug" micro-choice
+  - type: choose_node
+    node_id: salad_bar_joke
+    micro_choice_id: laugh_with_doug_micro
+
+  # Terminal choices now visible — laugh_with_doug requires "sided_with_doug"
+  # flag which was set. Pick the ungated catch_keiths_eye to prove both are available.
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: catch_keiths_eye
+
+  # ── Day 0 Evening — continue normally ─────────────────────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: evening_choice

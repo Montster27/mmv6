@@ -76,6 +76,10 @@ export async function POST(request: Request) {
     supabaseServer.from("user_anomalies").delete().eq("user_id", userId),
     supabaseServer.from("player_routine_schedules").delete().eq("user_id", userId),
     supabaseServer.from("routine_week_state").delete().eq("user_id", userId),
+    supabaseServer.from("player_skills").delete().eq("user_id", userId),
+    supabaseServer.from("skill_practice_events").delete().eq("user_id", userId),
+    supabaseServer.from("player_skill_web").delete().eq("user_id", userId),
+    supabaseServer.from("player_composites").delete().eq("user_id", userId),
     supabaseServer
       .from("social_actions")
       .delete()
@@ -96,6 +100,7 @@ export async function POST(request: Request) {
       npc_memory: {},
       relationships: {},
       expired_opportunities: [],
+      preclusion_gates: [],
       replay_intention: dailyState?.replay_intention ?? {},
       // TODO(arc-one): decide whether replay intention persists beyond Arc One.
       arc_one_reflection_done: false,

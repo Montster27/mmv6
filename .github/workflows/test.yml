@@ -7,6 +7,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,4 +17,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Validate content schema + track engine invariants
+        run: npm run validate:content
       - run: npm test
+      - name: Playthrough coverage report (advisory)
+        if: always()
+        run: npm run playthrough:coverage || true

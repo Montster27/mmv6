@@ -106,6 +106,8 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     set_npc_memory: setNpcMemory,
     requires_resource: requiresResource,
     costs_resource: costsResource,
+    requires_flag: isString(obj.requires_flag) ? obj.requires_flag : undefined,
+    excludes_flag: isString(obj.excludes_flag) ? obj.excludes_flag : undefined,
   };
 }
 

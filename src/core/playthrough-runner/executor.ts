@@ -5,7 +5,7 @@
  * Failure output is the most important deliverable.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import * as yaml from "js-yaml";
 import { PlaythroughHarness } from "./harness";
@@ -15,6 +15,8 @@ import type {
   StepFailure,
   ScriptResult,
   FixtureSnapshot,
+  TraceEntry,
+  ScriptTrace,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -61,6 +63,8 @@ function describeStep(step: ScriptStep): string {
       return `expect_resource(${step.name} ${step.op} ${step.value})`;
     case "choose":
       return `choose(${step.storylet_key}, ${step.choice_id})`;
+    case "choose_node":
+      return `choose_node(${step.node_id}, ${step.micro_choice_id})`;
     case "advance_segment":
       return "advance_segment";
     case "sleep":
@@ -102,12 +106,15 @@ function compareOp(actual: number, op: string, expected: number): boolean {
 
 export async function executeScript(
   script: PlaythroughScript,
-  options?: { scriptDir?: string; verbose?: boolean }
-): Promise<ScriptResult> {
+  options?: { scriptDir?: string; verbose?: boolean; recordTrace?: boolean }
+): Promise<ScriptResult & { trace?: ScriptTrace }> {
   const startTime = Date.now();
   const failures: StepFailure[] = [];
   const harness = new PlaythroughHarness();
   const scriptDir = options?.scriptDir ?? resolve("scripts/playthroughs");
+  const traceEntries: TraceEntry[] | undefined = options?.recordTrace
+    ? []
+    : undefined;
 
   try {
     // Initialize harness (fresh or from fixture)
@@ -125,7 +132,6 @@ export async function executeScript(
 
       // Future step types
       if (
-        step.type === "choose_node" ||
         step.type === "commit_routine" ||
         step.type === "advance_day"
       ) {
@@ -135,7 +141,13 @@ export async function executeScript(
       }
 
       try {
-        const failure = await executeStep(harness, step, i, priorSteps);
+        const failure = await executeStep(
+          harness,
+          step,
+          i,
+          priorSteps,
+          traceEntries
+        );
         if (failure) {
           failures.push(failure);
           if (options?.verbose) {
@@ -169,7 +181,7 @@ export async function executeScript(
       }
     }
 
-    return {
+    const result: ScriptResult & { trace?: ScriptTrace } = {
       name: script.name,
       passed: failures.length === 0,
       failures,
@@ -179,6 +191,16 @@ export async function executeScript(
       totalSteps: script.steps.length,
       durationMs: Date.now() - startTime,
     };
+
+    if (traceEntries) {
+      result.trace = {
+        script_name: script.name,
+        total_steps: script.steps.length,
+        entries: traceEntries,
+      };
+    }
+
+    return result;
   } finally {
     await harness.teardown().catch((err) => {
       console.error(`[runner] teardown failed: ${(err as Error).message}`);
@@ -189,13 +211,35 @@ export async function executeScript(
 /**
  * Execute a single step. Returns a StepFailure if the assertion fails, null if OK.
  * Throws on hard errors (DB failures, missing storylets, etc.).
+ *
+ * If `trace` is provided, appends a deterministic observation entry on
+ * successful steps. Failed steps are recorded via StepFailure instead —
+ * a trace represents the successful path only.
  */
 async function executeStep(
   harness: PlaythroughHarness,
   step: ScriptStep,
   stepIndex: number,
-  priorSteps: ScriptStep[]
+  priorSteps: ScriptStep[],
+  trace?: TraceEntry[]
 ): Promise<StepFailure | null> {
+  // Capture state_before snapshot for trace (deterministic — no wall clock).
+  const stateBefore = {
+    day: harness.dayIndex,
+    segment: harness.currentSegment,
+    hours_remaining: harness.hoursRemaining,
+  };
+  const pushTrace = (observed: Record<string, unknown>): void => {
+    if (!trace) return;
+    trace.push({
+      step_index: stepIndex,
+      step_type: step.type,
+      step_summary: describeStep(step),
+      state_before: stateBefore,
+      observed,
+    });
+  };
+
   switch (step.type) {
     case "expect_storylet_available": {
       const available = await harness.getAvailableStorylets();
@@ -258,6 +302,15 @@ async function executeStep(
         }
       }
 
+      pushTrace({
+        served_storylet_key: match.storylet.storylet_key,
+        served_by:
+          match.progress.next_key_override === match.storylet.storylet_key
+            ? "chain"
+            : "pool",
+        track_key: match.track.key,
+        expires_on_day: match.expires_on_day,
+      });
       return null;
     }
 
@@ -282,6 +335,7 @@ async function executeStep(
           priorSteps,
         };
       }
+      pushTrace({ not_available: step.storylet_key });
       return null;
     }
 
@@ -300,21 +354,78 @@ async function executeStep(
           priorSteps,
         };
       }
+      pushTrace({ name: step.name, value: actual });
       return null;
     }
 
     case "choose": {
-      await harness.choose(step.storylet_key, step.choice_id);
+      // Clear walk state on terminal choice (walk flags consumed)
+      harness.walkState = null;
+      const outcome = await harness.choose(step.storylet_key, step.choice_id);
+      pushTrace({
+        storylet_key: step.storylet_key,
+        choice_id: step.choice_id,
+        next_key: outcome.nextKey,
+        track_completed: outcome.trackCompleted,
+      });
+      return null;
+    }
+
+    case "choose_node": {
+      // Auto-begin walk if not started yet — look back at the most recent
+      // expect_storylet_available or choose step for the storylet key.
+      if (!harness.walkState) {
+        // Find the storylet key from prior steps
+        const priorChooseOrExpect = [...priorSteps]
+          .reverse()
+          .find(
+            (s) =>
+              s.type === "expect_storylet_available" || s.type === "choose"
+          );
+        const key =
+          priorChooseOrExpect?.type === "expect_storylet_available"
+            ? priorChooseOrExpect.storylet_key
+            : priorChooseOrExpect?.type === "choose"
+              ? priorChooseOrExpect.storylet_key
+              : null;
+        if (!key) {
+          throw new Error(
+            `choose_node requires an active node walk. ` +
+              `Add an expect_storylet_available step before the first choose_node.`
+          );
+        }
+        harness.beginNodeWalk(key);
+      }
+
+      const walkResult = await harness.chooseNode(
+        step.node_id,
+        step.micro_choice_id
+      );
+      pushTrace({
+        node_id: step.node_id,
+        micro_choice_id: step.micro_choice_id,
+        next_node_id: walkResult.nextNodeId,
+        terminal: walkResult.terminal,
+      });
       return null;
     }
 
     case "advance_segment": {
       await harness.advanceSegment();
+      pushTrace({
+        new_segment: harness.currentSegment,
+        new_hours_remaining: harness.hoursRemaining,
+      });
       return null;
     }
 
     case "sleep": {
       await harness.sleep();
+      pushTrace({
+        new_day: harness.dayIndex,
+        new_segment: harness.currentSegment,
+        new_hours_remaining: harness.hoursRemaining,
+      });
       return null;
     }
 
@@ -366,6 +477,102 @@ export function formatResult(result: ScriptResult): string {
 }
 
 // ---------------------------------------------------------------------------
+// Trace I/O + comparison (golden-file drift detection)
+// ---------------------------------------------------------------------------
+
+/** Path to the committed trace file for a script. */
+export function traceFilePath(scriptName: string, scriptDir?: string): string {
+  const dir = scriptDir ?? resolve("scripts/playthroughs");
+  return resolve(dir, "traces", `${scriptName}.trace.json`);
+}
+
+export function writeTrace(trace: ScriptTrace, scriptDir?: string): string {
+  const path = traceFilePath(trace.script_name, scriptDir);
+  // Stable key order + trailing newline for git-friendly diffs.
+  const json = JSON.stringify(trace, null, 2) + "\n";
+  const dir = dirname(path);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(path, json);
+  return path;
+}
+
+export function readTrace(
+  scriptName: string,
+  scriptDir?: string
+): ScriptTrace | null {
+  const path = traceFilePath(scriptName, scriptDir);
+  if (!existsSync(path)) return null;
+  return JSON.parse(readFileSync(path, "utf8")) as ScriptTrace;
+}
+
+export type TraceDiff = {
+  path: string;
+  expected: unknown;
+  actual: unknown;
+};
+
+/**
+ * Deep-compare two traces. Returns an array of diffs (empty if identical).
+ * Stops at the first N differing entries for readable output.
+ */
+export function diffTraces(
+  expected: ScriptTrace,
+  actual: ScriptTrace,
+  maxDiffs = 10
+): TraceDiff[] {
+  const diffs: TraceDiff[] = [];
+
+  if (expected.script_name !== actual.script_name) {
+    diffs.push({
+      path: "script_name",
+      expected: expected.script_name,
+      actual: actual.script_name,
+    });
+  }
+  if (expected.total_steps !== actual.total_steps) {
+    diffs.push({
+      path: "total_steps",
+      expected: expected.total_steps,
+      actual: actual.total_steps,
+    });
+  }
+
+  const len = Math.max(expected.entries.length, actual.entries.length);
+  for (let i = 0; i < len && diffs.length < maxDiffs; i++) {
+    const e = expected.entries[i];
+    const a = actual.entries[i];
+    if (!e) {
+      diffs.push({ path: `entries[${i}]`, expected: undefined, actual: a });
+      continue;
+    }
+    if (!a) {
+      diffs.push({ path: `entries[${i}]`, expected: e, actual: undefined });
+      continue;
+    }
+    const eStr = JSON.stringify(e);
+    const aStr = JSON.stringify(a);
+    if (eStr !== aStr) {
+      diffs.push({ path: `entries[${i}]`, expected: e, actual: a });
+    }
+  }
+
+  return diffs;
+}
+
+export function formatTraceDiff(diffs: TraceDiff[]): string {
+  if (diffs.length === 0) return "traces match";
+  const lines: string[] = [`${diffs.length} trace difference(s):`];
+  for (const d of diffs) {
+    lines.push(`  ${d.path}:`);
+    lines.push(`    expected: ${JSON.stringify(d.expected)}`);
+    lines.push(`    actual:   ${JSON.stringify(d.actual)}`);
+  }
+  return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Snapshot runner
 // ---------------------------------------------------------------------------
 
@@ -392,7 +599,6 @@ export async function executeAndSnapshot(
       const priorSteps = script.steps.slice(Math.max(0, i - 3), i);
 
       if (
-        step.type === "choose_node" ||
         step.type === "commit_routine" ||
         step.type === "advance_day"
       ) {

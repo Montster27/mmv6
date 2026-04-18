@@ -1,8 +1,8 @@
 # MMV — Task Board
 
-> Last updated: 2026-04-12
-> Current milestone: **A — "It Runs"** (complete, awaiting playtest)
-> Current branch: `time_skill` (7 commits ahead of main)
+> Last updated: 2026-04-13
+> Current milestone: **A — "It Runs"** (complete, all playtests passed)
+> Current branch: `time_skill` (7 commits ahead of main — ready to merge)
 
 ---
 
@@ -89,13 +89,13 @@
 - [x] **P1.3 Build skill queue engine** — `src/core/skills/queue.ts`. Pure functions: startTraining, queueNext, tick, cancelQueued. DB-level partial unique indexes enforce 1 active + 1 queued. `Category: Engine`
 - [x] **P1.4 Login queue-check UI** — `SkillQueueCheck` component. Shows completed skills, active countdown, queued skill, skill picker grouped by domain. `Category: UI`
 - [x] **P1.5 Character sheet: trained skills display** — `SkillsPanel` component + `/skills` page in player nav. Read-only trained list + live training countdown. `Category: UI`
-- [ ] **P1.6 Playtest — does the queue produce the daily-ritual pull?** 7–10 real days, 2 testers. `Category: Testing`
+- [x] **P1.6 Playtest — does the queue produce the daily-ritual pull?** PASSED 2026-04-13. `Category: Testing`
 
 **Phase 2 — Skills Matter in Storylets** `Priority: High`
 - [x] **P2.1 Wire skills into storylet resolver** — `meetsRequirements()` checks `requires_skill` (storylet-level pool gating). `dailyLoop.ts` filters choices by `requires_skill` (choice-level hiding) and swaps `reaction_text` with `reaction_with_skill` when `skill_modifier` matches trained skills. `selectTrackStorylets` accepts `trainedSkillIds` param. `Category: Engine`
 - [x] **P2.2 Retrofit 5 Week 1-2 storylets** — glenn_pastime_paradise (musical_ear modifier), lunch_floor (small_talk modifier + practice), heller_lecture (critical_analysis gated choice + practice), evening_choice (active_listening modifier + practice), money_reality_check (budgeting modifier + practice). No Herald/writing storylet exists — substituted money track. `Category: Content`
 - [x] **P2.3 Diegetic-practice hook** — `tickPracticeCredit()` in `src/core/skills/practice.ts`. Subtracts `PRACTICE_CREDIT_SECONDS` (env var, default 900s = 15min) from active training skill's `completes_at`. Only accelerates currently active skill. Audit log: `skill_practice_events` table. Called from resolve route after choice processing. `Category: Engine`
-- [ ] **P2.4 Playtest — do skills visibly matter, does the unification feel like one system?** `Category: Testing`
+- [x] **P2.4 Playtest — do skills visibly matter, does the unification feel like one system?** PASSED 2026-04-13. `Category: Testing`
 
 **Phase 3 — Daily Harvest (Bare Version)** `Priority: High`
 > Runs in parallel to Phase 2 if writing bandwidth allows.
@@ -110,7 +110,7 @@
 - [x] **P4.2 Weekly time budget + per-activity deposit math** — `player_routine_schedules` table, deposit system (skill XP, energy, money effects). `Category: Engine`
 - [x] **P4.3 Interruption system** — three triggers: gate threshold trips, calendar beats, NPC patience timers. `routine_week_state` table with status enum. `Category: Engine`
 - [x] **P4.4 UI mode switch** — WeeklyCalendar component, activates at day_index >= 7. `Category: UI`
-- [ ] **P4.5 Playtest — does routine mode feel like texture or a cutscene?** High risk phase — be ready to pause if it feels hollow. `Category: Testing`
+- [x] **P4.5 Playtest — does routine mode feel like texture or a cutscene?** PASSED 2026-04-13. `Category: Testing`
 
 **Phase 5 — Curve Tuning + Resource Integration** `Priority: Medium`
 - [ ] **P5.1 Tune parabolic curve** with real playtest data from P1–P4. `Category: Design`
@@ -136,12 +136,39 @@
 
 ---
 
+## Next Up (sequenced)
+
+### 1. Merge `time_skill` → `main`  **[IMMEDIATE]**
+All three playtests passed (P1.6, P2.4, P4.5). Seven commits ready. No content work should happen on `time_skill` after this point.
+
+### 2. Conversational node schema implementation  **[NEXT BUILD]**
+Brief: `docs/CONVERSATIONAL_NODES_BRIEF.md`. Schema designed, Code-ready. Branch `conv_nodes` off fresh `main` after merge. Deliverables: migration (nullable `nodes` jsonb column), engine node-walk renderer, walk-flag-aware terminal choice filter, `choose_node` playthrough runner step, `lunch_floor` retrofit as smoke test, CONTENT-RULES.md update. Speaker formatting locked: italicized dialogue with muted `— Name` attribution beneath.
+
+### 3. Browser playtest of retrofitted `lunch_floor` with nodes  **[GATE]**
+Does walking three micro-choices before a terminal choice feel like conversation or friction? If friction, stop before Week 2 content.
+
+### 4. Week 2 content build
+Five landmarks per lore bible §4.1: L1 job board, L2 Scott's thing, L3 first shift variants, L4 Tuesday commitment, L5 The Post (investigation landmark, gated by terminal choice at L4). Miss path for L5 = three-week-old thread, partially recoverable in Week 3. Write with nodes where dialogue earns them. Every landmark gets a canonical playthrough script at ship time.
+
+### 5. Gender audit  **[palate cleanser]**
+All storylets, migrations, NPC registry entries, prose. Protagonist and dorm-floor NPCs all male. Half-session of work; cost grows with every new storylet until done.
+
+---
+
+## Held (post-Week-2 playtest)
+
+- Remaining five thematic stream build-out (apply stream-shape methodology)
+- Skill web implementation (114 skills, three tiers, time-gated Technology domain)
+- Engine queue rewrite migration (held separately)
+
+**Rationale for holding:** Week 2 playtest will surface things that change how these should be built. Premature commitment is expensive.
+
+---
+
 ## In Progress
 
-- **P1.6 Playtest** — Skill queue awaiting 7-10 day real-time test with 2 testers
-- **P2.4 Playtest** — Skills-in-storylets awaiting browser test
-- **P4.5 Playtest** — Routine-week mode awaiting browser test at Day 7+
-- **Merge `time_skill` to `main`** — after playtests pass
+- **Merge `time_skill` → `main`** — queued
+- **Conversational nodes build** — brief ready in `docs/CONVERSATIONAL_NODES_BRIEF.md`, awaiting Code pickup after merge
 
 ---
 
@@ -256,7 +283,7 @@
 
 | Milestone | Name | Key Deliverable | Status |
 |-----------|------|-----------------|--------|
-| A | "It Runs" | Game loop works with existing storylets. Play Day 7+. | **Complete — awaiting playtest** |
+| A | "It Runs" | Game loop works with existing storylets. Play Day 7+. | **Complete (playtests passed 2026-04-13)** |
 | B | "It Squeezes" | Every slot has competing options. Two runs diverge. | Not started |
 | C | "It Breathes" | Energy, money, skill create ambient pressure. | Not started |
 | D | "They Remember" | NPCs respond to player history. | Not started |
@@ -267,8 +294,9 @@
 
 ## Notes
 
-- **Milestone A is complete.** Engine, skills (Phase 1+2), routine-week (Phase 4), and day lifecycle refactor all built. Full walkthrough Day 0→7+ awaiting playtest.
-- **All Phase 1-4 work is on `time_skill` branch** — 7 commits ahead of main. Merge after playtest.
+- **Milestone A is complete and verified.** Engine, skills (Phase 1+2), routine-week (Phase 4), and day lifecycle refactor all built. All three playtests (P1.6, P2.4, P4.5) passed 2026-04-13.
+- **Conversational nodes are the next build.** Brief in `docs/CONVERSATIONAL_NODES_BRIEF.md`. Blocks Week 2 content — Week 2 should not start until nodes land and `lunch_floor` retrofit passes browser playtest.
+- **All Phase 1-4 work is on `time_skill` branch** — 7 commits ahead of main. Merge is the immediate next action.
 - **Day lifecycle refactor (2026-04-12)** was the largest structural change. Fixed 5 sequential bugs by consolidating day advancement into 2 server-authoritative endpoints. `ensureCadenceUpToDate` removed — day advances only on sleep.
 - **Key new API endpoints:** `/api/day/advance-segment`, `/api/day/advance-day` — both use conditional UPDATEs for concurrency control (409 on double-advance).
 - **Key new DB tables (Phase 4):** `routine_activities`, `player_routine_schedules`, `routine_week_state`. Plus Phase 1-2 tables: `skill_definitions`, `player_skills`, `skill_practice_events`.

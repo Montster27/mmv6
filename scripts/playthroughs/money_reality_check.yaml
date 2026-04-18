@@ -1,0 +1,65 @@
+name: money_reality_check
+description: >
+  Tier 3 coverage backfill for the money track.
+
+  money_reality_check is the first storylet on the money track
+  (order_index=2) with due_offset_days=4, segment=evening,
+  expires_after_days=3. With started_day=1 it is eligible from Day 5
+  evening through Day 8 evening. Served via chain override on Day 5 —
+  first day of eligibility.
+
+  Regression test ensures the money track wakes up on Day 5 evening and
+  serves money_reality_check instead of silently skipping it (the
+  first_morning NULL-expiry bug class, but on a delayed-start track).
+  The go_out choice sets money track_state to friction_visible.
+
+steps:
+  # ── Day 1: Standard cards-path traversal ────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: catch_keiths_eye
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+
+  - type: sleep
+
+  # ── Days 2-4: sleep through, target is Day 5 evening ────────────────────
+  - type: sleep
+  - type: sleep
+  - type: sleep
+
+  # ── Day 5 Morning: money track not yet serving (evening segment storylet) ──
+  - type: expect_storylet_not_available
+    storylet_key: money_reality_check
+
+  # ── Day 5 Afternoon ─────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_not_available
+    storylet_key: money_reality_check
+
+  # ── Day 5 Evening — money_reality_check via chain override ──────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: money_reality_check
+    served_by: chain
+    at: {track: money}
+
+  - type: choose
+    storylet_key: money_reality_check
+    choice_id: go_out

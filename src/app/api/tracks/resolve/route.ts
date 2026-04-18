@@ -410,6 +410,42 @@ export async function POST(request: Request) {
     },
   });
 
+  // --- 8b. Write persistent flags (sets_flag on choice) ---
+  const setsFlag = chosenOption.sets_flag as string[] | undefined;
+  if (Array.isArray(setsFlag) && setsFlag.length > 0) {
+    const flagInserts = setsFlag.map((flag) => ({
+      user_id: user.id,
+      day: day_index,
+      event_type: "FLAG_SET",
+      track_id: progressRow.track_id,
+      track_progress_id: progressId,
+      step_key: effectiveStoryletKey,
+      option_key: flag,
+      meta: { source_choice: option_key },
+    }));
+    await supabaseServer.from("choice_log").insert(flagInserts);
+  }
+
+  // --- 8c. Apply preclusion (permanently lock out named storylets) ---
+  const precludes = chosenOption.precludes as string[] | undefined;
+  if (Array.isArray(precludes) && precludes.length > 0) {
+    const { data: dailyRow } = await supabaseServer
+      .from("daily_states")
+      .select("preclusion_gates")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const current = Array.isArray(dailyRow?.preclusion_gates)
+      ? (dailyRow.preclusion_gates as string[])
+      : [];
+    const merged = [...new Set([...current, ...precludes])];
+
+    await supabaseServer
+      .from("daily_states")
+      .update({ preclusion_gates: merged })
+      .eq("user_id", user.id);
+  }
+
   // --- 9. Update playthrough log ---
   // Detect new run: room_214 is always the first storylet, so resolving it with
   // an empty resolved-keys list means a fresh playthrough just started.

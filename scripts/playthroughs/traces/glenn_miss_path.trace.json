@@ -1,0 +1,217 @@
+{
+  "script_name": "glenn_miss_path",
+  "total_steps": 14,
+  "entries": [
+    {
+      "step_index": 0,
+      "step_type": "choose",
+      "step_summary": "choose(room_214, head_out)",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "room_214",
+        "choice_id": "head_out",
+        "next_key": "first_morning",
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 1,
+      "step_type": "choose",
+      "step_summary": "choose(dorm_hallmates, lunch_first)",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "dorm_hallmates",
+        "choice_id": "lunch_first",
+        "next_key": "lunch_floor",
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 2,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 3,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(glenn_pastime_paradise)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "served_storylet_key": "glenn_pastime_paradise",
+        "served_by": "chain",
+        "track_key": "opportunity",
+        "expires_on_day": 8
+      }
+    },
+    {
+      "step_index": 4,
+      "step_type": "choose",
+      "step_summary": "choose(lunch_floor, laugh_with_doug)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "storylet_key": "lunch_floor",
+        "choice_id": "laugh_with_doug",
+        "next_key": "evening_choice",
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 5,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 6,
+      "step_type": "choose",
+      "step_summary": "choose(evening_choice, go_to_party)",
+      "state_before": {
+        "day": 1,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "storylet_key": "evening_choice",
+        "choice_id": "go_to_party",
+        "next_key": null,
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 7,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 1,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 2,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 8,
+      "step_type": "expect_storylet_not_available",
+      "step_summary": "expect_storylet_not_available(terminal_first_visit)",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "not_available": "terminal_first_visit"
+      }
+    },
+    {
+      "step_index": 9,
+      "step_type": "expect_storylet_not_available",
+      "step_summary": "expect_storylet_not_available(glenn_the_walk)",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "not_available": "glenn_the_walk"
+      }
+    },
+    {
+      "step_index": 10,
+      "step_type": "choose",
+      "step_summary": "choose(first_morning, head_to_orientation)",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "first_morning",
+        "choice_id": "head_to_orientation",
+        "next_key": null,
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 11,
+      "step_type": "choose",
+      "step_summary": "choose(morning_after_party, continue_morning)",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "morning_after_party",
+        "choice_id": "continue_morning",
+        "next_key": null,
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 12,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 13,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(glenn_pastime_paradise, served_by=chain)",
+      "state_before": {
+        "day": 2,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "served_storylet_key": "glenn_pastime_paradise",
+        "served_by": "chain",
+        "track_key": "opportunity",
+        "expires_on_day": 8
+      }
+    }
+  ]
+}

@@ -35,6 +35,18 @@ type SelectTrackStoryletsArgs = {
    * Phase 2: binary check only (trained or not); min_level ignored.
    */
   trainedSkillIds?: Set<string>;
+  /**
+   * Map of track_id → Set of flag strings set by prior choices on that track.
+   * Sourced from choice_log WHERE event_type='FLAG_SET'.
+   * Used to evaluate requires_flag requirements. Track-scoped.
+   */
+  flagsByTrack?: Map<string, Set<string>>;
+  /**
+   * Set of storylet_key strings permanently precluded for the current run.
+   * Sourced from daily_states.preclusion_gates. Cross-track: a choice on one
+   * track can preclude storylets on any track.
+   */
+  precludedKeys?: Set<string>;
 };
 
 /** Hours remaining threshold below which conflict storylets bypass segment gating. */
@@ -47,24 +59,31 @@ const CONFLICT_THRESHOLD = 4;
  * Supported requirement types:
  *   requires_choice: string  — the player must have previously picked a choice
  *     with that option_key on this track.
+ *   requires_flag: string  — the player must have this flag set (via sets_flag
+ *     on a prior choice). Track-scoped, stored in choice_log as FLAG_SET events.
  *   requires_skill: { skill_id: string; min_level?: number }  — the player must
  *     have trained this skill. Phase 2: binary only (min_level ignored).
  *
  * Unknown requirement keys pass (forward-compatible).
  *
- * NOTE: requires_choice is track-scoped. requires_skill is global (skills are not
- * track-scoped). Cross-track choice gating is a future extension.
+ * NOTE: requires_choice and requires_flag are track-scoped. requires_skill is
+ * global (skills are not track-scoped).
  */
 function meetsRequirements(
   storylet: TrackStoryletRow,
   resolvedChoices: Set<string>,
-  trainedSkillIds: Set<string> = new Set()
+  trainedSkillIds: Set<string> = new Set(),
+  flags: Set<string> = new Set()
 ): boolean {
   const reqs = storylet.requirements as Record<string, unknown> | null | undefined;
   if (!reqs || typeof reqs !== "object" || Object.keys(reqs).length === 0) return true;
 
   if (typeof reqs.requires_choice === "string") {
     if (!resolvedChoices.has(reqs.requires_choice)) return false;
+  }
+
+  if (typeof reqs.requires_flag === "string") {
+    if (!flags.has(reqs.requires_flag)) return false;
   }
 
   // Phase 2: storylet-level skill gating (pool gating)
@@ -124,6 +143,8 @@ export function selectTrackStorylets({
   hoursRemaining,
   resolvedChoicesByTrack = new Map(),
   trainedSkillIds = new Set(),
+  flagsByTrack = new Map(),
+  precludedKeys = new Set(),
 }: SelectTrackStoryletsArgs): DueStorylet[] {
   const timeTight = typeof hoursRemaining === "number" && hoursRemaining < CONFLICT_THRESHOLD;
   const trackMap = new Map(tracks.map((t) => [t.id, t]));
@@ -146,6 +167,7 @@ export function selectTrackStorylets({
 
     const resolvedKeys = new Set(prog.resolved_storylet_keys);
     const resolvedChoices = resolvedChoicesByTrack.get(prog.track_id) ?? new Set<string>();
+    const trackFlags = flagsByTrack.get(prog.track_id) ?? new Set<string>();
     const trackStorylets = storyletsByTrack.get(prog.track_id) ?? [];
 
     // -------------------------------------------------------------------------
@@ -196,6 +218,8 @@ export function selectTrackStorylets({
       if (resolvedKeys.has(storylet.storylet_key)) continue;
       // Skip inactive
       if (!storylet.is_active) continue;
+      // Skip permanently precluded
+      if (precludedKeys.has(storylet.storylet_key)) continue;
 
       const dueDay = prog.started_day + storylet.due_offset_days;
       const expiresOnDay = dueDay + storylet.expires_after_days;
@@ -203,7 +227,7 @@ export function selectTrackStorylets({
       if (dayIndex < dueDay) continue;
       if (dayIndex > expiresOnDay) continue;
 
-      if (!meetsRequirements(storylet, resolvedChoices, trainedSkillIds)) continue;
+      if (!meetsRequirements(storylet, resolvedChoices, trainedSkillIds, trackFlags)) continue;
       if (!passesSegmentFilter(storylet, currentSegment, timeTight)) continue;
 
       const candidate: DueStorylet = { progress: prog, storylet, track, expires_on_day: expiresOnDay };

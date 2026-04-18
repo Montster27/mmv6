@@ -19,18 +19,22 @@
 | **Type definitions** | `src/types/` |
 | **Domain logic** | `src/domain/` |
 | **Content creation agent** | `agents/content-creator/` (has its own CLAUDE.md) |
-| **Task tracker** | `TASKS.md` (root) |
+| **Task tracker** | Kanban Pro board at `~/Documents/MMV/_assets/MMV_Docs/Kanban data/` (MAPPING.md for triage) |
+| **Process & vocabulary** | `SOP.md` (root), `GLOSSARY.md` (root) |
+| **Session handoff** | `HANDOFF.md` (root), `docs/END-OF-SESSION-PROTOCOL.md` |
 | **Design docs** | `docs/` |
 
 ---
 
 ## Before Every Session
 
-1. Read `TASKS.md` to understand current priorities and what's in progress
-2. Read this file for project rules
-3. Before writing any migration, read `docs/CONTENT-RULES.md`
-4. For content work, also read `agents/content-creator/CLAUDE.md`
-5. Use Plan Mode (Shift+Tab) before making changes — propose a plan, get approval, then execute
+1. Read `SOP.md` and `GLOSSARY.md` for process and vocabulary
+2. Read `HANDOFF.md` to understand current state
+3. Read this file for project rules
+4. Before writing any migration, read `docs/CONTENT-RULES.md`
+5. For content work, also read `agents/content-creator/CLAUDE.md`
+6. Use Plan Mode (Shift+Tab) before making changes — propose a plan, get approval, then execute
+7. When the user says "end session", follow `docs/END-OF-SESSION-PROTOCOL.md`
 
 ---
 
@@ -83,7 +87,7 @@ Every storylet choice must include:
 ### NPC Rules
 - **Name discipline:** NPC names MUST NOT appear in body text or choice labels before the player could plausibly know them. Use `introduces_npc` field to mark first encounters.
 - **Relational state:** trust (-3 to +3), reliability (-3 to +3), emotionalLoad (0-3), relationship (1-10)
-- **NPC IDs follow pattern:** `npc_role_firstname` (e.g., `npc_roommate_dana`, `npc_floor_miguel`)
+- **NPC IDs follow pattern:** `npc_role_firstname` (e.g., `npc_roommate_scott`, `npc_floor_miguel`)
 - **Canonical registry:** `docs/NPC_DATA_REFERENCE.md` — update when adding new NPCs
 - **Protagonist is male.** All dorm-floor NPCs and the RA are male (men's dorm). Female NPCs (Priya, etc.) exist elsewhere on campus — classrooms, library, social events.
 

@@ -3,9 +3,13 @@
  * Playthrough Runner — CLI
  *
  * Usage:
- *   npm run playthrough <script-path>          # single script
- *   npm run playthrough:all                    # all scripts (CI)
- *   npm run playthrough:snapshot <script-path> # run + save fixture
+ *   npm run playthrough <script-path>           # single script
+ *   npm run playthrough:all                     # all scripts (CI)
+ *   npm run playthrough:snapshot <script-path>  # run + save fixture
+ *   npm run playthrough -- --write-trace <path> # run + save trace JSON
+ *   npm run playthrough -- --check-trace <path> # run + diff vs committed trace
+ *   npm run playthrough -- --write-trace --all  # regenerate all traces
+ *   npm run playthrough -- --check-trace --all  # verify all traces (CI/local)
  */
 
 import { resolve, basename } from "node:path";
@@ -15,16 +19,25 @@ import {
   executeScript,
   executeAndSnapshot,
   formatResult,
+  writeTrace,
+  readTrace,
+  diffTraces,
+  formatTraceDiff,
 } from "./executor";
 import { clearCache } from "./loader";
 
 const SCRIPTS_DIR = resolve(process.cwd(), "scripts/playthroughs");
 
-async function runSingle(scriptPath: string, snapshot = false): Promise<boolean> {
+type RunMode = "normal" | "snapshot" | "write-trace" | "check-trace";
+
+async function runSingle(
+  scriptPath: string,
+  mode: RunMode = "normal"
+): Promise<boolean> {
   const script = loadScript(scriptPath);
   process.stderr.write(`Running: ${script.name}\n`);
 
-  if (snapshot) {
+  if (mode === "snapshot") {
     const { result, snapshot: snap } = await executeAndSnapshot(script, {
       scriptDir: SCRIPTS_DIR,
       verbose: true,
@@ -42,6 +55,39 @@ async function runSingle(scriptPath: string, snapshot = false): Promise<boolean>
     return result.passed;
   }
 
+  if (mode === "write-trace" || mode === "check-trace") {
+    const result = await executeScript(script, {
+      scriptDir: SCRIPTS_DIR,
+      verbose: true,
+      recordTrace: true,
+    });
+    console.log(formatResult(result));
+    if (!result.passed || !result.trace) return result.passed;
+
+    if (mode === "write-trace") {
+      const out = writeTrace(result.trace, SCRIPTS_DIR);
+      console.log(`Trace saved: ${out}`);
+      return true;
+    }
+
+    // check-trace
+    const expected = readTrace(script.name, SCRIPTS_DIR);
+    if (!expected) {
+      console.error(
+        `No committed trace found for "${script.name}". ` +
+          `Run with --write-trace first.`
+      );
+      return false;
+    }
+    const diffs = diffTraces(expected, result.trace);
+    if (diffs.length === 0) {
+      console.log(`Trace matches for "${script.name}".`);
+      return true;
+    }
+    console.error(`Trace drift for "${script.name}":\n${formatTraceDiff(diffs)}`);
+    return false;
+  }
+
   const result = await executeScript(script, {
     scriptDir: SCRIPTS_DIR,
     verbose: true,
@@ -50,9 +96,9 @@ async function runSingle(scriptPath: string, snapshot = false): Promise<boolean>
   return result.passed;
 }
 
-async function runAll(): Promise<boolean> {
+async function runAll(mode: RunMode = "normal"): Promise<boolean> {
   const files = readdirSync(SCRIPTS_DIR)
-    .filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"))
+    .filter((f) => (f.endsWith(".yaml") || f.endsWith(".yml")) && !f.startsWith("_"))
     .sort();
 
   if (files.length === 0) {
@@ -67,49 +113,42 @@ async function runAll(): Promise<boolean> {
 
   for (const file of files) {
     clearCache(); // Fresh content load per script
-    const script = loadScript(resolve(SCRIPTS_DIR, file));
-    process.stderr.write(`Running: ${script.name}\n`);
-
-    const result = await executeScript(script, {
-      scriptDir: SCRIPTS_DIR,
-      verbose: true,
-    });
-    console.log(formatResult(result));
+    const scriptPath = resolve(SCRIPTS_DIR, file);
+    const passed = await runSingle(scriptPath, mode);
+    const script = loadScript(scriptPath);
+    results.push({ name: script.name, passed, ms: 0 });
+    if (!passed) allPassed = false;
     console.log();
-
-    results.push({
-      name: result.name,
-      passed: result.passed,
-      ms: result.durationMs,
-    });
-    if (!result.passed) allPassed = false;
   }
 
   // Summary
   const passed = results.filter((r) => r.passed).length;
   const failed = results.filter((r) => !r.passed).length;
   console.log("─".repeat(60));
-  console.log(
-    `${passed} passed, ${failed} failed, ${results.length} total (${results.reduce((s, r) => s + r.ms, 0)}ms)`
-  );
+  console.log(`${passed} passed, ${failed} failed, ${results.length} total`);
 
   return allPassed;
 }
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  const isSnapshot = args.includes("--snapshot");
   const isAll = args.includes("--all");
+
+  let mode: RunMode = "normal";
+  if (args.includes("--snapshot")) mode = "snapshot";
+  else if (args.includes("--write-trace")) mode = "write-trace";
+  else if (args.includes("--check-trace")) mode = "check-trace";
+
   const scriptPaths = args.filter((a) => !a.startsWith("--"));
 
   let success: boolean;
 
   if (isAll || scriptPaths.length === 0) {
-    success = await runAll();
+    success = await runAll(mode);
   } else {
     success = true;
     for (const sp of scriptPaths) {
-      const passed = await runSingle(resolve(sp), isSnapshot);
+      const passed = await runSingle(resolve(sp), mode);
       if (!passed) success = false;
     }
   }

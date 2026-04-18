@@ -121,12 +121,17 @@ export async function getOrCreateDailyRun(
   // Read-only: day advancement happens exclusively via /api/day/advance-day
   const { data: dailyStateRow } = await supabase
     .from("daily_states")
-    .select("day_index,last_day_completed,last_day_index_completed")
+    .select("day_index,last_day_completed,last_day_index_completed,preclusion_gates")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
   if (!dailyStateRow) throw new Error("No daily state found for user.");
   const dayIndex = dailyStateRow.day_index;
+  const precludedKeys = new Set<string>(
+    Array.isArray(dailyStateRow.preclusion_gates)
+      ? (dailyStateRow.preclusion_gates as string[])
+      : []
+  );
   const alreadyCompletedToday =
     dailyStateRow.last_day_completed === todayUtc &&
     dailyStateRow.last_day_index_completed === dayIndex;
@@ -541,20 +546,37 @@ export async function getOrCreateDailyRun(
         // choice_log.option_key stores the choice "id" value from the storylet JSON.
         // Scoped per track — cross-track gating is a future extension.
         const resolvedChoicesByTrack = new Map<string, Set<string>>();
+        const flagsByTrack = new Map<string, Set<string>>();
         if (progress.length > 0) {
-          const { data: choiceLogs } = await supabase
-            .from("choice_log")
-            .select("track_id,option_key")
-            .eq("user_id", userId)
-            .in("track_id", trackIds)
-            .eq("event_type", "STORYLET_RESOLVED")
-            .not("option_key", "is", null);
+          const [{ data: choiceLogs }, { data: flagLogs }] = await Promise.all([
+            supabase
+              .from("choice_log")
+              .select("track_id,option_key")
+              .eq("user_id", userId)
+              .in("track_id", trackIds)
+              .eq("event_type", "STORYLET_RESOLVED")
+              .not("option_key", "is", null),
+            supabase
+              .from("choice_log")
+              .select("track_id,option_key")
+              .eq("user_id", userId)
+              .in("track_id", trackIds)
+              .eq("event_type", "FLAG_SET")
+              .not("option_key", "is", null),
+          ]);
 
           for (const log of choiceLogs ?? []) {
             if (!log.track_id || !log.option_key) continue;
             const set = resolvedChoicesByTrack.get(log.track_id) ?? new Set<string>();
             set.add(log.option_key as string);
             resolvedChoicesByTrack.set(log.track_id, set);
+          }
+
+          for (const log of flagLogs ?? []) {
+            if (!log.track_id || !log.option_key) continue;
+            const set = flagsByTrack.get(log.track_id) ?? new Set<string>();
+            set.add(log.option_key as string);
+            flagsByTrack.set(log.track_id, set);
           }
         }
 
@@ -578,6 +600,8 @@ export async function getOrCreateDailyRun(
           hoursRemaining: hoursLeft,
           resolvedChoicesByTrack,
           trainedSkillIds,
+          flagsByTrack,
+          precludedKeys,
         });
         console.log("[daily-run] selectTrackStorylets returned", dueStorylets.length, "storylets:", dueStorylets.map(d => d.storylet.slug));
 
