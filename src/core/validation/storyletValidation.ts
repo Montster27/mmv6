@@ -152,6 +152,12 @@ export function coerceStoryletRow(row: any): Storylet {
     due_offset_days: typeof row?.due_offset_days === "number" ? row.due_offset_days : undefined,
     expires_after_days: typeof row?.expires_after_days === "number" ? row.expires_after_days : undefined,
     default_next_key: isString(row?.default_next_key) ? row.default_next_key : (row?.default_next_key === null ? null : undefined),
+    // Segment / time-budget fields
+    segment: isString(row?.segment) ? row.segment as Storylet["segment"] : (row?.segment === null ? null : undefined),
+    time_cost_hours: typeof row?.time_cost_hours === "number" ? row.time_cost_hours : undefined,
+    is_conflict: typeof row?.is_conflict === "boolean" ? row.is_conflict : undefined,
+    // Conversational nodes
+    nodes: Array.isArray(row?.nodes) ? row.nodes : (row?.nodes === null ? null : undefined),
   };
 }
 

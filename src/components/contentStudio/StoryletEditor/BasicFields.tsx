@@ -160,6 +160,51 @@ export function BasicFields({
         </label>
       </div>
 
+      {/* Segment / time-budget system */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="text-xs text-slate-600">
+          Segment
+          <FieldHint text="Which time slot this storylet appears in. The three-slot system: morning, afternoon, evening. Leave blank for any segment." />
+          <select
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            value={storylet.segment ?? ""}
+            onChange={(e) =>
+              onChange({ segment: (e.target.value || null) as typeof storylet.segment })
+            }
+          >
+            <option value="">Any segment</option>
+            <option value="morning">Morning</option>
+            <option value="afternoon">Afternoon</option>
+            <option value="evening">Evening</option>
+            <option value="night">Night</option>
+          </select>
+        </label>
+        <label className="text-xs text-slate-600">
+          Time cost (hours)
+          <FieldHint text="Hours deducted from the daily time budget when this storylet is played. Default 1." />
+          <input
+            type="number"
+            step="0.5"
+            min="0"
+            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            value={storylet.time_cost_hours ?? ""}
+            placeholder="1"
+            onChange={(e) =>
+              onChange({ time_cost_hours: e.target.value ? Number(e.target.value) : null })
+            }
+          />
+        </label>
+        <label className="flex items-center gap-2 text-xs text-slate-600 pt-4">
+          <input
+            type="checkbox"
+            checked={storylet.is_conflict ?? false}
+            onChange={(e) => onChange({ is_conflict: e.target.checked })}
+          />
+          Conflict event
+          <FieldHint text="When checked, this storylet surfaces as a conflict event when the player's time budget is tight." />
+        </label>
+      </div>
+
       <div>
         <p className="text-xs text-slate-600 mb-1">Tags</p>
         <TagEditor
