@@ -17,15 +17,6 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  loadScript,
-  executeScript,
-  formatResult,
-  readTrace,
-  diffTraces,
-  formatTraceDiff,
-} from "./executor";
-import { clearCache } from "./loader";
 
 const SCRIPTS_DIR = resolve(process.cwd(), "scripts/playthroughs");
 
@@ -33,43 +24,57 @@ const scriptFiles = readdirSync(SCRIPTS_DIR)
   .filter((f) => (f.endsWith(".yaml") || f.endsWith(".yml")) && !f.startsWith("_"))
   .sort();
 
-describe("playthrough scripts", () => {
-  for (const file of scriptFiles) {
-    it(
-      file.replace(/\.ya?ml$/, ""),
-      async () => {
-        clearCache();
-        const script = loadScript(resolve(SCRIPTS_DIR, file));
-        const committedTrace = readTrace(script.name, SCRIPTS_DIR);
-        const result = await executeScript(script, {
-          scriptDir: SCRIPTS_DIR,
-          verbose: false,
-          recordTrace: committedTrace != null,
-        });
+// The runner imports `./client.ts`, which requires real Supabase credentials at
+// module-load time. When running in CI without those creds (the common case),
+// skip the whole suite rather than crash the test file.
+const hasSupabaseCreds =
+  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !!process.env.SUPABASE_SERVICE_ROLE_KEY &&
+  process.env.NEXT_PUBLIC_SUPABASE_URL !== "http://localhost";
 
-        if (!result.passed) {
-          // Print the formatted failure output for debugging
-          throw new Error(`\n${formatResult(result)}`);
-        }
+if (hasSupabaseCreds) {
+  const { loadScript, executeScript, formatResult, readTrace, diffTraces, formatTraceDiff } =
+    await import("./executor");
+  const { clearCache } = await import("./loader");
 
-        expect(result.passed).toBe(true);
-        expect(result.stepsRun).toBe(result.totalSteps);
+  describe("playthrough scripts", () => {
+    for (const file of scriptFiles) {
+      it(
+        file.replace(/\.ya?ml$/, ""),
+        async () => {
+          clearCache();
+          const script = loadScript(resolve(SCRIPTS_DIR, file));
+          const committedTrace = readTrace(script.name, SCRIPTS_DIR);
+          const result = await executeScript(script, {
+            scriptDir: SCRIPTS_DIR,
+            verbose: false,
+            recordTrace: committedTrace != null,
+          });
 
-        // Drift detection — fail loudly if the observed trace diverges from
-        // the committed golden file. Regenerate with:
-        //   npm run playthrough:trace:write
-        if (committedTrace && result.trace) {
-          const diffs = diffTraces(committedTrace, result.trace);
-          if (diffs.length > 0) {
-            throw new Error(
-              `Trace drift in "${script.name}":\n${formatTraceDiff(diffs)}\n\n` +
-                `If this change is intentional, regenerate with: ` +
-                `npm run playthrough:trace:write`
-            );
+          if (!result.passed) {
+            throw new Error(`\n${formatResult(result)}`);
           }
-        }
-      },
-      { timeout: 60_000 }
-    );
-  }
-});
+
+          expect(result.passed).toBe(true);
+          expect(result.stepsRun).toBe(result.totalSteps);
+
+          if (committedTrace && result.trace) {
+            const diffs = diffTraces(committedTrace, result.trace);
+            if (diffs.length > 0) {
+              throw new Error(
+                `Trace drift in "${script.name}":\n${formatTraceDiff(diffs)}\n\n` +
+                  `If this change is intentional, regenerate with: ` +
+                  `npm run playthrough:trace:write`
+              );
+            }
+          }
+        },
+        { timeout: 60_000 }
+      );
+    }
+  });
+} else {
+  describe.skip("playthrough scripts (requires Supabase credentials)", () => {
+    it("skipped", () => {});
+  });
+}
