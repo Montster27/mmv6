@@ -7,6 +7,7 @@ import { TRACK_LABELS, type TrackKey } from "@/types/tracks";
 import { TesterOnly } from "@/components/ux/TesterOnly";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 import { DialogueNodeView } from "@/components/play/DialogueNodeView";
+import { Button } from "@/components/ui/button";
 import { resolveNpcTokens, type RelationshipState } from "@/lib/relationships";
 
 type MoneyBand = "tight" | "okay" | "comfortable";
@@ -223,12 +224,9 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
           </TesterOnly>
           {onDismiss && (
             <div className="pt-2">
-              <button
-                onClick={onDismiss}
-                className="rounded border-2 border-primary/25 px-4 py-2 text-sm font-medium font-heading text-primary hover:bg-primary/5 hover:border-primary/40 active:bg-primary/10 transition-all"
-              >
+              <Button onClick={onDismiss} size="lg" className="font-heading">
                 {dismissLabel ?? "Continue"}
-              </button>
+              </Button>
             </div>
           )}
         </div>

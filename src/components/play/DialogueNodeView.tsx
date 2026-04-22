@@ -25,6 +25,11 @@ function evaluateNodeCondition(
 ): boolean {
   if (!condition) return true;
   if (condition.flag && !flags.has(condition.flag)) return false;
+  if (condition.all_flags && condition.all_flags.length > 0) {
+    for (const f of condition.all_flags) {
+      if (!flags.has(f)) return false;
+    }
+  }
   if (condition.npc_memory) {
     const dotIdx = condition.npc_memory.indexOf(".");
     if (dotIdx > 0) {
@@ -131,7 +136,7 @@ export function DialogueNodeView({
       }
 
       if (!evaluateNodeCondition(nextNode.condition, newFlags, relationships)) {
-        advance(nextNode.next, undefined);
+        advance(nextNode.else_next ?? nextNode.next, undefined);
         return;
       }
 
@@ -218,7 +223,7 @@ export function DialogueNodeView({
               <button
                 disabled={disabled}
                 onClick={handleContinue}
-                className="rounded border border-border/40 px-3 py-1.5 text-xs font-stat text-muted-foreground transition hover:border-primary/30 hover:text-foreground/70 disabled:opacity-50"
+                className="micro-choice-btn choice-enter"
               >
                 Continue
               </button>
