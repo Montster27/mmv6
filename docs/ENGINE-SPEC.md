@@ -41,19 +41,25 @@ For each progress row:
 ```
 1. Skip if progress.state != "ACTIVE"
 2. Skip if track is not found or is_enabled = false
-3. Look up the storylet: storyletByKey.get(`${track_id}:${current_storylet_key}`)
-   → if not found: skip (broken pointer — storylet doesn't exist on this track)
-4. dueDay = progress.storylet_due_day
-   expiresOnDay = dueDay + storylet.expires_after_days
-   → skip if dayIndex < dueDay  (too early)
-   → skip if dayIndex > expiresOnDay  (expired)
+3. Override path: if progress.next_key_override is set and points to a non-resolved
+   storylet, serve that one (subject to due-window + segment). This preserves
+   explicit `next_key` / `default_next_key` chains. A stale override (pointing to
+   an already-resolved storylet) is ignored and the pool scan runs instead.
+4. Pool scan: for every storylet on the track, keep it iff:
+   → not in progress.resolved_storylet_keys
+   → is_active = true
+   → storylet_key not in precludedKeys (daily_states.preclusion_gates)
+   → started_day + due_offset_days <= dayIndex <= that + expires_after_days
+   → meetsRequirements(storylet, resolvedChoices, trainedSkills, flags) (see §2)
+   → passesSegmentFilter (see below)
+   Pick the single candidate with the earliest expiry (most urgent).
 5. Segment filter:
    → if storylet.is_conflict AND hoursRemaining < 4: always surface (bypasses segment)
    → else if currentSegment is set AND storylet.segment is set:
        → skip if storylet.segment != currentSegment
    → if storylet.segment is NULL: always passes segment filter
-6. Add to candidates
-Sort by earliest expiresOnDay. Return first 2.
+6. Collect the one best candidate per track into `due[]`.
+Sort `due[]` by earliest expiresOnDay. Return first `maxStorylets` (default 2).
 ```
 
 ### Step 4 — Client renders
@@ -177,7 +183,25 @@ Tags like `game_entry`, `arc_one`, `day1` are informational metadata only. `game
 
 ### `requirements`
 
-**Read by:** Not read by the track engine. Only used by legacy `selectStorylets()` for eligibility filtering. Track storylets have no requirement gate — if `current_storylet_key` points to a storylet and it's in the due window, it shows.
+**Read by:** `selectTrackStorylets.ts` → `meetsRequirements()`. Applied during the pool scan (step 4 above). A storylet is only eligible if its `requirements` object is empty OR every requirement it lists is satisfied.
+
+Supported keys:
+
+| Key | Type | Meaning |
+|-----|------|---------|
+| `requires_choice` | string | Player must have previously picked a choice with this `option_key` on the **same track**. Sourced from `choice_log` where `event_type='STORYLET_RESOLVED'`. |
+| `requires_flag` | string | Player must have this flag set via `sets_flag` on a prior choice. Sourced from `choice_log` where `event_type='FLAG_SET'`. **Cross-track via global union** — see below. |
+| `requires_skill` | `{skill_id, min_level?}` | Player must have `skill_id` in `player_skills` with `status='trained'`. `min_level` is currently ignored (binary gate). |
+
+Unknown keys pass (forward-compatible).
+
+**`requires_flag` is cross-track.** The engine builds two flag collections from `choice_log` FLAG_SET events:
+- `flagsByTrack`: per-track set, for any future track-scoped check.
+- `globalFlags`: the union across all tracks.
+
+At pool-scan time the per-track set is unioned with `globalFlags` before calling `meetsRequirements`. This means a `requires_flag: "tuesday_terminal"` on an opportunity-track storylet (`the_post`) succeeds when the flag was set by a belonging-track storylet (`tuesday_commitment` → `tuesday_decided_terminal`).
+
+*Change history:* Prior to 2026-04-22 `requires_flag` was strict per-track and cross-track gates silently failed. Fixed in `dailyLoop.ts` (removes `.in("track_id", trackIds)` on the FLAG_SET query and builds `globalFlags`) + `selectTrackStorylets.ts` (unions `globalFlags` into `trackFlags` pre-evaluation). Unblocked `the_post` and `tuesday_night_terminal`.
 
 ---
 
@@ -336,4 +360,6 @@ A storylet with a non-null `nodes` column (jsonb array of `DialogueNode`) render
 - Node walk cannot write `next_key_override` or `sets_track_state`. Terminal choices retain sole authority over track progression.
 - Walk flags are in-memory only. They do not hit the DB.
 - NPC memory and relational effects from micro-choices commit immediately (not deferred).
-- `requires_flag` / `excludes_flag` on `StoryletChoice` are walk-local — not persisted, not read by the engine for pool gating.
+- `requires_flag` / `excludes_flag` on a **`StoryletChoice`** (terminal choice) are walk-local — filtered by `DialogueNodeView` against the in-memory walk flag set. They are NOT the same as the storylet-level `requires_flag` gate (which lives in `storylet.requirements.requires_flag` and goes through `meetsRequirements` during pool scan — see §2 `requirements`).
+- To persist a walk flag so a downstream storylet can gate on it, the terminal choice must carry its own `sets_flag: ["x"]`. Walk flags set inside micro-choices do NOT survive the scene.
+  - *Pattern:* `tuesday_commitment` ends with four walk-flag-gated terminals (`requires_flag` on the choice, `sets_flag` mirroring it). The walk filter selects the one matching the commitment; that terminal's `sets_flag` writes a FLAG_SET row that downstream storylets read via `meetsRequirements`.

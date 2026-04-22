@@ -1,6 +1,6 @@
 # MMV Handoff Brief
 > Context bridge for claude.ai, Claude Code, and Cowork sessions.
-> **Last updated:** 2026-04-20 (Week 2 content push: routine activates Day 3, 8 new activities, scott_notices + the_post landmarks, engine gains `all_flags` + `else_next` on DialogueNode conditions)
+> **Last updated:** 2026-04-22 (tuesday_terminal flag persistence fix — cross-track requires_flag now works via globalFlags union in dailyLoop; tuesday_commitment rewritten as 4 walk-flag-gated terminals; Bryce/Peterson introduces_npc wired; docs refreshed)
 
 ---
 
@@ -352,6 +352,7 @@ Driven by `docs/WEEK-2-CONTENT-BRIEF.md`. Five parts — all shipped.
 
 | Date | Decision | Context |
 |------|----------|---------|
+| 2026-04-22 | **Cross-track `requires_flag` now resolves (globalFlags union) + `tuesday_commitment` terminal rewrite** | Two coordinated changes. (1) Engine: `dailyLoop.ts` drops the `.in("track_id", trackIds)` filter on its FLAG_SET query and now builds a `globalFlags` set alongside the per-track `flagsByTrack` map. `selectTrackStorylets.ts` unions `globalFlags` onto each track's flag set before `meetsRequirements`. This unblocks `the_post` and `tuesday_night_terminal` (opportunity track, `requires_flag: tuesday_terminal`) and the other two Week 2 tuesday_night variants (`tuesday_night_shift` on money, `tuesday_night_dana_movie` on roommate) which all gate on flags set by `tuesday_commitment` (belonging). (2) Content: `20260422100000_tuesday_commitment_flag_persistence.sql` — `tuesday_commitment`'s single terminal `tuesday_decided` is replaced with four walk-flag-gated terminals (`tuesday_decided_study/terminal/shift/movie`), each carrying `requires_flag` (so `DialogueNodeView` shows the right one) AND persistent `sets_flag` (so the downstream storylet gate fires). Same migration also wires `introduces_npc` for Bryce (`evening_choice`) and Peterson (`morning_after_cards`) — closes Known Issue #5. |
 | 2026-04-20 | **Days 2-3 content shipped (+10 storylets)** | `20260420200000_days_2_3_content.sql` adds 5 academic (western_civ_day1, reading_or_lounge, second_morning_class, study_group_forming, catch_up_or_coast), 3 belonging (floor_lunch_day2, hallway_morning_day3, miguel_afternoon_day3), 1 money (bookstore_line), 1 roommate (roommate_evening_day3). All pool-mode (default_next_key NULL). 8 use conversational nodes; 2 (reading_or_lounge, catch_up_or_coast) are body+choices only. `catch_up_or_coast` pool-gated by `requires_flag: "skipped_reading"` (set by `reading_or_lounge` on the lounge path) — first content usage of Phase 2 requires_flag enforcement. `roommate_moment` (Day 3 evening placeholder) kept inactive — superseded by new `roommate_evening_day3`. Karen introduced in `bookstore_line` via choice-level event, not `introduces_npc` (she appears conditionally). |
 | 2026-04-20 | **Dana→Scott regression re-patched; dorm_roommate deleted** | 2026-04-17 rename migration only updated `body` and `choices`, leaving `nodes` untouched, and missed `tuesday_night_terminal` (choices only). Follow-up migration `20260420100000_fix_dana_scott_regression_and_cleanup.sql` scrubs all three columns on the six affected storylets. `dorm_roommate` (inactive, same Day 0 morning slot as active `room_214`) deleted after verifying no inbound references. `hall_morning`, `orientation_fair`, `cal_midnight_knock`, `roommate_moment` audited and kept (all orphaned; comment in migration file). Known Issue #12 closed. |
 | 2026-04-19 | **Arc-scoped flag table (`player_arc_flags`) added for harvest traces** | Existing `sets_flag` writes to `choice_log` with a `track_id` — track-scoped. Harvest trace flags (`saw_trace_*`) need to persist across tracks and into Arc Two for compound reveal checks. Rather than overload `choice_log`, added `player_arc_flags` (player_id, flag_name, source_slug, set_at). `draw_harvest_item()` writes to it; the existing track FLAG_SET path is untouched. Future arc-scope flags (non-harvest) should use this table too. |
@@ -394,7 +395,7 @@ Driven by `docs/WEEK-2-CONTENT-BRIEF.md`. Five parts — all shipped.
 A storylet is **either chained OR pooled**. Never both. If anything chains to it, the pool will never reach it. See `docs/CONTENT-RULES.md` for the full 10-rule spec.
 
 ### ENGINE-SPEC.md accuracy note
-ENGINE-SPEC.md says "requirements not read by track engine" (§2). **This is now outdated.** The pool scan in `selectTrackStorylets.ts` reads `requirements.requires_choice` and `requires_skill` via `meetsRequirements()`. The pool scan also checks `is_active`. Both were added in the pool-mode implementation (2026-04-01/02).
+**Refreshed 2026-04-22.** `docs/ENGINE-SPEC.md` §2 "requirements" now documents the current `meetsRequirements()` behaviour (requires_choice, requires_flag, requires_skill) and the cross-track `globalFlags` union added this session. §1 step 3 also rewritten to describe the pool scan properly. §9 (Conversational Node Walk / Invariants) distinguishes storylet-level `requires_flag` from choice-level walk-local `requires_flag`.
 
 ---
 
@@ -402,19 +403,20 @@ ENGINE-SPEC.md says "requirements not read by track engine" (§2). **This is now
 
 | # | Issue | Severity | Status |
 |---|-------|----------|--------|
-| 1 | **ENGINE-SPEC.md outdated** — says requirements not read by track engine; they are now (requires_choice + requires_skill) | Medium | Needs update |
-| 2 | **CONTENT-INVENTORY.md outdated** — lists 7 storylets; there are now 10+ active + 5 inactive | Medium | Needs regeneration |
-| 3 | **CHAIN-MAP.md partially outdated** — still shows evening_choice → hall_morning chain; that's been broken | Medium | Needs update |
-| 4 | **Contact scene (Glenn) has no storylet** — bench_glenn deleted, no replacement written | High | Design decision needed: when/where does the Contact reveal fire? |
-| 5 | **Bryce and Peterson never formally introduced** — in registry, named in text, but no introduces_npc | Low | Add to relevant storylets |
+| 1 | ~~**ENGINE-SPEC.md outdated**~~ | ~~Medium~~ | **FIXED 2026-04-22** — §1, §2, §9 rewritten. Documents current meetsRequirements + cross-track globalFlags. |
+| 2 | ~~**CONTENT-INVENTORY.md outdated**~~ | ~~Medium~~ | **FIXED 2026-04-22** — regenerated from live DB (45 active / 4 inactive / 6 tracks / Day 0–14). |
+| 3 | ~~**CHAIN-MAP.md outdated**~~ | ~~Medium~~ | **FIXED 2026-04-22** — full rewrite with current wiring, cross-track flag index, pool-scan model. |
+| 4 | **Contact scene (Glenn) has no storylet** — bench_glenn deleted, no replacement written | High | NOT a gap anymore — `glenn_pastime_paradise` (Day 0 aft) and `glenn_the_walk` (Day 5 morn) carry the contact thread. Entry `bench_glenn` hook still absent. Reframe or close. |
+| 5 | ~~**Bryce and Peterson never formally introduced**~~ | ~~Low~~ | **FIXED 2026-04-22** — `evening_choice.introduces_npc = [npc_anderson_bryce]`, `morning_after_cards.introduces_npc = [npc_floor_peterson]`. |
 | 6 | ~~**precludes arrays reference non-existent slugs**~~ | ~~Medium~~ | **FIXED 2026-04-17** — updated to real storylet keys + preclusion engine built |
-| 7 | **first_morning.expires_after_days is NULL** — engine treats as 0, meaning it expires same day it's due | Medium | Should be 7 for orientation content |
-| 8 | **opportunity and home tracks have 0 storylets** — enabled but empty, no progress rows created | Medium | Need at least entry storylets |
-| 9 | **`time_skill` branch not yet merged to `main`** — all Phase 1-4 work lives on this branch | High | Merge after playtest |
+| 7 | ~~**first_morning.expires_after_days is NULL**~~ | ~~Medium~~ | **FIXED** (in `20260414200000`) — value is 7. Prior HANDOFF entry was stale. Verified by SQL 2026-04-22. |
+| 8 | **opportunity and home tracks have 0 storylets** | Low | Now stale — opportunity has 5 (glenn_pastime_paradise, terminal_first_visit, glenn_the_walk, the_post, tuesday_night_terminal); home has 1 (pay_phone_line). Home still sparse; opportunity covered. |
+| 9 | **`time_skill` branch not yet merged to `main`** | High | Check: `git branch` shows `main` clean; this session's commits may already be on `main`. Verify merge state. |
 | 10 | **Phase 1-4 playtests outstanding** — skill queue, skills-in-storylets, routine-week all built but not playtested | High | Block content work until verified |
-| 11 | ~~**`requires_flag` not enforced by engine**~~ | ~~Medium~~ | **FIXED 2026-04-17** — `meetsRequirements()` now checks `requires_flag`. Glenn chain wired with `sets_flag`. |
-| 12 | ~~**Dana/Scott naming regression**~~ | ~~Medium~~ | **FIXED 2026-04-20** — `20260420100000_fix_dana_scott_regression_and_cleanup.sql` scrubs all six storylets (body + choices + nodes). 2026-04-17 migration missed `nodes` column and `tuesday_night_terminal`. |
-| 13 | **11 storylets still need `sets_flag` wiring** — job_board, dana_cereal, tuesday_commitment choices need `sets_flag` to gate downstream content. Glenn is fixed; rest pending. | Medium | Content migration needed |
+| 11 | ~~**`requires_flag` not enforced by engine**~~ | ~~Medium~~ | **FIXED 2026-04-17 (track-scoped), extended 2026-04-22 (cross-track via `globalFlags`)**. |
+| 12 | ~~**Dana/Scott naming regression**~~ | ~~Medium~~ | **FIXED 2026-04-20** — `20260420100000_fix_dana_scott_regression_and_cleanup.sql` scrubs all six storylets (body + choices + nodes). |
+| 13 | **Remaining `sets_flag` wiring** — `job_board` (has_job_* flags driving Day 10 shift variants) and `dana_cereal` (dana_cereal_cold gate on dana_letter_avoidance) still need explicit `sets_flag`. Glenn + tuesday_commitment are done. | Medium | Content migration needed |
+| 14 | **Vitest environment broken — vite install missing `client.mjs`** | Low | `node_modules/vite/dist/client/` only contains `env.mjs`; `npm install vite --no-save` hung in this session. Engine unit test changes from 2026-04-22 could NOT be run. Fix: full `npm install` or `rm -rf node_modules && npm install`. Engine change was verified by SQL only. |
 
 ---
 

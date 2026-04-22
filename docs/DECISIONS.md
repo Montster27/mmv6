@@ -1,5 +1,20 @@
 # Decisions Log
 
+## `requires_flag` is cross-track (globalFlags union) + `tuesday_commitment` rewrite
+
+- **Date:** 2026-04-22
+- **Context:** The Week 2 push (2026-04-20) landed `the_post`, `tuesday_night_terminal`, `tuesday_night_shift`, and `tuesday_night_dana_movie` on three different tracks, all gated on flags that `tuesday_commitment` (belonging track) was supposed to write. Two latent problems stopped any of them from firing in a real run. (a) The tuesday_* walk-flags were set by micro-choices inside the node walk — those are scene-local and never reach `choice_log` as `FLAG_SET`. (b) Even if they did, `dailyLoop.ts` scoped its FLAG_SET query to the *current* track IDs and `selectTrackStorylets.ts → meetsRequirements` only saw per-track flags, so an opportunity-track storylet couldn't read a belonging-track flag regardless. The HANDOFF 2026-04-20 "Known limitation" flagged both gaps and proposed the two-part fix.
+- **Decision:** Implemented both halves together.
+  - **Engine:** `dailyLoop.ts` now queries *all* FLAG_SET events for the user (dropped the `.in("track_id", trackIds)` filter) and builds a `globalFlags: Set<string>` alongside the per-track `flagsByTrack: Map<string, Set<string>>`. `selectTrackStorylets.ts` gained a `globalFlags` parameter; inside the pool-scan loop it unions `globalFlags` onto each track's own flag set before calling `meetsRequirements`. Per-track map is preserved — it's still available for any future track-scoped check — but the default evaluation path sees the union. The playthrough-runner loader + harness were updated in parallel so headless scripts see the same behaviour.
+  - **Content:** `20260422100000_tuesday_commitment_flag_persistence.sql` rewrites `tuesday_commitment.choices` from a single terminal `tuesday_decided` into four walk-flag-gated terminals (`tuesday_decided_study/terminal/shift/movie`). Each terminal carries `requires_flag: "tuesday_<path>"` so `DialogueNodeView`'s walk filter shows only the one matching the commitment the player made, AND `sets_flag: ["tuesday_<path>"]` so that walk-flag is persisted to `choice_log.FLAG_SET` on resolve. Same migration wires `introduces_npc` for `evening_choice` (Bryce) and `morning_after_cards` (Peterson) — a pending Known Issue #5 item, bundled because the migration was already touching those tables.
+- **Alternatives considered:**
+  - *Rewrite the micro-choice engine to persist walk-flags past the scene.* Rejected — breaks the clean separation between scene-local dialogue state and durable run state, and a walk-flag is by design a tool for local conditional rendering. The problem wasn't walk-flag semantics; it was that the **terminal** didn't persist.
+  - *Leave flags strictly per-track and duplicate the gate flags onto multiple tracks.* Rejected — requires coordinated multi-track writes on every commitment choice, multiplies the surface for drift, and the narrative truth is "I committed my Tuesday evening" (global) not "I committed my belonging-track Tuesday evening."
+  - *Replace per-track flags entirely with globalFlags.* Rejected as too invasive for this session — kept the per-track map so existing track-scoped checks keep working, and added the union at the evaluation site. Future refactor can consolidate if no check actually needs track scoping.
+- **Impact:** All four Week 2 tuesday_night_* variants are now reachable in real play. The cross-track gate pattern (`sets_flag` on one track → `requires_flag` on another) is now the canonical way to coordinate story beats across tracks. `docs/ENGINE-SPEC.md` §1/§2/§9 and `docs/CHAIN-MAP.md` were rewritten to document the new behaviour; `docs/CONTENT-INVENTORY.md` regenerated. Engine unit test `requires_flag is track-scoped` was repurposed to `requires_flag is cross-track via globalFlags`. SQL verification confirms DB state post-migration. Vitest could not be run this session due to an unrelated corrupted `node_modules/vite` (Known Issue #14); the change is small, SQL-verified, and the playthrough-runner harness was updated in lockstep.
+
+---
+
 ## Week 2 content push: routine activation, activity roster, crystallizers
 
 - **Date:** 2026-04-20

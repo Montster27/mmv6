@@ -1,349 +1,208 @@
 # MMV Chain Map
-> Maps every explicit storylet chain for existing Day 0 content, then sketches required chains for Days 0–3.
-> Written from migration source + ENGINE-SPEC.md. Does not assume; cites evidence.
+
+> Live wiring for every active track storylet, regenerated from Supabase on 2026-04-22.
+> Source of truth is the DB (`storylets`, `tracks`); this doc is derived.
 >
-> Engine rule: a storylet is only reachable if a prior storylet on the **same track** explicitly names it
-> as `next_key` (on a choice) or `default_next_key` (on the storylet). `order_index` only determines
-> the initial entry point when `buildInitialTrackProgress()` creates a new progress row.
+> **Engine model in one line:** the engine now runs a **pool scan per track** inside
+> `selectTrackStorylets.ts`. `next_key` on a choice still sets `next_key_override` to
+> prioritize explicit chains, but once the override resolves (or is missing), the
+> engine scans every eligible storylet on the track and returns the one with the
+> earliest expiry. Eligibility checks due-window, `is_active`, preclusion,
+> `meetsRequirements` (requires_choice / requires_flag / requires_skill), and the
+> segment filter. See `docs/ENGINE-SPEC.md` §1, §2.
 >
-> "Day 0" = player's `started_day` (arrival). "Day N" = `started_day + N`.
+> **Day numbering:** "Day 0" = player's `started_day` (arrival). "Day N" = `started_day + N`.
 
 ---
 
-## Current Chain State (post all migrations through 20260401000003)
+## Current Chain + Flag State
 
 ### ROOMMATE TRACK
 
 ```
-buildInitialTrackProgress → s_d1_room_214 (order_index = -1, due = Day 0)
-
-s_d1_room_214  [morning, Day 0]
-  storylet_key:    room_214
-  default_next_key: first_morning
-  choices:         head_out (no per-choice next_key → falls to default)
-  → [default_next_key] → s_d1_first_morning
-
-s_d1_first_morning  [morning, Day 1]
-  storylet_key:    first_morning
-  order_index:     1
-  due_offset_days: 1  → due on started_day + 1
-  default_next_key: NULL
-  choices:         head_to_orientation (no per-choice next_key)
-  → NULL → track COMPLETED
+Day 0 morning   room_214                 → default_next_key: first_morning
+Day 1 morning   first_morning            → default_next_key: NULL  (pool takes over)
+Day 2 morning   scott_day2_morning       → choice read_note_leave sets_flag: read_scotts_note
+Day 3 evening   roommate_evening_day3    → choice go_to_lounge_day3 sets_flag: lounge_day3
+Day 8 evening   dana_cereal              → (may set dana_cereal_cold via walk or terminal)
+Day 9 evening   dana_letter_surface      [ungated fallback]
+Day 9 evening   dana_letter_avoidance    requires_flag: dana_cereal_cold
+Day 9 evening   dana_letter_connected    requires_choice: real_question
+Day 11 evening  scott_notices            → sets_flag: scott_notices_resolved (either terminal)
+Day 14 evening  tuesday_night_dana_movie requires_flag: tuesday_dana_movie
 ```
 
-**State after Day 1 morning:** roommate track COMPLETED. No Day 2+ content.
-*(unchanged by 20260401000003 — roommate track already reached Day 1)*
+**Pool discipline:** Day 9 has three parallel `dana_letter_*` variants — the engine
+picks whichever meets its requirements. `dana_letter_surface` is the ungated fallback.
 
 ---
 
 ### BELONGING TRACK
 
 ```
-buildInitialTrackProgress → s_d1_dorm_hallmates (order_index = 1, due = Day 0)
-
-s_d1_dorm_hallmates  [morning, Day 0]
-  storylet_key:    dorm_hallmates
-  default_next_key: NULL
-  choices:
-    admin_before_lunch → next_key: lunch_floor
-    lunch_first        → next_key: lunch_floor
-    noncommittal       → next_key: lunch_floor
-  → [choice next_key] → s_d1_lunch_floor
-
-s_d1_lunch_floor  [afternoon, Day 0]
-  storylet_key:    lunch_floor
-  due_offset_days: 0  → due on started_day + 0 = Day 0
-  default_next_key: evening_choice
-  choices:         laugh_with_doug / catch_keiths_eye / focus_on_food (no per-choice next_key)
-  → [default_next_key] → s_d1_evening_choice
-
-s_d1_evening_choice  [evening, Day 0]
-  storylet_key:    evening_choice
-  due_offset_days: 0
-  default_next_key: hall_morning  ← wired in 20260401000003
-  choices:
-    go_to_party  → no next_key (precludes: s_d1_evening_cards, s_d1_evening_union — slugs don't exist)
-    go_to_cards  → no next_key (precludes: s_d1_evening_party, s_d1_evening_union — slugs don't exist)
-    go_to_union  → no next_key (precludes: s_d1_evening_party, s_d1_evening_cards — slugs don't exist)
-  → [default_next_key] → s_d1_hall_morning
-
-s_d1_hall_morning  [morning, Day 1]  — NEW in 20260401000003
-  storylet_key:    hall_morning
-  order_index:     4
-  due_offset_days: 1  → due on started_day + 1
-  segment:         morning
-  expires_after_days: 7
-  default_next_key: NULL
-  choices:         head_downstairs (no per-choice next_key)
-  nodes:           keith_morning (MC: heading_now → going_together, maybe_later → going_solo) → react_together/react_solo → hallway_beat → choices
-  → NULL → track COMPLETED
-
-s_d1_bench_glenn  [morning, Day 0]  — DISABLED (is_active = false), order_index = 4
-  Unreachable: nothing chains to it; is_active has no effect in track engine
-  but no chain pointer exists so it will never appear regardless.
+Day 0 morning    dorm_hallmates           → choice next_key: lunch_floor
+Day 0 afternoon  lunch_floor              → default_next_key: evening_choice
+Day 0 evening    evening_choice           [introduces npc_anderson_bryce]
+                                          (choices: go_to_party / go_to_cards / go_to_union)
+Day 1 morning    morning_after_party      requires_choice: go_to_party
+Day 1 morning    morning_after_cards      requires_choice: go_to_cards  [introduces npc_floor_peterson]
+Day 1 morning    morning_after_union      requires_choice: go_to_union
+Day 2 afternoon  floor_lunch_day2
+Day 3 morning    hallway_morning_day3
+Day 3 afternoon  miguel_afternoon_day3
+Day 10 afternoon miguel_guitar
+Day 11 afternoon priya_dining_hall
+Day 12 evening   doug_coach_story
+Day 13 evening   tuesday_commitment       (4 walk-flag-gated terminals; each persists its flag)
+                   tuesday_decided_study    sets_flag: tuesday_study_group
+                   tuesday_decided_terminal sets_flag: tuesday_terminal
+                   tuesday_decided_shift    sets_flag: tuesday_shift
+                   tuesday_decided_movie    sets_flag: tuesday_dana_movie
+Day 14 evening   tuesday_night_study      requires_flag: tuesday_study_group
 ```
 
-**State after Day 1 morning:** belonging track COMPLETED. No Day 2+ content.
-*(20260401000003 extended chain from Day 0 evening to Day 1 morning)*
+**Preclusion in `evening_choice`:** old `precludes` entries referenced
+non-existent slugs (`s_d1_evening_party` etc.). The chain now relies on
+`requires_choice` on the Day 1 morning-after variants, which is the correct
+pattern — preclusion is no longer needed there.
 
 ---
 
 ### ACADEMIC TRACK
 
 ```
-buildInitialTrackProgress → s_d1_admin_errand (order_index = 0, due = Day 0)
-
-s_d1_admin_errand  [morning, Day 0]
-  storylet_key:    admin_errand
-  due_offset_days: 0
-  default_next_key: advisor_visit  ← wired in 20260401000003
-  choices:
-    full_meal_plan / standard_meal_plan / minimum_meal_plan (no per-choice next_key)
-  → [default_next_key] → s_d1_advisor_visit
-
-s_d1_advisor_visit  [afternoon, Day 1]  — NEW in 20260401000003
-  storylet_key:    advisor_visit
-  order_index:     1
-  due_offset_days: 1  → due on started_day + 1
-  segment:         afternoon
-  expires_after_days: 7
-  default_next_key: NULL
-  choices:
-    lean_cs        → identity: [achieve, risk], stress +1
-    lean_humanities → identity: [achieve], stress 0
-    defer          → identity: [safety], stress -1
-  → NULL → track COMPLETED
-```
-
-**State after Day 1 afternoon:** academic track COMPLETED. No Day 2+ content.
-*(20260401000003 extended chain from Day 0 morning to Day 1 afternoon)*
-
----
-
-### MONEY / OPPORTUNITY / HOME TRACKS
-
-No storylets with these `track_id` values exist in active migrations.
-`buildInitialTrackProgress` skips tracks with zero storylets.
-No `track_progress` rows are created for these tracks.
-
----
-
-### Orphaned / Floating Storylets
-
-These exist in the DB but are unreachable via the track engine:
-
-| Slug | Track | Reason unreachable |
-|------|-------|--------------------|
-| `s_d1_bench_glenn` | belonging | `is_active=false`; nothing chains to it anyway |
-| `s_d1_dorm_roommate` | roommate | `is_active=false` (disabled in 20260331000002) |
-
----
-
-## What "Day 0" and "Day N" Mean
-
-| Engine term | Calendar meaning | Content currently built |
-|-------------|-----------------|------------------------|
-| Day 0 (due_offset=0) | Arrival day: morning → afternoon → evening | room_214, dorm_hallmates, lunch_floor, evening_choice, admin_errand |
-| Day 1 (due_offset=1) | First full orientation day: morning + afternoon | first_morning, hall_morning, advisor_visit |
-| Day 2 (due_offset=2) | Orientation Day 2 | nothing |
-| Day 3 (due_offset=3) | Orientation Day 3 | nothing |
-
----
-
-## Required Chains for Days 0–3
-
-Based on HANDOFF.md ("Orientation is Days 0–3 before classes"), STORYLINE_MAP.md, and existing content.
-This is a planning skeleton — it maps what the engine needs, not what the prose says.
-
-### ROOMMATE TRACK
-
-```
-Day 0
-  room_214 → first_morning ✓ (fixed in 20260401000002)
-
-Day 1
-  first_morning → [?? orientation assembly or dorm morning Day 2 ??]
-  STATUS: default_next_key = NULL → COMPLETED prematurely.
-  NEEDED: chain to the next roommate beat on Day 1 or Day 2.
-
-Day 2–3
-  Not designed. Likely: first real roommate friction or rapport beat.
-  Must be on the ROOMMATE track with due_offset_days = 2 or 3.
-```
-
-### BELONGING TRACK
-
-```
-Day 0
-  dorm_hallmates → lunch_floor → evening_choice ✓ (fully wired)
-
-Day 1
-  evening_choice → hall_morning ✓ (wired in 20260401000003)
-  hall_morning → NULL → COMPLETED
-
-Day 2–3
-  No content built. hall_morning needs a default_next_key for Day 2+ content.
-  NEEDED: a Day 2 belonging beat (orientation social? floor dynamic shift?)
-  Must be on BELONGING track with due_offset_days = 2.
-```
-
-### ACADEMIC TRACK
-
-```
-Day 0
-  admin_errand → advisor_visit ✓ (wired in 20260401000003)
-
-Day 1
-  advisor_visit (afternoon) → NULL → COMPLETED
-
-Day 2–3
-  No content built. advisor_visit needs a default_next_key for Day 2+ content.
-  NEEDED: a Day 2–3 academic beat (first class prep? syllabus pickup?)
-  Must be on ACADEMIC track with due_offset_days = 2 or 3.
-```
-
-### MONEY / OPPORTUNITY / HOME TRACKS
-
-```
-No content built for any of these tracks.
-buildInitialTrackProgress skips tracks with no storylets → no progress rows.
-Until at least one storylet exists per track, these tracks are silent.
+Day 0 morning    admin_errand             → default_next_key: advisor_visit
+Day 1 afternoon  advisor_visit
+Day 2 morning    western_civ_day1
+                   stay_after        sets_flag: checked_syllabus, met_studious_classmate
+                   try_to_talk_neighbor sets_flag: met_karen
+Day 2 evening    reading_or_lounge
+                   do_the_reading   sets_flag: did_reading
+                   go_to_lounge     sets_flag: skipped_reading, lounge_day2
+Day 3 morning    second_morning_class
+Day 3 afternoon  study_group_forming
+                   stay_and_review  sets_flag: extra_study
+Day 3 evening    catch_up_or_coast        requires_flag: skipped_reading
+                   catch_up_now     sets_flag: did_reading_late
+Day 8 morning    heller_lecture
 ```
 
 ---
 
-## Engine Constraint Flags
-
-Issues in the current design or the HANDOFF/STORYLINE_MAP vision that conflict with
-how the engine actually works. Each flag describes the conflict and the implication.
-
----
-
-### FLAG 1 — ~~Belonging track COMPLETES on Day 0; no Day 1+ path~~ RESOLVED
-
-**Fixed in:** `20260401000003_day1_content_and_chain_forward.sql`
-`evening_choice.default_next_key = 'hall_morning'` — belonging track now reaches Day 1 morning.
-**Remaining:** hall_morning still terminates with NULL. Day 2+ belonging content still unbuilt.
-
----
-
-### FLAG 2 — ~~Academic track COMPLETES on Day 0; all future academic content unreachable~~ RESOLVED
-
-**Fixed in:** `20260401000003_day1_content_and_chain_forward.sql`
-`admin_errand.default_next_key = 'advisor_visit'` — academic track now reaches Day 1 afternoon.
-**Remaining:** advisor_visit still terminates with NULL. Day 2+ academic content still unbuilt.
-
----
-
-### FLAG 3 — STORYLINE_MAP uses slug-based branching that the track engine doesn't support
-
-**Where:** STORYLINE_MAP references gates like `s14_marsh_office_hours available only if s7_first_class ran`.
-**Engine behavior:** The track engine has no cross-storylet flag-gate system. Track engine only checks: (a) is the progress ACTIVE? (b) is today >= storylet_due_day? (c) does current_storylet_key exist in this track? Requirements and conditions in the `requirements` field are **not read** by the track engine (only by the legacy selectStorylets system).
-**Fix required:** Conditional gates must be implemented either as: (a) separate track branches triggered by choice `next_key` values, or (b) node-level `condition` fields (local to a conversational storylet's node walk), or (c) NPC memory checks in the node system. Cross-storylet gating ("show this only if that completed") is not natively supported.
-
----
-
-### FLAG 4 — Due date calculation is relative to started_day, not current day
-
-**Where:** ENGINE-SPEC.md §3, resolve route line 205:
-`nextDueDay = progressRow.started_day + nextStorylet.due_offset_days`
-**Conflict with design:** If a player is slow and resolves Day 0 content on calendar Day 3, a storylet with `due_offset_days = 1` will be due on `started_day + 1`, which is already in the past. It will appear immediately (not "tomorrow"). This is not wrong per se, but content with expiry windows (expires_after_days) may expire before the player reaches it if they play slowly.
-**Implication:** For orientation content (Days 0–3), set `expires_after_days` generously (7+). Tight expiry windows only make sense for time-sensitive content in active weeks.
-
----
-
-### FLAG 5 — evening_choice precludes reference non-existent slugs
-
-**Where:** `s_d1_evening_choice`, all three choices:
-  - `precludes: ["s_d1_evening_cards", "s_d1_evening_union"]` (don't exist)
-  - `precludes: ["s_d1_evening_party", "s_d1_evening_union"]` (don't exist)
-  - `precludes: ["s_d1_evening_party", "s_d1_evening_cards"]` (don't exist)
-**Engine behavior:** Preclusion silently fails for non-existent slugs. No crash, no effect.
-**Fix required:** Either create the three variant storylets (`s_d1_evening_party`, `s_d1_evening_cards`, `s_d1_evening_union`) as separate slugs, or rework preclusion to reference the choice IDs within this single storylet.
-
----
-
-### FLAG 6 — maxStorylets = 2 caps Day 0 content delivery
-
-**Where:** `selectTrackStorylets()`, default `maxStorylets = 2`.
-**Conflict with design:** Day 0 has content on 3 active tracks (roommate, belonging, academic). All three could be "due" simultaneously (all have `due_offset_days = 0`). Only 2 show at once, sorted by soonest expiry. Depending on segment timing, admin_errand (academic) may be suppressed by the 2-slot cap while roommate and belonging content runs.
-**Implication:** Segment assignment is the primary scheduling tool. Content on different segments avoids competition. room_214 (morning) and dorm_hallmates (morning) plus admin_errand (morning) — three morning-segment storylets compete for 2 slots. One will be delayed or dropped.
-
----
-
-### FLAG 7 — bench_glenn (Glenn/Contact scene) is orphaned
-
-**Where:** `s_d1_bench_glenn`, disabled and unchained.
-**Design intent:** The Contact scene is the time-travel reveal — a critical narrative beat. Currently it's disabled and nothing chains to it.
-**Fix required:** Decision needed on which track carries the Contact scene and when in the sequence it fires. Once decided: (a) enable it, (b) chain to it from the correct prior storylet, (c) decide what it chains to next.
-
----
-
-### FLAG 8 — s_d1_first_morning slug prefix is inconsistent
-
-**Where:** `s_d1_first_morning`, slug uses `d1_` prefix but `due_offset_days = 1` (Day 1 = post-arrival).
-**Convention conflict:** All other `s_d1_*` slugs have `due_offset_days = 0` (arrival day). This storylet is Day 1 (post-arrival) by `due_offset_days` but `d1` by slug naming.
-**Implication:** Low severity. Naming only. But if a future convention assigns `s_d1_*` = arrival day and `s_d2_*` = second day, this slug will be confusing. Consider renaming to `s_d2_first_morning` in a future migration.
-
----
-
-## Sketch: Days 0–3 Required Chain Wiring
-
-This is what needs to be true for the engine to serve content through Day 3.
-Content not yet written is marked `[NOT BUILT]`.
+### MONEY TRACK
 
 ```
-ROOMMATE TRACK
-  Day 0 morning:   room_214 (order=-1, due=0) ──────────────────────────────── ✓
-    → default_next_key: first_morning
-  Day 1 morning:   first_morning (order=1, due=1) ──────────────────────────── ✓
-    → default_next_key: [Day 1 roommate beat, NOT BUILT] (due=1)
-  Day 2:           [roommate beat, NOT BUILT] (due=2)
-    → default_next_key: [Day 2 roommate beat, NOT BUILT] (due=2 or 3)
-  Day 3:           [roommate beat, NOT BUILT] (due=3)
-    → default_next_key: [Day 4 first-class-week roommate beat, NOT BUILT]
+Day 2 afternoon  bookstore_line
+                   check_balance     sets_flag: checked_balance
+Day 4 evening    money_reality_check
+Day 7 afternoon  job_board                (choice outcomes drive has_job_* flags)
+Day 10 morning   first_shift_dining       requires_flag: has_job_dining
+Day 10 morning   first_shift_grounds      requires_flag: has_job_grounds
+Day 10 afternoon first_shift_research     requires_flag: has_job_research
+Day 10 evening   first_shift_library      requires_flag: has_job_library
+Day 14 evening   tuesday_night_shift      requires_flag: tuesday_shift
+```
 
-BELONGING TRACK
-  Day 0 morning:   dorm_hallmates (order=1, due=0) ─────────────────────────── ✓
-    → choice next_key: lunch_floor
-  Day 0 afternoon: lunch_floor (order=2, due=0) ────────────────────────────── ✓
-    → default_next_key: evening_choice
-  Day 0 evening:   evening_choice (order=3, due=0) ─────────────────────────── ✓
-    → default_next_key: hall_morning  ✓ (wired in 20260401000003)
-  Day 1 morning:   hall_morning (order=4, due=1) ───────────────────────────── ✓
-    → default_next_key: [Day 2 belonging beat, NOT BUILT]  ←── terminates here
-  Day 2:           [orientation social / belonging beat, NOT BUILT] (due=2)
-    → default_next_key: [Day 3 beat, NOT BUILT] (due=3)
+**Branching model:** `job_board` writes one of four `has_job_*` flags; only the
+matching Day 10 shift fires. Same discipline as `tuesday_*` — persistent flags
+select from a pool of parallel storylets.
 
-ACADEMIC TRACK
-  Day 0 morning:   admin_errand (order=0, due=0) ───────────────────────────── ✓
-    → default_next_key: advisor_visit  ✓ (wired in 20260401000003)
-  Day 1 afternoon: advisor_visit (order=1, due=1) ──────────────────────────── ✓
-    → default_next_key: [Day 2–3 academic beat, NOT BUILT]  ←── terminates here
-  Day 2–3:         [NOT BUILT] — course add/drop, first class prep
-  Day 4+:          [first_class beat, NOT BUILT]
+---
 
-MONEY TRACK
-  Day 0–3:         No content. Track silent.
-  When to start:   STORYLINE_MAP suggests money friction appears Week 2.
-                   A Day 5–7 entry storylet would be the first money beat.
-                   Must create at least one storylet with this track_id to get a progress row.
+### OPPORTUNITY TRACK
 
-OPPORTUNITY TRACK
-  Day 0–3:         No content. Track silent.
-  When to start:   Orientation fair / bulletin board encounter — Day 1–3 range.
+```
+Day 0 afternoon  glenn_pastime_paradise
+                   head_to_evening  sets_flag: glenn_gave_direction
+Day 1 afternoon  terminal_first_visit     requires_flag: glenn_gave_direction
+                   leave_terminal   sets_flag: found_terminal
+Day 5 morning    glenn_the_walk           requires_flag: found_terminal
+Day 14 afternoon the_post                 requires_flag: tuesday_terminal
+                   log_off_quick    sets_flag: the_post_resolved
+                   log_off_shaken   sets_flag: the_post_resolved, delphi_archive_accessed
+Day 14 evening   tuesday_night_terminal   requires_flag: tuesday_terminal
+```
 
-HOME TRACK
-  Day 0–3:         No content. Track silent.
-  When to start:   Parent phone call — STORYLINE_MAP suggests Day 3–4 (Week 1).
+**Cross-track gate:** `the_post` and `tuesday_night_terminal` are on the
+opportunity track but gated on `tuesday_terminal`, which is set by a choice
+on the **belonging** track (`tuesday_commitment.tuesday_decided_terminal`).
+This only resolves because the engine unions `globalFlags` into each track's
+flag set before `meetsRequirements` (see ENGINE-SPEC.md §2 `requirements`).
+Prior to 2026-04-22 this gate silently failed.
+
+---
+
+### HOME TRACK
+
+```
+Day 7 evening    pay_phone_line   (single storylet; no chain beyond it yet)
 ```
 
 ---
 
-*Source: `supabase/migrations/20260330000001_replace_day1_content.sql`,
-`20260330000002_fix_day1_track_wiring.sql`, `20260331000001_add_room_214_opening.sql`,
-`20260331000002_fix_day1_sequencing.sql`, `20260331100000_rewrite_room_214_conversational.sql`,
-`20260401000001_first_morning_and_hallmates_fix.sql`, `20260401000002_fix_roommate_chain.sql`,
-`20260401000003_day1_content_and_chain_forward.sql`,
-`docs/ENGINE-SPEC.md`, `docs/CONTENT-INVENTORY.md`, `HANDOFF.md`, `docs/STORYLINE_MAP.md`*
+### Disabled / Orphaned
+
+| Slug | Track | Why disabled |
+|------|-------|--------------|
+| `hall_morning` | belonging | superseded by segment-aware Day 1 morning-after variants |
+| `orientation_fair` | belonging | design-stage; not yet wired |
+| `cal_midnight_knock` | belonging | design-stage; not yet wired |
+| `roommate_moment` | roommate | design-stage; not yet wired |
+| `bench_glenn` (pre-rewrite) | belonging | superseded by `glenn_pastime_paradise` on opportunity |
+| `s_d1_dorm_roommate` | roommate | superseded by `room_214` |
+
+---
+
+## Cross-Track Flag Index
+
+Flags listed here gate storylets on a track different from the one that sets them.
+
+| Flag | Set by | Gates |
+|------|--------|-------|
+| `glenn_gave_direction` | opportunity.glenn_pastime_paradise | opportunity.terminal_first_visit (same track, but gate via flag rather than next_key) |
+| `found_terminal` | opportunity.terminal_first_visit | opportunity.glenn_the_walk |
+| `tuesday_study_group` | belonging.tuesday_commitment | belonging.tuesday_night_study |
+| `tuesday_terminal` | belonging.tuesday_commitment | opportunity.the_post, opportunity.tuesday_night_terminal **← cross-track** |
+| `tuesday_shift` | belonging.tuesday_commitment | money.tuesday_night_shift **← cross-track** |
+| `tuesday_dana_movie` | belonging.tuesday_commitment | roommate.tuesday_night_dana_movie **← cross-track** |
+| `has_job_research` / `has_job_library` / `has_job_dining` / `has_job_grounds` | money.job_board | money.first_shift_* |
+| `dana_cereal_cold` | roommate.dana_cereal (walk flag → terminal sets_flag) | roommate.dana_letter_avoidance |
+| `skipped_reading` / `did_reading` | academic.reading_or_lounge | academic.catch_up_or_coast |
+
+---
+
+## Known Issues
+
+### FLAG 3 — requires_flag is NOT cross-storylet-gate-incapable (RESOLVED 2026-04-22)
+
+~~The track engine has no cross-storylet flag-gate system.~~
+
+Outdated. `selectTrackStorylets.ts → meetsRequirements()` now honours
+`requires_choice`, `requires_flag`, and `requires_skill` on `storylet.requirements`.
+`requires_flag` is further unioned across all tracks via `globalFlags` in
+`dailyLoop.ts`. STORYLINE_MAP-style cross-storylet gates ARE now supported —
+at the storylet level, via `sets_flag` on a terminal choice + `requires_flag`
+on a downstream storylet.
+
+### FLAG 4 — Due date is relative to started_day (UNCHANGED)
+
+`nextDueDay = progressRow.started_day + nextStorylet.due_offset_days`. A slow
+player can land past the dueDay and find storylets already in their expiry
+window. Orientation content uses `expires_after_days: 7` to absorb this;
+tighter windows (1–3) apply to Week 2 beats where ordering matters.
+
+### FLAG 6 — maxStorylets = 2 (UNCHANGED)
+
+Pool scan still returns at most one candidate per track; across tracks, cap is
+2 (configurable, default 2). Segment assignment remains the primary
+scheduling tool to avoid starving a track on a given day.
+
+---
+
+*Derived from DB state at 2026-04-22. Regenerate with:*
+```sql
+SELECT t.key, s.storylet_key, s.order_index, s.due_offset_days, s.expires_after_days,
+       s.segment, s.default_next_key, s.requirements
+FROM storylets s JOIN tracks t ON t.id = s.track_id
+WHERE s.is_active = true ORDER BY t.key, s.due_offset_days, s.order_index;
+```
