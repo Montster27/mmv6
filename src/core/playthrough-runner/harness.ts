@@ -433,9 +433,14 @@ export class PlaythroughHarness {
     }
 
     // Skip nodes whose condition is not met
-    if (nextNode.condition?.flag && !ws.flags.has(nextNode.condition.flag)) {
-      // Advance past this node to its next
-      ws.currentNodeId = nextNode.next ?? null;
+    const cond = nextNode.condition;
+    const conditionMet =
+      !cond ||
+      ((!cond.flag || ws.flags.has(cond.flag)) &&
+        (!cond.all_flags || cond.all_flags.every((f) => ws.flags.has(f))));
+    if (!conditionMet) {
+      // Advance past this node via its explicit else_next, else fall through to .next
+      ws.currentNodeId = nextNode.else_next ?? nextNode.next ?? null;
       if (!ws.currentNodeId || ws.currentNodeId === "choices") {
         ws.terminal = "choices";
         ws.currentNodeId = null;

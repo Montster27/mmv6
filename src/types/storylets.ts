@@ -176,6 +176,8 @@ export type DialogueNode = {
   condition?: {
     /** Walk-local flag must be set. */
     flag?: string;
+    /** Every walk-local flag in the list must be set. Used for quiz-style compound gates. */
+    all_flags?: string[];
     /** NPC memory key must be truthy. Format: "npc_id.memory_key". */
     npc_memory?: string;
   };
@@ -183,6 +185,9 @@ export type DialogueNode = {
   micro_choices?: MicroChoice[];
   /** Auto-advance target when no micro_choices. "choices" or null = show terminal choices. */
   next?: string;
+  /** When condition is NOT met, advance here instead of `next`. Enables explicit
+   *  if/else branching at gate nodes (e.g. quiz check routing pass vs fail). */
+  else_next?: string;
 };
 
 export type Storylet = {
