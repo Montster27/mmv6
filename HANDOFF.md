@@ -1,6 +1,6 @@
 # MMV Handoff Brief
 > Context bridge for claude.ai, Claude Code, and Cowork sessions.
-> **Last updated:** 2026-04-17 (verified via browser playtest with claude-in-chrome)
+> **Last updated:** 2026-04-20 (Week 2 content push: routine activates Day 3, 8 new activities, scott_notices + the_post landmarks, engine gains `all_flags` + `else_next` on DialogueNode conditions)
 
 ---
 
@@ -60,24 +60,24 @@ V16MMV/mmv/
 
 ---
 
-## Live DB State (as of 2026-04-17)
+## Live DB State (as of 2026-04-20)
 
-### Active Storylets: 31 total (see `docs/GAP-ANALYSIS.md` for full matrix)
+### Active Storylets: 45 total (see `docs/GAP-ANALYSIS.md` for full matrix)
 
 | Track | Active | Day range | Key storylets |
 |-------|--------|-----------|---------------|
-| **roommate** | 6 | 0–14 | room_214 (chain), first_morning, **scott_day2_morning** (pool, Day 2), dana_cereal, dana_letter_* (3 variants), tuesday_night_dana_movie |
-| **belonging** | 11 | 0–14 | dorm_hallmates→lunch_floor→evening_choice (chain), morning_after_* (3 pool), miguel_guitar, priya_dining_hall, doug_coach_story, tuesday_commitment, tuesday_night_study |
-| **academic** | 2 | 1, 8 | advisor_visit, heller_lecture |
-| **money** | 7 | 4–14 | money_reality_check, job_board, first_shift_* (4 variants), tuesday_night_shift |
-| **opportunity** | 4 | 0–14 | glenn_pastime_paradise, terminal_first_visit, glenn_the_walk, tuesday_night_terminal |
+| **roommate** | 10 | 0–14 | room_214 (chain), first_morning, scott_day2_morning (Day 2), roommate_evening_day3, dana_cereal, dana_letter_* (3 variants), tuesday_night_dana_movie, **scott_notices** (Day 11 evening — crystallizer) |
+| **belonging** | 14 | 0–14 | dorm_hallmates→lunch_floor→evening_choice (chain), morning_after_* (3 pool), miguel_guitar, priya_dining_hall, doug_coach_story, tuesday_commitment, tuesday_night_study, floor_lunch_day2, hallway_morning_day3, miguel_afternoon_day3 |
+| **academic** | 7 | 1–8 | advisor_visit, heller_lecture, western_civ_day1, reading_or_lounge, second_morning_class, study_group_forming, catch_up_or_coast (gated by `skipped_reading` flag) |
+| **money** | 8 | 2–14 | money_reality_check, job_board, first_shift_* (4 variants), tuesday_night_shift, bookstore_line |
+| **opportunity** | 5 | 0–14 | glenn_pastime_paradise, terminal_first_visit, glenn_the_walk, tuesday_night_terminal, **the_post** (Day 14 afternoon — Delphi Group quiz) |
 | **home** | 1 | 7 | pay_phone_line |
 
-### Inactive/Disabled Storylets (5)
-Same as before: hall_morning, dorm_roommate, roommate_moment, orientation_fair, cal_midnight_knock.
+### Inactive/Disabled Storylets (4)
+hall_morning, roommate_moment (superseded by `roommate_evening_day3`), orientation_fair, cal_midnight_knock. (`dorm_roommate` deleted 2026-04-20 — superseded by `room_214`, identical slot.)
 
 ### Deleted Storylets
-Same as before: bench_glenn (2026-04-02).
+bench_glenn (2026-04-02), dorm_roommate (2026-04-20 — duplicate of room_214).
 
 ### New DB Tables (Phase 1-4)
 
@@ -89,6 +89,9 @@ Same as before: bench_glenn (2026-04-02).
 | `routine_activities` | Standing activity catalog (6 seeded) | Phase 4 (2026-04-12) |
 | `player_routine_schedules` | Per-user committed weekly schedules | Phase 4 (2026-04-12) |
 | `routine_week_state` | Per-user weekly state machine | Phase 4 (2026-04-12) |
+| `harvest_items` | Dream / letter / usenet pool (28 seeded) | Phase 3 (2026-04-19) |
+| `harvest_seen` | Per-player seen-item junction (prevents repeats) | Phase 3 (2026-04-19) |
+| `player_arc_flags` | **Arc-scoped** flags (unlike track-scoped choice_log FLAG_SET) — used by 6 harvest traces | Phase 3 (2026-04-19) |
 
 ### NPC Registry (13 NPCs)
 
@@ -231,6 +234,30 @@ npm run playthrough:test                                        # vitest integra
 - `requires_flag` is NOT enforced by engine — Glenn storylets using it pass regardless (known limitation)
 - Same-track validation in both engine and harness prevents cross-track chain bugs even with bad DB data
 
+### Days 2-3 Content (built 2026-04-20)
+- **Migration:** `supabase/migrations/20260420200000_days_2_3_content.sql` — 10 new active storylets, applied clean
+- **Brief:** `docs/DAYS-2-3-CONTENT-BRIEF.md` is the authoring spec (body text, nodes, choices, flags, NPC events)
+- **Academic (5):** `western_civ_day1` (Day 2 morning, intro `npc_prof_western_civ`), `reading_or_lounge` (Day 2 evening — body+choices only, no nodes; sets `skipped_reading` flag on lounge path), `second_morning_class` (Day 3 morning), `study_group_forming` (Day 3 afternoon, intro `npc_studious_priya`), `catch_up_or_coast` (Day 3 evening, pool-gated by `requires_flag: "skipped_reading"`)
+- **Belonging (3):** `floor_lunch_day2` (Day 2 afternoon), `hallway_morning_day3` (Day 3 morning), `miguel_afternoon_day3` (Day 3 afternoon)
+- **Money (1):** `bookstore_line` (Day 2 afternoon — introduces Karen via choice-level NPC event, not `introduces_npc`)
+- **Roommate (1):** `roommate_evening_day3` (Day 3 evening — supersedes inactive `roommate_moment`; idempotent UPDATE in migration keeps `roommate_moment.is_active=false`)
+- **Pattern:** all 10 use pool mode (`default_next_key=NULL`). 8 have conversational nodes; `reading_or_lounge` and `catch_up_or_coast` are body+choices only.
+- **Status:** Migration applied. Active storylet count 33 → 43 (+10 new). (Prior HANDOFF snapshot said 31; the roommate row undercounted by 2 — it was actually 8 pre-session, not 6.) All 10 verified by `storylets` query.
+
+### Week 2 Content Push (built 2026-04-20)
+Driven by `docs/WEEK-2-CONTENT-BRIEF.md`. Five parts — all shipped.
+
+- **Part 1 — Routine activation moved Day 7 → Day 3.** `ROUTINE_MODE_START_DAY` constant changed. Classes start Day 3; the mechanic now matches the fiction.
+- **Part 2 — Activity roster expansion.** Added `activities.segment_lock` column. 6 existing activities updated + 8 new authored (14 total: 3 morning, 5 afternoon, 6 evening). Every segment has more valid activities than slots. Migration includes `NOT NULL` default where appropriate + backfill UPDATEs.
+- **Part 3 — `scott_notices` (Day 11 evening, roommate track, 2h).** `supabase/migrations/20260420400000_scott_notices.sql`. Roommate crystallizer with 10 nodes + 2 terminals. Three entry paths (`scott_opens` if `trust_high`, `scott_opens_low` if `trust_low`, `scott_absent` as unconditional fallback via node ordering). Micro-choices pair `sets_flag` (walk-local) with `set_npc_memory` (persistent) so the `noticed_something` / `roommate_avoids` signal survives beyond the scene. Migration also (a) retrofits `scott_day2_morning` + 3 dana_letter_* terminals to write `trust_high`/`trust_low` NPC memory so scott_notices' entry gates have something to branch on, and (b) sweeps the final Known Issue #12 residue (4 rows still carried `npc_roommate_dana` in choices/nodes).
+- **Part 4 — `the_post` / "The Delphi Group" (Day 14 afternoon, opportunity track, 2h).** `supabase/migrations/20260420500000_the_post.sql`. Forecasting-quiz landmark with 13 nodes + 2 terminals. Gated by `requires_flag: tuesday_terminal`. Three quiz questions; correct answers set walk-flags `delphi_q{1,2,3}_correct`; `submit_answers` uses new `condition.all_flags` to gate success vs `else_next: submit_answers_fail`. Archive-reading path sets walk-flag `delphi_archive_seen`, which gates the `log_off_shaken` terminal — that terminal's persistent `sets_flag: [the_post_resolved, delphi_archive_accessed]` is how the arc flag fires only on the quiz-passed path. Walk-away path (`walk_away_node`) available from hesitation node. Introduces `cassandra_7` / `heraclitus` as future NPCs (handles-only, no `introduces_npc` yet — not yet real NPCs in the registry).
+- **Part 4 engine side — two schema additions on `DialogueNode`:**
+  - `condition.all_flags: string[]` — compound walk-flag gate; all listed flags must be set.
+  - `else_next: string` — explicit fallback target when condition fails (overrides `.next`).
+  Both evaluators updated for parity: `DialogueNodeView` (player UI) + `playthrough-runner/harness.ts` (test harness). `tsc --noEmit` clean. No content using pre-existing node conditions is affected.
+- **Part 5 — 2 entries added to `docs/DECISIONS.md`** (Week 2 push rollup + engine extension rationale).
+- **Known limitation carried forward:** `tuesday_terminal` is set by a micro-choice inside `tuesday_commitment` (pre-existing content, belonging track). Micro-choice `sets_flag` is scene-local, so the flag never reaches `choice_log` as a persistent FLAG_SET. Even if it did, flagsByTrack scoping is per-track (`src/core/engine/dailyLoop.ts:547`: "cross-track gating is a future extension"), so an opportunity-track storylet couldn't read a belonging-track flag. Both gaps block the `requires_flag: tuesday_terminal` gate on `tuesday_night_terminal` (pre-existing) and `the_post` (new) from firing in a real run. Fix options: (a) rewrite `tuesday_commitment`'s terminal choice into four walk-flag-gated terminals that each persist their tuesday_* flag, and (b) extend `dailyLoop.ts` to union a global flag set onto each track's flag set before `meetsRequirements`. Not done in this session — scope outside the Week 2 content brief.
+
 ### scott_day2_morning Storylet (built 2026-04-17)
 - First Day 2 content, filling the Days 2-3 content desert on the roommate track
 - **Engine extension:** `DialogueNode.condition` now supports `npc_memory` checks (format: `"npc_id.memory_key"`)
@@ -249,6 +276,25 @@ npm run playthrough:test                                        # vitest integra
 - Playthrough runner harness updated to load/write flags
 - 3 new unit tests (invariant 6 additions)
 - Glenn chain fixed: `glenn_pastime_paradise` sets `glenn_gave_direction`, `terminal_first_visit` sets `found_terminal`
+
+### Phase 3 Harvest Pool — Schema + 28 Templates (built 2026-04-19)
+- **Migration:** `supabase/migrations/20260419100000_phase3_harvest_pool.sql` — ran clean against live DB
+- **New tables (3):**
+  - `harvest_items` — slug PK, type ∈ {dream, letter, usenet}, subtype, day_min/max window, gate_requires, weight, body, attribution, sets_flag, identity_tags JSONB
+  - `harvest_seen` — (player_id, slug) junction — one-per-player-per-item
+  - `player_arc_flags` — **arc-scoped** flag table (distinct from track-scoped FLAG_SET in `choice_log`). Used for the 6 harvest trace flags so Arc Two can do compound checks.
+- **Draw function:** `public.draw_harvest_item(p_player_id, p_current_day) RETURNS harvest_items` (SECURITY DEFINER)
+  - Filters by day window, gate_requires (checks `player_arc_flags`), excludes already-seen
+  - Weighted random via cumulative `SUM() OVER (ORDER BY slug)` against `random() * total_weight`
+  - Returns NULL on empty pool (caller falls through to "no visit today")
+- **Seeded content (28 items from `docs/harvest_templates_draft.md`):**
+  - 8 dreams (textures of returning / half-memory / déjà vu — no gates)
+  - 6 letters from home (1 each of mom, dad, sibling, high_school_friend, grandparent, ex)
+  - 8 usenet texture posts (net.philosophy / net.misc / rec.music — no gates)
+  - 6 usenet trace posts (all gated by `terminal_accessed`, each sets a unique `saw_trace_*` arc flag: NV, sports_anomaly, arc_terminology, contact_signal, harwick_mention, nv_three)
+- **RLS:** harvest_items/items public read; harvest_seen/player_arc_flags each user sees only own rows; writes restricted via auth.uid() policies
+- **Not built (intentional):** login-flow caller, Usenet display slot, UI. This migration is read-only infra — wiring happens in P3.3 (T-1776329281038).
+- **Status:** Migration applied. Draw function verified: Day 1 returns one of {dream_001, dream_002, dream_006, texture_001}; Day 14 pool = 22 (no gate) / 28 (with terminal_accessed); empty pool returns NULL. 28 templates (draft only had 28, not 30 as ticket originally specified).
 
 ### Runtime Preclusion (T-016, built 2026-04-17)
 - When a choice has `precludes: ["storylet_key", ...]`, those keys are appended to `daily_states.preclusion_gates`
@@ -288,16 +334,17 @@ npm run playthrough:test                                        # vitest integra
 
 ### Immediate (playtesting)
 1. **Playtest Day 0 → Day 7+** — full walkthrough confirming: morning-after scenes, day advancement, skill queue, routine-week mode activation
-2. **Phase 3 (Daily Harvest)** — harvest pool schema, 30 templates, login flow. Runs parallel to content work.
+2. **Phase 3 (Daily Harvest) — continue:** schema + 28 templates shipped 2026-04-19. Next: P3.3 login flow caller (T-1776329281038), P3.4 weak real-date texture (T-1776329281039), P3.5 90-second feel playtest (T-1776329281040). Authoring 2 more templates to hit 30 is a small content top-up, not a blocker.
 3. **Merge `time_skill` branch to `main`** — all phases 1-4 are on this branch
 
 ### Next milestone work (Milestone B — "It Squeezes")
-4. **Map remaining Arc One storylets** — gap analysis for Days 2-14
-5. **Build Day 2-3 content** — extend all active tracks past their current COMPLETED endpoints
+4. **Map remaining Arc One storylets** — gap analysis for Days 4-14 (Days 2-3 now filled)
+5. ~~**Build Day 2-3 content**~~ — DONE 2026-04-20 (`20260420200000_days_2_3_content.sql`, +10 storylets)
 6. **Implement runtime preclusion** — walk precludes field, permanently lock out storylets
 7. **Fill opportunity and home tracks** — at least one entry storylet each
 8. **Build batch content validator** — CLI script for schema/NPC/period checks
 9. **Fix bench_glenn / Contact scene** — deleted as orphan, needs design decision on when/where it fires
+10. **Playtest Day 2-3 flow** — walk the new content in the browser, confirm pool scan serves the right storylet per segment; verify `skipped_reading` flag properly gates `catch_up_or_coast`
 
 ---
 
@@ -305,6 +352,10 @@ npm run playthrough:test                                        # vitest integra
 
 | Date | Decision | Context |
 |------|----------|---------|
+| 2026-04-20 | **Days 2-3 content shipped (+10 storylets)** | `20260420200000_days_2_3_content.sql` adds 5 academic (western_civ_day1, reading_or_lounge, second_morning_class, study_group_forming, catch_up_or_coast), 3 belonging (floor_lunch_day2, hallway_morning_day3, miguel_afternoon_day3), 1 money (bookstore_line), 1 roommate (roommate_evening_day3). All pool-mode (default_next_key NULL). 8 use conversational nodes; 2 (reading_or_lounge, catch_up_or_coast) are body+choices only. `catch_up_or_coast` pool-gated by `requires_flag: "skipped_reading"` (set by `reading_or_lounge` on the lounge path) — first content usage of Phase 2 requires_flag enforcement. `roommate_moment` (Day 3 evening placeholder) kept inactive — superseded by new `roommate_evening_day3`. Karen introduced in `bookstore_line` via choice-level event, not `introduces_npc` (she appears conditionally). |
+| 2026-04-20 | **Dana→Scott regression re-patched; dorm_roommate deleted** | 2026-04-17 rename migration only updated `body` and `choices`, leaving `nodes` untouched, and missed `tuesday_night_terminal` (choices only). Follow-up migration `20260420100000_fix_dana_scott_regression_and_cleanup.sql` scrubs all three columns on the six affected storylets. `dorm_roommate` (inactive, same Day 0 morning slot as active `room_214`) deleted after verifying no inbound references. `hall_morning`, `orientation_fair`, `cal_midnight_knock`, `roommate_moment` audited and kept (all orphaned; comment in migration file). Known Issue #12 closed. |
+| 2026-04-19 | **Arc-scoped flag table (`player_arc_flags`) added for harvest traces** | Existing `sets_flag` writes to `choice_log` with a `track_id` — track-scoped. Harvest trace flags (`saw_trace_*`) need to persist across tracks and into Arc Two for compound reveal checks. Rather than overload `choice_log`, added `player_arc_flags` (player_id, flag_name, source_slug, set_at). `draw_harvest_item()` writes to it; the existing track FLAG_SET path is untouched. Future arc-scope flags (non-harvest) should use this table too. |
+| 2026-04-19 | **Phase 3 Harvest Pool infra shipped (schema + 28 templates)** | `harvest_items`, `harvest_seen`, `player_arc_flags` tables + `draw_harvest_item()` SQL function. 28 items (8 dreams, 6 letters, 14 usenet — 8 texture + 6 terminal-gated traces). Login-flow caller, UI, and Usenet slot explicitly NOT built yet (P3.3 / P3.4 work). Migration ran clean, no schema conflicts. P3.2 ticket originally specified 30 templates; draft only contained 28 — not a blocker, flagged on ticket. |
 | 2026-04-17 | **scott_day2_morning: npc_memory conditions on dialogue nodes** | Extended `DialogueNode.condition` to support `npc_memory` checks (format: `"npc_id.key"`). Entry nodes branch on NPC memory from prior storylets. Used Option A (single storylet with router-style fallthrough) over Option C (three pool variants) — cleaner, no pool gating issues, forward-looking for future conditional content. Terminal choice gating uses `scott_engaged` walk flag as fallback for unsupported `requires_flag_mode:"any"`. `read_scotts_note` persisted via `sets_flag` for future Day 4-5 callback. Room_214 retrofitted with `played_cool` NPC memory on non-warm paths. |
 | 2026-04-17 | **Runtime preclusion + requires_flag enforcement (T-016)** | `meetsRequirements()` now enforces `requires_flag` (track-scoped, stored as FLAG_SET events in choice_log). Preclusion writes to `daily_states.preclusion_gates` (cross-track, per-run). Pool scan filters precluded keys. Evening_choice phantom precludes fixed. Glenn chain wired with `sets_flag`. 37 unit tests, all 209 tests pass. |
 | 2026-04-17 | **Gap analysis completed (T-006)** | 30 active storylets across all 6 tracks (was reported as 10+). Coverage matrix at `docs/GAP-ANALYSIS.md`. Critical: Days 2-3 empty, home track has 1 storylet, Dana/Scott naming regression in 5 storylets. 30% inaccessibility achievable with 4 fork points once content fills gaps. |
@@ -362,7 +413,7 @@ ENGINE-SPEC.md says "requirements not read by track engine" (§2). **This is now
 | 9 | **`time_skill` branch not yet merged to `main`** — all Phase 1-4 work lives on this branch | High | Merge after playtest |
 | 10 | **Phase 1-4 playtests outstanding** — skill queue, skills-in-storylets, routine-week all built but not playtested | High | Block content work until verified |
 | 11 | ~~**`requires_flag` not enforced by engine**~~ | ~~Medium~~ | **FIXED 2026-04-17** — `meetsRequirements()` now checks `requires_flag`. Glenn chain wired with `sets_flag`. |
-| 12 | **Dana/Scott naming regression** — 5 newer storylets use "Dana" instead of canonical "Scott". NPC events reference `npc_roommate_dana`. | Medium | Needs migration (T-1776329281010) |
+| 12 | ~~**Dana/Scott naming regression**~~ | ~~Medium~~ | **FIXED 2026-04-20** — `20260420100000_fix_dana_scott_regression_and_cleanup.sql` scrubs all six storylets (body + choices + nodes). 2026-04-17 migration missed `nodes` column and `tuesday_night_terminal`. |
 | 13 | **11 storylets still need `sets_flag` wiring** — job_board, dana_cereal, tuesday_commitment choices need `sets_flag` to gate downstream content. Glenn is fixed; rest pending. | Medium | Content migration needed |
 
 ---

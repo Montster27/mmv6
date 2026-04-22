@@ -1,5 +1,49 @@
 # Decisions Log
 
+## Week 2 content push: routine activation, activity roster, crystallizers
+
+- **Date:** 2026-04-20
+- **Context:** `docs/WEEK-2-CONTENT-BRIEF.md` scoped the Week 2 shape — when routine mode activates, what activities exist, where it collides, and two landmark storylets (L2 scott_notices Day 11 eve, L5 the_post Day 14 aft). Seven discrete decisions landed in the same session; rolling them up under one heading with the per-decision lines preserved.
+- **Decisions:**
+  1. **Routine mode activates Day 3** (was Day 7). Classes start Day 3 — the fiction matches the mechanic. Short first week (Days 3–6) is training.
+  2. **Activities are time-locked to segments** (new `activities.segment_lock` column). morning_run is morning-only, floor_hangout is evening-only, etc. Creates natural collisions.
+  3. **14 activities total (6 existing + 8 new).** 3 morning, 5 afternoon, 6 evening. Every segment has more valid activities than slots — afternoon and evening are the sharpest squeeze.
+  4. **L2 `scott_notices` placed Day 11 evening.** Roommate crystallizer. Three entry paths (trust_high / trust_low / absent) keyed on NPC memory accumulated across the prior 9 days. Sets `scott_noticed_something` via persistent NPC memory — the single most important roommate flag for the 50-year arc. Bundled with a trust-retrofit across prior Scott terminals (`scott_day2_morning`, `dana_letter_connected`, `dana_letter_surface`, `dana_letter_avoidance`) and a final sweep of Known Issue #12 residue (four `npc_roommate_dana` references in choices/nodes).
+  5. **L5 `the_post` placed Day 14 afternoon.** Investigation landmark. Gated by `tuesday_terminal` flag (chose terminal path on `tuesday_commitment`). Separate from the Day 14 evening `tuesday_night_*` pileup.
+  6. **L5 (`the_post`) designed as "The Delphi Group."** Forecasting quiz as Knower authentication: 3 questions about near-term future events — only a time traveler gets all 3 right. Unlocks a password-protected Usenet archive of oblique discussions (historical forces, temporal physics, flagged "minor" current events). The arc flag `delphi_archive_accessed` is carried only by the walk-flag-gated terminal `log_off_shaken` (visible only after reading the archive), so the flag fires only on the quiz-passed path. Introduces cassandra_7 and heraclitus as future NPCs. Walk-away path available — player can refuse to announce themselves.
+  7. **DEFERRED: Minimum weekly activity frequency for meaningful deposits.** Revisit after Week 2 playtest. Current deposits apply per-slot regardless of weekly frequency.
+- **Impact:** Two landmark storylets inserted, 8 new activities, routine activation four days earlier. Content now depends on two fresh engine hooks (compound walk-flag gating + explicit else-branch on conditional nodes) — see the separate "Node conditions: `all_flags` + `else_next`" decision below for the engine side.
+
+---
+
+## Node conditions: `all_flags` compound gate and `else_next` fallback routing
+
+- **Date:** 2026-04-20
+- **Context:** `the_post` needs two behaviors the existing node engine didn't support: (1) a mid-walk gate that requires *all three* quiz correct-answer flags (not just one), and (2) an explicit branch when the gate fails so the flow routes to `submit_answers_fail` instead of falling through to the success path. Without (1), every correct quiz flag would need its own chained conditional node. Without (2), the engine would render `submit_answers` on success and then `.next` (= `access_granted`) on both pass and fail — so quiz failures would still show "access granted" text.
+- **Decision:** Extended `DialogueNode.condition` with optional `all_flags: string[]` (all named walk-flags must be set) and added a sibling field `DialogueNode.else_next: string` (advance target when condition is not met, overrides `.next`). Both evaluators updated for parity: `DialogueNodeView.evaluateNodeCondition` + the `advance` callback (player UI), and the playthrough-runner harness's in-walk condition check (test harness).
+- **Alternatives considered:** (1) Sequential conditional nodes, one per quiz flag (brief's fallback option 2) — rejected because it's three nodes and three hops per quiz submit, and the flag-list semantic is natural. (2) Implicit sibling fallthrough (scan next node in array on condition fail, like `findInitialNode` does at walk start) — rejected because it conflates routing with node ordering and makes flow reordering risky; `else_next` is explicit at the callsite.
+- **Impact:** Two small schema additions, two small evaluator changes, same behavior for all existing content (neither field required). First content using both: `the_post.submit_answers`. This is the engine-side half of decision #6 above.
+
+---
+
+## Days 2-3 content: pool-mode everywhere; first requires_flag content usage
+- **Date:** 2026-04-20
+- **Context:** The 2026-04-17 gap analysis (T-1776329281006) flagged Days 2-3 as a total content desert — zero storylets across any track between Day 1 afternoon and Day 4 evening. Ten new storylets authored per `docs/DAYS-2-3-CONTENT-BRIEF.md` to cover all four active-at-that-range tracks (academic, belonging, money, roommate).
+- **Decision:** All 10 shipped as **pool-mode storylets** (`default_next_key=NULL`), relying on the pool scan's `segment + due_offset_days + requirements` gating. No chain wiring added. `catch_up_or_coast` uses `requires_flag: "skipped_reading"` (set by `reading_or_lounge` on the lounge path) — the first production content use of Phase 2's requires_flag enforcement. `roommate_evening_day3` supersedes the inactive `roommate_moment` placeholder; the migration includes an idempotent UPDATE to keep `roommate_moment.is_active=false` as defense.
+- **Alternatives considered:** (1) Author some as chains (e.g. `western_civ_day1 → reading_or_lounge` on the academic track) — rejected because the 2026-04-02 engine shift was explicitly away from chaining, and chains would hide the content from any player whose earlier choices skipped the entry point. (2) Use `introduces_npc` for Karen on `bookstore_line` — rejected because Karen only appears on one branch; using `introduces_npc` would force-introduce her even when the player doesn't take that branch. Introduced her at choice-level instead.
+- **Impact:** Active storylet count 33 → 43. Days 2-3 go from 0% coverage to fully populated across academic/belonging/money/roommate (opportunity and home remain sparse per their existing pattern). First live test of `requires_flag` in content — watch for regressions in pool scan on the specific `catch_up_or_coast` gate during next playtest.
+
+---
+
+## Arc-scoped flag storage (`player_arc_flags`) added alongside track-scoped FLAG_SET
+- **Date:** 2026-04-19
+- **Context:** Phase 3 Harvest Pool introduced trace usenet posts that each set a `saw_trace_*` flag when drawn. Arc Two will read those flags to compute compound reveals (e.g. "player has seen NV + contact_signal + nv_three → unlock Arc Two opening beat"). The existing `sets_flag` mechanism writes FLAG_SET rows into `choice_log` with a `track_id`, making flags **track-scoped**. Harvest items don't belong to a track — they're drawn outside the storylet/track system — and the downstream reads are cross-arc, not cross-storylet-within-arc.
+- **Decision:** Added a new table `player_arc_flags (player_id, flag_name, source_slug, set_at)` with arc-scope semantics (flags persist indefinitely within a player, readable from any track or arc). The `draw_harvest_item()` SQL function writes into this table when a drawn item has `sets_flag`. The existing track-scoped FLAG_SET path in `choice_log` is untouched — storylet choices still use it.
+- **Alternatives considered:** (1) Overload `choice_log` with a sentinel `track_id` like NULL or `"__arc__"` — rejected because the column is NOT NULL and a FK to tracks, and because mixing scope semantics in one table invites subtle reader bugs. (2) Add an `arc_scoped` boolean to `choice_log` — rejected for the same reason: it complicates every query that reads track flags. (3) Compute trace status by scanning `harvest_seen` + joining `harvest_items.sets_flag` at read time — rejected because Arc Two read paths want fast `flag_name IN (...)` lookups, and this couples arc logic to harvest schema.
+- **Impact:** New table, new RLS policy, one new SQL function write path. Three lines of friction for future authors: if you want a flag readable cross-arc (not just within a track's chain), write to `player_arc_flags`; otherwise keep using `sets_flag` on the choice. This convention should be added to CLAUDE.md when a second cross-arc flag use case lands.
+
+---
+
 ## Auto-advance timer removed; segment transitions require explicit clicks
 - **Date:** 2026-04-17
 - **Context:** The play page had a `useEffect` + `setTimeout(400ms)` that auto-advanced through empty segments. During the lunch_floor conv-node playtest, this caused segment cascades — morning → afternoon → evening → night in ~1 second — because the timer fired with state captured at render time (React stale closure), not at fire time. Three successive patches (storylet_key filter, isFetching guard, ref guard) were needed before the root cause was clear.
@@ -29,3 +73,12 @@
 ## Phase One scope lock
 - **Decision:** We will not add new systems unless they serve the daily loop.
 - **Date:** 2026-01-06
+
+---
+
+## Dana→Scott rename migration is `nodes`-unsafe
+- **Date:** 2026-04-20
+- **Context:** The 2026-04-17 Dana→Scott rename (`20260417200000_rename_dana_to_scott.sql`) scrubbed the `body` and `choices` columns but not `nodes`. When the `nodes` jsonb was added on 2026-04-13 for conversational storylets, any blanket rename migration that walks content text must update `nodes::text` too. The regression surfaced in gap analysis (T-006) and was re-fixed on 2026-04-20 with a six-storylet patch that also caught `tuesday_night_terminal` (missed by the original rename entirely).
+- **Decision:** Future content-text migrations (rename, scrub, period corrections) MUST update body, choices, and nodes together. The 2026-04-20 follow-up is the template. Adding a column-level convention: any new jsonb column that holds prose text must be listed in a central migration checklist before the next rename lands.
+- **Alternatives considered:** Leaving it as a one-off fix — rejected because conversational nodes will keep expanding and future renames will repeat the bug unless the convention is locked.
+- **Impact:** One follow-up migration (`20260420100000_fix_dana_scott_regression_and_cleanup.sql`). Closes Known Issue #12. Informs any future rename PR that touches the `storylets` table.
