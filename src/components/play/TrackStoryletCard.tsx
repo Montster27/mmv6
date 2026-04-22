@@ -127,10 +127,14 @@ function meetsMoneyRequirement(
 
 export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDismiss, dismissLabel, resolvedOption, moneyBand, relationships, resources }: TrackStoryletCardProps) {
   const [choosing, setChoosing] = useState(false);
-  const [chosenOption, setChosenOption] = useState<StoryletChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const displayedOption = resolvedOption ?? chosenOption;
+  // Source of truth for "a choice has been resolved" is the parent (resolvedOption).
+  // We intentionally do NOT mirror chosenOption locally: if the parent fails to move
+  // the beat into pendingDismissalBeats (mini-game, insufficient_resources, network
+  // error, silent return), a local mirror would render the outcome box with no
+  // Continue button — a stuck state the user can only escape via logout/login.
+  const displayedOption = resolvedOption;
 
   const resolve = (text: string) => resolveNpcTokens(text, relationships ?? null);
 
@@ -138,14 +142,12 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
   const daysLeft = storylet.expires_on_day - dayIndex;
 
   async function handleChoice(option: StoryletChoice) {
-    if (choosing || displayedOption) return;
+    if (choosing || resolvedOption) return;
     setChoosing(true);
     setError(null);
-    setChosenOption(option);
     try {
       await onChoice(storylet, option);
     } catch (err) {
-      setChosenOption(null);
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setChoosing(false);
