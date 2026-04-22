@@ -7,37 +7,37 @@ const ACTIVITIES: RoutineActivity[] = [
     id: "1", activity_key: "attend_classes", display_name: "Attend Classes",
     category: "academic", half_day_cost: 2, requirements: null,
     npc_deposits: [], skill_practice_ids: ["critical_analysis"],
-    flavor_text: "", interruption_hooks: [], is_active: true,
+    flavor_text: "", interruption_hooks: [], is_active: true, segment_lock: null,
   },
   {
     id: "2", activity_key: "library_study", display_name: "Library Study",
     category: "academic", half_day_cost: 1, requirements: null,
     npc_deposits: [], skill_practice_ids: ["critical_analysis"],
-    flavor_text: "", interruption_hooks: [], is_active: true,
+    flavor_text: "", interruption_hooks: [], is_active: true, segment_lock: null,
   },
   {
     id: "3", activity_key: "running", display_name: "Running",
     category: "physical", half_day_cost: 1, requirements: null,
     npc_deposits: [], skill_practice_ids: ["running_endurance"],
-    flavor_text: "", interruption_hooks: [], is_active: true,
+    flavor_text: "", interruption_hooks: [], is_active: true, segment_lock: null,
   },
   {
     id: "4", activity_key: "dorm_floor_time", display_name: "Hang on the Floor",
     category: "social", half_day_cost: 1, requirements: null,
     npc_deposits: [], skill_practice_ids: ["small_talk"],
-    flavor_text: "", interruption_hooks: [], is_active: true,
+    flavor_text: "", interruption_hooks: [], is_active: true, segment_lock: null,
   },
   {
     id: "5", activity_key: "library_shift", display_name: "Library Shift",
     category: "work", half_day_cost: 2, requirements: { requires_flag: "has_job_library" },
     npc_deposits: [], skill_practice_ids: ["budgeting"],
-    flavor_text: "", interruption_hooks: [], is_active: true,
+    flavor_text: "", interruption_hooks: [], is_active: true, segment_lock: null,
   },
   {
     id: "6", activity_key: "herald_meetings", display_name: "Herald Meetings",
     category: "creative", half_day_cost: 1, requirements: { requires_flag: "herald_intro" },
     npc_deposits: [], skill_practice_ids: ["creative_writing"],
-    flavor_text: "", interruption_hooks: [], is_active: false,
+    flavor_text: "", interruption_hooks: [], is_active: false, segment_lock: null,
   },
 ];
 

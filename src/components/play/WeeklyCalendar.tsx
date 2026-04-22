@@ -132,7 +132,7 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className={`font-semibold text-sm ${locked ? "text-gray-400" : colors.text}`}>
                       {act.display_name}
                     </span>
@@ -142,6 +142,11 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
                     <span className={`text-xs px-1.5 py-0.5 rounded ${colors.bg} ${colors.text}`}>
                       {act.category}
                     </span>
+                    {act.segment_lock && act.segment_lock.length > 0 && act.segment_lock.length < 3 && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-[#e9e0cf] text-[#4a5568]">
+                        {act.segment_lock.join(" · ")}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-[#4a5568] mt-1 italic leading-relaxed">
                     {locked ? "You haven't unlocked this yet." : act.flavor_text}

@@ -27,6 +27,8 @@ export type NpcDeposit = {
   magnitude?: number;
 };
 
+export type SegmentLock = "morning" | "afternoon" | "evening";
+
 export type RoutineActivity = {
   id: string;
   activity_key: string;
@@ -39,6 +41,7 @@ export type RoutineActivity = {
   flavor_text: string;
   interruption_hooks: string[];
   is_active: boolean;
+  segment_lock: SegmentLock[] | null;
 };
 
 // ---------------------------------------------------------------------------

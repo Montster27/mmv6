@@ -19,6 +19,7 @@ const makeActivity = (
   flavor_text: "",
   interruption_hooks: [],
   is_active: true,
+  segment_lock: null,
 });
 
 describe("computeWeeklyDeposits", () => {
