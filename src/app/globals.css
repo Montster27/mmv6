@@ -386,6 +386,25 @@ body::before {
   border-color: hsl(14 50% 70%);
 }
 
+/* Row-level pulse — wraps an entire resource row, fades a tinted background */
+@keyframes pulse-gain {
+  0%   { background-color: hsl(145 40% 94%); }
+  100% { background-color: transparent; }
+}
+
+@keyframes pulse-loss {
+  0%   { background-color: hsl(14 60% 95%); }
+  100% { background-color: transparent; }
+}
+
+.pulse-gain {
+  animation: pulse-gain 600ms ease-out;
+}
+
+.pulse-loss {
+  animation: pulse-loss 600ms ease-out;
+}
+
 /* Narrative fade-in — for storylet body and segment transitions */
 @keyframes narrative-fade-in {
   from {

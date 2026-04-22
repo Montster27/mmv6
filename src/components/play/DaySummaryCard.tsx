@@ -19,11 +19,13 @@ type Props = {
   resourcesEnabled?: boolean;
 };
 
-/**
- * Phase 3: Replaces the raw AllocationSection in chapterOneMode.
- * Shows a brief day-start summary (free hours, committed blocks) with
- * a collapsible panel for adjusting the underlying allocation sliders.
- */
+const SEGMENTS: ReadonlyArray<{ id: string; label: string }> = [
+  { id: "morning", label: "Morning" },
+  { id: "afternoon", label: "Afternoon" },
+  { id: "evening", label: "Evening" },
+  { id: "night", label: "Night" },
+];
+
 export default function DaySummaryCard({
   dayIndex,
   currentSegment,
@@ -41,50 +43,62 @@ export default function DaySummaryCard({
 
   const workHours = Math.round(allocation.work / 100 * 6);
   const studyHours = allocation.study > 0 ? 2 : 0;
+  const activeSegment = currentSegment.toLowerCase();
 
   return (
-    <section className="rounded border-2 border-primary/20 bg-card px-5 py-4 space-y-3">
-      <div className="flex items-center justify-between">
+    <section
+      data-segment={activeSegment}
+      className="segment-tinted rounded border border-border bg-card px-5 py-4 space-y-3 prep-stripe-top shadow-warm"
+    >
+      <div className="flex items-start justify-between gap-3">
         <div>
           <p className="prep-label">
             Day {dayIndex} — <span className="capitalize">{currentSegment}</span>
           </p>
-          <p className="text-2xl font-bold text-primary font-heading mt-0.5">
+          <p className="text-2xl font-bold text-primary font-heading mt-1">
             {hoursRemaining}h free today
           </p>
         </div>
-        <div className="text-right text-sm text-muted-foreground space-y-0.5">
+        <div className="text-right">
+          <p className="prep-label">Commitments</p>
           {hoursCommitted > 0 ? (
-            <>
-              {workHours > 0 && (
-                <p>{workHours}h work</p>
-              )}
-              {studyHours > 0 && (
-                <p>{studyHours}h class / study</p>
-              )}
-            </>
+            <div className="mt-1 space-y-0.5 text-sm font-body text-foreground/75">
+              {workHours > 0 && <p>{workHours}h work</p>}
+              {studyHours > 0 && <p>{studyHours}h class / study</p>}
+            </div>
           ) : (
-            <p className="text-muted-foreground/60">No commitments today</p>
+            <p className="mt-1 text-sm font-body text-muted-foreground/70 italic">None today</p>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-          <div
-            className="h-full rounded-full bg-primary/60 transition-all"
-            style={{ width: `${Math.max(0, Math.min(100, (hoursRemaining / 16) * 100))}%` }}
-          />
-        </div>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {hoursCommitted}h committed
-        </span>
+      <div className="prep-divider" />
+
+      <div className="flex items-center gap-4">
+        {SEGMENTS.map((s) => {
+          const isActive = s.id === activeSegment;
+          return (
+            <span
+              key={s.id}
+              className="prep-label pb-1"
+              style={{
+                opacity: isActive ? 1 : 0.35,
+                fontWeight: isActive ? 700 : 400,
+                borderBottom: isActive
+                  ? "2px solid hsl(14 73% 61%)"
+                  : "2px solid transparent",
+              }}
+            >
+              {s.label}
+            </span>
+          );
+        })}
       </div>
 
       <Button
         variant="ghost"
         size="sm"
-        className="text-xs text-muted-foreground"
+        className="text-xs text-muted-foreground font-stat"
         onClick={() => setExpanded((v) => !v)}
       >
         {expanded ? "▲ Hide allocation" : "▾ Adjust allocation"}

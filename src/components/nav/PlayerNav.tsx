@@ -19,7 +19,7 @@ export function PlayerNav() {
     <nav className="nav-collegiate flex items-center justify-between px-5 py-2.5">
       <div className="flex items-center gap-1">
         <span className="font-heading text-base font-bold tracking-tight text-primary-foreground mr-4">
-          Harwick
+          Many More Versions
         </span>
         {navItems.map((item) => {
           const isActive =

@@ -91,22 +91,27 @@ export default function WelcomePage() {
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="prep-label">Loading…</p>
       </div>
     );
   }
 
   if (status === "no_game") {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-4">
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl font-semibold">Welcome</h1>
-          <p className="text-muted-foreground">Ready to begin?</p>
-        </div>
+      <div className="mx-auto max-w-[620px] px-5 pt-16 pb-24 text-center narrative-enter">
+        <p className="prep-label mb-3">Fall 1983 · Harwick University</p>
+        <h1 className="font-heading font-bold leading-[1.15] tracking-tight text-foreground text-[clamp(2rem,2vw+1.4rem,2.75rem)] mb-6">
+          Many More Versions
+        </h1>
+        <p className="font-body text-foreground/85 text-base leading-[1.75] text-left mb-8 mx-auto max-w-[42rem]">
+          You are nineteen. The posters in your dorm are still curling at the edges. Somewhere, in a
+          future you can almost remember, you are older — and someone is dialing a payphone. Not yet.
+          First: get through the week. Pick your major. Figure out what it costs to be anyone in particular.
+        </p>
         <Button size="lg" onClick={handleNewGame} disabled={resetting}>
-          {resetting ? "Starting..." : "Start New Game"}
+          {resetting ? "Starting…" : "Begin, September 4th →"}
         </Button>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="mt-4 text-sm text-destructive font-body">{error}</p>}
       </div>
     );
   }
@@ -114,52 +119,56 @@ export default function WelcomePage() {
   // has_game
   if (confirmNewGame) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-4">
-        <div className="text-center space-y-2 max-w-sm">
-          <h2 className="text-xl font-semibold">Start over?</h2>
-          <p className="text-muted-foreground text-sm">
-            This will erase all your progress — Day {dailyState?.day_index ?? 1} and everything you&apos;ve done so far. This cannot be undone.
-          </p>
-        </div>
-        <div className="flex gap-3">
+      <div className="mx-auto max-w-[520px] px-5 pt-16 pb-24 text-center narrative-enter">
+        <p className="prep-label mb-3">Start over</p>
+        <h2 className="font-heading font-bold text-2xl text-foreground mb-4">
+          Erase this life?
+        </h2>
+        <p className="font-body text-foreground/80 text-[15px] leading-relaxed mb-8">
+          You&apos;re on Day {dailyState?.day_index ?? 1}. Starting a new game wipes this run — every
+          choice, every conversation, everyone you&apos;ve met. Nothing carries over.
+        </p>
+        <div className="flex gap-3 justify-center">
           <Button
             variant="outline"
             onClick={() => setConfirmNewGame(false)}
             disabled={resetting}
           >
-            Cancel
+            Keep this life
           </Button>
           <Button
             variant="destructive"
             onClick={handleNewGame}
             disabled={resetting}
           >
-            {resetting ? "Resetting..." : "Yes, start over"}
+            {resetting ? "Resetting…" : "Yes, start over"}
           </Button>
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="mt-4 text-sm text-destructive font-body">{error}</p>}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 px-4">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-semibold">Welcome back</h1>
-        <p className="text-muted-foreground">
-          You&apos;re on Day {dailyState?.day_index ?? 1}.
-        </p>
-      </div>
-      <div className="flex flex-col gap-3 w-full max-w-xs">
+    <div className="mx-auto max-w-[520px] px-5 pt-16 pb-24 text-center narrative-enter">
+      <p className="prep-label mb-3">Fall 1983 · Harwick University</p>
+      <h1 className="font-heading font-bold leading-[1.15] tracking-tight text-foreground text-[clamp(2rem,2vw+1.4rem,2.75rem)] mb-4">
+        Welcome back
+      </h1>
+      <p className="font-body text-foreground/80 text-base leading-relaxed mb-8">
+        You&apos;re on <span className="font-stat text-foreground">Day {dailyState?.day_index ?? 1}</span>. The
+        week keeps going whether you&apos;re ready or not.
+      </p>
+      <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
         <Button size="lg" onClick={() => router.push("/play")}>
-          Continue
+          Continue →
         </Button>
         <Button
-          variant="outline"
-          size="lg"
+          variant="ghost"
+          size="sm"
           onClick={() => setConfirmNewGame(true)}
         >
-          Start New Game
+          Start a new life
         </Button>
       </div>
     </div>

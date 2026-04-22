@@ -79,6 +79,12 @@ function bar(value: number | undefined, key: string, highlight?: boolean) {
   );
 }
 
+function rowPulseClass(delta: number | undefined, key: string): string {
+  if (typeof delta !== "number" || delta === 0) return "";
+  const isGood = key === "stress" ? delta < 0 : delta > 0;
+  return isGood ? "pulse-gain" : "pulse-loss";
+}
+
 function deltaBadge(delta?: number, isGain?: boolean) {
   if (typeof delta !== "number" || delta === 0) return null;
   const sign = delta > 0 ? "+" : "";
@@ -153,7 +159,7 @@ function ProgressPanelComponent({
         onMouseEnter={onResourcesHoverStart}
         onMouseLeave={onResourcesHoverEnd}
       >
-        <div>
+        <div className={`rounded px-2 py-1.5 -mx-2 ${rowPulseClass(lastAppliedDeltas?.energy, "energy")}`}>
           <div className="flex items-center justify-between text-sm text-foreground/80 mb-1">
             <span className="font-body">{resourceLabel("energy")}</span>
             <span className="font-stat text-xs">
@@ -163,7 +169,7 @@ function ProgressPanelComponent({
           </div>
           {bar(energy, "energy", highlightEnergy)}
         </div>
-        <div>
+        <div className={`rounded px-2 py-1.5 -mx-2 ${rowPulseClass(lastAppliedDeltas?.stress, "stress")}`}>
           <div className="flex items-center justify-between text-sm text-foreground/80 mb-1">
             <span className="font-body">{resourceLabel("stress")}</span>
             <span className="font-stat text-xs">
@@ -273,7 +279,7 @@ function ProgressPanelComponent({
                   typeof highlight?.vectors?.[key] === "number" &&
                   highlight.vectors[key] !== 0;
                 return (
-                  <div key={key}>
+                  <div key={key} className={`rounded px-2 py-1.5 -mx-2 ${rowPulseClass(delta, key)}`}>
                     <div className="flex items-center justify-between text-sm text-foreground/70 mb-1">
                       <span className="capitalize font-body">{key}</span>
                       <span className="font-stat text-xs">
