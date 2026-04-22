@@ -690,7 +690,9 @@ describe("selectTrackStorylets — invariant 6: requirements all gate", () => {
     expect(unlocked.map((r) => r.storylet.storylet_key)).toEqual(["s_flag_gated"]);
   });
 
-  it("requires_flag is track-scoped — flag on different track does NOT unlock", () => {
+  it("requires_flag is cross-track via globalFlags — flag set on track A unlocks storylet on track B", () => {
+    // Regression guard for the tuesday_terminal → the_post gate: a flag set by
+    // a choice on the belonging track must unlock an opportunity-track storylet.
     const trackA = makeTrack({ id: "track_a", key: "track_a" });
     const trackB = makeTrack({ id: "track_b", key: "track_b" });
     const progA = makeProgress({ id: "p_a", track_id: "track_a" });
@@ -702,15 +704,29 @@ describe("selectTrackStorylets — invariant 6: requirements all gate", () => {
       }),
     ];
 
-    const result = selectTrackStorylets({
+    // flagsByTrack alone (track_a) does NOT unlock — per-track map only holds
+    // the track that wrote the flag.
+    const lockedWithoutGlobal = selectTrackStorylets({
       dayIndex: 1,
       progress: [progA, progB],
       storylets,
       tracks: [trackA, trackB],
       flagsByTrack: new Map([["track_a", new Set(["my_flag"])]]),
     });
+    expect(lockedWithoutGlobal).toEqual([]);
 
-    expect(result).toEqual([]);
+    // With globalFlags populated (as dailyLoop does in practice) the gate opens.
+    const unlockedWithGlobal = selectTrackStorylets({
+      dayIndex: 1,
+      progress: [progA, progB],
+      storylets,
+      tracks: [trackA, trackB],
+      flagsByTrack: new Map([["track_a", new Set(["my_flag"])]]),
+      globalFlags: new Set(["my_flag"]),
+    });
+    expect(unlockedWithGlobal.map((r) => r.storylet.storylet_key)).toEqual([
+      "s_b_flag_gated",
+    ]);
   });
 
   it("combined requires_flag AND requires_choice — both must pass", () => {

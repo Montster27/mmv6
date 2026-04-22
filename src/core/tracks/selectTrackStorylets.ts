@@ -38,9 +38,20 @@ type SelectTrackStoryletsArgs = {
   /**
    * Map of track_id → Set of flag strings set by prior choices on that track.
    * Sourced from choice_log WHERE event_type='FLAG_SET'.
-   * Used to evaluate requires_flag requirements. Track-scoped.
+   * Used to evaluate requires_flag requirements.
+   *
+   * Flags on this map are unioned with `globalFlags` before evaluation, so a
+   * storylet on one track CAN read a flag set by a choice on another track.
+   * (Change 2026-04-22 — prior behaviour was strict per-track.)
    */
   flagsByTrack?: Map<string, Set<string>>;
+  /**
+   * Cross-track flag union — every FLAG_SET event in this run, regardless of
+   * which track wrote it. Unioned with the per-track flag set when evaluating
+   * requires_flag. Lets opportunity-track storylets read flags set by choices
+   * on the belonging track (and vice versa).
+   */
+  globalFlags?: Set<string>;
   /**
    * Set of storylet_key strings permanently precluded for the current run.
    * Sourced from daily_states.preclusion_gates. Cross-track: a choice on one
@@ -144,6 +155,7 @@ export function selectTrackStorylets({
   resolvedChoicesByTrack = new Map(),
   trainedSkillIds = new Set(),
   flagsByTrack = new Map(),
+  globalFlags = new Set(),
   precludedKeys = new Set(),
 }: SelectTrackStoryletsArgs): DueStorylet[] {
   const timeTight = typeof hoursRemaining === "number" && hoursRemaining < CONFLICT_THRESHOLD;
@@ -167,7 +179,12 @@ export function selectTrackStorylets({
 
     const resolvedKeys = new Set(prog.resolved_storylet_keys);
     const resolvedChoices = resolvedChoicesByTrack.get(prog.track_id) ?? new Set<string>();
-    const trackFlags = flagsByTrack.get(prog.track_id) ?? new Set<string>();
+    const trackFlagsOwn = flagsByTrack.get(prog.track_id) ?? new Set<string>();
+    // Union track-local flags with global flags so cross-track gates resolve.
+    const trackFlags =
+      globalFlags.size === 0
+        ? trackFlagsOwn
+        : new Set<string>([...trackFlagsOwn, ...globalFlags]);
     const trackStorylets = storyletsByTrack.get(prog.track_id) ?? [];
 
     // -------------------------------------------------------------------------

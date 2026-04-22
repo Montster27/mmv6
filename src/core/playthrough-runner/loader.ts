@@ -67,7 +67,7 @@ export async function loadChoiceLog(
 
 export async function loadFlagLog(
   userId: string
-): Promise<Map<string, Set<string>>> {
+): Promise<{ flagsByTrack: Map<string, Set<string>>; globalFlags: Set<string> }> {
   const { data, error } = await db
     .from("choice_log")
     .select("track_id,option_key")
@@ -75,14 +75,18 @@ export async function loadFlagLog(
     .eq("event_type", "FLAG_SET");
   if (error) throw new Error(`Failed to load flag_log: ${error.message}`);
 
-  const map = new Map<string, Set<string>>();
+  const flagsByTrack = new Map<string, Set<string>>();
+  const globalFlags = new Set<string>();
   for (const row of data ?? []) {
-    if (!row.track_id || !row.option_key) continue;
-    const set = map.get(row.track_id) ?? new Set<string>();
-    set.add(row.option_key);
-    map.set(row.track_id, set);
+    if (!row.option_key) continue;
+    globalFlags.add(row.option_key);
+    if (row.track_id) {
+      const set = flagsByTrack.get(row.track_id) ?? new Set<string>();
+      set.add(row.option_key);
+      flagsByTrack.set(row.track_id, set);
+    }
   }
-  return map;
+  return { flagsByTrack, globalFlags };
 }
 
 export function clearCache(): void {

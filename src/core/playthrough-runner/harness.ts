@@ -109,10 +109,11 @@ export class PlaythroughHarness {
       .select("*")
       .eq("user_id", this.userId);
 
-    const [resolvedChoicesByTrack, flagsByTrack] = await Promise.all([
+    const [resolvedChoicesByTrack, flags] = await Promise.all([
       loadChoiceLog(this.userId),
       loadFlagLog(this.userId),
     ]);
+    const { flagsByTrack, globalFlags } = flags;
 
     const { data: skills } = await db
       .from("player_skills")
@@ -142,6 +143,7 @@ export class PlaythroughHarness {
       resolvedChoicesByTrack,
       trainedSkillIds,
       flagsByTrack,
+      globalFlags,
       precludedKeys,
     });
   }

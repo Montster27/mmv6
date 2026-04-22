@@ -544,10 +544,15 @@ export async function getOrCreateDailyRun(
 
         // 5b. Load resolved choice option_keys per track (for requires_choice gating).
         // choice_log.option_key stores the choice "id" value from the storylet JSON.
-        // Scoped per track — cross-track gating is a future extension.
+        // requires_choice is still evaluated per-track. requires_flag is evaluated
+        // against the union of track-local flags + a global flag set (see below).
         const resolvedChoicesByTrack = new Map<string, Set<string>>();
         const flagsByTrack = new Map<string, Set<string>>();
+        const globalFlags = new Set<string>();
         if (progress.length > 0) {
+          // Load FLAG_SET events without a track_id filter so cross-track gates
+          // (e.g. the_post gated by tuesday_terminal set on the belonging track)
+          // resolve. Track_id is still recorded per row for the per-track map.
           const [{ data: choiceLogs }, { data: flagLogs }] = await Promise.all([
             supabase
               .from("choice_log")
@@ -560,7 +565,6 @@ export async function getOrCreateDailyRun(
               .from("choice_log")
               .select("track_id,option_key")
               .eq("user_id", userId)
-              .in("track_id", trackIds)
               .eq("event_type", "FLAG_SET")
               .not("option_key", "is", null),
           ]);
@@ -573,10 +577,14 @@ export async function getOrCreateDailyRun(
           }
 
           for (const log of flagLogs ?? []) {
-            if (!log.track_id || !log.option_key) continue;
-            const set = flagsByTrack.get(log.track_id) ?? new Set<string>();
-            set.add(log.option_key as string);
-            flagsByTrack.set(log.track_id, set);
+            if (!log.option_key) continue;
+            const flag = log.option_key as string;
+            globalFlags.add(flag);
+            if (log.track_id) {
+              const set = flagsByTrack.get(log.track_id) ?? new Set<string>();
+              set.add(flag);
+              flagsByTrack.set(log.track_id, set);
+            }
           }
         }
 
@@ -601,6 +609,7 @@ export async function getOrCreateDailyRun(
           resolvedChoicesByTrack,
           trainedSkillIds,
           flagsByTrack,
+          globalFlags,
           precludedKeys,
         });
         console.log("[daily-run] selectTrackStorylets returned", dueStorylets.length, "storylets:", dueStorylets.map(d => d.storylet.slug));
