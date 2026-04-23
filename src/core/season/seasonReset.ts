@@ -1,19 +1,7 @@
 import { supabase } from "@/lib/supabase/browser";
-import { utcToday } from "@/lib/cadence";
 import { trackEvent } from "@/lib/events";
 import type { DailyState } from "@/types/daily";
 import type { Season, SeasonRecap, UserSeason } from "@/types/seasons";
-
-type ResetPayload = {
-  day_index: number;
-  energy: number;
-  stress: number;
-  vectors: Record<string, number>;
-  start_date: string;
-  last_day_completed: null;
-  last_day_index_completed: null;
-  updated_at: string;
-};
 
 function toDate(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00Z`);
@@ -29,19 +17,6 @@ function pickSeasonIndex(seasons: Season[], today: string): number | null {
   if (!candidates.length) return null;
   candidates.sort((a, b) => b.season_index - a.season_index);
   return candidates[0].season_index;
-}
-
-function buildResetPayload(today: string): ResetPayload {
-  return {
-    day_index: 0,
-    energy: 100,
-    stress: 0,
-    vectors: {},
-    start_date: today,
-    last_day_completed: null,
-    last_day_index_completed: null,
-    updated_at: new Date().toISOString(),
-  };
 }
 
 function pickTopVector(vectors: DailyState["vectors"]): string | null {
@@ -139,17 +114,12 @@ export async function performSeasonReset(
     topVector,
   };
 
-  const today = utcToday();
-  const resetPayload = buildResetPayload(today);
-
-  const { error: resetError } = await supabase
-    .from("daily_states")
-    .update(resetPayload)
-    .eq("user_id", userId);
-
-  if (resetError) {
-    throw new Error(`Season reset failed: could not reset daily state. ${resetError.message}`);
-  }
+  // Season rollover no longer wipes daily_states. Before this change, a season
+  // transition (auto-detected on page load via user_seasons drift) would reset
+  // day_index → 0, energy → 100, etc., silently nuking the player's run.
+  // Combined with a race where user_seasons didn't sync, this produced the
+  // "Day 0 Night stuck" bug. Progress is now preserved across season changes;
+  // user-visible resets must go through /api/run/reset explicitly.
 
   const { error: seasonError } = await supabase
     .from("user_seasons")
@@ -180,5 +150,4 @@ export async function performSeasonReset(
 
 export const _testOnly = {
   pickSeasonIndex,
-  buildResetPayload,
 };
