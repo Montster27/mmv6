@@ -2371,7 +2371,6 @@ export default function PlayPage() {
           progress_id: beat.progress_id,
           storylet_key: beat.storylet_key,
           option_key: option.id,
-          day_index: dayIndex,
         }),
       });
       if (!res.ok) {

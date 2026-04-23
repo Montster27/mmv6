@@ -25,15 +25,20 @@ async function getUserFromToken(token?: string) {
 /**
  * POST /api/tracks/resolve
  *
- * Body: { progress_id: string; option_key: string; day_index: number }
+ * Body: { progress_id: string; option_key: string; storylet_key?: string }
+ *
+ * day_index is no longer accepted from the client — it's read server-side
+ * from daily_states so stale client caches / multi-tab drift can't write
+ * log entries to the wrong day.
  *
  * Resolves a track storylet for the current user:
- * 1. Verifies the track_progress row belongs to the authenticated user
- * 2. Finds the chosen option on the current storylet
- * 3. Applies resource costs/rewards to today's day_state
- * 4. Applies track state transitions to track_progress.track_state
- * 5. Advances track_progress to next storylet (or marks COMPLETED)
- * 6. Records to choice_log
+ * 1. Reads canonical day_index from daily_states
+ * 2. Verifies the track_progress row belongs to the authenticated user
+ * 3. Finds the chosen option on the current storylet
+ * 4. Applies resource costs/rewards to today's day_state
+ * 5. Applies track state transitions to track_progress.track_state
+ * 6. Advances track_progress to next storylet (or marks COMPLETED)
+ * 7. Records to choice_log
  */
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -52,16 +57,30 @@ export async function POST(request: Request) {
 
   const progressId = (payload as Record<string, unknown>).progress_id;
   const clientStoryletKey = (payload as Record<string, unknown>).storylet_key as string | undefined;
-  const { option_key, day_index } = payload as {
-    option_key?: string;
-    day_index?: number;
-  };
+  const { option_key } = payload as { option_key?: string };
 
-  if (!progressId || !option_key || typeof day_index !== "number") {
+  if (!progressId || !option_key) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  // --- 1. Load progress and verify ownership ---
+  // --- 1. Read canonical day_index from daily_states ---
+  // The client used to send day_index in the payload; we now ignore that and
+  // read it server-side. This prevents stale-cache / multi-tab drift from
+  // writing choice_log.day entries on the wrong day (the "Day 3 skip" pattern
+  // observed in pre-refactor playthroughs).
+  const { data: dailyStateRow, error: dailyErr } = await supabaseServer
+    .from("daily_states")
+    .select("day_index")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (dailyErr || !dailyStateRow) {
+    return NextResponse.json({ error: "No daily state found" }, { status: 404 });
+  }
+  const day_index = dailyStateRow.day_index as number;
+
+  // --- 2. Load progress and verify ownership ---
   const { data: progressRow, error: progressErr } = await supabaseServer
     .from("track_progress")
     .select("*")
