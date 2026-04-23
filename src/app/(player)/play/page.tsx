@@ -3585,64 +3585,85 @@ export default function PlayPage() {
                       <h2 className="prep-label">
                         Today&apos;s Moments
                       </h2>
-                      {/* Resolved beats awaiting user dismissal (shown first so reaction text is prominent) */}
-                      {pendingDismissalBeats.map(({ beat, chosenOption }) => {
-                        // If this is the last pending beat and all storylets are resolved,
-                        // merge the dismiss and segment-advance into one click.
-                        const isLastPending = pendingDismissalBeats.length === 1;
+                      {(() => {
+                        // Once every storylet in the segment is resolved and we have at
+                        // least one outcome still pending dismissal, collapse the per-card
+                        // Continue buttons into a single bottom CTA that atomically
+                        // clears pending beats AND advances the segment. Prior per-card
+                        // behaviour required N clicks and relied on a refetch race to
+                        // surface "Continue to <next> →" on the remaining card — if that
+                        // re-render didn't land cleanly the player was stuck.
                         const allResolved = trackStorylets.every(
                           (b) => resolvedTrackStoryletIds.has(b.storylet_key)
                         );
-                        const segmentDone = isLastPending && allResolved;
                         const currentSeg = (dayState?.current_segment ?? "morning") as Segment;
                         const canAdvance =
-                          segmentDone &&
+                          allResolved &&
+                          pendingDismissalBeats.length > 0 &&
                           currentSeg !== "night" &&
                           (dayState?.hours_remaining ?? 16) > 0;
                         const nextSeg = canAdvance
                           ? SEGMENT_ORDER[SEGMENT_ORDER.indexOf(currentSeg) + 1]
                           : null;
-
+                        const useBottomCta = canAdvance && !!nextSeg;
                         return (
-                          <TrackStoryletCard
-                            key={beat.progress_id}
-                            storylet={beat}
-                            dayIndex={dayIndex}
-                            onChoice={handleTrackStoryletChoice}
-                            disabled
-                            resolvedOption={chosenOption}
-                            onDismiss={() => {
-                              handleDismissTrackStorylet(beat, canAdvance);
-                              if (canAdvance) handleAdvanceSegment();
-                            }}
-                            dismissLabel={
-                              nextSeg ? `Continue to ${nextSeg} →` : undefined
-                            }
-                            relationships={relationshipsState}
-                          />
+                          <>
+                            {/* Resolved beats awaiting user dismissal (shown first so reaction text is prominent) */}
+                            {pendingDismissalBeats.map(({ beat, chosenOption }) => (
+                              <TrackStoryletCard
+                                key={beat.progress_id}
+                                storylet={beat}
+                                dayIndex={dayIndex}
+                                onChoice={handleTrackStoryletChoice}
+                                disabled
+                                resolvedOption={chosenOption}
+                                onDismiss={
+                                  useBottomCta
+                                    ? undefined
+                                    : () => handleDismissTrackStorylet(beat, false)
+                                }
+                                relationships={relationshipsState}
+                              />
+                            ))}
+                            {/* Unresolved track storylets */}
+                            {trackStorylets
+                              .filter((b) => !resolvedTrackStoryletIds.has(b.storylet_key))
+                              .map((ts) => (
+                                <TrackStoryletCard
+                                  key={ts.progress_id}
+                                  storylet={ts}
+                                  dayIndex={dayIndex}
+                                  onChoice={handleTrackStoryletChoice}
+                                  moneyBand={chapterOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
+                                  relationships={relationshipsState}
+                                  resources={dayState ? {
+                                    energy: dayState.energy,
+                                    stress: dayState.stress,
+                                    cashOnHand: dayState.cashOnHand,
+                                    knowledge: dayState.knowledge,
+                                    socialLeverage: dayState.socialLeverage,
+                                    physicalResilience: dayState.physicalResilience,
+                                  } : null}
+                                />
+                              ))}
+                            {useBottomCta && nextSeg && (
+                              <div className="pt-2">
+                                <Button
+                                  size="lg"
+                                  className="font-heading"
+                                  onClick={() => {
+                                    setPendingDismissalBeats([]);
+                                    setBridgeText(null);
+                                    handleAdvanceSegment();
+                                  }}
+                                >
+                                  {`Continue to ${nextSeg} →`}
+                                </Button>
+                              </div>
+                            )}
+                          </>
                         );
-                      })}
-                      {/* Unresolved track storylets */}
-                      {trackStorylets
-                        .filter((b) => !resolvedTrackStoryletIds.has(b.storylet_key))
-                        .map((ts) => (
-                          <TrackStoryletCard
-                            key={ts.progress_id}
-                            storylet={ts}
-                            dayIndex={dayIndex}
-                            onChoice={handleTrackStoryletChoice}
-                            moneyBand={chapterOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
-                            relationships={relationshipsState}
-                            resources={dayState ? {
-                              energy: dayState.energy,
-                              stress: dayState.stress,
-                              cashOnHand: dayState.cashOnHand,
-                              knowledge: dayState.knowledge,
-                              socialLeverage: dayState.socialLeverage,
-                              physicalResilience: dayState.physicalResilience,
-                            } : null}
-                          />
-                        ))}
+                      })()}
                     </section>
                   )}
 
