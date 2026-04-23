@@ -1,6 +1,6 @@
 # MMV Handoff Brief
 > Context bridge for claude.ai, Claude Code, and Cowork sessions.
-> **Last updated:** 2026-04-22 (vitest env repaired; job_board + dana_cereal walk-flag bridges — Known Issues #13 and #14 closed; 196 tests green)
+> **Last updated:** 2026-04-23 (time-architecture refactor: single `/api/time/advance` endpoint, `daily_states` is now canonical for day+segment+hours, `performSeasonReset` no longer wipes progress, `daily_states.day_index >= 1` CHECK, routine interruption-on-resolved-storylet bug fixed. 195 tests green. Steps 7-8 of plan deferred — see "Remaining architectural cleanup" below.)
 
 ---
 
@@ -269,6 +269,56 @@ Driven by `docs/WEEK-2-CONTENT-BRIEF.md`. Five parts — all shipped.
 - `node_modules/vite/dist/client/client.mjs` was missing (only `env.mjs` present). `rm -rf node_modules && npm install` restored both. Full `npx vitest run` now clean in ~1.2s.
 - Unblocks CI-style verification for all engine work going forward. Closes Known Issue #14.
 
+### Time-architecture refactor (2026-04-23)
+
+This session chased a cascade of stuck-state bugs back to a root architectural problem — **multiple writers of `daily_states.day_index` and split reads between `daily_states` and `player_day_state`** — and fixed it. Four commits on `main`: `aa062d8`, `0fd818c`, `f6c65aa`, `b24b301`.
+
+#### Symptoms observed this session (all fixed)
+1. **Multi-beat dismiss race** — When a segment had 2+ resolved outcome cards (e.g. afternoon with `lunch_floor` + `glenn_pastime_paradise`), clicking Continue on one dismissed it but the remaining card's segment-advance button arrived inconsistently on the re-render. Player was stuck with two plain "Continue" buttons, no path to the next segment.
+2. **Day 0 Night stuck** — `daily_states.day_index` could be reset to 0 by `performSeasonReset` auto-firing on page load when `user_seasons` drifted. `createDayStateFromPrevious(userId, 0)` then invented a phantom `player_day_state` row with `DEFAULT_STATE` values (energy 70, stress 20, random cash 200–600), which the player could never legitimately reach. Sleep appeared to "loop" because each click advanced through each saved end-of-day snapshot in order.
+3. **Routine interruption loop on resolved storylet** — `routine_week_state.status = "interrupted"` pointing at `scott_day2_morning` (already in `track_progress.resolved_storylet_keys`). `checkInterruptions` had no filter against resolved keys, so the interruption kept re-firing every tick.
+4. **Day_index drift across tabs / stale cache** — `/api/tracks/resolve` trusted client-supplied `day_index` in the payload. A stale React Query cache or concurrent tab could write `choice_log.day` / `track_progress.updated_day` against the wrong day. (The earlier "Day 3 skip" pattern from 2026-04-22's playthrough.)
+
+#### Root cause
+
+At least **eight different code paths** were writing `daily_states.day_index` (advance-day, advance-segment indirectly, seasonReset, dev/test endpoints, reset, weeklyTick twice, cadence.ts — half of which were dead or racing each other). Segment info lived in `player_day_state` while the day pointer lived in `daily_states`, so reads could disagree across the two tables. The earliest design had a single writer but the codebase accumulated layers without tearing out the old ones.
+
+#### Changes shipped
+
+**`aa062d8` — Multi-beat dismiss fix (client-side UX)**
+- When all storylets in a segment are resolved and ≥1 outcome is still pending dismissal, per-card Continue buttons are hidden and a single bottom "Continue to {next} →" CTA dismisses all pending beats AND advances the segment atomically.
+- File: `src/app/(player)/play/page.tsx` (around the `pendingDismissalBeats.map` render).
+- Verified working on fresh playthrough.
+
+**`0fd818c` — seasonReset neutered + DB CHECK constraint + dead cadence paths removed**
+- `src/lib/cadence.ts` reduced to `utcToday` only. `ensureCadenceUpToDate` and `computeDayIndex` deleted (were dead code per prior session comments but still shipped in the bundle).
+- Migration `20260423100000_daily_states_day_index_nonneg_check.sql`: `CHECK (day_index >= 1)` on `daily_states`. Any future code attempting to write 0 now fails loudly with a constraint violation instead of silently corrupting state.
+- `performSeasonReset` in `src/core/season/seasonReset.ts` no longer updates `daily_states`. It still updates `user_seasons` (so the drift loop stops) and still returns the recap, but season rollover no longer wipes player progress. `buildResetPayload` helper + corresponding test removed.
+
+**`f6c65aa` — Single `/api/time/advance` endpoint + `daily_states` as canonical for segment**
+- Migration `20260423110000_daily_states_segment_columns.sql`: adds `current_segment text`, `hours_remaining int`, `hours_committed int` to `daily_states` with CHECK constraints. Backfilled from `player_day_state.day_index = daily_states.day_index` per-user.
+- `src/app/api/time/advance/route.ts` (new): reads current `(day_index, current_segment, hours_remaining)` from `daily_states` and decides internally whether to bump segment or roll the day. Conditional UPDATEs on `current_segment` / `day_index` prevent double-advance on retries or tab races. Returns 409 when the client's intent has already been applied by a concurrent caller.
+- **Deleted:** `/api/day/advance-segment` and `/api/day/advance-day` routes. Only one endpoint writes time now.
+- `src/core/engine/dailyLoop.ts`: `getOrCreateDailyRun` reads `current_segment` / `hours_remaining` / `hours_committed` from `daily_states` (canonical) instead of `player_day_state`. `player_day_state` becomes a historical per-day log.
+- `src/core/routine/weeklyTick.ts` — `runWeek` no longer writes `daily_states.day_index`. Both the interruption branch and the end-of-week branch have the direct `daily_states.update({ day_index })` calls removed. The routine tick still tracks internal progress via `routine_week_state.current_week_day` and applies deposits; the player's canonical day only advances when they sleep (via `/api/time/advance`). Dual-writer race eliminated.
+- `src/core/routine/checkInterruptions.ts` accepts `resolvedStoryletKeys?: Set<string>` and skips any gate/beat/patience trigger whose `storylet_key` is already resolved. `weeklyTick.runWeek` loads the union of `track_progress.resolved_storylet_keys` for the user and passes it in.
+- Client `handleAdvanceSegment` + `handleSleep` route through a shared `postAdvanceTime` helper that calls `/api/time/advance`. The server decides the action; the client only sets intent-specific UI state (bridge text for segment, sleep-card animation for day rollover).
+
+**`b24b301` — Server-authoritative `day_index` on `/api/tracks/resolve`**
+- `day_index` removed from the request body. Server reads it from `daily_states` at the top of the handler and uses that canonical value everywhere (resource snapshot lookup, `choice_log.day`, `stream_states` update, `playthrough_log` write, `track_progress.updated_day`).
+- Client stops sending `day_index` in the `/api/tracks/resolve` payload.
+- Kills the class of bug where stale React Query cache or a multi-tab race writes log entries against a drifted day.
+
+#### Test status
+- `npx tsc --noEmit` clean on all touched files (pre-existing errors in `.next/types/*` and `playwright.config.ts` are unrelated).
+- `npx vitest run`: 42 files, 195 passed / 1 skipped in ~1.1s.
+- User playtested through Day 5+ on `f6c65aa` and reported "worked clean continue"; `b24b301` ships the tracks/resolve cleanup on top but wasn't independently playtested this session.
+
+#### What's NOT done (steps 7-8 of the original plan)
+Deferred to a future session per user's decision to pause after step 6:
+- **Step 7**: Replace ~10 `setDailyState({...dailyState, fieldX})` mid-session mutations in `play/page.tsx` with `queryClient.invalidateQueries({ queryKey: ["daily-run", userId] })` after the server mutation succeeds. Currently the client silently patches its cached copy of `daily_states` for `relationships` / `life_pressure_state` / `skill_flags` / `preclusion_gates` etc. after each storylet resolve. This works but creates a divergence window between client render and server truth — another class of latent drift.
+- **Step 8**: Delete `dayIndexState` / `dayStateRef` / `refreshTick` from `play/page.tsx`. Depends on step 7 being in. Once state is read exclusively from React Query, these fallback/mirror variables are dead weight. ~30 min of work.
+
 ### scott_day2_morning Storylet (built 2026-04-17)
 - First Day 2 content, filling the Days 2-3 content desert on the roommate track
 - **Engine extension:** `DialogueNode.condition` now supports `npc_memory` checks (format: `"npc_id.memory_key"`)
@@ -343,6 +393,11 @@ Driven by `docs/WEEK-2-CONTENT-BRIEF.md`. Five parts — all shipped.
 
 ## What's Next (probable, pending review)
 
+### Immediate (post-refactor stabilization)
+0. **Playtest confirmation** — `f6c65aa` was user-verified through Day 5+ this session; `b24b301` (server-authoritative day_index on `/api/tracks/resolve`) ships on top but wasn't independently playtested. Next session: reset + play through Day 7+ again, confirm routine mode activation on Day 3 (`ROUTINE_MODE_START_DAY = 3`) doesn't surface the old interruption-loop symptoms.
+0a. **Step 7 cleanup** (~1–1.5h, medium risk) — replace ~10 `setDailyState({...dailyState, X})` mid-session mutations in `play/page.tsx` with `queryClient.invalidateQueries` after server mutation. See Known Issue #19 and the "Time-Architecture Invariants" section for context.
+0b. **Step 8 cleanup** (~30 min, low risk, depends on 0a) — delete `dayIndexState` / `dayStateRef` / `refreshTick` once React Query is the sole client-side source of truth. See Known Issue #20.
+
 ### Immediate (playtesting)
 1. **Playtest Day 0 → Day 7+** — full walkthrough confirming: morning-after scenes, day advancement, skill queue, routine-week mode activation
 2. **Phase 3 (Daily Harvest) — continue:** schema + 28 templates shipped 2026-04-19. Next: P3.3 login flow caller (T-1776329281038), P3.4 weak real-date texture (T-1776329281039), P3.5 90-second feel playtest (T-1776329281040). Authoring 2 more templates to hit 30 is a small content top-up, not a blocker.
@@ -363,6 +418,10 @@ Driven by `docs/WEEK-2-CONTENT-BRIEF.md`. Five parts — all shipped.
 
 | Date | Decision | Context |
 |------|----------|---------|
+| 2026-04-23 | **Server-authoritative `day_index` on `/api/tracks/resolve`** (`b24b301`) | Client stops sending `day_index` in the payload; server reads it from `daily_states` at handler top. Kills the stale-cache / multi-tab drift class of bug where `choice_log.day` could be written against the wrong day (the earlier "Day 3 skip" pattern). |
+| 2026-04-23 | **Single `/api/time/advance` endpoint + `daily_states` is canonical for segment** (`f6c65aa`) | Migration adds `current_segment` / `hours_remaining` / `hours_committed` to `daily_states`; new endpoint decides internally whether to bump segment or roll day; old `/api/day/advance-segment` and `/api/day/advance-day` deleted. `dailyLoop.ts` reads segment canonical from `daily_states`. `weeklyTick.runWeek` no longer writes `daily_states.day_index` — player's day only advances via sleep. `checkInterruptions` now filters out already-resolved storylets via `resolvedStoryletKeys`. Eliminates the three most painful architecture bugs (Day 0 stuck, multi-beat race, routine interruption loop) by reducing 8 `day_index` writers to 1. |
+| 2026-04-23 | **`performSeasonReset` no longer wipes `daily_states` + `CHECK (day_index >= 1)` constraint + dead cadence paths removed** (`0fd818c`) | Season rollover used to auto-set `daily_states.day_index = 0` and zero the stats, which combined with a race on `user_seasons` sync could silently nuke a player's progress mid-session and create phantom day-0 state. Now it only updates `user_seasons`. DB constraint throws loudly if anything writes 0. `lib/cadence.ts` reduced to `utcToday` only (removed `ensureCadenceUpToDate` and `computeDayIndex` — documented as dead but still shipped). `buildResetPayload` removed. |
+| 2026-04-23 | **Multi-beat segment dismiss collapsed into single bottom CTA** (`aa062d8`) | When 2+ outcome cards share a segment, per-card Continue is hidden and a single bottom "Continue to {next} →" dismisses all pending and advances atomically. The previous per-card sequence relied on a refetch race to surface the segment-advance button on the last remaining card, which failed inconsistently. |
 | 2026-04-22 | **Walk-flag bridge extended to job_board + dana_cereal; vitest env repaired** | Closes Known Issues #13 and #14. Migration `20260422200000_job_board_and_dana_cereal_flag_persistence.sql` applies the tuesday_commitment pattern to the two remaining walk-flag-bridge storylets. `job_board`: single terminal → 4 flag-gated terminals (`has_job_library/dining/grounds/research` now persist, unblocking the Day 10 `first_shift_*` variants). `dana_cereal`: added `dana_cereal_neutral` walk flag to the `no_thanks` micro-choice so every path writes exactly one flag; single terminal → 3 flag-gated terminals (cold persists `dana_cereal_cold`, unblocking `dana_letter_avoidance` on Day 9 evening). SQL flag-path join confirms every persisted flag has a live consumer. Separately, `rm -rf node_modules && npm install` restored missing `vite/dist/client/client.mjs`; full vitest suite now runs green (42 files, 196 passed / 1 skipped). |
 | 2026-04-22 | **Cross-track `requires_flag` now resolves (globalFlags union) + `tuesday_commitment` terminal rewrite** | Two coordinated changes. (1) Engine: `dailyLoop.ts` drops the `.in("track_id", trackIds)` filter on its FLAG_SET query and now builds a `globalFlags` set alongside the per-track `flagsByTrack` map. `selectTrackStorylets.ts` unions `globalFlags` onto each track's flag set before `meetsRequirements`. This unblocks `the_post` and `tuesday_night_terminal` (opportunity track, `requires_flag: tuesday_terminal`) and the other two Week 2 tuesday_night variants (`tuesday_night_shift` on money, `tuesday_night_dana_movie` on roommate) which all gate on flags set by `tuesday_commitment` (belonging). (2) Content: `20260422100000_tuesday_commitment_flag_persistence.sql` — `tuesday_commitment`'s single terminal `tuesday_decided` is replaced with four walk-flag-gated terminals (`tuesday_decided_study/terminal/shift/movie`), each carrying `requires_flag` (so `DialogueNodeView` shows the right one) AND persistent `sets_flag` (so the downstream storylet gate fires). Same migration also wires `introduces_npc` for Bryce (`evening_choice`) and Peterson (`morning_after_cards`) — closes Known Issue #5. |
 | 2026-04-20 | **Days 2-3 content shipped (+10 storylets)** | `20260420200000_days_2_3_content.sql` adds 5 academic (western_civ_day1, reading_or_lounge, second_morning_class, study_group_forming, catch_up_or_coast), 3 belonging (floor_lunch_day2, hallway_morning_day3, miguel_afternoon_day3), 1 money (bookstore_line), 1 roommate (roommate_evening_day3). All pool-mode (default_next_key NULL). 8 use conversational nodes; 2 (reading_or_lounge, catch_up_or_coast) are body+choices only. `catch_up_or_coast` pool-gated by `requires_flag: "skipped_reading"` (set by `reading_or_lounge` on the lounge path) — first content usage of Phase 2 requires_flag enforcement. `roommate_moment` (Day 3 evening placeholder) kept inactive — superseded by new `roommate_evening_day3`. Karen introduced in `bookstore_line` via choice-level event, not `introduces_npc` (she appears conditionally). |
@@ -397,10 +456,13 @@ Driven by `docs/WEEK-2-CONTENT-BRIEF.md`. Five parts — all shipped.
 1. **Chain mode**: storylet served via `next_key_override` on `track_progress`. Set when a prior storylet's choice has `next_key` or the storylet has `default_next_key`.
 2. **Pool mode**: storylet served via pool scan when `next_key_override` is NULL. Filtered by: is_active, due_offset_days window, segment, `meetsRequirements()` (requires_choice, requires_skill).
 
-### Day lifecycle (server-authoritative)
-- `POST /api/day/advance-segment` — advances morning→afternoon→evening. Conditional UPDATE prevents double-advance.
-- `POST /api/day/advance-day` — finalizes current day + creates next day state + increments day_index. Conditional UPDATE prevents double-advance.
-- `getOrCreateDailyRun()` in `dailyLoop.ts` is **read-only** — never writes to day_index or current_segment.
+### Day lifecycle (post-2026-04-23 refactor, server-authoritative)
+- **Single endpoint:** `POST /api/time/advance` — decides internally whether this is a segment bump or a day rollover based on `daily_states.(current_segment, hours_remaining)`. Conditional UPDATEs prevent double-advance. Returns 409 on race. Replaced the former `/api/day/advance-segment` + `/api/day/advance-day` split (both deleted).
+- **Single source of truth:** `daily_states` row (one per user) holds `day_index`, `current_segment`, `hours_remaining`, `hours_committed`. `player_day_state` is now a historical per-day log for stats; segment info is derived from `daily_states`.
+- **DB invariant:** `CHECK (day_index >= 1)` on `daily_states` — any code that attempts to write 0 fails loudly.
+- **`getOrCreateDailyRun()` in `dailyLoop.ts` is read-only** — never writes to day_index or current_segment.
+- **`weeklyTick.runWeek` does not write `daily_states.day_index`.** The routine tick tracks abstract week progression via `routine_week_state.current_week_day` and applies deposits; the player's canonical day advances only when they sleep.
+- **`performSeasonReset` does not write `daily_states`.** Season rollover preserves progress; only `user_seasons` is updated.
 - Day advancement is sleep-driven only. No wall-clock catch-up.
 
 ### Key constraint: CONTENT-RULES.md
@@ -408,6 +470,63 @@ A storylet is **either chained OR pooled**. Never both. If anything chains to it
 
 ### ENGINE-SPEC.md accuracy note
 **Refreshed 2026-04-22.** `docs/ENGINE-SPEC.md` §2 "requirements" now documents the current `meetsRequirements()` behaviour (requires_choice, requires_flag, requires_skill) and the cross-track `globalFlags` union added this session. §1 step 3 also rewritten to describe the pool scan properly. §9 (Conversational Node Walk / Invariants) distinguishes storylet-level `requires_flag` from choice-level walk-local `requires_flag`.
+
+---
+
+## Time-Architecture Invariants & Diagnostic Patterns (post-2026-04-23)
+
+**This section is load-bearing for future debugging. It documents the invariants established by the 2026-04-23 refactor and the recurring bug patterns we fixed, so they can be recognised fast if something similar resurfaces.**
+
+### Invariants (what MUST hold; violations are bugs)
+
+1. **`daily_states` is the single source of truth for current time.** The one row per user answers "what day / segment / hours is the player on right now?" via `(day_index, current_segment, hours_remaining, hours_committed)`. Anything that reads time from `player_day_state` for the "current" (not historical) state is a bug.
+2. **`/api/time/advance` is the only code path that writes `daily_states.day_index` or `current_segment` during normal play.** Dev/admin reset endpoints are the only other legitimate writers. If you find a new writer, it's probably the cause of whatever bug you're chasing.
+3. **`daily_states.day_index >= 1` always.** Enforced by a CHECK constraint. If you see day 0 anywhere, the constraint has been bypassed (shouldn't be possible) or the bug is in how something reads `day_index` from a different table.
+4. **`weeklyTick.runWeek` does NOT write `daily_states`.** Routine tick tracks internal progress in `routine_week_state`. The player's canonical day advances only via sleep (`/api/time/advance`).
+5. **`performSeasonReset` does NOT write `daily_states`.** Season rollover only syncs `user_seasons`. Progress is preserved across season changes.
+6. **`/api/tracks/resolve` ignores any `day_index` in the request body.** Server reads it from `daily_states`. Client should not send it; if it does, the value is discarded.
+7. **`checkInterruptions` filters out already-resolved storylets** via the `resolvedStoryletKeys` parameter. An interruption that keeps re-firing on the same storylet is either (a) a resolved storylet slipping through this filter, or (b) a new storylet that never resolved because resume isn't running.
+
+### Bug patterns this session uncovered (and how to recognise them)
+
+| Symptom | Likely cause | First thing to check |
+|---------|-------------|----------------------|
+| Player sees "Day 0 Night, 4h, energy 70, stress 20" | Phantom `player_day_state` row from `createDayStateFromPrevious(userId, 0)`; `daily_states.day_index` was 0 at some moment | `SELECT day_index FROM daily_states WHERE user_id=X` — should be ≥1. If you see day-0 rows in `player_day_state`, something wrote `daily_states.day_index = 0`. |
+| Sleep button appears to loop (each click shows another "Day N Night, 4h, Sleep?") | Player had multiple `player_day_state` rows with `current_segment='night'` from prior session's segment advances; each sleep bumps day_index and shows the next saved snapshot | `SELECT day_index, current_segment, hours_remaining FROM player_day_state WHERE user_id=X ORDER BY day_index` |
+| Two resolved outcome cards, each with plain "Continue", clicking either doesn't advance segment | Multi-beat dismiss race (the pre-`aa062d8` bug pattern). The single bottom CTA should render when `allResolved && canAdvance`. | Check `pendingDismissalBeats` length and `trackStorylets.every(resolved)` evaluation in render. |
+| Routine interruption keeps re-firing on a storylet the player already resolved | `checkInterruptions` not receiving `resolvedStoryletKeys`, or the keys query is wrong | `SELECT storylet_key FROM routine_week_state WHERE user_id=X` — confirm it matches a key in `track_progress.resolved_storylet_keys` for ANY track. |
+| `choice_log.day` entries written against wrong day (e.g. Day 3 skipped, or day bouncing 1→2→3→0→1 in events) | Pre-`b24b301` — client sent stale `day_index` in `/api/tracks/resolve` payload. Shouldn't happen post-refactor, but if it does, check the client isn't somehow falling back to a stale cache. | `SELECT day_index, event_type, ts FROM events WHERE user_id=X ORDER BY ts` — any non-monotonic day_index sequence is a red flag. |
+| Game mode / routine state disagrees with day_index | Leftover `routine_week_state` from an old run not cleared on reset, or `ROUTINE_MODE_START_DAY=3` activating when not expected | `SELECT * FROM routine_week_state WHERE user_id=X` — status should be `committed` / `interrupted` / `completed`. If `interrupted` is stuck, check the interruption storylet_key vs `track_progress.resolved_storylet_keys`. |
+| Any of the above after a playtest of a pre-deployed branch | Deployment timing. Vercel takes ~1-2 min after push. Stale client bundle from before the fix. | Check: `git log --oneline origin/main`, compare deployment timestamp (`mcp__vercel__list_deployments`) against when the bug was observed. Hard refresh (⌘⇧R) forces new bundle. |
+
+### Debug SQL toolkit (copy-paste for future sessions)
+
+```sql
+-- Current state snapshot for one user
+SELECT day_index, current_segment, hours_remaining, hours_committed FROM daily_states WHERE user_id='X';
+SELECT day_index, current_segment, hours_remaining, energy, stress, resolved_at FROM player_day_state WHERE user_id='X' ORDER BY day_index;
+SELECT status, current_week_day, interruption_storylet_key, interruption_reason, deposits_applied_through_day FROM routine_week_state WHERE user_id='X';
+SELECT t.key, tp.state, tp.resolved_storylet_keys, tp.next_key_override, tp.updated_day FROM track_progress tp JOIN tracks t ON t.id=tp.track_id WHERE tp.user_id='X' ORDER BY t.key;
+
+-- Client-side day_index drift signal (any non-monotonic sequence is suspect)
+SELECT ts, day_index, event_type FROM events WHERE user_id='X' AND day_index IS NOT NULL ORDER BY ts;
+
+-- Choice log ordered by creation — day column should be monotonically non-decreasing
+SELECT day, step_key, option_key, created_at FROM choice_log WHERE user_id='X' ORDER BY created_at ASC;
+
+-- Who is the latest active user? (Useful when you don't know the user_id)
+SELECT user_id, COUNT(*) AS entries, MAX(created_at) AS latest FROM choice_log GROUP BY user_id ORDER BY latest DESC LIMIT 5;
+
+-- Surgical reset for one user (equivalent to hitting the in-game reset button, minus the UI roundtrip)
+-- See src/app/api/run/reset/route.ts for the canonical delete list; keep this query in sync if tables are added.
+```
+
+### When adding new time-related writes, remember
+
+- **Don't write `daily_states.day_index` or `current_segment` directly.** Call `/api/time/advance` or use its Postgres-level equivalent (inline the conditional UPDATE pattern). If you need a new advancement semantic, extend `/api/time/advance` rather than adding a parallel writer.
+- **Don't write `player_day_state.current_segment` or `hours_remaining`.** The `/api/time/advance` endpoint does this as a backward-compat mirror; new code should treat those fields on `player_day_state` as read-only.
+- **Don't trust client-supplied `day_index` in API request bodies.** Read it from `daily_states` server-side.
+- **Don't mutate `dailyState` client-side via `setDailyState({...dailyState, X})`.** This is the last remaining anti-pattern (step 7 of the original cleanup plan) — use `queryClient.invalidateQueries` instead. Existing call sites still doing this are a known risk; don't add new ones.
 
 ---
 
@@ -429,6 +548,13 @@ A storylet is **either chained OR pooled**. Never both. If anything chains to it
 | 12 | ~~**Dana/Scott naming regression**~~ | ~~Medium~~ | **FIXED 2026-04-20** — `20260420100000_fix_dana_scott_regression_and_cleanup.sql` scrubs all six storylets (body + choices + nodes). |
 | 13 | ~~**Remaining `sets_flag` wiring**~~ | ~~Medium~~ | **FIXED 2026-04-22** — `20260422200000_job_board_and_dana_cereal_flag_persistence.sql`. `job_board` now has 4 walk-flag-gated terminals persisting `has_job_{library,dining,grounds,research}` (unblocks Day 10 `first_shift_*`). `dana_cereal` now has 3 walk-flag-gated terminals; cold path persists `dana_cereal_cold` (unblocks `dana_letter_avoidance`). SQL join confirms every persisted flag has a live consumer. |
 | 14 | ~~**Vitest environment broken — vite install missing `client.mjs`**~~ | ~~Low~~ | **FIXED 2026-04-22** — `rm -rf node_modules && npm install` restored `client.mjs`. Full suite: 42 files, 196 passed / 1 skipped in ~1.2s. Engine change from prior session now green. |
+| 15 | ~~**Multi-beat dismiss race — two plain "Continue" buttons, neither advances segment**~~ | ~~High~~ | **FIXED 2026-04-23** (`aa062d8`) — single bottom CTA when `allResolved`. User-verified. |
+| 16 | ~~**Day 0 Night stuck / sleep loops**~~ | ~~High~~ | **FIXED 2026-04-23** (`0fd818c`) — `performSeasonReset` no longer wipes `daily_states`; `CHECK (day_index >= 1)` catches any future regression loudly. |
+| 17 | ~~**Routine interruption re-fires on already-resolved storylet**~~ | ~~High~~ | **FIXED 2026-04-23** (`f6c65aa`) — `checkInterruptions` accepts `resolvedStoryletKeys` and `runWeek` passes it in. |
+| 18 | ~~**`daily_states.day_index` has 8 writers; `choice_log.day` can drift across tabs**~~ | ~~High~~ | **FIXED 2026-04-23** (`f6c65aa`, `b24b301`) — single `/api/time/advance` endpoint is the sole day-time writer. `/api/tracks/resolve` reads `day_index` server-side; client stops sending it. |
+| 19 | **Step 7 cleanup deferred: ~10 `setDailyState({...dailyState, X})` mid-session mutations in `play/page.tsx`** | Medium | NOT DONE 2026-04-23. Mutations silently patch client's cached `daily_states` after storylet resolves (`relationships`, `life_pressure_state`, `skill_flags`, `preclusion_gates` etc.). Replace with `queryClient.invalidateQueries` after server mutation. ~1–1.5h, medium risk (touches ~10 features). |
+| 20 | **Step 8 cleanup deferred: delete `dayIndexState` / `dayStateRef` / `refreshTick`** | Low | NOT DONE 2026-04-23. Blocked by #19. Once state is read exclusively from React Query, these fallback/mirror variables are dead weight. ~30 min. |
+| 21 | **Allocation path (`saveTimeAllocation`) still writes `hours_committed` / `hours_remaining` to `player_day_state`, not `daily_states`** | Low | Not hit in Chapter One day-by-day play (gated by `featureFlags.resources`). Fold into step 7 cleanup or handle when allocation flow is next touched. Don't forget if routine-week allocation is re-enabled. |
 
 ---
 
