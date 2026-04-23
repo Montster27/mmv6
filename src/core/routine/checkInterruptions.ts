@@ -82,6 +82,13 @@ export type CheckInterruptionsArgs = {
   patienceThresholdDays: number;
   /** Gate thresholds that have already fired (avoid re-firing). */
   firedGateKeys?: Set<string>;
+  /**
+   * Storylet keys the player has already resolved (across all tracks). Any
+   * trigger whose storylet_key is in this set is skipped — otherwise the
+   * routine loop can park at an interruption the player can never clear,
+   * because the storylet has no unresolved state to serve.
+   */
+  resolvedStoryletKeys?: Set<string>;
 };
 
 export function checkInterruptions(
@@ -95,12 +102,14 @@ export function checkInterruptions(
     npcDepositHistory,
     patienceThresholdDays,
     firedGateKeys = new Set(),
+    resolvedStoryletKeys = new Set(),
   } = args;
 
   // ── 1. Gate threshold trips (highest priority) ──
   for (const gate of GATE_THRESHOLDS) {
     const key = `${gate.npc_id}:${gate.field}:${gate.direction}`;
     if (firedGateKeys.has(key)) continue;
+    if (resolvedStoryletKeys.has(gate.storylet_key)) continue;
 
     const rel = relationships[gate.npc_id];
     if (!rel) continue;
@@ -121,20 +130,22 @@ export function checkInterruptions(
 
   // ── 2. Calendar beats ──
   for (const beat of calendarBeats) {
-    if (beat.due_offset_days === diegeticDayIndex) {
-      return {
-        type: "calendar_beat",
-        storylet_key: beat.storylet_key,
-        fires_on_day: weekDay,
-        description: `Something pulls you out of your routine.`,
-      };
-    }
+    if (beat.due_offset_days !== diegeticDayIndex) continue;
+    if (resolvedStoryletKeys.has(beat.storylet_key)) continue;
+
+    return {
+      type: "calendar_beat",
+      storylet_key: beat.storylet_key,
+      fires_on_day: weekDay,
+      description: `Something pulls you out of your routine.`,
+    };
   }
 
   // ── 3. NPC patience timer ──
   for (const cfg of PATIENCE_NPCS) {
     const rel = relationships[cfg.npc_id];
     if (!rel || !rel.met) continue; // Only fire for NPCs the player has met
+    if (resolvedStoryletKeys.has(cfg.storylet_key)) continue;
 
     const lastDeposit = npcDepositHistory.get(cfg.npc_id) ?? 0;
     const daysSinceDeposit = diegeticDayIndex - lastDeposit;

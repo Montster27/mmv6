@@ -177,6 +177,23 @@ export async function runWeek(
 
   const trainedSkillIds = new Set((trainedRows ?? []).map((r) => (r as { skill_id: string }).skill_id));
 
+  // Load resolved storylet keys so interruptions don't park at a beat the
+  // player has already cleared. Union across all of this user's tracks.
+  const { data: progressRows } = await supabase
+    .from("track_progress")
+    .select("resolved_storylet_keys")
+    .eq("user_id", userId);
+
+  const resolvedStoryletKeys = new Set<string>();
+  for (const row of progressRows ?? []) {
+    const keys = (row as { resolved_storylet_keys: unknown }).resolved_storylet_keys;
+    if (Array.isArray(keys)) {
+      for (const k of keys) {
+        if (typeof k === "string") resolvedStoryletKeys.add(k);
+      }
+    }
+  }
+
   // Track fired gates across this tick to avoid re-firing
   const firedGateKeys = new Set<string>();
 
@@ -218,6 +235,7 @@ export async function runWeek(
       npcDepositHistory,
       patienceThresholdDays: NPC_PATIENCE_THRESHOLD_WEEKS * DAYS_PER_WEEK,
       firedGateKeys,
+      resolvedStoryletKeys,
     });
 
     // Update deposits_applied_through_day
@@ -234,7 +252,10 @@ export async function runWeek(
     daysCompleted++;
 
     if (interruption) {
-      // Set interrupted state
+      // Set interrupted state. Note: we do NOT write daily_states.day_index
+      // here anymore — that's the exclusive domain of /api/time/advance.
+      // Routine tick tracks its own progress via routine_week_state.current_week_day;
+      // the player's canonical day only advances when they sleep.
       await supabase
         .from("routine_week_state")
         .update({
@@ -247,12 +268,6 @@ export async function runWeek(
         .eq("user_id", userId)
         .eq("diegetic_week_start", weekStart);
 
-      // Advance day_index to interruption day
-      await supabase
-        .from("daily_states")
-        .update({ day_index: diegeticDay })
-        .eq("user_id", userId);
-
       return {
         depositsApplied,
         interruptionFired: interruption,
@@ -263,6 +278,9 @@ export async function runWeek(
   }
 
   // ── Week completed without interruption ──
+  // Same note: no daily_states.day_index write. The player must advance time
+  // via /api/time/advance (sleep); the routine tick only tracks abstract
+  // week progression and applied deposits.
   const newDayIndex = weekStart + DAYS_PER_WEEK;
 
   await supabase
@@ -273,12 +291,6 @@ export async function runWeek(
     })
     .eq("user_id", userId)
     .eq("diegetic_week_start", weekStart);
-
-  // Advance day_index
-  await supabase
-    .from("daily_states")
-    .update({ day_index: newDayIndex })
-    .eq("user_id", userId);
 
   return {
     depositsApplied,

@@ -1,5 +1,5 @@
-// ensureCadenceUpToDate removed — day advancement is now exclusively sleep-driven
-// via /api/day/advance-day. No wall-clock auto-advance.
+// All time advancement (segment and day) happens exclusively via /api/time/advance.
+// No wall-clock auto-advance; daily_states is the single source of truth.
 import { runsForTodayPair, computeStage } from "@/core/engine/dailyLoop.utils";
 import {
   fetchDailyState,
@@ -118,15 +118,27 @@ export async function getOrCreateDailyRun(
     };
   }
 
-  // Read-only: day advancement happens exclusively via /api/day/advance-day
+  // Read-only: time advancement happens exclusively via /api/time/advance.
+  // daily_states is the single source of truth for (day_index, current_segment,
+  // hours_remaining, hours_committed). player_day_state is now a historical
+  // log for per-day stats only.
   const { data: dailyStateRow } = await supabase
     .from("daily_states")
-    .select("day_index,last_day_completed,last_day_index_completed,preclusion_gates")
+    .select("day_index,current_segment,hours_remaining,hours_committed,last_day_completed,last_day_index_completed,preclusion_gates")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
   if (!dailyStateRow) throw new Error("No daily state found for user.");
   const dayIndex = dailyStateRow.day_index;
+  const canonicalSegment =
+    ((dailyStateRow.current_segment as
+      | 'morning'
+      | 'afternoon'
+      | 'evening'
+      | 'night'
+      | null) ?? 'morning');
+  const canonicalHoursRemaining = (dailyStateRow.hours_remaining as number | null) ?? 16;
+  const canonicalHoursCommitted = (dailyStateRow.hours_committed as number | null) ?? 0;
   const precludedKeys = new Set<string>(
     Array.isArray(dailyStateRow.preclusion_gates)
       ? (dailyStateRow.preclusion_gates as string[])
@@ -589,8 +601,8 @@ export async function getOrCreateDailyRun(
         }
 
         // 6. Select due storylets and format for DailyRun
-        const currentSeg = dayStateRaw?.current_segment ?? 'morning';
-        const hoursLeft = dayStateRaw?.hours_remaining ?? 16;
+        const currentSeg = canonicalSegment;
+        const hoursLeft = canonicalHoursRemaining;
         console.log("[daily-run] selectTrackStorylets input:", {
           dayIndex,
           progressCount: progress.length,
@@ -751,7 +763,7 @@ export async function getOrCreateDailyRun(
   // When no storylets match the current segment but the day still has hours left,
   // keep stage as "storylet_1" so the client shows the SegmentTransitionCard
   // instead of auto-completing the day.
-  const dayDone = (dayStateRaw?.current_segment ?? 'morning') === 'night' || (dayStateRaw?.hours_remaining ?? 16) <= 0;
+  const dayDone = canonicalSegment === 'night' || canonicalHoursRemaining <= 0;
   const resolvedStage: typeof stage =
     // In routine_schedule mode, force storylet_1 so the client renders the calendar
     gameMode === "routine_schedule"
@@ -845,9 +857,11 @@ export async function getOrCreateDailyRun(
         total_social: dayState.total_social,
         total_health: dayState.total_health,
         total_fun: dayState.total_fun,
-        current_segment: dayState.current_segment ?? 'morning',
-        hours_remaining: dayState.hours_remaining ?? 16,
-        hours_committed: dayState.hours_committed ?? 0,
+        // Segment info comes from daily_states (canonical), NOT player_day_state.
+        // player_day_state's copy of these fields is kept only for legacy readers.
+        current_segment: canonicalSegment,
+        hours_remaining: canonicalHoursRemaining,
+        hours_committed: canonicalHoursCommitted,
       }
       : null,
     chapterOneState: chapterOneState ?? undefined,

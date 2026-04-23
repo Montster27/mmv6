@@ -25,7 +25,7 @@ import { ReflectionSection } from "@/components/play/ReflectionSection";
 import { ChapterOneReflection } from "@/components/play/ChapterOneReflection";
 import { TesterFeedback } from "@/components/play/TesterFeedback";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
-// ensureCadenceUpToDate removed — day advancement is now sleep-driven via /api/day/advance-day
+// All time advancement (segment + day) goes through /api/time/advance.
 import { trackEvent } from "@/lib/events";
 import { supabase } from "@/lib/supabase/browser";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
@@ -1054,12 +1054,43 @@ export default function PlayPage() {
   // (~100-300ms). The auto-advance timer (400ms) can fire in that gap.
   const advanceInFlightRef = useRef(false);
 
+  // Single entry point for time advance. The server decides whether this is a
+  // segment bump or a full day rollover based on daily_states — the client
+  // never guesses. Both "Continue to <next> →" buttons and the Sleep button
+  // call this; the caller only sets intent-specific UI state (bridge text or
+  // sleep-card animation) before/after.
+  const postAdvanceTime = async (): Promise<
+    | { ok: true; action: "segment" | "day" }
+    | { ok: false; alreadyAdvanced: boolean }
+  > => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) return { ok: false, alreadyAdvanced: false };
+
+    const res = await fetch("/api/time/advance", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (res.status === 409) {
+      return { ok: false, alreadyAdvanced: true };
+    }
+    if (!res.ok) {
+      console.error("[time-advance] request failed", res.status);
+      return { ok: false, alreadyAdvanced: false };
+    }
+
+    const body = (await res.json().catch(() => null)) as
+      | { action: "segment" | "day" }
+      | null;
+    return { ok: true, action: body?.action ?? "segment" };
+  };
+
   const handleAdvanceSegment = async () => {
-    if (advanceInFlightRef.current) return; // guard against concurrent calls
+    if (advanceInFlightRef.current) return;
     advanceInFlightRef.current = true;
 
     try {
-      // Compute next segment locally for bridge text only
       const ds = dayStateRef.current ?? dayState;
       if (!ds) return;
       const current = (ds.current_segment as Segment | undefined) ?? 'morning';
@@ -1069,27 +1100,9 @@ export default function PlayPage() {
       }
       setSleepCardDone(false);
 
-      // Server-authoritative segment advance (conditional UPDATE prevents double-advance)
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) return;
+      const result = await postAdvanceTime();
+      if (!result.ok && !result.alreadyAdvanced) return;
 
-      const res = await fetch("/api/day/advance-segment", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 409) {
-        // Segment already advanced (double-click / two tabs). Just refetch.
-        await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
-        return;
-      }
-      if (!res.ok) {
-        console.error("Failed to advance segment", res.status);
-        return;
-      }
-
-      // Refetch to get fresh state from server (no optimistic update)
       await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
     } finally {
       advanceInFlightRef.current = false;
@@ -1099,26 +1112,15 @@ export default function PlayPage() {
   const handleSleep = async () => {
     setSleepCardDone(true);
     try {
-      // Server-authoritative day advance: finalize + create next day + increment day_index
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) return;
-
-      const res = await fetch("/api/day/advance-day", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 409) {
-        // Day already advanced (double-click / two tabs). Just refetch.
+      const result = await postAdvanceTime();
+      if (!result.ok) {
         setSleepCardDone(false);
-        await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
+        if (result.alreadyAdvanced) {
+          await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
+        }
         return;
       }
-      if (!res.ok) throw new Error("Failed to advance day");
-
       setSleepCardDone(false);
-      // Refetch to get fresh state for the new day
       await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
     } catch (e) {
       console.error("Failed to advance day via sleep", e);
