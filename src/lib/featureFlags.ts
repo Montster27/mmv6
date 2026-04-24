@@ -16,6 +16,13 @@ export type FeatureFlags = {
   contentStudioPublishEnabled: boolean;
   beatBufferEnabled: boolean;
   relationshipDebugEnabled: boolean;
+  /**
+   * Show the routine-interruption Continue card when a weekly tick parks on
+   * an interruption storylet. Disabled by default until the resume path is
+   * verified end-to-end; enabling from localStorage is safe for internal
+   * testing but the player-facing route should stay gated.
+   */
+  routineInterruptionCardEnabled: boolean;
 };
 
 function parseFlag(value: string | undefined): boolean | null {
@@ -61,6 +68,7 @@ export function getFeatureFlags(): FeatureFlags {
           contentStudioPublishEnabled: false,
           beatBufferEnabled: true,
           relationshipDebugEnabled: true,
+          routineInterruptionCardEnabled: false,
         }
       : {
           chapterOneScarcityEnabled: true,
@@ -80,6 +88,7 @@ export function getFeatureFlags(): FeatureFlags {
           contentStudioPublishEnabled: true,
           beatBufferEnabled: true,
           relationshipDebugEnabled: true,
+          routineInterruptionCardEnabled: false,
         };
 
   const studioFlag =
@@ -130,6 +139,8 @@ export function getFeatureFlags(): FeatureFlags {
       parseFlag(process.env.NEXT_PUBLIC_BEAT_BUFFER) ?? undefined,
     relationshipDebugEnabled:
       parseFlag(process.env.NEXT_PUBLIC_REL_DEBUG) ?? undefined,
+    routineInterruptionCardEnabled:
+      parseFlag(process.env.NEXT_PUBLIC_ROUTINE_INTERRUPTION_CARD) ?? undefined,
   };
 
   // Strip undefined values so unset env vars don't shadow base defaults.

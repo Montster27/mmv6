@@ -113,6 +113,7 @@ import { SleepCard } from "@/components/play/SleepCard";
 import { SegmentTransitionCard } from "@/components/play/SegmentTransitionCard";
 import { WeeklyCalendar } from "@/components/play/WeeklyCalendar";
 import { InterruptionTransitionCard } from "@/components/play/InterruptionTransitionCard";
+import { SkillsNudge } from "@/components/play/SkillsNudge";
 import { RoutineWeekSummary } from "@/components/play/RoutineWeekSummary";
 import { computeWeekStart } from "@/core/routine/constants";
 import { getBridgeText } from "@/lib/segmentBridge";
@@ -2388,7 +2389,82 @@ export default function PlayPage() {
 
       const resBody = await res.json().catch(() => ({ next_key: null }));
 
-      // --- Apply relationship events from the arc beat choice ---
+      // --- Resolve conditional reaction text (e.g. money_band conditions) ---
+      // Computed BEFORE the optimistic UI flip so the outcome card opens with
+      // the correct reaction text instead of rendering empty and patching in.
+      let resolvedOption = option;
+      const conditions = option.reaction_text_conditions;
+      if (
+        conditions &&
+        conditions.length > 0 &&
+        (!option.reaction_text || option.reaction_text.trim() === "")
+      ) {
+        const npcMemForCond = Object.fromEntries(
+          Object.entries(relationshipsState).map(([npcId, entry]) => {
+            const rec = entry as Record<string, unknown>;
+            return [
+              npcId,
+              {
+                met: rec.met === true,
+                knows_name: rec.knows_name === true,
+                knows_face: rec.knows_face === true,
+              },
+            ];
+          })
+        );
+        const condContext: Record<string, unknown> = {
+          npc_memory: npcMemForCond,
+        };
+        if (chapterOneState?.moneyBand) {
+          condContext.money_band = chapterOneState.moneyBand;
+        }
+        for (const cond of conditions) {
+          if (matchesRequirement(cond.if, condContext)) {
+            resolvedOption = { ...option, reaction_text: cond.text };
+            break;
+          }
+        }
+      }
+
+      // ── Optimistic UI flip — happen NOW (pre-relationship network) ──────
+      // Gate 0 playtest: clicks felt 1–2s laggy because the outcome card was
+      // gated behind the `updateRelationships` round-trip. Relationship
+      // writes are non-fatal and best-effort, so we surface the outcome
+      // first and persist relationships in the background.
+      const outcomeDeltas = (option.outcome as { deltas?: { energy?: number; stress?: number; resources?: Record<string, number> } } | undefined)?.deltas;
+      if (outcomeDeltas && dayState) {
+        const nextEnergy =
+          typeof outcomeDeltas.energy === "number"
+            ? Math.max(0, Math.min(100, dayState.energy + outcomeDeltas.energy))
+            : dayState.energy;
+        const nextStress =
+          typeof outcomeDeltas.stress === "number"
+            ? Math.max(0, Math.min(100, dayState.stress + outcomeDeltas.stress))
+            : dayState.stress;
+        const res = outcomeDeltas.resources ?? {};
+        setDayState({
+          ...dayState,
+          energy: nextEnergy,
+          stress: nextStress,
+          cashOnHand: dayState.cashOnHand + (res.cashOnHand ?? 0),
+          knowledge: dayState.knowledge + (res.knowledge ?? 0),
+          socialLeverage: dayState.socialLeverage + (res.socialLeverage ?? 0),
+          physicalResilience: Math.max(
+            0,
+            Math.min(100, dayState.physicalResilience + (res.physicalResilience ?? 0))
+          ),
+        });
+      }
+
+      const newResolved = new Set([...resolvedTrackStoryletIds, beat.storylet_key]);
+      setResolvedTrackStoryletIds(newResolved);
+      // Keep this beat visible until the user dismisses it via the Continue button.
+      // Also clear the mini-game overlay here (if active) so both state changes
+      // land in the same React batch — prevents the un-resolved card flashing back.
+      setActiveMiniGame(null);
+      setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: resolvedOption }]);
+
+      // --- Apply relationship events (backgrounded; UI already flipped) ---
       if (userId) {
         const introEvents = (beat.introduces_npc ?? [])
           .filter((npcId: string) => !relationshipsState[npcId]?.met)
@@ -2449,75 +2525,6 @@ export default function PlayPage() {
           }
         }
       }
-
-      // --- Resolve conditional reaction text (e.g. money_band conditions) ---
-      let resolvedOption = option;
-      const conditions = option.reaction_text_conditions;
-      if (
-        conditions &&
-        conditions.length > 0 &&
-        (!option.reaction_text || option.reaction_text.trim() === "")
-      ) {
-        const npcMemForCond = Object.fromEntries(
-          Object.entries(relationshipsState).map(([npcId, entry]) => {
-            const rec = entry as Record<string, unknown>;
-            return [
-              npcId,
-              {
-                met: rec.met === true,
-                knows_name: rec.knows_name === true,
-                knows_face: rec.knows_face === true,
-              },
-            ];
-          })
-        );
-        const condContext: Record<string, unknown> = {
-          npc_memory: npcMemForCond,
-        };
-        if (chapterOneState?.moneyBand) {
-          condContext.money_band = chapterOneState.moneyBand;
-        }
-        for (const cond of conditions) {
-          if (matchesRequirement(cond.if, condContext)) {
-            resolvedOption = { ...option, reaction_text: cond.text };
-            break;
-          }
-        }
-      }
-
-      // --- Apply outcome.deltas to local dayState (optimistic update) ---
-      const outcomeDeltas = (option.outcome as { deltas?: { energy?: number; stress?: number; resources?: Record<string, number> } } | undefined)?.deltas;
-      if (outcomeDeltas && dayState) {
-        const nextEnergy =
-          typeof outcomeDeltas.energy === "number"
-            ? Math.max(0, Math.min(100, dayState.energy + outcomeDeltas.energy))
-            : dayState.energy;
-        const nextStress =
-          typeof outcomeDeltas.stress === "number"
-            ? Math.max(0, Math.min(100, dayState.stress + outcomeDeltas.stress))
-            : dayState.stress;
-        const res = outcomeDeltas.resources ?? {};
-        setDayState({
-          ...dayState,
-          energy: nextEnergy,
-          stress: nextStress,
-          cashOnHand: dayState.cashOnHand + (res.cashOnHand ?? 0),
-          knowledge: dayState.knowledge + (res.knowledge ?? 0),
-          socialLeverage: dayState.socialLeverage + (res.socialLeverage ?? 0),
-          physicalResilience: Math.max(
-            0,
-            Math.min(100, dayState.physicalResilience + (res.physicalResilience ?? 0))
-          ),
-        });
-      }
-
-      const newResolved = new Set([...resolvedTrackStoryletIds, beat.storylet_key]);
-      setResolvedTrackStoryletIds(newResolved);
-      // Keep this beat visible until the user dismisses it via the Continue button.
-      // Also clear the mini-game overlay here (if active) so both state changes
-      // land in the same React batch — prevents the un-resolved card flashing back.
-      setActiveMiniGame(null);
-      setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: resolvedOption }]);
 
       // Only mark day complete when all beats are resolved AND no more steps are queued
       // NOTE: API returns "next_key" (not "next_step_key") — field name was mismatched.
@@ -2759,14 +2766,13 @@ export default function PlayPage() {
     setRefreshTick((t) => t + 1);
   }, [chapterOneMode, visibleTrackCount, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage, sleepCardDone]);
 
-  // Segment transitions are explicit player clicks (SegmentTransitionCard).
-  // Previously this effect auto-advanced through empty segments after a 400ms
-  // delay, but the timer fired with state captured at render time — creating
-  // a window where stale snapshots triggered cascading advances. The tradeoff
-  // is a tiny UX regression (player clicks a button to continue to afternoon
-  // even when there's no content) in exchange for eliminating an entire class
-  // of timing bugs. See commits 07c047d, 22b3b46, 9bbde1c for the patch chain
-  // that preceded this removal.
+  // Segment transitions auto-advance from inside SegmentTransitionCard (300ms
+  // fade on mount → onAdvance → handleAdvanceSegment). The page-level effect
+  // that previously auto-advanced via a 400ms timer was removed because it
+  // fired with state captured at render time; the in-card timer fires from
+  // the render that already decided the card should show, so the race is
+  // closed. advanceInFlightRef guards against concurrent advances.
+  // See commits 07c047d, 22b3b46, 9bbde1c for the earlier patch chain.
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
@@ -3561,7 +3567,18 @@ export default function PlayPage() {
                     />
                   )}
 
-                  {USE_DAILY_LOOP_ORCHESTRATOR && gameMode === "daily" && interruptionCard && (
+                  {/*
+                    Interruption card is gated by featureFlags.routineInterruptionCardEnabled
+                    (default false) until the resume path is verified end-to-end.
+                    The resume endpoint exists and the click-through is wired, but
+                    handleRoutineResume currently re-invokes runWeek which can re-fire
+                    the same interruption — producing the "button does nothing"
+                    perception from the Gate 0 playtest. Re-enable via
+                    NEXT_PUBLIC_ROUTINE_INTERRUPTION_CARD=1 or the local override key
+                    `routineInterruptionCardEnabled: true` once runWeek advances past
+                    the resolved beat.
+                  */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR && gameMode === "daily" && interruptionCard && featureFlags.routineInterruptionCardEnabled && (
                     <InterruptionTransitionCard
                       text={interruptionCard.text}
                       onContinue={handleRoutineResume}
@@ -3574,6 +3591,18 @@ export default function PlayPage() {
                       schedule={committedSchedule}
                       activities={routineActivities}
                       onPlanNext={handlePlanNextWeek}
+                    />
+                  )}
+
+                  {/*
+                    Skills discoverability nudge — Day 1 only, once the player
+                    has resolved at least one beat (so it lands after a moment
+                    of lived fiction, not on a cold start). Dismisses via
+                    localStorage; the component returns null once clicked.
+                  */}
+                  {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode && (
+                    <SkillsNudge
+                      eligible={dayIndex === 1 && resolvedTrackStoryletIds.size > 0}
                     />
                   )}
 
@@ -3607,32 +3636,60 @@ export default function PlayPage() {
                           ? SEGMENT_ORDER[SEGMENT_ORDER.indexOf(currentSeg) + 1]
                           : null;
                         const useBottomCta = canAdvance && !!nextSeg;
+
+                        // Serialize into a SINGLE list so a beat keeps its place
+                        // across resolve → outcome. Rendering pending-dismissals and
+                        // unresolved beats from two separate .map calls treats them
+                        // as siblings at different child positions under the
+                        // fragment — which forces React to unmount+remount the card
+                        // when it swaps between them, replaying narrative-enter
+                        // and producing the "blink" seen in Gate 0.
+                        //
+                        // Rules baked in here:
+                        //   - If ANY beat in trackStorylets is unresolved, render
+                        //     only the first unresolved beat (avoids contradictory
+                        //     directions on screen, e.g. "head to your room" vs
+                        //     "head across the quad").
+                        //   - Once every beat is resolved, render one card per
+                        //     pending dismissal — the collapsed bottom-CTA below
+                        //     advances the segment atomically.
+                        const firstUnresolvedIdx = trackStorylets.findIndex(
+                          (b) => !resolvedTrackStoryletIds.has(b.storylet_key),
+                        );
+                        const unifiedCards: Array<
+                          | { kind: "unresolved"; beat: (typeof trackStorylets)[number] }
+                          | { kind: "pending"; beat: (typeof trackStorylets)[number]; chosenOption: StoryletChoice }
+                        > = [];
+                        if (firstUnresolvedIdx >= 0) {
+                          unifiedCards.push({ kind: "unresolved", beat: trackStorylets[firstUnresolvedIdx] });
+                        } else {
+                          for (const p of pendingDismissalBeats) {
+                            unifiedCards.push({ kind: "pending", beat: p.beat, chosenOption: p.chosenOption });
+                          }
+                        }
+
                         return (
                           <>
-                            {/* Resolved beats awaiting user dismissal (shown first so reaction text is prominent) */}
-                            {pendingDismissalBeats.map(({ beat, chosenOption }) => (
-                              <TrackStoryletCard
-                                key={beat.progress_id}
-                                storylet={beat}
-                                dayIndex={dayIndex}
-                                onChoice={handleTrackStoryletChoice}
-                                disabled
-                                resolvedOption={chosenOption}
-                                onDismiss={
-                                  useBottomCta
-                                    ? undefined
-                                    : () => handleDismissTrackStorylet(beat, false)
-                                }
-                                relationships={relationshipsState}
-                              />
-                            ))}
-                            {/* Unresolved track storylets */}
-                            {trackStorylets
-                              .filter((b) => !resolvedTrackStoryletIds.has(b.storylet_key))
-                              .map((ts) => (
+                            {unifiedCards.map((card) =>
+                              card.kind === "pending" ? (
                                 <TrackStoryletCard
-                                  key={ts.progress_id}
-                                  storylet={ts}
+                                  key={card.beat.progress_id}
+                                  storylet={card.beat}
+                                  dayIndex={dayIndex}
+                                  onChoice={handleTrackStoryletChoice}
+                                  disabled
+                                  resolvedOption={card.chosenOption}
+                                  onDismiss={
+                                    useBottomCta
+                                      ? undefined
+                                      : () => handleDismissTrackStorylet(card.beat, false)
+                                  }
+                                  relationships={relationshipsState}
+                                />
+                              ) : (
+                                <TrackStoryletCard
+                                  key={card.beat.progress_id}
+                                  storylet={card.beat}
                                   dayIndex={dayIndex}
                                   onChoice={handleTrackStoryletChoice}
                                   moneyBand={chapterOneState?.moneyBand as "tight" | "okay" | "comfortable" | undefined}
@@ -3646,7 +3703,8 @@ export default function PlayPage() {
                                     physicalResilience: dayState.physicalResilience,
                                   } : null}
                                 />
-                              ))}
+                              ),
+                            )}
                             {useBottomCta && nextSeg && (
                               <div className="pt-2">
                                 <Button

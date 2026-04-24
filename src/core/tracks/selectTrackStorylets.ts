@@ -192,10 +192,15 @@ export function selectTrackStorylets({
     // This preserves explicit chains (next_key on a choice / default_next_key).
     // -------------------------------------------------------------------------
     if (prog.next_key_override) {
-      // Safety: if the override points to an already-resolved storylet, clear
-      // it and fall through to the pool scan instead of re-serving it.
-      if (resolvedKeys.has(prog.next_key_override)) {
-        // Fall through to pool scan — override is stale
+      // Safety: if the override points to an already-resolved OR precluded
+      // storylet, fall through to pool scan. Preclusion check mirrors pool
+      // scan (line 239) — a choice that precludes a storylet must do so
+      // whether it lands via chain or pool.
+      if (
+        resolvedKeys.has(prog.next_key_override) ||
+        precludedKeys.has(prog.next_key_override)
+      ) {
+        // Fall through to pool scan — override is stale or precluded
       } else {
         const overrideStorylet = trackStorylets.find(
           (s) => s.storylet_key === prog.next_key_override
