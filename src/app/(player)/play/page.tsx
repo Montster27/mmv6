@@ -3719,21 +3719,28 @@ export default function PlayPage() {
 
                   {/* Global mini-game overlay — shows on top of arc beats when active */}
                   {activeMiniGame?.previewOnly && (
-                    <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-3">
-                      <div>
-                        <h3 className="font-heading text-xl font-semibold text-primary">
-                          Dorm Phone Relay Preview
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Temporary dev launcher. This preview is not wired to story content yet.
-                        </p>
+                    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/55 p-4 backdrop-blur-[2px] md:p-8">
+                      <div className="mx-auto mt-6 w-full max-w-6xl rounded-2xl border border-border bg-card p-4 shadow-2xl md:mt-10 md:p-6">
+                        <div className="mb-4 flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="font-heading text-xl font-semibold text-primary">
+                              Dorm Phone Relay Preview
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              Temporary dev launcher. This preview is not wired to story content yet.
+                            </p>
+                          </div>
+                          <Button variant="ghost" onClick={handleMiniGameCancel}>
+                            Close
+                          </Button>
+                        </div>
+                        <MiniGameShell
+                          gameType={activeMiniGame.type}
+                          config={activeMiniGame.config}
+                          onComplete={handleMiniGameComplete}
+                          onCancel={handleMiniGameCancel}
+                        />
                       </div>
-                      <MiniGameShell
-                        gameType={activeMiniGame.type}
-                        config={activeMiniGame.config}
-                        onComplete={handleMiniGameComplete}
-                        onCancel={handleMiniGameCancel}
-                      />
                     </div>
                   )}
                   {activeMiniGame && activeMiniGame.pendingTrackStorylet && (
