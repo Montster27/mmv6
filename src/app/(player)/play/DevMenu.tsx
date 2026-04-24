@@ -54,6 +54,7 @@ type Props = {
   onAdvanceDay: (userId: string) => void;
   onResetAccount: (userId: string) => void;
   onToggleAdmin: (userId: string, next: boolean) => void;
+  onLaunchPhoneRelayPreview?: () => void;
   onFlagsChanged?: () => void;
   relationshipDebugEnabled?: boolean;
   relDebugEvents?: Array<{
@@ -140,6 +141,7 @@ export default function DevMenu({
   onAdvanceDay,
   onResetAccount,
   onToggleAdmin,
+  onLaunchPhoneRelayPreview,
   onFlagsChanged,
   relationshipDebugEnabled = false,
   relDebugEvents = [],
@@ -271,6 +273,19 @@ export default function DevMenu({
       <p className="text-sm text-slate-600">
         Reset accounts or advance the day for testing.
       </p>
+      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="font-medium">Mini-games</p>
+            <p className="text-xs text-slate-500">
+              Temporary launch points before story content is wired.
+            </p>
+          </div>
+          <Button variant="secondary" onClick={() => onLaunchPhoneRelayPreview?.()}>
+            Open Dorm Phone Relay
+          </Button>
+        </div>
+      </div>
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 space-y-2">
         <div className="flex items-center justify-between gap-2">
           <span>Test mode (your account).</span>

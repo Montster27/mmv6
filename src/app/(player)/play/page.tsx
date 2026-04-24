@@ -315,6 +315,7 @@ export default function PlayPage() {
     choiceId: string;
     sourceKey: string;
     config?: Record<string, unknown>;
+    previewOnly?: boolean;
     /** When the mini-game was triggered from a track storylet, store it to resume. */
     pendingTrackStorylet?: { storylet: TrackStorylet; option: StoryletChoice };
   } | null>(null);
@@ -2258,6 +2259,16 @@ export default function PlayPage() {
   const handleMiniGameComplete = useCallback(
     (result: MiniGameResult) => {
       if (!activeMiniGame) return;
+      if (activeMiniGame.previewOnly) {
+        setActiveMiniGame(null);
+        toast(
+          result.won
+            ? `Dorm Phone Relay complete. Score ${result.score}.`
+            : `Dorm Phone Relay ended. Score ${result.score}.`,
+          { duration: 4000 }
+        );
+        return;
+      }
       pendingMiniGameResolutionRef.current = {
         sourceKey: activeMiniGame.sourceKey,
         result,
@@ -2281,11 +2292,34 @@ export default function PlayPage() {
     if (!activeMiniGame) return;
     const pending = activeMiniGame.pendingTrackStorylet;
     setActiveMiniGame(null);
-    if (!pending) {
+    if (!pending && !activeMiniGame.previewOnly) {
       setSelectedChoiceId(null);
       setPendingAdvanceTarget(null);
     }
   }, [activeMiniGame]);
+
+  const handleLaunchPhoneRelayPreview = useCallback(() => {
+    pendingMiniGameResolutionRef.current = null;
+    setActiveMiniGame({
+      type: "phoneRelay",
+      choiceId: "__dev_phone_relay_preview__",
+      sourceKey: "__dev_phone_relay_preview__",
+      previewOnly: true,
+      config: {
+        hooks: {
+          onSuccess: {
+            chance: 1,
+            storyletHookText: "You handled that call well. People noticed.",
+          },
+          onMistake: {
+            chance: 1,
+            anomalyText:
+              "The wrong person insists the hall phone never rang at all.",
+          },
+        },
+      },
+    });
+  }, []);
 
   const handleReactionContinue = () => {
     setPendingReactionText(null);
@@ -3143,6 +3177,7 @@ export default function PlayPage() {
               onAdvanceDay={handleAdvanceDay}
               onResetAccount={handleResetAccount}
               onToggleAdmin={handleToggleAdmin}
+              onLaunchPhoneRelayPreview={handleLaunchPhoneRelayPreview}
               onFlagsChanged={() => setFeatureFlagsVersion((v) => v + 1)}
               relationshipDebugEnabled={relationshipDebugEnabled}
               relDebugEvents={relDebugEvents}
