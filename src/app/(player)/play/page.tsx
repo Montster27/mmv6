@@ -2300,6 +2300,7 @@ export default function PlayPage() {
 
   const handleLaunchPhoneRelayPreview = useCallback(() => {
     pendingMiniGameResolutionRef.current = null;
+    setShowDevMenu(false);
     setActiveMiniGame({
       type: "phoneRelay",
       choiceId: "__dev_phone_relay_preview__",
@@ -3717,6 +3718,24 @@ export default function PlayPage() {
                   )}
 
                   {/* Global mini-game overlay — shows on top of arc beats when active */}
+                  {activeMiniGame?.previewOnly && (
+                    <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-3">
+                      <div>
+                        <h3 className="font-heading text-xl font-semibold text-primary">
+                          Dorm Phone Relay Preview
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Temporary dev launcher. This preview is not wired to story content yet.
+                        </p>
+                      </div>
+                      <MiniGameShell
+                        gameType={activeMiniGame.type}
+                        config={activeMiniGame.config}
+                        onComplete={handleMiniGameComplete}
+                        onCancel={handleMiniGameCancel}
+                      />
+                    </div>
+                  )}
                   {activeMiniGame && activeMiniGame.pendingTrackStorylet && (
                     <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
                       <MiniGameShell
