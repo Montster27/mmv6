@@ -11,6 +11,7 @@ import {
 import { resourceLabel } from "@/core/resources/resourceMap";
 import type { ResourceKey } from "@/core/resources/resourceKeys";
 import { tickPracticeCredit } from "@/core/skills/practice";
+import { resolveChoiceOutcomeById } from "@/lib/minigames/resolveMiniGameChoice";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -57,7 +58,10 @@ export async function POST(request: Request) {
 
   const progressId = (payload as Record<string, unknown>).progress_id;
   const clientStoryletKey = (payload as Record<string, unknown>).storylet_key as string | undefined;
-  const { option_key } = payload as { option_key?: string };
+  const { option_key, forced_outcome_id } = payload as {
+    option_key?: string;
+    forced_outcome_id?: string;
+  };
 
   if (!progressId || !option_key) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -126,9 +130,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Option not found" }, { status: 400 });
   }
 
+  const resolvedForcedOutcome =
+    typeof forced_outcome_id === "string"
+      ? resolveChoiceOutcomeById(chosenOption as any, forced_outcome_id)
+      : undefined;
+  const effectiveChosenOption = resolvedForcedOutcome
+    ? { ...chosenOption, outcome: resolvedForcedOutcome }
+    : chosenOption;
+
   // --- 3. Validate resource gate (server-side) ---
   const snapshot = await getResourceSnapshot(supabaseServer as any, user.id, day_index);
-  const gate = checkResourceGate(snapshot, chosenOption);
+  const gate = checkResourceGate(snapshot, effectiveChosenOption);
   if (!gate.passed) {
     const label = gate.failedKey
       ? resourceLabel(gate.failedKey as ResourceKey)
@@ -146,7 +158,7 @@ export async function POST(request: Request) {
   // Handles: costs.resources, rewards.resources, energy_cost, outcome.deltas, costs_resource
   // Uses shared clamping (energy 0-100, stress 0-100, etc.)
   // Writes to player_day_state (canonical) + syncs energy/stress to daily_states
-  const rawDeltas = collectChoiceResourceDeltas(chosenOption);
+  const rawDeltas = collectChoiceResourceDeltas(effectiveChosenOption);
   let resourceResult: { deltas: Record<string, number> } | null = null;
 
   if (Object.keys(rawDeltas).length > 0) {

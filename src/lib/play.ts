@@ -17,6 +17,7 @@ import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
 import { applyResourceDelta } from "@/lib/resources";
 import type { CheckResult, CheckSkillLevels } from "@/types/checks";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { resolveChoiceOutcomeById } from "@/lib/minigames/resolveMiniGameChoice";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -577,6 +578,7 @@ export async function applyOutcomeForChoice(
     dayState?: { energy: number; stress: number } | null;
     skills?: CheckSkillLevels | null;
     posture?: string | null;
+    forcedOutcomeId?: string;
   }
 ): Promise<{
   nextDailyState: DailyState;
@@ -612,7 +614,16 @@ export async function applyOutcomeForChoice(
   let resolvedOutcomeAnomalies: string[] | undefined = choice?.outcome?.anomalies;
   let lastCheck: CheckResult | undefined;
 
-  if (!resolvedOutcome && choice?.check && choice?.outcomes && choice.outcomes.length > 0) {
+  if (!resolvedOutcome && choice?.outcomes?.length && options?.forcedOutcomeId) {
+    resolvedOutcome = resolveChoiceOutcomeById(choice, options.forcedOutcomeId);
+    resolvedOutcomeId = options.forcedOutcomeId;
+    resolvedOutcomeAnomalies = resolvedOutcome?.anomalies;
+  } else if (
+    !resolvedOutcome &&
+    choice?.check &&
+    choice?.outcomes &&
+    choice.outcomes.length > 0
+  ) {
     const featureFlags = getFeatureFlags();
     const skills = featureFlags.skills
       ? options?.skills ??

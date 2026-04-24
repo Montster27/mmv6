@@ -104,6 +104,10 @@ import { TesterOnly } from "@/components/ux/TesterOnly";
 import { gameMessage, testerMessage } from "@/lib/messages";
 import { getAppMode } from "@/lib/mode";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import {
+  getMiniGameOutcomeId,
+  resolveChoiceOutcomeById,
+} from "@/lib/minigames/resolveMiniGameChoice";
 import { useBootstrap } from "@/hooks/queries/useBootstrap";
 import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
@@ -134,6 +138,33 @@ const defaultAllocation: AllocationPayload = {
 
 const USE_DAILY_LOOP_ORCHESTRATOR = true;
 const BEAT_AUTO_ADVANCE_MS: number | null = null;
+
+type PendingMiniGameResolution = {
+  sourceKey: string;
+  result: MiniGameResult;
+};
+
+function buildStoryletMiniGameSourceKey(storyletId: string, choiceId: string) {
+  return `storylet:${storyletId}:${choiceId}`;
+}
+
+function buildTrackMiniGameSourceKey(progressId: string, optionId: string) {
+  return `track:${progressId}:${optionId}`;
+}
+
+function appendMiniGameHookText(
+  baseText: string | null,
+  result: MiniGameResult | null
+) {
+  const extras = [
+    result?.meta?.storyletHookText,
+    result?.meta?.anomalyText,
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+  if (extras.length === 0) return baseText;
+  if (!baseText || baseText.trim().length === 0) return extras.join("\n\n");
+  return `${baseText}\n\n${extras.join("\n\n")}`;
+}
 
 export default function PlayPage() {
   const session = useSession();
@@ -282,6 +313,7 @@ export default function PlayPage() {
   const [activeMiniGame, setActiveMiniGame] = useState<{
     type: MiniGameType;
     choiceId: string;
+    sourceKey: string;
     config?: Record<string, unknown>;
     /** When the mini-game was triggered from a track storylet, store it to resume. */
     pendingTrackStorylet?: { storylet: TrackStorylet; option: StoryletChoice };
@@ -449,6 +481,9 @@ export default function PlayPage() {
   const lastRunDayIndexRef = useRef<number | null>(null);
   const funPulseShownTracked = useRef(false);
   const pendingTransitionRef = useRef<(() => void) | null>(null);
+  const pendingMiniGameResolutionRef = useRef<PendingMiniGameResolution | null>(
+    null
+  );
 
   const dayIndex = useMemo(
     () => dailyState?.day_index ?? dayIndexState,
@@ -1729,6 +1764,16 @@ export default function PlayPage() {
     const selectedChoice = toChoices(currentStorylet).find(
       (choice) => choice.id === choiceId
     );
+    const miniGameSourceKey = buildStoryletMiniGameSourceKey(
+      currentStorylet.id,
+      choiceId
+    );
+    const pendingMiniGameResolution = pendingMiniGameResolutionRef.current;
+    const pendingMiniGameResult =
+      selectedChoice?.mini_game &&
+      pendingMiniGameResolution?.sourceKey === miniGameSourceKey
+        ? pendingMiniGameResolution.result
+        : null;
     setSelectedChoiceId(choiceId);
     setPendingAdvanceTarget(selectedChoice?.targetStoryletId ?? null);
 
@@ -1736,10 +1781,11 @@ export default function PlayPage() {
     // If this choice triggers a mini-game, show it instead of resolving now.
     // The game's onComplete callback will call handleMiniGameComplete which
     // re-enters handleChoice logic with the game result already captured.
-    if (selectedChoice?.mini_game && !activeMiniGame) {
+    if (selectedChoice?.mini_game && !pendingMiniGameResult && !activeMiniGame) {
       setActiveMiniGame({
         type: selectedChoice.mini_game.type,
         choiceId,
+        sourceKey: miniGameSourceKey,
         config: selectedChoice.mini_game.config,
       });
       return; // wait for game to finish
@@ -1835,8 +1881,9 @@ export default function PlayPage() {
               dayState,
               posture: posture?.posture ?? null,
               skills: featureFlags.skills ? skills ?? undefined : undefined,
-    }
-  );
+              forcedOutcomeId: getMiniGameOutcomeId(pendingMiniGameResult),
+            }
+          );
 
         setDailyState(nextDailyState);
         if (dayState) {
@@ -1898,9 +1945,12 @@ export default function PlayPage() {
             appliedDeltas.resources &&
               Object.keys(appliedDeltas.resources).length > 0
           );
-        beatFallbackMessage = appliedMessage ?? null;
+        beatFallbackMessage = appendMiniGameHookText(
+          appliedMessage ?? null,
+          pendingMiniGameResult
+        );
         setOutcomeMessage(
-          appliedMessage || (hasDeltas ? "Choice recorded." : null)
+          beatFallbackMessage || (hasDeltas ? "Choice recorded." : null)
         );
         setOutcomeDeltas(hasDeltas ? appliedDeltas : null);
         if (resolvedCheck) {
@@ -1915,14 +1965,19 @@ export default function PlayPage() {
             })
           );
         }
-        if (resolvedOutcomeAnomalies?.length) {
+        const miniGameAnomalies = pendingMiniGameResult?.meta?.anomalyIds ?? [];
+        const combinedAnomalies = [
+          ...(resolvedOutcomeAnomalies ?? []),
+          ...miniGameAnomalies,
+        ];
+        if (combinedAnomalies.length) {
           await awardAnomalies({
             userId,
-            anomalyIds: resolvedOutcomeAnomalies,
+            anomalyIds: combinedAnomalies,
             dayIndex,
             source: currentStorylet.slug ?? currentStorylet.id,
           });
-          resolvedOutcomeAnomalies.forEach((anomalyId) => {
+          combinedAnomalies.forEach((anomalyId) => {
             trackWithSeason({
               event_type: "anomaly_discovered",
               day_index: dayIndex,
@@ -2023,10 +2078,13 @@ export default function PlayPage() {
       }
 
       const reactionText =
-        typeof resolvedReactionText === "string" &&
-        resolvedReactionText.trim().length > 0
-          ? resolvedReactionText.trim()
-          : null;
+        appendMiniGameHookText(
+          typeof resolvedReactionText === "string" &&
+            resolvedReactionText.trim().length > 0
+            ? resolvedReactionText.trim()
+            : null,
+          pendingMiniGameResult
+        );
       const beatText =
         reactionText ??
         (beatBufferEnabled && beatFallbackMessage ? beatFallbackMessage : null);
@@ -2082,6 +2140,7 @@ export default function PlayPage() {
         ...mapLegacyNpcKnowledge(selectedChoice?.set_npc_memory),
         ...mapLegacyRelationalEffects(matchedCondition?.relational_effects),
         ...mapLegacyNpcKnowledge(matchedCondition?.set_npc_memory),
+        ...((pendingMiniGameResult?.meta?.relationshipEvents ?? []) as RelationshipEvent[]),
       ] as any;
       if (relationshipEvents.length > 0) {
         const { next: nextRelationships, logs } = applyRelationshipEvents(
@@ -2150,6 +2209,10 @@ export default function PlayPage() {
         }
       }
 
+      if (pendingMiniGameResult) {
+        pendingMiniGameResolutionRef.current = null;
+      }
+
       // Wire skill_modifier → skillFlags
       const skillModifier = selectedChoice?.skill_modifier as string | undefined;
       if (skillModifier && chapterOneState?.skillFlags) {
@@ -2195,23 +2258,34 @@ export default function PlayPage() {
   const handleMiniGameComplete = useCallback(
     (result: MiniGameResult) => {
       if (!activeMiniGame) return;
+      pendingMiniGameResolutionRef.current = {
+        sourceKey: activeMiniGame.sourceKey,
+        result,
+      };
       const pending = activeMiniGame.pendingTrackStorylet;
       const { choiceId } = activeMiniGame;
 
       if (pending && trackStoryletChoiceRef.current) {
-        // Track storylet path: keep activeMiniGame set (overlay stays up) while
-        // the resolve API call is in progress. handleTrackStoryletChoice will
-        // clear it once the call completes, so both state changes land in the
-        // same React batch — no flash of the un-resolved card in between.
+        setActiveMiniGame(null);
         trackStoryletChoiceRef.current(pending.storylet, pending.option);
       } else {
-        // Legacy storylet path: clear overlay then re-invoke handleChoice.
         setActiveMiniGame(null);
         handleChoice(choiceId);
       }
     },
     [activeMiniGame]
   );
+
+  const handleMiniGameCancel = useCallback(() => {
+    pendingMiniGameResolutionRef.current = null;
+    if (!activeMiniGame) return;
+    const pending = activeMiniGame.pendingTrackStorylet;
+    setActiveMiniGame(null);
+    if (!pending) {
+      setSelectedChoiceId(null);
+      setPendingAdvanceTarget(null);
+    }
+  }, [activeMiniGame]);
 
   const handleReactionContinue = () => {
     setPendingReactionText(null);
@@ -2346,11 +2420,24 @@ export default function PlayPage() {
 
   const handleTrackStoryletChoice = useCallback(
     async (beat: TrackStorylet, option: StoryletChoice) => {
+      const miniGameSourceKey = buildTrackMiniGameSourceKey(
+        beat.progress_id,
+        option.id
+      );
+      const pendingMiniGameResolution = pendingMiniGameResolutionRef.current;
+      const pendingMiniGameResult =
+        option.mini_game &&
+        pendingMiniGameResolution?.sourceKey === miniGameSourceKey
+          ? pendingMiniGameResolution.result
+          : null;
+      const forcedOutcomeId = getMiniGameOutcomeId(pendingMiniGameResult);
+
       // ── Mini-game intercept for track storylets ─────────────────────────
-      if (option.mini_game && !activeMiniGame) {
+      if (option.mini_game && !pendingMiniGameResult && !activeMiniGame) {
         setActiveMiniGame({
           type: option.mini_game.type,
           choiceId: option.id,
+          sourceKey: miniGameSourceKey,
           config: option.mini_game.config,
           pendingTrackStorylet: { storylet: beat, option },
         });
@@ -2372,6 +2459,7 @@ export default function PlayPage() {
           progress_id: beat.progress_id,
           storylet_key: beat.storylet_key,
           option_key: option.id,
+          forced_outcome_id: forcedOutcomeId,
         }),
       });
       if (!res.ok) {
@@ -2392,7 +2480,12 @@ export default function PlayPage() {
       // --- Resolve conditional reaction text (e.g. money_band conditions) ---
       // Computed BEFORE the optimistic UI flip so the outcome card opens with
       // the correct reaction text instead of rendering empty and patching in.
-      let resolvedOption = option;
+      const resolvedOutcome =
+        resolveChoiceOutcomeById(option, forcedOutcomeId) ?? option.outcome;
+      let resolvedOption: StoryletChoice = {
+        ...option,
+        outcome: resolvedOutcome,
+      };
       const conditions = option.reaction_text_conditions;
       if (
         conditions &&
@@ -2425,13 +2518,38 @@ export default function PlayPage() {
           }
         }
       }
+      if (
+        (!resolvedOption.reaction_text || resolvedOption.reaction_text.trim() === "") &&
+        resolvedOutcome?.text
+      ) {
+        resolvedOption = {
+          ...resolvedOption,
+          reaction_text: resolvedOutcome.text,
+        };
+      }
+      const resolvedReactionText = appendMiniGameHookText(
+        resolvedOption.reaction_text?.trim() ?? null,
+        pendingMiniGameResult
+      );
+      if (resolvedReactionText) {
+        resolvedOption = {
+          ...resolvedOption,
+          reaction_text: resolvedReactionText,
+        };
+      }
 
       // ── Optimistic UI flip — happen NOW (pre-relationship network) ──────
       // Gate 0 playtest: clicks felt 1–2s laggy because the outcome card was
       // gated behind the `updateRelationships` round-trip. Relationship
       // writes are non-fatal and best-effort, so we surface the outcome
       // first and persist relationships in the background.
-      const outcomeDeltas = (option.outcome as { deltas?: { energy?: number; stress?: number; resources?: Record<string, number> } } | undefined)?.deltas;
+      const outcomeDeltas = (resolvedOption.outcome as {
+        deltas?: {
+          energy?: number;
+          stress?: number;
+          resources?: Record<string, number>;
+        };
+      } | undefined)?.deltas;
       if (outcomeDeltas && dayState) {
         const nextEnergy =
           typeof outcomeDeltas.energy === "number"
@@ -2461,8 +2579,20 @@ export default function PlayPage() {
       // Keep this beat visible until the user dismisses it via the Continue button.
       // Also clear the mini-game overlay here (if active) so both state changes
       // land in the same React batch — prevents the un-resolved card flashing back.
-      setActiveMiniGame(null);
       setPendingDismissalBeats((prev) => [...prev, { beat, chosenOption: resolvedOption }]);
+
+      const anomalyIds = [
+        ...((resolvedOption.outcome?.anomalies ?? []) as string[]),
+        ...((pendingMiniGameResult?.meta?.anomalyIds ?? []) as string[]),
+      ];
+      if (userId && anomalyIds.length > 0) {
+        await awardAnomalies({
+          userId,
+          anomalyIds,
+          dayIndex,
+          source: beat.track_key,
+        });
+      }
 
       // --- Apply relationship events (backgrounded; UI already flipped) ---
       if (userId) {
@@ -2475,6 +2605,7 @@ export default function PlayPage() {
           ...((option.events_emitted ?? []) as any),
           ...mapLegacyRelationalEffects(option.relational_effects),
           ...mapLegacyNpcKnowledge(option.set_npc_memory),
+          ...((pendingMiniGameResult?.meta?.relationshipEvents ?? []) as RelationshipEvent[]),
         ] as any;
 
         if (relationshipEvents.length > 0) {
@@ -2546,6 +2677,9 @@ export default function PlayPage() {
             console.error("Failed to mark daily complete after arc beats", e);
           }
         }
+      }
+      if (pendingMiniGameResult) {
+        pendingMiniGameResolutionRef.current = null;
       }
       } catch (e) {
         console.error("[track-storylet-choice]", e);
@@ -3352,6 +3486,7 @@ export default function PlayPage() {
                                         gameType={activeMiniGame.type}
                                         config={activeMiniGame.config}
                                         onComplete={handleMiniGameComplete}
+                                        onCancel={handleMiniGameCancel}
                                       />
                                     </div>
                                   )}
@@ -3553,6 +3688,7 @@ export default function PlayPage() {
                         gameType={activeMiniGame.type}
                         config={activeMiniGame.config}
                         onComplete={handleMiniGameComplete}
+                        onCancel={handleMiniGameCancel}
                       />
                     </div>
                   )}

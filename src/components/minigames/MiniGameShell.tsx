@@ -11,6 +11,9 @@ import type { MiniGameType, MiniGameResult } from "@/types/storylets";
 const SnakeGame = dynamic(() => import("./SnakeGame"), { ssr: false });
 const CapsGame = dynamic(() => import("./CapsGame"), { ssr: false });
 const MemoryCardGame = dynamic(() => import("./MemoryCardGame"), { ssr: false });
+const DormPhoneRelayGame = dynamic(() => import("./DormPhoneRelayGame"), {
+  ssr: false,
+});
 
 // ---------------------------------------------------------------------------
 // Difficulty tracker — session-level adaptive difficulty
@@ -100,6 +103,7 @@ export default function MiniGameShell({
     snake: "ARCADE — SERPENT",
     caps: "CAPS",
     memory: "MEMORY MATCH",
+    phoneRelay: "DORM PHONE RELAY",
   };
 
   return (
@@ -147,6 +151,13 @@ export default function MiniGameShell({
         )}
         {gameType === "memory" && (
           <MemoryCardGame
+            onComplete={handleComplete}
+            difficulty={difficulty}
+            config={config}
+          />
+        )}
+        {gameType === "phoneRelay" && (
+          <DormPhoneRelayGame
             onComplete={handleComplete}
             difficulty={difficulty}
             config={config}

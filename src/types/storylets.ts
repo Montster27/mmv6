@@ -1,12 +1,21 @@
 import type { ResourceKey } from "@/core/resources/resourceKeys";
+import type { RelationshipEvent } from "@/lib/relationships";
 
 // ── Mini-game types ──────────────────────────────────────────────────────────
 
-export type MiniGameType = "snake" | "caps" | "memory";
+export type MiniGameType = "snake" | "caps" | "memory" | "phoneRelay";
 
 export type MiniGameResult = {
   won: boolean;
   score: number;
+  meta?: {
+    forcedOutcomeId?: "success" | "failure";
+    relationshipEvents?: RelationshipEvent[];
+    anomalyIds?: string[];
+    storyletHookText?: string;
+    anomalyText?: string;
+    [key: string]: unknown;
+  };
 };
 
 /** Props contract every mini-game component must accept. */
