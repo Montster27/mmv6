@@ -27,6 +27,7 @@ export default function WelcomePage() {
   const [confirmNewGame, setConfirmNewGame] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFriction, setShowFriction] = useState(false);
 
   useEffect(() => {
     async function checkGameState() {
@@ -97,6 +98,49 @@ export default function WelcomePage() {
   }
 
   if (status === "no_game") {
+    if (showFriction) {
+      return (
+        <div className="mx-auto max-w-[640px] px-5 pt-16 pb-24 narrative-enter">
+          <p className="prep-label mb-6 text-center">Before you begin</p>
+          <div className="font-body text-foreground/85 text-[15px] leading-[1.85] space-y-5 mb-10">
+            <p>
+              This game is set in 1983. The people in it talk the way people talked in 1983.
+            </p>
+            <p>
+              Some of what they say was common then and is understood as harmful now. Casual slurs,
+              unexamined assumptions about women, about race, about who belongs and who doesn&apos;t —
+              these were the water we swam in. Most of us didn&apos;t think about it. Some of us were
+              hurt by it. Some of us did the hurting without knowing. Many of us were both.
+            </p>
+            <p>
+              The game does not look away from this. You will hear these things said by people who
+              are not villains — people who are generous, funny, and kind in other ways. You will
+              have choices about how to respond. Those choices will matter, in ways that unfold over
+              time.
+            </p>
+            <p>
+              Right now, you experience the game from a specific perspective. As the story moves
+              forward through the decades and the system grows, you will be able to shape who you
+              are — your identity, your background, your starting point. The friction will feel
+              different depending on who you choose to be.
+            </p>
+            <p>
+              Nothing in this game is an endorsement. Everything in it is an invitation to notice
+              what you notice, and to sit with what that means.
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <Button size="lg" onClick={handleNewGame} disabled={resetting}>
+              {resetting ? "Starting…" : "Begin"}
+            </Button>
+          </div>
+          {error && (
+            <p className="mt-4 text-sm text-destructive font-body text-center">{error}</p>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="mx-auto max-w-[620px] px-5 pt-16 pb-24 text-center narrative-enter">
         <p className="prep-label mb-3">Fall 1983 · Harwick University</p>
@@ -108,8 +152,8 @@ export default function WelcomePage() {
           future you can almost remember, you are older — and someone is dialing a payphone. Not yet.
           First: get through the week. Pick your major. Figure out what it costs to be anyone in particular.
         </p>
-        <Button size="lg" onClick={handleNewGame} disabled={resetting}>
-          {resetting ? "Starting…" : "Begin, September 4th →"}
+        <Button size="lg" onClick={() => setShowFriction(true)} disabled={resetting}>
+          Begin, September 4th →
         </Button>
         {error && <p className="mt-4 text-sm text-destructive font-body">{error}</p>}
       </div>
