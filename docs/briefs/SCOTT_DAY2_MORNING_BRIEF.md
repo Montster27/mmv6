@@ -247,7 +247,14 @@ The Pretenders tape is on his desk. He's rewound it to the beginning.
     },
     "events_emitted": [
       { "npc_id": "npc_roommate_scott", "type": "DEFERRED_TENSION", "magnitude": 0.5 }
-    ]
+    ],
+    "conditional_events": {
+      "if_flag": "was_brief",
+      "then": [
+        { "npc_id": "npc_roommate_scott", "type": "DEFERRED_TENSION", "magnitude": 0.5 }
+      ],
+      "else": []
+    }
   },
   {
     "id": "read_note_leave",
@@ -310,7 +317,15 @@ can converge to set a single `scott_engaged` flag that the terminal checks.
 engage micro-choices. Terminal checks for that one flag. This is the
 recommended approach if `any` mode isn't in the engine.
 
-### 3. The `read_scotts_note` flag
+### 3. Conditional events_emitted
+
+`head_out_alone` has different events depending on whether the player
+was brief or just took the absent path. If conditional events aren't
+supported, the simplest fix: emit `DEFERRED_TENSION` always on this
+choice at magnitude 0.5. The absent-path player gets it too, which is
+appropriate — they deferred by never being in the room at the same time.
+
+### 4. The `read_scotts_note` flag
 
 This is a **persistent flag** (not a walk flag). It should survive past
 this storylet, stored in `choice_log` as a `FLAG_SET` event. A future
@@ -318,10 +333,12 @@ roommate storylet (Day 4-5 range) will check for it — the player can
 reference the note to Scott in a later conversation. That callback
 storylet is a separate content task.
 
-### 4. Preamble / Body Text
+### 5. Preamble / Body Text
 
 The body (preamble) field on the storylet row should be **empty or minimal**.
-All the opening text is in the entry nodes. Set body to something like:
+All the opening text is in the entry nodes. The preamble was traditionally
+the non-interactive text before choices, but with conversational nodes,
+the nodes carry the prose. Set body to something like:
 
 ```
 Room 214. Morning light through the window your roommate's desk sits under.
@@ -364,6 +381,11 @@ Player sees both. If they pick Scott, the belonging beat queues for next
 load or expires. If they pick belonging, Scott's storylet persists
 (expires_after_days: 7) and can fire on Day 3 morning instead.
 
+**This is the roommate track's permanent tension:** Scott is always
+there, always available, never urgent. The floor and the campus are
+louder. The player who prioritizes proximity over novelty is making
+a real choice that compounds.
+
 ---
 
 ## System Effects Summary
@@ -385,6 +407,8 @@ load or expires. If they pick belonging, Scott's storylet persists
 - Scott is already introduced via `room_214` (`introduces_npc`). No
   introduction needed here. Name renders normally.
 - No new NPCs introduced in this storylet.
+- **NPC name discipline:** Scott's name appears in body text and node
+  dialogue. This is correct — `knows_name` is already true from Day 0.
 
 ---
 
