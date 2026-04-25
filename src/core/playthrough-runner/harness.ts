@@ -417,6 +417,36 @@ export class PlaythroughHarness {
         .eq("user_id", this.userId);
     }
 
+    // Apply period_stance: bump counter on daily_states + log temporal event
+    // Mirrors the render-time write path in src/app/(player)/play/page.tsx so
+    // harness-driven tests exercise the same surface the UI does.
+    if (micro.period_stance) {
+      const tag = micro.period_stance;
+      const { data: daily } = await db
+        .from("daily_states")
+        .select("period_stance_state")
+        .eq("user_id", this.userId)
+        .maybeSingle();
+      const current =
+        (daily?.period_stance_state as Record<string, number>) ?? {};
+      const next = { ...current, [tag]: (current[tag] ?? 0) + 1 };
+      await db
+        .from("daily_states")
+        .update({
+          period_stance_state: next,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", this.userId);
+      await db.from("choice_log").insert({
+        user_id: this.userId,
+        day: this.dayIndex,
+        event_type: "PERIOD_STANCE",
+        option_key: tag,
+        step_key: ws.storyletKey,
+        meta: { node_id: nodeId, micro_choice_id: microChoiceId },
+      });
+    }
+
     // Navigate to next
     const dest = micro.next;
     if (dest === "choices" || dest === "exit") {
@@ -670,6 +700,81 @@ export class PlaythroughHarness {
   }
 
   /**
+   * Write identity attributes to the characters row. Any omitted attribute is
+   * left at its current value (or DB default if the row is fresh).
+   * Upserts to tolerate the seed path, which does not create a characters row.
+   */
+  async setIdentity(identity: {
+    race?: string;
+    gender?: string;
+    sexuality?: string;
+  }): Promise<void> {
+    const patch: Record<string, string> = {};
+    if (identity.race !== undefined) patch.identity_race = identity.race;
+    if (identity.gender !== undefined) patch.identity_gender = identity.gender;
+    if (identity.sexuality !== undefined) {
+      patch.identity_sexuality = identity.sexuality;
+    }
+
+    const { data: existing } = await db
+      .from("characters")
+      .select("id")
+      .eq("user_id", this.userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      await db
+        .from("characters")
+        .update(patch)
+        .eq("user_id", this.userId);
+    } else {
+      await db
+        .from("characters")
+        .insert({ user_id: this.userId, name: null, ...patch });
+    }
+  }
+
+  /**
+   * Read the counter for a single period_stance tag from daily_states.
+   * Mirrors periodStanceCount() but sourced from DB, not an in-memory state.
+   */
+  async getPeriodStanceCount(
+    tag: "challenged" | "deflected" | "absorbed"
+  ): Promise<number> {
+    const { data } = await db
+      .from("daily_states")
+      .select("period_stance_state")
+      .eq("user_id", this.userId)
+      .maybeSingle();
+    const state =
+      (data?.period_stance_state as Record<string, number>) ?? {};
+    return state[tag] ?? 0;
+  }
+
+  /**
+   * Read the most recent PERIOD_STANCE choice_log event for this user.
+   * Returns null if no such event has ever been logged.
+   */
+  async getPriorPeriodStance(): Promise<
+    "challenged" | "deflected" | "absorbed" | null
+  > {
+    const { data } = await db
+      .from("choice_log")
+      .select("option_key")
+      .eq("user_id", this.userId)
+      .eq("event_type", "PERIOD_STANCE")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const raw = data?.option_key;
+    if (raw === "challenged" || raw === "deflected" || raw === "absorbed") {
+      return raw;
+    }
+    return null;
+  }
+
+  /**
    * Get track_progress for a given track key. Used by executor for context.
    */
   async getTrackProgress(
@@ -704,6 +809,7 @@ export class PlaythroughHarness {
       stress: 0,
       vectors: {},
       life_pressure_state: {},
+      period_stance_state: {},
       energy_level: "high",
       money_band: "okay",
       skill_flags: {},

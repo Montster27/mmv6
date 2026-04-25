@@ -63,6 +63,7 @@ import {
 import type { DailyState } from "../src/types/daily";
 import type { Storylet, StoryletRun } from "../src/types/storylets";
 import type { RelationshipState } from "../src/lib/relationships";
+import { flattenAllEvents } from "../src/lib/eventsEmitted";
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
 
@@ -419,12 +420,10 @@ async function simulateDay(
       await saveRun(db, userId, storylet.id, dayIndex, choice.id);
     }
 
-    // Collect NPC events from this choice
-    const eventsFromField = (choice.events_emitted ?? []) as Array<{
-      npc_id: string;
-      type: string;
-      magnitude?: number;
-    }>;
+    // Collect NPC events from this choice. Flatten both flat and grouped
+    // forms so the simulator exercises every possible relationship edge,
+    // not just the walk-flag-matched subset.
+    const eventsFromField = flattenAllEvents(choice.events_emitted);
     const legacyRelEvents = choice.relational_effects
       ? mapLegacyRelationalEffects(choice.relational_effects)
       : [];

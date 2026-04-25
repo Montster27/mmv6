@@ -9,6 +9,7 @@ import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 import { DialogueNodeView } from "@/components/play/DialogueNodeView";
 import { Button } from "@/components/ui/button";
 import { resolveNpcTokens, type RelationshipState } from "@/lib/relationships";
+import type { PlayerContext } from "@/lib/nodeConditions";
 
 type MoneyBand = "tight" | "okay" | "comfortable";
 
@@ -30,7 +31,11 @@ type ResourceSnapshot = {
 type TrackStoryletCardProps = {
   storylet: TrackStorylet;
   dayIndex: number;
-  onChoice: (storylet: TrackStorylet, option: StoryletChoice) => Promise<void>;
+  onChoice: (
+    storylet: TrackStorylet,
+    option: StoryletChoice,
+    activeFlags: Set<string>
+  ) => Promise<void>;
   disabled?: boolean;
   onDismiss?: () => void;
   dismissLabel?: string;
@@ -38,6 +43,15 @@ type TrackStoryletCardProps = {
   moneyBand?: MoneyBand | null;
   relationships?: Record<string, RelationshipState> | null;
   resources?: ResourceSnapshot | null;
+  /** Player identity + period-stance state, forwarded to DialogueNodeView. */
+  playerContext?: PlayerContext;
+  /** Forwarded to DialogueNodeView to propagate micro-choice effects. */
+  onMicroEffects?: (effects: {
+    set_npc_memory?: Record<string, Record<string, boolean>>;
+    relational_effect?: Record<string, Record<string, number>>;
+    identity_tags?: string[];
+    period_stance?: "challenged" | "deflected" | "absorbed";
+  }) => void;
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -125,7 +139,7 @@ function meetsMoneyRequirement(
   return playerRank >= requiredRank;
 }
 
-export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDismiss, dismissLabel, resolvedOption, moneyBand, relationships, resources }: TrackStoryletCardProps) {
+export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDismiss, dismissLabel, resolvedOption, moneyBand, relationships, resources, playerContext, onMicroEffects }: TrackStoryletCardProps) {
   const [choosing, setChoosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,12 +155,15 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
   const trackLabel = TRACK_LABELS[storylet.track_key as TrackKey] ?? storylet.track_key;
   const daysLeft = storylet.expires_on_day - dayIndex;
 
-  async function handleChoice(option: StoryletChoice) {
+  async function handleChoice(
+    option: StoryletChoice,
+    activeFlags: Set<string> = new Set()
+  ) {
     if (choosing || resolvedOption) return;
     setChoosing(true);
     setError(null);
     try {
-      await onChoice(storylet, option);
+      await onChoice(storylet, option, activeFlags);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -178,11 +195,13 @@ export function TrackStoryletCard({ storylet, dayIndex, onChoice, disabled, onDi
             preamble={resolve(storylet.body)}
             nodes={storylet.nodes}
             choices={storylet.options}
-            onChoice={(choiceId) => {
+            onChoice={(choiceId, activeFlags) => {
               const option = storylet.options.find((o) => o.id === choiceId);
-              if (option) handleChoice(option);
+              if (option) handleChoice(option, activeFlags);
             }}
+            onMicroEffects={onMicroEffects}
             relationships={relationships as Record<string, Record<string, unknown>> | null}
+            playerContext={playerContext}
             disabled={choosing || disabled}
           />
         ) : (

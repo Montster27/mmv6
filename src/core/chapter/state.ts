@@ -6,6 +6,8 @@ import type {
   LifePressureState,
   MoneyBand,
   NpcMemory,
+  PeriodStanceState,
+  PeriodStanceTag,
   SkillFlags,
   RelationshipState,
 } from "@/core/chapter/types";
@@ -19,6 +21,25 @@ const DEFAULT_LIFE_PRESSURE: LifePressureState = {
   confront: 0,
   avoid: 0,
 };
+
+const DEFAULT_PERIOD_STANCE: PeriodStanceState = {
+  challenged: 0,
+  deflected: 0,
+  absorbed: 0,
+};
+
+const PERIOD_STANCE_TAGS: readonly PeriodStanceTag[] = [
+  "challenged",
+  "deflected",
+  "absorbed",
+];
+
+function isPeriodStanceTag(value: unknown): value is PeriodStanceTag {
+  return (
+    typeof value === "string" &&
+    (PERIOD_STANCE_TAGS as readonly string[]).includes(value)
+  );
+}
 
 const DEFAULT_SKILL_FLAGS: SkillFlags = {
   studyDiscipline: 0,
@@ -60,6 +81,18 @@ function normalizeLifePressure(raw: unknown): LifePressureState {
     achievement: normalizeNumber(record.achievement),
     confront: normalizeNumber(record.confront),
     avoid: normalizeNumber(record.avoid),
+  };
+}
+
+function normalizePeriodStance(raw: unknown): PeriodStanceState {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ...DEFAULT_PERIOD_STANCE };
+  }
+  const record = raw as Record<string, unknown>;
+  return {
+    challenged: normalizeNumber(record.challenged),
+    deflected: normalizeNumber(record.deflected),
+    absorbed: normalizeNumber(record.absorbed),
   };
 }
 
@@ -151,6 +184,7 @@ export function getChapterOneState(dailyState: DailyState | null): ChapterOneSta
   const energy = typeof dailyState?.energy === "number" ? dailyState.energy : 100;
   return {
     lifePressureState: normalizeLifePressure(dailyState?.life_pressure_state),
+    periodStanceState: normalizePeriodStance(dailyState?.period_stance_state),
     energyLevel: normalizeEnergyLevel(
       dailyState?.energy_level ?? deriveEnergyLevel(energy)
     ),
@@ -177,6 +211,34 @@ export function bumpLifePressure(
     }
   });
   return next;
+}
+
+export function bumpPeriodStance(
+  current: PeriodStanceState,
+  tag: unknown
+): PeriodStanceState {
+  if (!isPeriodStanceTag(tag)) return current;
+  return { ...current, [tag]: (current[tag] ?? 0) + 1 };
+}
+
+export function periodStanceCount(
+  state: PeriodStanceState,
+  tag: PeriodStanceTag
+): number {
+  return state[tag] ?? 0;
+}
+
+export function getDominantPeriodStance(
+  state: PeriodStanceState
+): PeriodStanceTag | null {
+  const entries = PERIOD_STANCE_TAGS.map(
+    (tag) => [tag, state[tag] ?? 0] as const
+  );
+  const max = entries.reduce((acc, [, count]) => Math.max(acc, count), 0);
+  if (max === 0) return null;
+  const leaders = entries.filter(([, count]) => count === max);
+  if (leaders.length !== 1) return null;
+  return leaders[0][0];
 }
 
 const NPC_MEMORY_MAX = 10;

@@ -6,6 +6,20 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase/browser";
 import { useSession } from "@/contexts/SessionContext";
+import { fetchPlayerIdentity, saveCharacterIdentity } from "@/lib/playerIdentity";
+import {
+  DEFAULT_PLAYER_IDENTITY,
+  IDENTITY_GENDER_LABELS,
+  IDENTITY_GENDER_VALUES,
+  IDENTITY_RACE_LABELS,
+  IDENTITY_RACE_VALUES,
+  IDENTITY_SEXUALITY_LABELS,
+  IDENTITY_SEXUALITY_VALUES,
+  type IdentityGender,
+  type IdentityRace,
+  type IdentitySexuality,
+  type PlayerIdentity,
+} from "@/types/identity";
 
 type GameStatus = "loading" | "no_game" | "has_game";
 
@@ -28,14 +42,20 @@ export default function WelcomePage() {
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFriction, setShowFriction] = useState(false);
+  const [showIdentity, setShowIdentity] = useState(false);
+  const [identity, setIdentity] = useState<PlayerIdentity>(DEFAULT_PLAYER_IDENTITY);
 
   useEffect(() => {
     async function checkGameState() {
-      const { data } = await supabase
-        .from("daily_states")
-        .select("day_index,start_date,last_day_completed,energy,stress")
-        .eq("user_id", userId)
-        .maybeSingle();
+      const [{ data }, existingIdentity] = await Promise.all([
+        supabase
+          .from("daily_states")
+          .select("day_index,start_date,last_day_completed,energy,stress")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        fetchPlayerIdentity(userId),
+      ]);
+      setIdentity(existingIdentity);
 
       if (!data || !data.start_date) {
         setStatus("no_game");
@@ -76,6 +96,7 @@ export default function WelcomePage() {
     setResetting(true);
     setError(null);
     try {
+      await saveCharacterIdentity(userId, identity);
       const token = session.access_token;
       const res = await fetch("/api/run/reset", {
         method: "POST",
@@ -93,6 +114,92 @@ export default function WelcomePage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <p className="prep-label">Loading…</p>
+      </div>
+    );
+  }
+
+  if (showIdentity) {
+    return (
+      <div className="mx-auto max-w-[620px] px-5 pt-16 pb-24 narrative-enter">
+        <p className="prep-label mb-6 text-center">Who you are</p>
+        <div className="font-body text-foreground/85 text-[15px] leading-[1.85] space-y-4 mb-8">
+          <p>
+            This is fall 1983. Some details about who you are will shape how the world sees you
+            and how you experience it. You can leave anything unspecified — the game will treat
+            that as the default 1983 dorm experience.
+          </p>
+          <p className="text-foreground/60 text-[13px]">
+            These choices are locked once you begin. They will not change the shape of the story,
+            only how specific moments land.
+          </p>
+        </div>
+        <div className="space-y-5 mb-10">
+          <label className="block">
+            <span className="prep-label mb-2 block">Race</span>
+            <select
+              className="w-full rounded border border-foreground/20 bg-background px-3 py-2 font-body text-[15px] text-foreground focus:border-foreground/50 focus:outline-none"
+              value={identity.race}
+              onChange={(e) =>
+                setIdentity((prev) => ({
+                  ...prev,
+                  race: e.target.value as IdentityRace,
+                }))
+              }
+            >
+              {IDENTITY_RACE_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {IDENTITY_RACE_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="prep-label mb-2 block">Gender</span>
+            <select
+              className="w-full rounded border border-foreground/20 bg-background px-3 py-2 font-body text-[15px] text-foreground focus:border-foreground/50 focus:outline-none"
+              value={identity.gender}
+              onChange={(e) =>
+                setIdentity((prev) => ({
+                  ...prev,
+                  gender: e.target.value as IdentityGender,
+                }))
+              }
+            >
+              {IDENTITY_GENDER_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {IDENTITY_GENDER_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="prep-label mb-2 block">Sexuality</span>
+            <select
+              className="w-full rounded border border-foreground/20 bg-background px-3 py-2 font-body text-[15px] text-foreground focus:border-foreground/50 focus:outline-none"
+              value={identity.sexuality}
+              onChange={(e) =>
+                setIdentity((prev) => ({
+                  ...prev,
+                  sexuality: e.target.value as IdentitySexuality,
+                }))
+              }
+            >
+              {IDENTITY_SEXUALITY_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {IDENTITY_SEXUALITY_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="flex justify-center">
+          <Button size="lg" onClick={handleNewGame} disabled={resetting}>
+            {resetting ? "Starting…" : "Begin"}
+          </Button>
+        </div>
+        {error && (
+          <p className="mt-4 text-sm text-destructive font-body text-center">{error}</p>
+        )}
       </div>
     );
   }
@@ -130,13 +237,10 @@ export default function WelcomePage() {
             </p>
           </div>
           <div className="flex justify-center">
-            <Button size="lg" onClick={handleNewGame} disabled={resetting}>
-              {resetting ? "Starting…" : "Begin"}
+            <Button size="lg" onClick={() => setShowIdentity(true)} disabled={resetting}>
+              Continue →
             </Button>
           </div>
-          {error && (
-            <p className="mt-4 text-sm text-destructive font-body text-center">{error}</p>
-          )}
         </div>
       );
     }
@@ -182,10 +286,13 @@ export default function WelcomePage() {
           </Button>
           <Button
             variant="destructive"
-            onClick={handleNewGame}
+            onClick={() => {
+              setConfirmNewGame(false);
+              setShowIdentity(true);
+            }}
             disabled={resetting}
           >
-            {resetting ? "Resetting…" : "Yes, start over"}
+            Yes, start over
           </Button>
         </div>
         {error && <p className="mt-4 text-sm text-destructive font-body">{error}</p>}

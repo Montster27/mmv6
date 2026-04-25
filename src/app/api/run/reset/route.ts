@@ -94,6 +94,7 @@ export async function POST(request: Request) {
       stress: 0,
       vectors: {},
       life_pressure_state: {},
+      period_stance_state: {},
       energy_level: "high",
       money_band: "okay",
       skill_flags: {},

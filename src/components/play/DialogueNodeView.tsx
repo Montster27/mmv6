@@ -3,56 +3,52 @@
 import { useState, useCallback } from "react";
 import type { DialogueNode, MicroChoice, StoryletChoice } from "@/types/storylets";
 import { getNpcEntry } from "@/domain/npcs/registry";
+import {
+  evaluateNodeCondition,
+  resolveNodeText,
+  resolveMicroLabel,
+  type PlayerContext,
+} from "@/lib/nodeConditions";
 
 type DialogueNodeViewProps = {
   preamble: string;
   nodes: DialogueNode[];
   choices: StoryletChoice[];
-  onChoice: (choiceId: string) => void;
+  /**
+   * Called when the player picks a terminal choice. Receives the set of
+   * walk-local flags that were active at the moment of selection — call sites
+   * use this to evaluate conditional `events_emitted` groups and variant
+   * selection for downstream prose / relationship fallout.
+   */
+  onChoice: (choiceId: string, activeFlags: Set<string>) => void;
   onMicroEffects?: (effects: {
     set_npc_memory?: Record<string, Record<string, boolean>>;
     relational_effect?: Record<string, Record<string, number>>;
     identity_tags?: string[];
+    period_stance?: "challenged" | "deflected" | "absorbed";
   }) => void;
   relationships?: Record<string, Record<string, unknown>> | null;
+  /** Player identity + period-stance state for node gates and variant selection. */
+  playerContext?: PlayerContext;
   disabled?: boolean;
 };
 
-function evaluateNodeCondition(
-  condition: DialogueNode["condition"],
-  flags: Set<string>,
-  relationships?: Record<string, Record<string, unknown>> | null
-): boolean {
-  if (!condition) return true;
-  if (condition.flag && !flags.has(condition.flag)) return false;
-  if (condition.all_flags && condition.all_flags.length > 0) {
-    for (const f of condition.all_flags) {
-      if (!flags.has(f)) return false;
-    }
-  }
-  if (condition.npc_memory) {
-    const dotIdx = condition.npc_memory.indexOf(".");
-    if (dotIdx > 0) {
-      const npcId = condition.npc_memory.slice(0, dotIdx);
-      const key = condition.npc_memory.slice(dotIdx + 1);
-      if (!relationships?.[npcId]?.[key]) return false;
-    }
-  }
-  return true;
-}
-
 function findInitialNode(
   nodes: DialogueNode[],
-  relationships?: Record<string, Record<string, unknown>> | null
+  relationships?: Record<string, Record<string, unknown>> | null,
+  playerContext?: PlayerContext
 ): string | null {
   const emptyFlags = new Set<string>();
   for (const node of nodes) {
-    if (evaluateNodeCondition(node.condition, emptyFlags, relationships)) {
+    if (evaluateNodeCondition(node.condition, emptyFlags, relationships, playerContext)) {
       return node.id;
     }
     if (node.next) {
       const target = nodes.find((n) => n.id === node.next);
-      if (target && evaluateNodeCondition(target.condition, emptyFlags, relationships)) {
+      if (
+        target &&
+        evaluateNodeCondition(target.condition, emptyFlags, relationships, playerContext)
+      ) {
         return target.id;
       }
     }
@@ -62,9 +58,11 @@ function findInitialNode(
 
 function NodeText({
   node,
+  text,
   className,
 }: {
   node: DialogueNode;
+  text: string;
   className?: string;
 }) {
   if (node.speaker && node.speaker !== "narrator") {
@@ -76,7 +74,7 @@ function NodeText({
     return (
       <div className={className}>
         <p className="whitespace-pre-line font-body text-[15px] italic leading-relaxed text-foreground/85">
-          &ldquo;{node.text}&rdquo;
+          &ldquo;{text}&rdquo;
         </p>
         <p className="mt-1 font-stat text-xs text-muted-foreground/60 tracking-wide">
           &mdash; {displayName}
@@ -86,7 +84,7 @@ function NodeText({
   }
   return (
     <p className={`whitespace-pre-line font-body text-[15px] leading-relaxed text-foreground/85 ${className ?? ""}`}>
-      {node.text}
+      {text}
     </p>
   );
 }
@@ -98,10 +96,11 @@ export function DialogueNodeView({
   onChoice,
   onMicroEffects,
   relationships,
+  playerContext,
   disabled,
 }: DialogueNodeViewProps) {
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(() =>
-    findInitialNode(nodes, relationships)
+    findInitialNode(nodes, relationships, playerContext)
   );
   const [activeFlags, setActiveFlags] = useState<Set<string>>(new Set());
   const [completedNodeIds, setCompletedNodeIds] = useState<string[]>([]);
@@ -135,7 +134,9 @@ export function DialogueNodeView({
         return;
       }
 
-      if (!evaluateNodeCondition(nextNode.condition, newFlags, relationships)) {
+      if (
+        !evaluateNodeCondition(nextNode.condition, newFlags, relationships, playerContext)
+      ) {
         advance(nextNode.else_next ?? nextNode.next, undefined);
         return;
       }
@@ -145,19 +146,23 @@ export function DialogueNodeView({
       );
       setCurrentNodeId(dest);
     },
-    [activeFlags, currentNodeId, nodes]
+    [activeFlags, currentNodeId, nodes, relationships, playerContext]
   );
 
   const handleMicroChoice = useCallback(
     (micro: MicroChoice) => {
       if (
         onMicroEffects &&
-        (micro.set_npc_memory || micro.relational_effect || micro.identity_tags?.length)
+        (micro.set_npc_memory ||
+          micro.relational_effect ||
+          micro.identity_tags?.length ||
+          micro.period_stance)
       ) {
         onMicroEffects({
           set_npc_memory: micro.set_npc_memory,
           relational_effect: micro.relational_effect,
           identity_tags: micro.identity_tags,
+          period_stance: micro.period_stance,
         });
       }
       advance(micro.next, micro.sets_flag);
@@ -195,9 +200,10 @@ export function DialogueNodeView({
       {completedNodeIds.map((id) => {
         const node = nodes.find((n) => n.id === id);
         if (!node) return null;
+        const text = resolveNodeText(node, activeFlags, relationships, playerContext);
         return (
           <div key={id} className="opacity-40 border-l-2 border-border/30 pl-4">
-            <NodeText node={node} className="text-sm" />
+            <NodeText node={node} text={text} className="text-sm" />
           </div>
         );
       })}
@@ -205,7 +211,10 @@ export function DialogueNodeView({
       {/* Current active node */}
       {currentNode && (
         <div className="narrative-enter">
-          <NodeText node={currentNode} />
+          <NodeText
+            node={currentNode}
+            text={resolveNodeText(currentNode, activeFlags, relationships, playerContext)}
+          />
           <div className="mt-3 space-y-2">
             {currentNode.micro_choices && currentNode.micro_choices.length > 0 ? (
               currentNode.micro_choices.map((micro, i) => (
@@ -216,7 +225,7 @@ export function DialogueNodeView({
                   className="micro-choice-btn choice-enter"
                   style={{ animationDelay: `${i * 0.06}s` }}
                 >
-                  {micro.label}
+                  {resolveMicroLabel(micro, activeFlags, relationships, playerContext)}
                 </button>
               ))
             ) : (
@@ -240,7 +249,7 @@ export function DialogueNodeView({
               {i > 0 && <div className="prep-divider" />}
               <button
                 disabled={disabled}
-                onClick={() => onChoice(choice.id)}
+                onClick={() => onChoice(choice.id, new Set(activeFlags))}
                 className="choice-btn choice-enter"
                 style={{ animationDelay: `${i * 0.08}s` }}
               >

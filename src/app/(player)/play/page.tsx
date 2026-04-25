@@ -27,6 +27,7 @@ import { TesterFeedback } from "@/components/play/TesterFeedback";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 // All time advancement (segment + day) goes through /api/time/advance.
 import { trackEvent } from "@/lib/events";
+import { resolveEventsEmitted } from "@/lib/eventsEmitted";
 import { supabase } from "@/lib/supabase/browser";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 import { awardAnomalies } from "@/lib/anomalies";
@@ -50,6 +51,9 @@ import {
   toChoices,
   updateRelationships,
   updateLifePressureState,
+  updatePeriodStanceState,
+  logPeriodStanceEvent,
+  getPriorPeriodStance,
   updateSkillFlags,
   updatePreclusionGates,
   type AllocationPayload,
@@ -70,7 +74,16 @@ import {
   type CompareSnapshot,
 } from "@/lib/afterActionCompare";
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
-import { getChapterOneState, bumpLifePressure, updateSkillFlag } from "@/core/chapter/state";
+import {
+  getChapterOneState,
+  bumpLifePressure,
+  bumpPeriodStance,
+  updateSkillFlag,
+} from "@/core/chapter/state";
+import { fetchPlayerIdentity } from "@/lib/playerIdentity";
+import type { PlayerIdentity } from "@/types/identity";
+import type { PeriodStanceTag } from "@/core/chapter/types";
+import type { PlayerContext } from "@/lib/nodeConditions";
 import {
   applyRelationshipEvents,
   ensureRelationshipDefaults,
@@ -140,6 +153,9 @@ export default function PlayPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [userId, setUserId] = useState<string | null>(null);
+  const [playerIdentity, setPlayerIdentity] = useState<PlayerIdentity | null>(null);
+  const [priorPeriodStance, setPriorPeriodStance] =
+    useState<PeriodStanceTag | null>(null);
   const bootstrapQuery = useBootstrap();
   const {
     dailyState,
@@ -372,6 +388,25 @@ export default function PlayPage() {
       })
       .catch(() => {});
   }, [bootstrapUserId, session?.access_token]);
+
+  // Fetch player identity + prior period_stance once userId is known. Both
+  // feed the DialogueNodeView playerContext for gate and variant evaluation.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      const [identity, prior] = await Promise.all([
+        fetchPlayerIdentity(userId),
+        getPriorPeriodStance(userId),
+      ]);
+      if (cancelled) return;
+      setPlayerIdentity(identity);
+      setPriorPeriodStance(prior);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const testerMode = useMemo(() => getAppMode().testerMode, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1686,13 +1721,14 @@ export default function PlayPage() {
 
   // ── Micro-choice persistent effects (node walk) ─────────────────────────
   // Called by DialogueNodeView when a micro-choice carries set_npc_memory,
-  // relational_effect, or identity_tags. Effects commit immediately — not
-  // deferred to terminal choice resolution.
+  // relational_effect, identity_tags, or period_stance. Effects commit
+  // immediately — not deferred to terminal choice resolution.
   const handleMicroEffects = useCallback(
     async (effects: {
       set_npc_memory?: Record<string, Record<string, boolean>>;
       relational_effect?: Record<string, Record<string, number>>;
       identity_tags?: string[];
+      period_stance?: "challenged" | "deflected" | "absorbed";
     }) => {
       if (!userId) return;
       const events: RelationshipEvent[] = [
@@ -1718,11 +1754,37 @@ export default function PlayPage() {
           setDailyState({ ...dailyState, life_pressure_state: nextLp });
         }
       }
+      const stance = effects.period_stance;
+      if (stance && chapterOneState) {
+        const nextStance = bumpPeriodStance(chapterOneState.periodStanceState, stance);
+        await Promise.all([
+          updatePeriodStanceState(userId, nextStance),
+          logPeriodStanceEvent(userId, dayIndex, stance, {
+            storylet_slug: currentStorylet?.slug ?? "",
+          }),
+        ]);
+        setPriorPeriodStance(stance);
+        if (dailyState) {
+          setDailyState({ ...dailyState, period_stance_state: nextStance });
+        }
+      }
     },
     [userId, relationshipsState, currentStorylet, dayIndex, dailyState, chapterOneState]
   );
 
-  const handleChoice = async (choiceId: string) => {
+  const playerContext = useMemo<PlayerContext>(
+    () => ({
+      identity: playerIdentity,
+      periodStance: chapterOneState?.periodStanceState ?? null,
+      priorPeriodStance,
+    }),
+    [playerIdentity, chapterOneState?.periodStanceState, priorPeriodStance]
+  );
+
+  const handleChoice = async (
+    choiceId: string,
+    activeFlags: Set<string> = new Set()
+  ) => {
     if (!userId || !currentStorylet) return;
     if (pendingReactionText) return;
     recordInteraction();
@@ -2077,7 +2139,7 @@ export default function PlayPage() {
 
       const relationshipEvents = [
         ...introEvents,
-        ...((selectedChoice?.events_emitted ?? []) as any),
+        ...resolveEventsEmitted(selectedChoice?.events_emitted, activeFlags),
         ...mapLegacyRelationalEffects(selectedChoice?.relational_effects),
         ...mapLegacyNpcKnowledge(selectedChoice?.set_npc_memory),
         ...mapLegacyRelationalEffects(matchedCondition?.relational_effects),
@@ -2345,7 +2407,11 @@ export default function PlayPage() {
   };
 
   const handleTrackStoryletChoice = useCallback(
-    async (beat: TrackStorylet, option: StoryletChoice) => {
+    async (
+      beat: TrackStorylet,
+      option: StoryletChoice,
+      activeFlags: Set<string> = new Set()
+    ) => {
       // ── Mini-game intercept for track storylets ─────────────────────────
       if (option.mini_game && !activeMiniGame) {
         setActiveMiniGame({
@@ -2472,7 +2538,7 @@ export default function PlayPage() {
 
         const relationshipEvents = [
           ...introEvents,
-          ...((option.events_emitted ?? []) as any),
+          ...resolveEventsEmitted(option.events_emitted, activeFlags),
           ...mapLegacyRelationalEffects(option.relational_effects),
           ...mapLegacyNpcKnowledge(option.set_npc_memory),
         ] as any;
@@ -3246,6 +3312,7 @@ export default function PlayPage() {
                                       choices={choices}
                                       onChoice={handleChoice}
                                       onMicroEffects={handleMicroEffects}
+                                      playerContext={playerContext}
                                       disabled={savingChoice}
                                     />
                                   );
@@ -3685,6 +3752,8 @@ export default function PlayPage() {
                                       : () => handleDismissTrackStorylet(card.beat, false)
                                   }
                                   relationships={relationshipsState}
+                                  playerContext={playerContext}
+                                  onMicroEffects={handleMicroEffects}
                                 />
                               ) : (
                                 <TrackStoryletCard
@@ -3702,6 +3771,8 @@ export default function PlayPage() {
                                     socialLeverage: dayState.socialLeverage,
                                     physicalResilience: dayState.physicalResilience,
                                   } : null}
+                                  playerContext={playerContext}
+                                  onMicroEffects={handleMicroEffects}
                                 />
                               ),
                             )}

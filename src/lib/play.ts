@@ -767,6 +767,53 @@ export async function updateLifePressureState(
   if (error) console.error("Failed to update life_pressure_state", error);
 }
 
+export async function updatePeriodStanceState(
+  userId: string,
+  periodStanceState: Record<string, number>
+): Promise<void> {
+  const { error } = await supabase
+    .from("daily_states")
+    .update({ period_stance_state: periodStanceState, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("Failed to update period_stance_state", error);
+}
+
+export async function logPeriodStanceEvent(
+  userId: string,
+  dayIndex: number,
+  tag: "challenged" | "deflected" | "absorbed",
+  meta: Record<string, unknown> = {}
+): Promise<void> {
+  const { error } = await supabase.from("choice_log").insert({
+    user_id: userId,
+    day: dayIndex,
+    event_type: "PERIOD_STANCE",
+    option_key: tag,
+    meta,
+  });
+  if (error) console.error("Failed to log PERIOD_STANCE event", error);
+}
+
+export async function getPriorPeriodStance(
+  userId: string
+): Promise<"challenged" | "deflected" | "absorbed" | null> {
+  const { data, error } = await supabase
+    .from("choice_log")
+    .select("option_key")
+    .eq("user_id", userId)
+    .eq("event_type", "PERIOD_STANCE")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("Failed to read prior PERIOD_STANCE event", error);
+    return null;
+  }
+  const raw = data?.option_key;
+  if (raw === "challenged" || raw === "deflected" || raw === "absorbed") return raw;
+  return null;
+}
+
 export async function updateSkillFlags(
   userId: string,
   skillFlags: Record<string, number>
