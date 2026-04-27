@@ -447,51 +447,99 @@ export class PlaythroughHarness {
       });
     }
 
-    // Navigate to next
-    const dest = micro.next;
+    // Navigate to next — auto-advance through text-only and condition-failed nodes.
+    this.navigateTo(micro.next);
+    return {
+      nextNodeId: ws.currentNodeId,
+      terminal: ws.terminal,
+    };
+  }
+
+  /**
+   * Walk-internal navigation. Auto-advances through text-only intro/coda nodes
+   * and skips nodes whose condition does not hold, until landing on either:
+   *   - a node with `micro_choices` (player input point), or
+   *   - a terminal ("choices" or "exit").
+   *
+   * Condition predicates evaluated against `walkState.flags`:
+   *   - `flag`, `all_flags`
+   * Condition predicates treated as met (real game writes the underlying state
+   * on each micro-choice; harness scripts test specific paths):
+   *   - `npc_memory`, `period_stance`, `prior_period_stance`, `identity`
+   *
+   * Mutates `walkState.currentNodeId` and/or `walkState.terminal`. Throws if
+   * recursion exceeds 32 hops (indicates malformed content).
+   */
+  private navigateTo(dest: string, depth = 0): void {
+    const ws = this.walkState;
+    if (!ws) {
+      throw new Error("navigateTo called without an active walkState");
+    }
+
+    if (depth >= 32) {
+      throw new Error(
+        `navigateTo recursion cap exceeded (32 hops) in storylet "${ws.storyletKey}" — likely malformed content`
+      );
+    }
+
     if (dest === "choices" || dest === "exit") {
       ws.terminal = dest;
       ws.currentNodeId = null;
-      return { nextNodeId: null, terminal: dest };
+      return;
     }
 
-    // Find next node, check condition gate
-    const nextNode = ws.nodes.find((n) => n.id === dest);
-    if (!nextNode) {
-      // Unknown target — fall through to choices
+    const node = ws.nodes.find((n) => n.id === dest);
+    if (!node) {
+      // Unknown destination — fall through to choices
       ws.terminal = "choices";
       ws.currentNodeId = null;
-      return { nextNodeId: null, terminal: "choices" };
+      return;
     }
 
-    // Skip nodes whose condition is not met
-    const cond = nextNode.condition;
-    const conditionMet =
-      !cond ||
-      ((!cond.flag || ws.flags.has(cond.flag)) &&
-        (!cond.all_flags || cond.all_flags.every((f) => ws.flags.has(f))));
+    // Evaluate condition. Only flag / all_flags read walkState.flags here.
+    // Other predicates (npc_memory, period_stance, prior_period_stance,
+    // identity) are treated as met — scripts test specific paths.
+    const cond = node.condition;
+    let conditionMet = true;
+    if (cond) {
+      const flagOk = !cond.flag || ws.flags.has(cond.flag);
+      const allFlagsOk =
+        !cond.all_flags || cond.all_flags.every((f) => ws.flags.has(f));
+      conditionMet = flagOk && allFlagsOk;
+    }
+
     if (!conditionMet) {
-      // Advance past this node via its explicit else_next, else fall through to .next
-      ws.currentNodeId = nextNode.else_next ?? nextNode.next ?? null;
-      if (!ws.currentNodeId || ws.currentNodeId === "choices") {
+      const fallback = node.else_next ?? node.next;
+      if (!fallback) {
         ws.terminal = "choices";
         ws.currentNodeId = null;
-        return { nextNodeId: null, terminal: "choices" };
+        return;
       }
-      if (ws.currentNodeId === "exit") {
-        ws.terminal = "exit";
-        ws.currentNodeId = null;
-        return { nextNodeId: null, terminal: "exit" };
-      }
-      return { nextNodeId: ws.currentNodeId, terminal: null };
+      this.navigateTo(fallback, depth + 1);
+      return;
     }
 
-    ws.currentNodeId = dest;
-    return { nextNodeId: dest, terminal: null };
+    // Condition met (or absent). If the node has player input, land here.
+    if (node.micro_choices && node.micro_choices.length > 0) {
+      ws.currentNodeId = dest;
+      ws.terminal = null;
+      return;
+    }
+
+    // Text-only node — auto-advance through .next. No `next` means the walk
+    // has run off the end of the node tree → exit.
+    if (!node.next) {
+      ws.terminal = "exit";
+      ws.currentNodeId = null;
+      return;
+    }
+    this.navigateTo(node.next, depth + 1);
   }
 
   /**
    * Begin a node walk for a storylet. Called by the executor before choose_node steps.
+   * The walk's starting `currentNodeId` is whatever `navigateTo` lands on after
+   * auto-advancing through any text-only intro nodes — not necessarily nodes[0].
    */
   beginNodeWalk(storyletKey: string): void {
     const storylet = this.storylets.find((s) => s.storylet_key === storyletKey);
@@ -504,11 +552,12 @@ export class PlaythroughHarness {
 
     this.walkState = {
       storyletKey,
-      currentNodeId: nodes[0].id,
+      currentNodeId: null,
       flags: new Set(),
       nodes,
       terminal: null,
     };
+    this.navigateTo(nodes[0].id);
   }
 
   /**
