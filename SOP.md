@@ -35,7 +35,7 @@ Say this at the end of every Claude Code session. Code should:
 
 1. **Update HANDOFF.md** — what we did, what's next, any new decisions
 2. **Update "Branches in flight"** — if any branch was created, advanced, merged, or had its gate change this session, edit the table near the top of HANDOFF.md to match. When a branch merges to main, remove its row.
-3. **Update Kanban tickets** — move completed tickets to `col_done`, create new tickets for work discovered, update `modified` and `modifiedBy: claude-code`
+3. **Update Kanban tickets** — move completed tickets to `col_done`, create new tickets for work discovered, update `modified` and `modifiedBy: claude-code`. **Before writing `status: col_done` on any ticket, paste the verifying shell output (test result, SQL scan, file listing) into the close note.** Don't close on intent — close on evidence. The ticket body should be a report of what happened, not a summary of what should have happened.
 4. **Log decisions** to `docs/DECISIONS.md` if any design calls were made
 5. **Write one MemPalace note** if a non-obvious rationale needs preserving (the "why", not the "what")
 6. **Flag** anything that needs attention in the next session
@@ -66,6 +66,7 @@ Say this in claude.ai when things feel fuzzy. The PM will audit:
 - **MemPalace health**: is it being queried or just written to?
 - **Doc freshness**: are HANDOFF.md, CHAIN-MAP.md, ENGINE-SPEC.md current?
 - **Test health**: are playthrough traces passing? Any new content without coverage?
+- **Ticket-vs-disk audit** *(added 2026-04-27 after the T-1777215600001/002 fabricated-work incident)*: run `npx tsx scripts/audit-closed-tickets.ts` from the repo root. The script walks every `col_done` ticket, regex-extracts file references (migrations, playthrough scripts, source paths, docs), and reports any reference whose target file is missing from disk. Triage findings — most are real (file was claimed but not written); some are false positives ("replaces planned `docs/X.md`" phrasing matches the regex). Either delete the dead reference or reopen the ticket. See `docs/AUDIT-PATTERN.md` for the protocol.
 
 ---
 
