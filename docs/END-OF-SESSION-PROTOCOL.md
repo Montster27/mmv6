@@ -31,6 +31,7 @@ The Kanban board lives at a path OUTSIDE the repo:
 - Change `status` from `col_todo` or `col_doing` to `col_done`
 - Set `modified` to current ISO 8601 timestamp
 - Set `modifiedBy: "claude-code"`
+- **Paste the verifying shell output** into the close note (test result, SQL scan, file listing, `git log`, etc.) — close on evidence, not intent. The ticket body should be a report of what happened, not a summary. See `docs/AUDIT-PATTERN.md` for the rationale and the disk-vs-ticket audit that catches stale `col_done` ticket bodies.
 - If no ticket existed for the work, create one in `col_done` (see "Creating tickets" below)
 
 ### For new work discovered:
