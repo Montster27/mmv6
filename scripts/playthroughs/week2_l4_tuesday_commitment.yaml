@@ -1,0 +1,97 @@
+name: week2_l4_tuesday_commitment
+description: >
+  L4 Week 2 landmark — tuesday_commitment (belonging track, Day 14 evening).
+  Walks the commit_terminal path: micro-choice sets walk flag tuesday_terminal,
+  terminal tuesday_decided_terminal persists tuesday_terminal as a FLAG_SET in
+  choice_log (the cross-track flag L5 reads via the globalFlags union).
+
+  Path: Day 1 chain → 12 sleeps to Day 13 morning → resolve doug_coach_story
+  on Day 13 evening (clears belonging bestCandidate slot for Day 14, since
+  doug expires offset 14 vs tuesday_commitment offset 15) → sleep → Day 14
+  evening tuesday_commitment → walk schedule_scan (auto-advance) → the_choice
+  micro_choice commit_terminal → choice_made (auto-advance) → terminal
+  tuesday_decided_terminal.
+
+  Engine extensions exercised:
+    • navigateTo auto-advance through schedule_scan and choice_made
+      (text-only nodes wrapping the_choice).
+    • Walk-flag-gated terminal selection (tuesday_decided_terminal only
+      visible after commit_terminal writes tuesday_terminal walk flag).
+
+steps:
+  # ── Day 1: chain ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+
+  # ── Sleep to Day 13 morning (12 sleeps total) ─────────────────────────
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+
+  # ── Day 13 evening: doug_coach_story (clears belonging bestCandidate) ──
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: doug_coach_story
+    at: { day: 13, segment: evening, track: belonging }
+
+  - type: choose
+    storylet_key: doug_coach_story
+    choice_id: doug_story_end
+
+  # ── Day 14 evening: tuesday_commitment ────────────────────────────────
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: tuesday_commitment
+    at: { day: 14, segment: evening, track: belonging }
+    served_by: pool
+
+  # schedule_scan is text-only (next: the_choice). navigateTo auto-
+  # advances to the_choice, which has the four flag-setting micro-choices.
+  - type: choose_node
+    node_id: the_choice
+    micro_choice_id: commit_terminal
+
+  # commit_terminal sets the walk flag tuesday_terminal.
+  - type: expect_walk_flag
+    flag: tuesday_terminal
+    present: true
+
+  # choice_made is text-only (next: choices). navigateTo terminates the
+  # walk. Resolve the matching terminal — its sets_flag persists
+  # tuesday_terminal to choice_log as a cross-track FLAG_SET.
+  - type: choose
+    storylet_key: tuesday_commitment
+    choice_id: tuesday_decided_terminal

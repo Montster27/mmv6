@@ -1,0 +1,96 @@
+name: week2_l2_scott_notices
+description: >
+  L2 Week 2 landmark — scott_notices (roommate track, Day 12-14 evening
+  crystallizer; this script targets Day 13 evening to avoid early-window
+  competitor noise).
+
+  Walks the warm-entry crystallizer path: scott_opens (gated on npc_memory
+  trust_high — harness treats npc_memory predicates as met, so we land
+  here without authoring the prior NPC memory) → the_question micro
+  turn_it_back (sets walk flag scott_noticed_something + persistent NPC
+  memory noticed_something) → scott_accepts (text-only, navigateTo
+  terminates at choices) → terminal lights_out_close (persists
+  scott_notices_resolved as FLAG_SET).
+
+  Path: Day 1 chain → 12 sleeps to Day 13 morning → Day 13 evening pool
+  has just doug_coach_story (belonging) and scott_notices (roommate),
+  both fit in the maxStorylets=2 cap → walk + resolve.
+
+  Engine extensions exercised:
+    • navigateTo treats npc_memory predicates as met (per spec — real
+      game behavior still requires the memory to be set, but harness
+      scripts test specific paths).
+    • navigateTo auto-advance through scott_accepts (text-only coda).
+
+steps:
+  # ── Day 1: chain ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+
+  # ── Sleep to Day 13 morning (12 sleeps) ───────────────────────────────
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+
+  # ── Day 13 evening: scott_notices ─────────────────────────────────────
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: scott_notices
+    at: { day: 13, segment: evening, track: roommate }
+    served_by: pool
+
+  # nodes[0] is scott_opens (condition: npc_memory trust_high). navigateTo
+  # treats npc_memory as met, so the walk lands directly on scott_opens.
+  - type: choose_node
+    node_id: scott_opens
+    micro_choice_id: sure
+
+  - type: expect_walk_flag
+    flag: scott_noticed_something
+    present: false
+
+  # the_question.turn_it_back sets walk flag scott_noticed_something
+  # and persistent NPC memory noticed_something. navigateTo follows .next
+  # to scott_accepts (text-only, next: choices) and terminates the walk.
+  - type: choose_node
+    node_id: the_question
+    micro_choice_id: turn_it_back
+
+  - type: expect_walk_flag
+    flag: scott_noticed_something
+    present: true
+
+  # Terminal lights_out_close persists scott_notices_resolved as FLAG_SET.
+  - type: choose
+    storylet_key: scott_notices
+    choice_id: lights_out_close
