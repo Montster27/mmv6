@@ -1,0 +1,89 @@
+name: week2_l1_job_board
+description: >
+  L1 Week 2 landmark — job_board (money track, Day 8 afternoon).
+  Picks the library card (one of four flag-gated terminals).
+
+  Path: Day 1 chain → 4 sleeps → Day 5 evening money_reality_check
+  (chain entry for money track, must resolve to clear the chain so
+  job_board pool scan runs) → 3 sleeps → Day 8 afternoon job_board
+  pool → walk pick_card.job_library (sets walk flag has_job_library)
+  → terminal leave_board_library (requires + persists has_job_library).
+
+  Engine extensions exercised:
+    • navigateTo auto-advance through scan_board (text-only intro)
+      and card_taken (text-only coda).
+    • Walk-flag-gated terminal selection (leave_board_library only
+      visible after the matching micro-choice writes has_job_library).
+
+steps:
+  # ── Day 1: chain ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  - type: advance_segment
+
+  # Clear glenn_pastime_paradise so opportunity pool is open later.
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+
+  # ── Sleep to Day 5 morning (4 sleeps: Day 1→2→3→4→5) ──────────────────
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+
+  # ── Day 5 evening: money_reality_check (money chain entry) ────────────
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: money_reality_check
+    at: { track: money }
+    served_by: chain
+
+  - type: choose
+    storylet_key: money_reality_check
+    choice_id: go_out
+
+  # ── Sleep to Day 8 morning (3 sleeps: Day 5→6→7→8) ────────────────────
+  - type: sleep
+  - type: sleep
+  - type: sleep
+
+  # ── Day 8 afternoon: job_board (money pool) ───────────────────────────
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: job_board
+    at: { day: 8, segment: afternoon, track: money }
+    served_by: pool
+
+  # scan_board is text-only (next: pick_card). navigateTo auto-advances
+  # to pick_card. Take the library card.
+  - type: choose_node
+    node_id: pick_card
+    micro_choice_id: job_library
+
+  - type: expect_walk_flag
+    flag: has_job_library
+    present: true
+
+  # card_taken is text-only (next: choices). navigateTo terminates the
+  # walk. The terminal requires has_job_library, sets it persistently.
+  - type: choose
+    storylet_key: job_board
+    choice_id: leave_board_library

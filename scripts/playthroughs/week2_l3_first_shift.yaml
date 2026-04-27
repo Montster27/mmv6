@@ -1,0 +1,124 @@
+name: week2_l3_first_shift
+description: >
+  L3 Week 2 landmark — first_shift_library (money track, Day 11 evening).
+  Gated by walk-flag has_job_library set in L1 (job_board.leave_board_library
+  persists has_job_library via sets_flag).
+
+  Path: Day 1 chain → Day 5 evening money_reality_check → Day 8 afternoon
+  job_board (pick library) → clear evening competitors on Days 8/9/10
+  (pay_phone_line, dana_cereal neutral path, dana_letter_surface) so
+  first_shift_library makes the maxStorylets=2 cap on Day 11 evening
+  → resolve finish_shift_library terminal.
+
+  Inlines the L1 path at script start rather than composing a fixture —
+  has_job_library is the only state needed and the duplication is small.
+  Storylet has no nodes (body+choices only) — just resolve the terminal.
+
+steps:
+  # ── Day 1: chain ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+
+  # ── Sleep to Day 5 morning ────────────────────────────────────────────
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+
+  # ── Day 5 evening: money_reality_check (clears money chain) ───────────
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: money_reality_check
+    choice_id: go_out
+
+  # ── Sleep to Day 8 morning ────────────────────────────────────────────
+  - type: sleep
+  - type: sleep
+  - type: sleep
+
+  # ── Day 8 afternoon: job_board → library terminal (sets has_job_library) ──
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: job_board
+    at: { day: 8, segment: afternoon, track: money }
+    served_by: pool
+
+  - type: choose_node
+    node_id: pick_card
+    micro_choice_id: job_library
+
+  - type: choose
+    storylet_key: job_board
+    choice_id: leave_board_library
+
+  # ── Day 8 evening: clear pay_phone_line (home track, expires Day 11) ──
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: pay_phone_line
+    choice_id: phone_continue
+
+  # ── Day 9 evening: clear dana_cereal (roommate, expires Day 11) ───────
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: dana_cereal
+    at: { track: roommate }
+
+  # Walk through cereal_offer; pick neutral path so we don't unlock
+  # dana_letter_avoidance (which would require additional clearing).
+  - type: choose_node
+    node_id: cereal_offer
+    micro_choice_id: no_thanks
+
+  - type: choose
+    storylet_key: dana_cereal
+    choice_id: cereal_continue_neutral
+
+  # ── Day 10 evening: clear dana_letter_surface (roommate, expires Day 12) ──
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: dana_letter_surface
+    choice_id: dana_surface_end
+
+  # ── Day 11 evening: first_shift_library (gated by has_job_library) ────
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: first_shift_library
+    at: { day: 11, segment: evening, track: money }
+    served_by: pool
+
+  # No nodes — resolve the single terminal directly.
+  - type: choose
+    storylet_key: first_shift_library
+    choice_id: finish_shift_library
