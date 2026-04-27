@@ -1,7 +1,7 @@
 # MMV — Standard Operating Procedures
 > The one file you look at when you forget the process.
 > Lives in the repo root so every Code session sees it.
-> Last updated: 2026-04-16
+> Last updated: 2026-04-27
 
 ---
 
@@ -20,6 +20,8 @@ Tell me: top of stack, any vocabulary drift, any blocked tickets.
 Today I'm working on: [describe what you want to do]
 ```
 
+When reading HANDOFF.md, scan the **Branches in flight** section near the top — it lists every non-main branch with its merge gate and gate owner. If anything you're about to do touches one of those branches, surface the gate to the user before starting.
+
 For claude.ai (PM) sessions, just say "Start session" — the PM knows this file.
 
 For Cowork sessions (Obsidian / design brain):
@@ -32,10 +34,11 @@ Today I need to [specific task — write a spec / produce a deck / organize docs
 Say this at the end of every Claude Code session. Code should:
 
 1. **Update HANDOFF.md** — what we did, what's next, any new decisions
-2. **Update Kanban tickets** — move completed tickets to `col_done`, create new tickets for work discovered, update `modified` and `modifiedBy: claude-code`
-3. **Log decisions** to `docs/DECISIONS.md` if any design calls were made
-4. **Write one MemPalace note** if a non-obvious rationale needs preserving (the "why", not the "what")
-5. **Flag** anything that needs attention in the next session
+2. **Update "Branches in flight"** — if any branch was created, advanced, merged, or had its gate change this session, edit the table near the top of HANDOFF.md to match. When a branch merges to main, remove its row.
+3. **Update Kanban tickets** — move completed tickets to `col_done`, create new tickets for work discovered, update `modified` and `modifiedBy: claude-code`
+4. **Log decisions** to `docs/DECISIONS.md` if any design calls were made
+5. **Write one MemPalace note** if a non-obvious rationale needs preserving (the "why", not the "what")
+6. **Flag** anything that needs attention in the next session
 
 The Kanban board lives at: `~/Documents/MMV/_assets/MMV_Docs/Kanban data/`
 Ticket conventions: see `claude.md` in that directory. Key rules:

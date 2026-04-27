@@ -10,11 +10,12 @@
 Update the repo-root `HANDOFF.md` with:
 
 1. **What we did this session** — add to the "What's Done" section if anything shipped, or note progress in "What's In Progress"
-2. **What's next** — update the "What's Next" section based on where we stopped
-3. **New decisions** — add rows to the "Recent Decisions" table for any design calls made
-4. **Known issues** — add or update rows in the "Known Issues" table
-5. **Live DB State** — if storylets, NPCs, or tables were added/modified, update those tables
-6. **Bump the "Last updated" date** at the top
+2. **Branches in flight** — if any branch was created, advanced (commit count changed), merged, or had its gate change this session, edit the table near the top. When a branch merges to main, REMOVE its row from this table — the merge commit goes in "What's Done."
+3. **What's next** — update the "What's Next" section based on where we stopped
+4. **New decisions** — add rows to the "Recent Decisions" table for any design calls made
+5. **Known issues** — add or update rows in the "Known Issues" table
+6. **Live DB State** — if storylets, NPCs, or tables were added/modified, update those tables
+7. **Bump the "Last updated" date** at the top
 
 ---
 
@@ -131,6 +132,7 @@ Top of stack for next time: [the most important next thing]
 
 ```
 □ HANDOFF.md updated (what we did, what's next, decisions, issues, DB state)
+□ HANDOFF.md "Branches in flight" updated (if any branch state changed; remove row on merge)
 □ Kanban tickets updated (completed → col_done, new work → col_backlog/col_todo)
 □ modifiedBy set to "claude-code" on all touched tickets
 □ docs/DECISIONS.md updated (if any design calls made)

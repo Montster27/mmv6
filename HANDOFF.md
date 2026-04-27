@@ -10,6 +10,18 @@
 
 ---
 
+## Branches in flight
+
+Each non-main branch with its merge gate. Update whenever a branch is created, advanced, or merged. When a branch merges to main, remove its row from this table — the merge commit goes in "What's Done."
+
+| Branch | Status | Gate | Gate owner | Ticket |
+|--------|--------|------|-----------|--------|
+| `feature/period-stance-infrastructure` | 9 commits ahead of main (origin tip `60f8a2c`) | Phase 1–4 browser playtest pass (Issue #10) | monty | [T-1777300000001](../../Documents/MMV/_assets/MMV_Docs/Kanban%20data/tickets/T-1777300000001.md) |
+
+`time_skill` is fully merged into main (verified 2026-04-27: `git rev-list --count main..time_skill` = 0; tip `fae2d34` reachable from main; 48 commits behind). Removed from this table.
+
+---
+
 ## Project Summary
 **MMV (Many More Versions of You)** is a narrative-driven life simulation set in 1983.
 Players wake up in a college dorm room, gradually discover they've been sent back in time,
