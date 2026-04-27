@@ -18,7 +18,7 @@ Each non-main branch with its merge gate. Update whenever a branch is created, a
 
 | Branch | Status | Gate | Gate owner | Ticket |
 |--------|--------|------|-----------|--------|
-| `feature/period-stance-infrastructure` | 14 commits ahead of main (local tip `e58c00f`; origin tip `60f8a2c` — 5 commits unpushed from sprint b2c3d closer) | Phase 1–4 browser playtest pass (Issue #10) | monty | [T-1777300000001](../../Documents/MMV/_assets/MMV_Docs/Kanban%20data/tickets/T-1777300000001.md) |
+| `feature/period-stance-infrastructure` | local tip `8303968`, ≈16 commits ahead of main (origin tip `60f8a2c`, 7 commits unpushed from sprint b2c3d closer) | Phase 1–4 browser playtest pass (Issue #10) | monty | [T-1777300000001](../../Documents/MMV/_assets/MMV_Docs/Kanban%20data/tickets/T-1777300000001.md) |
 
 `time_skill` is fully merged into main (verified 2026-04-27: `git rev-list --count main..time_skill` = 0; tip `fae2d34` reachable from main; 48 commits behind). Removed from this table.
 
