@@ -32,7 +32,7 @@ The cultural norm is: **ticket bodies are reports, not summaries.** A reader six
 
 Run `npx tsx scripts/audit-closed-tickets.ts` during every `drift check`. The script:
 
-1. Walks `~/Documents/MMV/_assets/MMV_Docs/Kanban data/tickets/*.md`.
+1. Walks `~/Projects/MMV/_assets/MMV_Docs/Kanban data/tickets/*.md`.
 2. Filters to `status: col_done`.
 3. Regex-extracts file references from the body. Patterns:
    - `supabase/migrations/<14digits>_<slug>.sql`

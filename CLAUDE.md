@@ -19,7 +19,7 @@
 | **Type definitions** | `src/types/` |
 | **Domain logic** | `src/domain/` |
 | **Content creation agent** | `agents/content-creator/` (has its own CLAUDE.md) |
-| **Task tracker** | Kanban Pro board at `~/Documents/MMV/_assets/MMV_Docs/Kanban data/` (MAPPING.md for triage) |
+| **Task tracker** | Kanban Pro board at `~/Projects/MMV/_assets/MMV_Docs/Kanban data/` (MAPPING.md for triage) |
 | **Process & vocabulary** | `SOP.md` (root), `GLOSSARY.md` (root) |
 | **Session handoff** | `HANDOFF.md` (root), `docs/END-OF-SESSION-PROTOCOL.md` |
 | **Design docs** | `docs/` |

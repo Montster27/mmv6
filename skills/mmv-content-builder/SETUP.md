@@ -4,7 +4,7 @@
 
 The skill is installed at:
 ```
-/Users/montysharma/Documents/V16MMV/mmv/skills/mmv-content-builder/
+/Users/montysharma/Projects/V16MMV/mmv/skills/mmv-content-builder/
 ├── SKILL.md
 └── references/
     ├── stream-shapes.md
@@ -20,7 +20,7 @@ The skill is installed at:
 ### Step 1: Open your project in Cowork
 1. Open **Claude Desktop**
 2. Switch to the **Cowork** tab
-3. Open a project pointed at `/Users/montysharma/Documents/V16MMV/mmv/`
+3. Open a project pointed at `/Users/montysharma/Projects/V16MMV/mmv/`
 4. The skill lives in the `skills/` directory — Cowork picks it up automatically
 
 ### Step 2: Paste the starter prompt
@@ -54,7 +54,7 @@ the player participates in.
 
 ### Option A: Upload as a .skill file
 ```bash
-cd /Users/montysharma/Documents/V16MMV/mmv/skills
+cd /Users/montysharma/Projects/V16MMV/mmv/skills
 zip -r mmv-content-builder.skill mmv-content-builder/
 ```
 Then go to **Customize > Skills > Upload** and upload the zip.

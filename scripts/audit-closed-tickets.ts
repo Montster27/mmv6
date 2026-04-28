@@ -22,7 +22,7 @@ import * as path from "node:path";
 
 const TICKETS_DIR = path.resolve(
   process.env.HOME || "",
-  "Documents/MMV/_assets/MMV_Docs/Kanban data/tickets",
+  "Projects/MMV/_assets/MMV_Docs/Kanban data/tickets",
 );
 const REPO_ROOT = path.resolve(__dirname, "..");
 

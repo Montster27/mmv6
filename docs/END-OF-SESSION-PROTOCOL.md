@@ -23,7 +23,7 @@ Update the repo-root `HANDOFF.md` with:
 
 The Kanban board lives at a path OUTSIDE the repo:
 ```
-~/Documents/MMV/_assets/MMV_Docs/Kanban data/
+~/Projects/MMV/_assets/MMV_Docs/Kanban data/
 ```
 
 ### For completed work:

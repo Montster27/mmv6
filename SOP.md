@@ -14,7 +14,7 @@ Paste this at the top of every Claude Code session:
 
 ```
 Read SOP.md, HANDOFF.md, and GLOSSARY.md.
-Check MAPPING.md at ~/Documents/MMV/_assets/MMV_Docs/Kanban data/MAPPING.md
+Check MAPPING.md at ~/Projects/MMV/_assets/MMV_Docs/Kanban data/MAPPING.md
 for current sprint tickets.
 Tell me: top of stack, any vocabulary drift, any blocked tickets.
 Today I'm working on: [describe what you want to do]
@@ -40,7 +40,7 @@ Say this at the end of every Claude Code session. Code should:
 5. **Write one MemPalace note** if a non-obvious rationale needs preserving (the "why", not the "what")
 6. **Flag** anything that needs attention in the next session
 
-The Kanban board lives at: `~/Documents/MMV/_assets/MMV_Docs/Kanban data/`
+The Kanban board lives at: `~/Projects/MMV/_assets/MMV_Docs/Kanban data/`
 Ticket conventions: see `claude.md` in that directory. Key rules:
 - Filename = ticket ID (`T-<13-digit-timestamp>.md`)
 - `modifiedBy: claude-code` (never use Monty's profile name)
@@ -84,7 +84,7 @@ Say this in claude.ai when things feel fuzzy. The PM will audit:
 | **docs/CHAIN-MAP.md** | Current chain wiring + flags | Code (after content changes) | `docs/` |
 | **docs/ENGINE-SPEC.md** | Engine behavior spec (partially outdated — see HANDOFF) | Code (needs refresh) | `docs/` |
 | **CLAUDE.md** | Claude Code project bible — auto-read by Code | Code (when conventions change) | repo root |
-| **Kanban MAPPING.md** | Ticket index — read-first triage view | Kanban Pro (auto-generated) | `~/Documents/MMV/_assets/MMV_Docs/Kanban data/` |
+| **Kanban MAPPING.md** | Ticket index — read-first triage view | Kanban Pro (auto-generated) | `~/Projects/MMV/_assets/MMV_Docs/Kanban data/` |
 | **Kanban board.json** | Board topology, epics, sprints | Kanban Pro UI or PM | `.kanban/` in Kanban dir |
 | **MemPalace** | Decision memory — rationale that would get re-explained | Code or PM (after non-obvious decisions) | Obsidian vault |
 
