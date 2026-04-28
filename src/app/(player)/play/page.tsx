@@ -3797,12 +3797,17 @@ export default function PlayPage() {
                     </section>
                   )}
 
-                  {/* Segment transition card — morning/afternoon/evening done, advance to next */}
+                  {/* Segment transition card — morning/afternoon/evening done, advance to next.
+                      Mirrors the auto-complete effect's "resolved>0 || stage=='complete'"
+                      guard (line ~2829) so a fresh load with not-yet-fetched beats can't
+                      auto-skip through every segment of the day. Without this, the
+                      key={segment}-driven remount fires onAdvance during the loading race. */}
                   {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode &&
                     visibleTrackCount === 0 && pendingDismissalBeats.length === 0 &&
                     !sleepCardDone &&
                     dayState?.current_segment !== 'night' &&
-                    (dayState?.hours_remaining ?? 16) > 0 && (
+                    (dayState?.hours_remaining ?? 16) > 0 &&
+                    (resolvedTrackStoryletIds.size > 0 || stage === "complete") && (
                     <SegmentTransitionCard
                       key={`${dayIndex}-${dayState?.current_segment ?? 'morning'}`}
                       currentSegment={(dayState?.current_segment ?? 'morning') as 'morning' | 'afternoon' | 'evening' | 'night'}
