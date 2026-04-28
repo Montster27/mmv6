@@ -3801,16 +3801,21 @@ export default function PlayPage() {
                   )}
 
                   {/* Segment transition card — explicit Continue button advances to next.
-                      Gated on `resolvedTrackStoryletIds.size > 0 || stage === "complete"`
-                      to mirror the auto-complete effect (line ~2829): on a fresh load with
-                      not-yet-fetched beats, this prevents the card from appearing prematurely
-                      and letting the player click past content that's about to render. */}
+                      Gated on `!dailyRunQuery.isFetching` so the card only renders against
+                      settled data: this prevents fresh-load and post-advance refetch windows
+                      from showing a Continue button against stale (or not-yet-arrived) beat
+                      data — without that gate the player could click past content that's
+                      about to render. Same gate pattern as the prior page-level auto-advance
+                      effect from commit 22b3b46. (Earlier we tried gating on
+                      resolvedTrackStoryletIds.size, which is incorrect: line 559-566 wipes
+                      that Set on every refetch by design, so the gate evaluated false at
+                      every empty intermediate segment — the Day 2 evening hang.) */}
                   {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode &&
                     visibleTrackCount === 0 && pendingDismissalBeats.length === 0 &&
                     !sleepCardDone &&
                     dayState?.current_segment !== 'night' &&
                     (dayState?.hours_remaining ?? 16) > 0 &&
-                    (resolvedTrackStoryletIds.size > 0 || stage === "complete") && (
+                    !dailyRunQuery.isFetching && (
                     <SegmentTransitionCard
                       key={`${dayIndex}-${dayState?.current_segment ?? 'morning'}`}
                       currentSegment={(dayState?.current_segment ?? 'morning') as 'morning' | 'afternoon' | 'evening' | 'night'}
