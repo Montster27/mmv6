@@ -109,6 +109,12 @@ export async function POST(request: Request) {
     .from("daily_states")
     .update({
       day_index: 1,
+      // Match /api/time/advance day-rollover semantics: segment + hours must
+      // be reset alongside day_index, otherwise a dev-reset while at night
+      // carries 'night' / 0h forward and lands at SleepCard on Day 1.
+      current_segment: "morning",
+      hours_remaining: 16,
+      hours_committed: 0,
       energy: 100,
       stress: 0,
       vectors: {},
