@@ -1,5 +1,55 @@
 # Decisions Log
 
+## PATH B (relocation to `~/Projects/`) executed as the strategic fix replacing PATH A's xattr band-aid
+
+- **Date:** 2026-04-28 (later same day, separate session)
+- **Context:** PATH A's `xattr -w com.apple.fileprovider.ignore#P 1 .git` bought one push of stability but is a band-aid against iCloud "Desktop & Documents Folders" sync — the xattr is folklore-level documented, may not survive macOS major upgrades, and only protects `.git/` (not `node_modules/`, which was already in known-unhealthy state with `@xxx 2/` duplicate scope dirs and a partially-evicted `playwright/package.json`). T-1777382919259 ("heal node_modules + .next, or relocate") was kept as the explicit fallback; this session executed the relocation arm of that ticket.
+- **Decision:** PATH B — move the repo and the Kanban data out of `~/Documents/` (iCloud-synced) into `~/Projects/` (confirmed local-only via `xattr ~/Projects` returning empty, and presence of pre-existing dev folders like `Godot`, `ShyGuy`, `zen-mcp-server`).
+  - Pre-move: `rm -rf node_modules` (`.next/` was already absent from yesterday's PATH A cleanup) — shrinks the move from 590M to 73M, gets the heal-via-reinstall that T-1777382919259's PATH A arm wanted anyway, just in a different sequence.
+  - `mv ~/Documents/V16MMV/mmv ~/Projects/V16MMV/mmv` — same-volume rename (filesystem rename, fast, atomic).
+  - `mv "~/Documents/MMV/_assets/MMV_Docs/Kanban data" "~/Projects/MMV/_assets/MMV_Docs/Kanban data"` — also same-volume rename.
+  - **Worktree repair (added to plan during execution — not in T-1777382919259's original sketch):** ran `git worktree repair` from the new main worktree; the four internal worktrees under `.claude/worktrees/` showed as `prunable` because their `.git/worktrees/*/gitdir` files still referenced absolute paths under `~/Documents/...`. Re-ran `git worktree repair <new-paths>` for each. Also ran `git -C /private/tmp/mmv-signal-hunt worktree repair` to fix the external worktree's `.git` file pointer. All 6 worktrees now resolve correctly (the original "5 worktrees" count from yesterday's DECISIONS row was off by one — there are 4 internal + 1 external + 1 main = 6).
+  - **`.claude/settings.local.json` mass-update (also added to plan during execution):** the file had **101** absolute paths to `/Users/montysharma/Documents/V16MMV/mmv` (yesterday's DECISIONS row estimated `~80`). Used `sed -i '' 's|...Documents...|...Projects...|g'` — safe by construction because all 101 entries are read-only allowlist patterns, not logic. Without this, every allowlisted Bash command in the harness re-prompts until refreshed. File line count unchanged at 401.
+  - **Path-reference sweep across docs + code:** updated `scripts/audit-closed-tickets.ts` (the `TICKETS_DIR` constant — code, not just docs); doc files `CLAUDE.md`, `SOP.md`, `GLOSSARY.md`, `HANDOFF.md`, `docs/AUDIT-PATTERN.md`, `docs/END-OF-SESSION-PROTOCOL.md`, `docs/PHASE-1-4-PLAYTEST-RUNBOOK.md`, `skills/mmv-content-builder/SETUP.md`. Deleted `test_output.json` (stale generated artifact full of test-name path noise; regenerates on next vitest run). Left `docs/DECISIONS.md` lines 6 + 15 (PATH A entry) as historical record — the entry describes past state in past tense and rewriting it would distort the decision log.
+  - **Bonus runbook fixes:** `docs/PHASE-1-4-PLAYTEST-RUNBOOK.md` had hardcoded "7 commits ahead" language in two places (the line-41 comment and the line-19 prose paragraph) and a "7 commits' worth" reference on line 26. All three replaced with non-counted phrasing — count drift was already real (branch is 17 ahead, not 7) and would only grow.
+  - **Verification at new location:** `git fsck --full` completed in 1.5s (yesterday it hung 22 min on iCloud-evicted blobs); `git fetch origin` clean; `git status` shows expected dirty files; `npx tsc --noEmit` clean; `npx vitest run` 246 passed / 1 skipped (parity); `npm run playthrough:all` 13 pass / 7 fail (parity — the 7 are the pre-existing day0/glenn scripts, T-1777297557482); `npx tsx scripts/audit-closed-tickets.ts` exits 0 with the same false-positive findings as yesterday (RELEASE-TIMELINE.md, X.md). No iCloud xattrs at the new location.
+- **Why `~/Projects/` over alternatives:**
+  - *`~/Code/`* (yesterday's draft destination): rejected because creating a new top-level dir would split tooling state from monty's existing dev folders.
+  - *`~/dev/`* and similar: same objection.
+  - *`~/Projects/`*: confirmed local-only, already populated with sibling dev folders (`Godot`, `ShyGuy`, `zen-mcp-server`, `meyenv`, etc.), no creation cost.
+- **What was NOT done (deferred):**
+  - The `com.apple.fileprovider.ignore#P` xattr on `.git/` from PATH A is still set at the new location — harmless (defense in depth) but redundant since `~/Projects/` is not iCloud-synced. Cleanup is cosmetic; left in place.
+  - Empty `~/Documents/V16MMV/` parent directory still exists (had three sibling files: `AGENTS.md`, `AI_RULES.md`, `caps.png`) — left for monty to triage; not the move's concern.
+  - `~/Documents/MMV/_assets/MMV_Docs/` left intact (logos, decks, mmv-landing/) — only the `Kanban data/` subdirectory moved.
+- **Impact:** The git-infrastructure failure mode that triggered yesterday's PATH A is structurally eliminated, not just suppressed. `git fsck --full` runs in seconds. Working tree free of iCloud sync risk. T-1777382919259 closed by this session. The Phase 1–4 playtest precondition (healthy repo, 0 unpushed) remains satisfied.
+- **Lessons applied for the next mass-relocation:**
+  - Always grep for hardcoded paths in `.claude/settings.local.json` before estimating the relocation cost — the actual count was 101, not the ~80 estimated yesterday.
+  - Always plan an explicit `git worktree repair` step — internal worktrees moved with the repo but their absolute-path metadata didn't follow.
+  - Same-volume `mv` is fast and atomic; cross-volume would need rsync-with-verify. Check `df -h ~` first.
+  - The Bash-tool harness's cwd check refuses commands when the recorded cwd no longer exists; recreating a placeholder file at the old path with the `Write` tool restored function until cwd auto-relocated. Document this for any future `mv` of the active session's CWD.
+
+---
+
+## PATH A (in-place cleanup) over PATH B (relocate repo) for iCloud-Documents `.git/` corruption
+
+- **Date:** 2026-04-28
+- **Context:** Pre-flight for the Phase 1–4 playtest failed with `fatal: bad object refs/remotes/origin/main 2`. The literal `" 2"` suffix in the ref name is macOS's sync-conflict pattern. Diagnosis confirmed iCloud "Desktop & Documents Folders" sync is active on `~/Documents` (xattr `com.apple.icloud.desktop` on the parent directory), so the entire repo at `~/Documents/V16MMV/mmv` lives inside an actively-synced folder. Two `.git/` files were duplicated: `.git/index 2` and `.git/refs/remotes/origin/main 2` (the latter pointed to a stale SHA `ab90671` from April 18, while the good `main` ref correctly pointed to `752ec06` from April 24). Eight commits were unpushed on `feature/period-stance-infrastructure` (tip `9ce0435`). The push was blocked.
+- **Decision:** PATH A — clean up the duplicates in place + per-folder iCloud exclusion via xattr, then push and proceed.
+  - Deleted `.git/index 2` and `.git/refs/remotes/origin/main 2` directly (hand-targeted, not a wildcard sweep).
+  - Ran `git remote prune origin && git fetch origin --prune` clean.
+  - Set `xattr -w com.apple.fileprovider.ignore#P 1 .git` to keep iCloud out of the ref store going forward.
+  - Verified with lighter ref-reads (`git log --oneline origin/main -5`, `main..HEAD = 17`, `HEAD..main = 0`) and `npx vitest run` (246 passed / 1 skipped, parity with last green). `git fsck --full` was attempted but hung 22 min on `.git/objects/5e/3a99...` — call stack was `read_loose_object → map_fd` waiting on iCloud to materialize an evicted blob. Killed and substituted lighter checks; full fsck deferred until iCloud is fully excluded from the working tree.
+  - Pushed `feature/period-stance-infrastructure`: origin tip `60f8a2c` → `9ce0435` (8 commits). 0 unpushed.
+  - Filed T-1777382919258 (this work, closed) and T-1777382919259 (followup: heal `node_modules` + `.next`, decide PATH B if exclusion proves insufficient).
+- **Alternatives considered:**
+  - *PATH B — relocate the repo to `~/Code/V16MMV/mmv`.* Rejected for the immediate fix because the relocation cost is real and partially irreversible: 5 worktrees to repair (`git worktree repair` plus the `/private/tmp/mmv-signal-hunt` external worktree), ~80 absolute-path entries in `.claude/settings.local.json` to rewrite (mostly read-only allowlists, but they start re-prompting until refreshed), and likely additional state in IDE workspaces, Vercel/Supabase project links, and shell aliases. The Kanban data also lives at `~/Documents/MMV/_assets/MMV_Docs/Kanban data/` — moving the repo doesn't help that path; only turning off Documents iCloud sync does, and Kanban data is plain markdown which is far less prone to sync conflicts than `.git/`'s rapidly-rewritten files. Kept B as the explicit fallback in T-1777382919259 if the xattr approach proves insufficient.
+  - *Turn off "Desktop & Documents Folders" iCloud sync globally in System Settings.* Rejected as the heaviest hammer — affects every folder under Documents on every device, not just this repo. Worth doing if monty wants it off everywhere, but a session-time decision is too invasive.
+  - *Use `.nosync` directory suffix.* Rejected — would require renaming `.git` to `.git.nosync` which breaks every git operation. The xattr approach achieves the same exclusion without breaking paths.
+  - *Wait out `git fsck --full`.* Rejected after 22 min and 0.79s of CPU — iCloud was materializing evicted objects on demand and the unbounded duration was incompatible with finishing the session. Lighter ref-read verification + a clean `vitest run` was sufficient evidence to push.
+- **Impact:** The Phase 1–4 playtest precondition (clean repo, healthy refs, 0 unpushed commits) is now satisfied. The playtest itself runs in a separate sitting per `docs/PHASE-1-4-PLAYTEST-RUNBOOK.md` (created this session from claude.ai-supplied content). Wider iCloud damage in `node_modules/` (duplicate scope dirs + at least one partially-evicted package — `playwright/package.json` is missing) and `.next/` (~30 sync-duplicates this session, deleted) is documented but not yet healed; tracked in T-1777382919259. The xattr-based per-folder iCloud exclusion is folklore-level documented and may need re-verification after a macOS upgrade or directory recreation. If duplicates recur, that's the trigger for PATH B.
+
+---
+
 ## Branches in flight + ticket-vs-disk audit pattern
 
 - **Date:** 2026-04-27
