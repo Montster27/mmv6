@@ -3804,6 +3804,7 @@ export default function PlayPage() {
                     dayState?.current_segment !== 'night' &&
                     (dayState?.hours_remaining ?? 16) > 0 && (
                     <SegmentTransitionCard
+                      key={`${dayIndex}-${dayState?.current_segment ?? 'morning'}`}
                       currentSegment={(dayState?.current_segment ?? 'morning') as 'morning' | 'afternoon' | 'evening' | 'night'}
                       hoursRemaining={dayState?.hours_remaining ?? 16}
                       onAdvance={handleAdvanceSegment}
