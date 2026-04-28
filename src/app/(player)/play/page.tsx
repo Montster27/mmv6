@@ -2832,13 +2832,16 @@ export default function PlayPage() {
     setRefreshTick((t) => t + 1);
   }, [chapterOneMode, visibleTrackCount, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage, sleepCardDone]);
 
-  // Segment transitions auto-advance from inside SegmentTransitionCard (300ms
-  // fade on mount → onAdvance → handleAdvanceSegment). The page-level effect
-  // that previously auto-advanced via a 400ms timer was removed because it
-  // fired with state captured at render time; the in-card timer fires from
-  // the render that already decided the card should show, so the race is
-  // closed. advanceInFlightRef guards against concurrent advances.
-  // See commits 07c047d, 22b3b46, 9bbde1c for the earlier patch chain.
+  // Segment transitions are explicit player clicks: SegmentTransitionCard
+  // renders a "Continue to <next>" button that calls handleAdvanceSegment
+  // when the player is between segments with no beats to surface.
+  // advanceInFlightRef guards against double-clicks racing two
+  // /api/time/advance calls. No timer-based auto-advance — that pattern
+  // (page-level 400ms timer, then later in-card 300ms timer) repeatedly
+  // produced cascade bugs (skip-through-empty-segments) and stuck-card
+  // bugs (re-render cancels timeout) because both fired with state
+  // snapshotted at scheduling time. See 00edffc for the rework rationale
+  // and 07c047d / 22b3b46 / 9bbde1c for the earlier patch chain.
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
@@ -3797,11 +3800,11 @@ export default function PlayPage() {
                     </section>
                   )}
 
-                  {/* Segment transition card — morning/afternoon/evening done, advance to next.
-                      Mirrors the auto-complete effect's "resolved>0 || stage=='complete'"
-                      guard (line ~2829) so a fresh load with not-yet-fetched beats can't
-                      auto-skip through every segment of the day. Without this, the
-                      key={segment}-driven remount fires onAdvance during the loading race. */}
+                  {/* Segment transition card — explicit Continue button advances to next.
+                      Gated on `resolvedTrackStoryletIds.size > 0 || stage === "complete"`
+                      to mirror the auto-complete effect (line ~2829): on a fresh load with
+                      not-yet-fetched beats, this prevents the card from appearing prematurely
+                      and letting the player click past content that's about to render. */}
                   {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode &&
                     visibleTrackCount === 0 && pendingDismissalBeats.length === 0 &&
                     !sleepCardDone &&

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
 
 type Segment = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -11,11 +11,23 @@ const NEXT_SEGMENT: Record<Segment, Segment> = {
   night: 'night',
 };
 
-const SEGMENT_FLAVOR: Record<Segment, { heading: string }> = {
-  afternoon: { heading: 'The morning is behind you.' },
-  evening: { heading: 'The afternoon fades.' },
-  night: { heading: 'The evening is done.' },
-  morning: { heading: '' },
+const SEGMENT_FLAVOR: Record<Segment, { heading: string; body: string }> = {
+  afternoon: {
+    heading: 'The morning is behind you.',
+    body: 'The afternoon opens up. A stretch of hours without anything fixed on the schedule.',
+  },
+  evening: {
+    heading: 'The afternoon fades.',
+    body: 'The light shifts. The campus starts to feel quieter in some ways, louder in others. Evening has its own texture.',
+  },
+  night: {
+    heading: 'The evening is done.',
+    body: 'The hall gets quieter. Whoever is still up is awake because they chose to be. The night part of the day begins.',
+  },
+  morning: {
+    heading: 'A new segment.',
+    body: '',
+  },
 };
 
 type Props = {
@@ -24,41 +36,54 @@ type Props = {
   onAdvance: () => void;
 };
 
-const AUTO_ADVANCE_MS = 300;
-
-export function SegmentTransitionCard({ currentSegment, onAdvance }: Props) {
+// Explicit-click design — no auto-advance timer. Aligns with the
+// 00edffc refactor that removed the page-level auto-advance timer for
+// the same reason (stale-closure window during data refetch / re-render
+// would fire onAdvance unreliably or skip through multiple segments).
+// ad97554's P1.5 reintroduced a 300ms in-card timer with firedRef as
+// safety; that pattern broke under parent re-renders within the 300ms
+// window (cleanup clears the timer, firedRef short-circuits scheduling
+// a new one — observed at day 2 evening with empty segment causing
+// "The evening is done." to hang permanently). This component has no
+// timing assumptions: the player clicks Continue to advance.
+//
+// Concurrent-click safety is at the parent: handleAdvanceSegment
+// guards on advanceInFlightRef so a double-click can't fire two
+// /api/time/advance calls.
+export function SegmentTransitionCard({ currentSegment, hoursRemaining, onAdvance }: Props) {
   const nextSegment = NEXT_SEGMENT[currentSegment];
   const flavor = SEGMENT_FLAVOR[nextSegment];
-  // Local guard: a StrictMode double-mount or a parent re-render must not
-  // fire onAdvance twice. The parent-level advanceInFlightRef also guards
-  // against concurrent calls to /api/time/advance, but that guard is
-  // stateful and may reset between renders — this local ref is belt-and-
-  // braces for the single card instance.
-  const firedRef = useRef(false);
-
-  useEffect(() => {
-    if (firedRef.current) return;
-    firedRef.current = true;
-    const t = window.setTimeout(() => {
-      onAdvance();
-    }, AUTO_ADVANCE_MS);
-    return () => {
-      window.clearTimeout(t);
-    };
-  }, [onAdvance]);
 
   return (
-    <div
-      className="rounded border-2 border-primary/10 bg-card px-6 py-6 shadow-warm-lg narrative-enter"
-      role="status"
-      aria-live="polite"
-    >
-      <p className="prep-label">{currentSegment} — done</p>
-      {flavor.heading && (
-        <h3 className="mt-3 font-heading text-2xl font-bold text-foreground leading-snug">
-          {flavor.heading}
-        </h3>
+    <div className="rounded border-2 border-primary/10 bg-card px-6 py-6 shadow-warm-lg space-y-4 narrative-enter">
+      <p className="prep-label segment-text-enter">
+        {currentSegment} — done
+      </p>
+      <h3
+        className="font-heading text-2xl font-bold text-foreground leading-snug segment-text-enter"
+        style={{ animationDelay: '0.15s' }}
+      >
+        {flavor.heading}
+      </h3>
+      {flavor.body && (
+        <p
+          className="font-body text-base text-foreground/70 leading-relaxed max-w-[36rem] segment-text-enter"
+          style={{ animationDelay: '0.3s' }}
+        >
+          {flavor.body}
+        </p>
       )}
+      <div
+        className="flex items-center justify-between pt-2 segment-text-enter"
+        style={{ animationDelay: '0.45s' }}
+      >
+        <span className="font-stat text-xs text-muted-foreground tabular-nums">
+          {hoursRemaining}h remaining
+        </span>
+        <Button onClick={onAdvance} size="default">
+          Continue to {nextSegment}
+        </Button>
+      </div>
     </div>
   );
 }
