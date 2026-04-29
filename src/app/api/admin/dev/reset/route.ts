@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import { isUserAdmin } from "@/lib/adminAuthServer";
 import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
+import { logState } from "@/lib/stateLog";
 
 function utcToday(): string {
   const now = new Date();
@@ -70,6 +71,20 @@ export async function POST(request: Request) {
   const now = new Date().toISOString();
   const currentSeasonIndex = await getCurrentSeasonIndex();
 
+  logState({
+    surface: "reset",
+    action: "resetUser.start",
+    userId,
+    details: { route: "dev-reset", adminId: admin.id, currentSeasonIndex },
+  });
+
+  // PHASE-2-NOTE: [surface 2, dev-reset] this route omits period_stance_state
+  // and preclusion_gates from the daily_states reset; run-reset includes them.
+  // Either is a divergence that could leave dev-reset users with stale stance
+  // counters or precluded keys.
+  // PHASE-2-NOTE: [surface 2, dev-reset] deletes are sequential here, parallel
+  // in run-reset — different atomicity surface.
+
   await supabaseServer.from("storylet_runs").delete().eq("user_id", userId);
   await supabaseServer.from("reflections").delete().eq("user_id", userId);
   await supabaseServer.from("time_allocations").delete().eq("user_id", userId);
@@ -104,6 +119,27 @@ export async function POST(request: Request) {
     .from("social_actions")
     .delete()
     .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`);
+
+  logState({
+    surface: "reset",
+    action: "resetUser.deletes.after",
+    userId,
+    details: { route: "dev-reset", hypothesisCount: hypothesisIds.length },
+  });
+
+  logState({
+    surface: "reset",
+    action: "resetUser.dailyStates.before",
+    userId,
+    details: {
+      route: "dev-reset",
+      newDayIndex: 1,
+      newCurrentSegment: "morning",
+      newHoursRemaining: 16,
+      newHoursCommitted: 0,
+      bcfc171Coverage: ["current_segment", "hours_remaining", "hours_committed"],
+    },
+  });
 
   await supabaseServer
     .from("daily_states")
@@ -160,6 +196,13 @@ export async function POST(request: Request) {
       })
       .eq("user_id", userId);
   }
+
+  logState({
+    surface: "reset",
+    action: "resetUser.complete",
+    userId,
+    details: { route: "dev-reset", currentSeasonIndex },
+  });
 
   return NextResponse.json({ ok: true });
 }

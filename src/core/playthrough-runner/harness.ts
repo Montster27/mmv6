@@ -22,6 +22,7 @@ import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 import type { Track, TrackStoryletRow, TrackProgress, DueStorylet } from "@/types/tracks";
 import type { DialogueNode, MicroChoice } from "@/types/storylets";
 import type { FixtureSnapshot } from "./types";
+import { logState } from "@/lib/stateLog";
 
 const SEGMENT_ORDER = ["morning", "afternoon", "evening", "night"] as const;
 
@@ -307,6 +308,20 @@ export class PlaythroughHarness {
     }
 
     // Record to choice_log (drives requires_choice pool gating)
+    logState({
+      surface: "choice-log",
+      action: "choiceLog.storyletResolved",
+      userId: this.userId,
+      details: {
+        harness: true,
+        dayIndex: this.dayIndex,
+        trackId: storylet.track_id,
+        progressId: progressRow.id,
+        stepKey: storyletKey,
+        optionKey: choiceId,
+        nextKey: validNextKey,
+      },
+    });
     await db.from("choice_log").insert({
       user_id: this.userId,
       day: this.dayIndex,
@@ -321,6 +336,20 @@ export class PlaythroughHarness {
     // Write persistent flags (sets_flag on choice)
     const setsFlag = choice.sets_flag as string[] | undefined;
     if (Array.isArray(setsFlag) && setsFlag.length > 0) {
+      logState({
+        surface: "choice-log",
+        action: "choiceLog.flagSet",
+        userId: this.userId,
+        details: {
+          harness: true,
+          dayIndex: this.dayIndex,
+          trackId: storylet.track_id,
+          progressId: progressRow.id,
+          stepKey: storyletKey,
+          sourceChoice: choiceId,
+          flags: setsFlag,
+        },
+      });
       const flagInserts = setsFlag.map((flag) => ({
         user_id: this.userId,
         day: this.dayIndex,
@@ -437,6 +466,19 @@ export class PlaythroughHarness {
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", this.userId);
+      logState({
+        surface: "choice-log",
+        action: "choiceLog.periodStance",
+        userId: this.userId,
+        details: {
+          harness: true,
+          dayIndex: this.dayIndex,
+          tag,
+          storyletKey: ws.storyletKey,
+          nodeId,
+          microChoiceId,
+        },
+      });
       await db.from("choice_log").insert({
         user_id: this.userId,
         day: this.dayIndex,

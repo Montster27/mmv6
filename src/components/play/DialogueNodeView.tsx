@@ -9,6 +9,7 @@ import {
   resolveMicroLabel,
   type PlayerContext,
 } from "@/lib/nodeConditions";
+import { logState } from "@/lib/stateLog";
 
 type DialogueNodeViewProps = {
   preamble: string;
@@ -52,23 +53,53 @@ function loadPersistedWalk(storyletKey: string | undefined): PersistedWalkState 
   if (!storyletKey || typeof window === "undefined") return null;
   try {
     const raw = window.sessionStorage.getItem(WALK_STATE_STORAGE_PREFIX + storyletKey);
-    if (!raw) return null;
+    if (!raw) {
+      logState({
+        surface: "walk-state",
+        action: "walkState.read",
+        details: { storyletKey, found: false },
+      });
+      return null;
+    }
     const parsed = JSON.parse(raw) as Partial<PersistedWalkState>;
-    return {
+    const result = {
       currentNodeId: parsed.currentNodeId ?? null,
       activeFlags: Array.isArray(parsed.activeFlags) ? parsed.activeFlags : [],
       completedNodeIds: Array.isArray(parsed.completedNodeIds) ? parsed.completedNodeIds : [],
       showChoices: Boolean(parsed.showChoices),
     };
-  } catch {
+    logState({
+      surface: "walk-state",
+      action: "walkState.read",
+      details: {
+        storyletKey,
+        found: true,
+        currentNodeId: result.currentNodeId,
+        activeFlagsCount: result.activeFlags.length,
+        completedCount: result.completedNodeIds.length,
+        showChoices: result.showChoices,
+      },
+    });
+    return result;
+  } catch (err) {
+    logState({
+      surface: "walk-state",
+      action: "walkState.read.error",
+      details: { storyletKey, error: (err as Error)?.message ?? String(err) },
+    });
     return null;
   }
 }
 
-function clearPersistedWalk(storyletKey: string | undefined) {
+function clearPersistedWalk(storyletKey: string | undefined, reason: "terminalChoice" | "explicit" = "explicit") {
   if (!storyletKey || typeof window === "undefined") return;
   try {
     window.sessionStorage.removeItem(WALK_STATE_STORAGE_PREFIX + storyletKey);
+    logState({
+      surface: "walk-state",
+      action: "walkState.clear",
+      details: { storyletKey, reason },
+    });
   } catch {
     // ignore — storage may be full or disabled
   }
@@ -179,8 +210,23 @@ export function DialogueNodeView({
           showChoices,
         }),
       );
-    } catch {
-      // ignore — storage may be full or disabled
+      logState({
+        surface: "walk-state",
+        action: "walkState.write",
+        details: {
+          storyletKey,
+          currentNodeId,
+          activeFlagsCount: activeFlags.size,
+          completedCount: completedNodeIds.length,
+          showChoices,
+        },
+      });
+    } catch (err) {
+      logState({
+        surface: "walk-state",
+        action: "walkState.write.error",
+        details: { storyletKey, error: (err as Error)?.message ?? String(err) },
+      });
     }
   }, [storyletKey, currentNodeId, activeFlags, completedNodeIds, showChoices]);
 
@@ -328,7 +374,7 @@ export function DialogueNodeView({
               <button
                 disabled={disabled}
                 onClick={() => {
-                  clearPersistedWalk(storyletKey);
+                  clearPersistedWalk(storyletKey, "terminalChoice");
                   onChoice(choice.id, new Set(activeFlags));
                 }}
                 className="choice-btn choice-enter"

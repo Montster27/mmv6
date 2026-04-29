@@ -7,6 +7,7 @@ import {
 } from "@/core/resources/resourceDelta";
 import { recordResourceTrace } from "@/core/resources/resourceTrace";
 import type { ResourceDelta } from "@/core/resources/resourceDelta";
+import { logState } from "@/lib/stateLog";
 
 type ResourceApplyOptions = {
   source?: string;
@@ -91,6 +92,19 @@ export async function applyResourceDelta(
   };
   recordResourceTrace(traceEvent);
 
+  logState({
+    surface: "choice-log",
+    action: "choiceLog.resourceApplied",
+    userId,
+    details: {
+      dayIndex,
+      stepKey: options.stepKey ?? null,
+      optionKey: options.optionKey ?? null,
+      source: options.source ?? "resource_delta",
+      appliedKeys: Object.keys(applied),
+      skillPoints: delta.skill_points ?? 0,
+    },
+  });
   const { error: logError } = await supabase.from("choice_log").insert({
     user_id: userId,
     day: dayIndex,

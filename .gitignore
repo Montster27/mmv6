@@ -53,3 +53,6 @@ next-env.d.ts
 
 # simulation logs
 sim-log-*.json
+
+# Phase 1 instrumentation captures (T-1777400000001) — local diagnostic dumps, not for repo
+/docs/captures/

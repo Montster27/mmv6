@@ -17,6 +17,7 @@ import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
 import { applyResourceDelta } from "@/lib/resources";
 import type { CheckResult, CheckSkillLevels } from "@/types/checks";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { logState } from "@/lib/stateLog";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -760,6 +761,12 @@ export async function updateLifePressureState(
   userId: string,
   lifePressureState: Record<string, number>
 ): Promise<void> {
+  logState({
+    surface: "daily-state-mutation",
+    action: "dailyStates.lifePressureState",
+    userId,
+    details: { keys: Object.keys(lifePressureState), valueCount: Object.keys(lifePressureState).length },
+  });
   const { error } = await supabase
     .from("daily_states")
     .update({ life_pressure_state: lifePressureState, updated_at: new Date().toISOString() })
@@ -771,6 +778,12 @@ export async function updatePeriodStanceState(
   userId: string,
   periodStanceState: Record<string, number>
 ): Promise<void> {
+  logState({
+    surface: "daily-state-mutation",
+    action: "dailyStates.periodStanceState",
+    userId,
+    details: { state: periodStanceState },
+  });
   const { error } = await supabase
     .from("daily_states")
     .update({ period_stance_state: periodStanceState, updated_at: new Date().toISOString() })
@@ -784,6 +797,12 @@ export async function logPeriodStanceEvent(
   tag: "challenged" | "deflected" | "absorbed",
   meta: Record<string, unknown> = {}
 ): Promise<void> {
+  logState({
+    surface: "choice-log",
+    action: "choiceLog.periodStance",
+    userId,
+    details: { dayIndex, tag, meta },
+  });
   const { error } = await supabase.from("choice_log").insert({
     user_id: userId,
     day: dayIndex,
@@ -818,6 +837,12 @@ export async function updateSkillFlags(
   userId: string,
   skillFlags: Record<string, number>
 ): Promise<void> {
+  logState({
+    surface: "daily-state-mutation",
+    action: "dailyStates.skillFlags",
+    userId,
+    details: { keys: Object.keys(skillFlags) },
+  });
   const { error } = await supabase
     .from("daily_states")
     .update({ skill_flags: skillFlags, updated_at: new Date().toISOString() })
@@ -829,6 +854,12 @@ export async function updatePreclusionGates(
   userId: string,
   gates: string[]
 ): Promise<void> {
+  logState({
+    surface: "daily-state-mutation",
+    action: "dailyStates.preclusionGates",
+    userId,
+    details: { count: gates.length },
+  });
   const { error } = await supabase
     .from("daily_states")
     .update({ preclusion_gates: gates, updated_at: new Date().toISOString() })

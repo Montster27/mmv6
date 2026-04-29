@@ -134,6 +134,7 @@ import type { Segment as BridgeSegment } from "@/lib/segmentBridge";
 import type { TrackStorylet } from "@/types/tracks";
 import type { StoryletChoice } from "@/types/storylets";
 import { useQueryClient } from "@tanstack/react-query";
+import { logState } from "@/lib/stateLog";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -364,6 +365,11 @@ export default function PlayPage() {
   useEffect(() => {
     if (bootstrapQuery.isError) {
       setError("Failed to load play state.");
+      logState({
+        surface: "session-restore",
+        action: "sessionRestore.bootstrap.error",
+        details: {},
+      });
       return;
     }
     if (!bootstrapQuery.data) return;
@@ -372,6 +378,15 @@ export default function PlayPage() {
     setBootstrapIsAdmin(Boolean(bootstrapQuery.data.isAdmin));
     setBootstrapAssignments(bootstrapQuery.data.experiments ?? {});
     setUserId(bootstrapQuery.data.userId);
+    logState({
+      surface: "session-restore",
+      action: "sessionRestore.bootstrap.success",
+      userId: bootstrapQuery.data.userId,
+      details: {
+        isAdmin: Boolean(bootstrapQuery.data.isAdmin),
+        experimentCount: Object.keys(bootstrapQuery.data.experiments ?? {}).length,
+      },
+    });
   }, [bootstrapQuery.data, bootstrapQuery.isError]);
 
   // Fetch skill web on bootstrap
@@ -402,6 +417,12 @@ export default function PlayPage() {
       if (cancelled) return;
       setPlayerIdentity(identity);
       setPriorPeriodStance(prior);
+      logState({
+        surface: "session-restore",
+        action: "sessionRestore.identityStance",
+        userId,
+        details: { identityFetched: !!identity, priorPeriodStance: prior },
+      });
     })();
     return () => {
       cancelled = true;
@@ -860,6 +881,21 @@ export default function PlayPage() {
         if (USE_DAILY_LOOP_ORCHESTRATOR) {
           const run = dailyRunQuery.data;
           if (!run) return;
+          logState({
+            surface: "session-restore",
+            action: "sessionRestore.dailyRun.success",
+            userId: bootstrapUserId ?? undefined,
+            details: {
+              dayIndex: run.dayIndex,
+              stage: run.stage,
+              storyletCount: run.storylets?.length ?? 0,
+              hasDayState: !!run.dayState,
+              hasDailyState: !!run.dailyState,
+              gameMode: run.gameMode ?? null,
+              prevDayIndexRef: lastRunDayIndexRef.current,
+              refreshTick,
+            },
+          });
           if (
             typeof lastRunDayIndexRef.current === "number" &&
             lastRunDayIndexRef.current !== run.dayIndex
@@ -909,6 +945,18 @@ export default function PlayPage() {
           const ds =
             run.dailyState ?? (await fetchDailyState(bootstrapUserId));
           if (ds) {
+            logState({
+              surface: "daily-state-mutation",
+              action: "sessionRestore.hydrate",
+              userId: bootstrapUserId ?? undefined,
+              details: {
+                dailyStateDayIndex: (ds as any)?.day_index ?? null,
+                runDayIndex: run.dayIndex,
+                source: run.dailyState ? "dailyRunQuery" : "fetchDailyState",
+                currentSegment: (ds as any)?.current_segment ?? null,
+                hoursRemaining: (ds as any)?.hours_remaining ?? null,
+              },
+            });
             setDailyState({ ...ds, day_index: run.dayIndex });
             if (!run.dayState) {
               setDayState({
@@ -1731,6 +1779,19 @@ export default function PlayPage() {
       period_stance?: "challenged" | "deflected" | "absorbed";
     }) => {
       if (!userId) return;
+      logState({
+        surface: "micro-choice",
+        action: "microChoice.start",
+        userId,
+        details: {
+          storyletSlug: currentStorylet?.slug ?? null,
+          dayIndex,
+          hasNpcMemory: !!effects.set_npc_memory,
+          hasRelational: !!effects.relational_effect,
+          identityTagsCount: (effects.identity_tags ?? []).length,
+          periodStance: effects.period_stance ?? null,
+        },
+      });
       const events: RelationshipEvent[] = [
         ...mapLegacyRelationalEffects(effects.relational_effect),
         ...mapLegacyNpcKnowledge(effects.set_npc_memory),
@@ -1743,6 +1804,12 @@ export default function PlayPage() {
         );
         await updateRelationships(userId, nextRelationships, dayIndex);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "microChoice.relationships",
+            userId,
+            details: { storyletSlug: currentStorylet?.slug ?? null, npcCount: Object.keys(nextRelationships).length },
+          });
           setDailyState({ ...dailyState, relationships: nextRelationships });
         }
       }
@@ -1751,6 +1818,12 @@ export default function PlayPage() {
         const nextLp = bumpLifePressure(chapterOneState.lifePressureState, tags);
         await updateLifePressureState(userId, nextLp);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "microChoice.lifePressure",
+            userId,
+            details: { storyletSlug: currentStorylet?.slug ?? null, identityTags: tags },
+          });
           setDailyState({ ...dailyState, life_pressure_state: nextLp });
         }
       }
@@ -1765,9 +1838,21 @@ export default function PlayPage() {
         ]);
         setPriorPeriodStance(stance);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "microChoice.periodStance",
+            userId,
+            details: { storyletSlug: currentStorylet?.slug ?? null, stance, nextStance },
+          });
           setDailyState({ ...dailyState, period_stance_state: nextStance });
         }
       }
+      logState({
+        surface: "micro-choice",
+        action: "microChoice.complete",
+        userId,
+        details: { storyletSlug: currentStorylet?.slug ?? null },
+      });
     },
     [userId, relationshipsState, currentStorylet, dayIndex, dailyState, chapterOneState]
   );
@@ -2153,6 +2238,12 @@ export default function PlayPage() {
         );
         await updateRelationships(userId, nextRelationships, dayIndex);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.relationships",
+            userId,
+            details: { storyletSlug: currentStorylet.slug, choiceId, npcCount: Object.keys(nextRelationships).length },
+          });
           setDailyState({ ...dailyState, relationships: nextRelationships });
         }
         const summary = logs.map((entry) => {
@@ -2208,6 +2299,12 @@ export default function PlayPage() {
         const nextLp = bumpLifePressure(chapterOneState.lifePressureState, choiceIdentityTags);
         await updateLifePressureState(userId, nextLp);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.lifePressure",
+            userId,
+            details: { storyletSlug: currentStorylet.slug, choiceId, identityTags: choiceIdentityTags },
+          });
           setDailyState({ ...dailyState, life_pressure_state: nextLp });
         }
       }
@@ -2218,6 +2315,12 @@ export default function PlayPage() {
         const nextFlags = updateSkillFlag(chapterOneState.skillFlags, skillModifier as any);
         await updateSkillFlags(userId, nextFlags);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.skillFlags",
+            userId,
+            details: { storyletSlug: currentStorylet.slug, choiceId, skillModifier },
+          });
           setDailyState({ ...dailyState, skill_flags: nextFlags });
         }
       }
@@ -2229,6 +2332,12 @@ export default function PlayPage() {
         const nextGates = [...new Set([...currentGates, ...precludes])];
         await updatePreclusionGates(userId, nextGates);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.preclusionGates",
+            userId,
+            details: { storyletSlug: currentStorylet.slug, choiceId, addedKeys: precludes, prevCount: currentGates.length, newCount: nextGates.length },
+          });
           setDailyState({ ...dailyState, preclusion_gates: nextGates });
         }
       }
@@ -2428,6 +2537,18 @@ export default function PlayPage() {
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("No session");
 
+      logState({
+        surface: "track-resolve",
+        action: "resolveTerminalChoice.clientStart",
+        userId: userId ?? undefined,
+        details: {
+          progressId: beat.progress_id,
+          storyletKey: beat.storylet_key,
+          optionKey: option.id,
+          dayIndex,
+        },
+      });
+
       const res = await fetch("/api/tracks/resolve", {
         method: "POST",
         headers: {
@@ -2442,6 +2563,18 @@ export default function PlayPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+        logState({
+          surface: "track-resolve",
+          action: "resolveTerminalChoice.clientError",
+          userId: userId ?? undefined,
+          details: {
+            progressId: beat.progress_id,
+            storyletKey: beat.storylet_key,
+            optionKey: option.id,
+            status: res.status,
+            error: body.error ?? null,
+          },
+        });
         if (body.error === "insufficient_resources") {
           toast(
             (body.message as string) ?? "Not enough resources for this choice.",
@@ -2454,6 +2587,20 @@ export default function PlayPage() {
       }
 
       const resBody = await res.json().catch(() => ({ next_key: null }));
+
+      logState({
+        surface: "track-resolve",
+        action: "resolveTerminalChoice.clientComplete",
+        userId: userId ?? undefined,
+        details: {
+          progressId: beat.progress_id,
+          storyletKey: beat.storylet_key,
+          optionKey: option.id,
+          nextKey: (resBody as any)?.next_key ?? null,
+          activatedTrack: (resBody as any)?.activated_track ?? null,
+          duplicate: (resBody as any)?.duplicate ?? false,
+        },
+      });
 
       // --- Resolve conditional reaction text (e.g. money_band conditions) ---
       // Computed BEFORE the optimistic UI flip so the outcome card opens with
@@ -2508,6 +2655,18 @@ export default function PlayPage() {
             ? Math.max(0, Math.min(100, dayState.stress + outcomeDeltas.stress))
             : dayState.stress;
         const res = outcomeDeltas.resources ?? {};
+        logState({
+          surface: "daily-state-mutation",
+          action: "terminalResolve.optimisticDayState",
+          userId: userId ?? undefined,
+          details: {
+            storyletKey: beat.storylet_key,
+            optionKey: option.id,
+            energyDelta: outcomeDeltas.energy ?? 0,
+            stressDelta: outcomeDeltas.stress ?? 0,
+            resourceKeys: Object.keys(res),
+          },
+        });
         setDayState({
           ...dayState,
           energy: nextEnergy,
@@ -2555,8 +2714,17 @@ export default function PlayPage() {
             );
             await updateRelationships(userId, nextRelationships, dayIndex);
             if (dailyState) {
+              logState({
+                surface: "daily-state-mutation",
+                action: "trackStoryletChoice.relationships",
+                userId,
+                details: { storyletKey: beat.storylet_key, optionKey: option.id, npcCount: Object.keys(nextRelationships).length, eventCount: relationshipEvents.length },
+              });
               setDailyState({ ...dailyState, relationships: nextRelationships });
             }
+            // PHASE-2-NOTE: [surface 6b, line 2743] choice_log insert here is
+            // a fire-and-forget client-side write outside the resolve route —
+            // potentially an under-instrumented surface for state-divergence.
             // Log each relationship change
             logs.forEach((entry) => {
               const flagChanged =
