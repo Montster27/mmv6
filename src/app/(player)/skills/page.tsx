@@ -6,17 +6,21 @@ import { SkillsPanel } from "@/components/skills/SkillsPanel";
 import { useSkillQueue } from "@/hooks/useSkillQueue";
 
 export default function SkillsPage() {
-  const { active, trained, loading } = useSkillQueue();
+  const { active, queued, availableToTrain, loading } = useSkillQueue();
   const [showQueue, setShowQueue] = useState(false);
   const [autoShown, setAutoShown] = useState(false);
 
-  // Auto-show queue if player has nothing training on first load
+  // Auto-show queue whenever the player has an empty slot they could fill.
+  // Covers first load (no active), after returning mid-training (active set
+  // but queued empty — T-1777320000001), and after a completion frees a slot.
   useEffect(() => {
-    if (!loading && !active && trained.length === 0 && !autoShown) {
+    if (loading || autoShown) return;
+    const hasOpenSlot = !active || !queued;
+    if (hasOpenSlot && availableToTrain.length > 0) {
       setShowQueue(true);
       setAutoShown(true);
     }
-  }, [loading, active, trained.length, autoShown]);
+  }, [loading, active, queued, availableToTrain.length, autoShown]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 space-y-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { DialogueNode, MicroChoice, StoryletChoice } from "@/types/storylets";
 import { getNpcEntry } from "@/domain/npcs/registry";
 import {
@@ -31,7 +31,48 @@ type DialogueNodeViewProps = {
   /** Player identity + period-stance state for node gates and variant selection. */
   playerContext?: PlayerContext;
   disabled?: boolean;
+  /**
+   * Stable identifier for the storylet, used to persist the in-progress walk
+   * across navigations away from /play (e.g. to /skills) — see T-1777320000003.
+   * When omitted, walk state lives only in-memory.
+   */
+  storyletKey?: string;
 };
+
+const WALK_STATE_STORAGE_PREFIX = "mmv:dialogueWalk:";
+
+interface PersistedWalkState {
+  currentNodeId: string | null;
+  activeFlags: string[];
+  completedNodeIds: string[];
+  showChoices: boolean;
+}
+
+function loadPersistedWalk(storyletKey: string | undefined): PersistedWalkState | null {
+  if (!storyletKey || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(WALK_STATE_STORAGE_PREFIX + storyletKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersistedWalkState>;
+    return {
+      currentNodeId: parsed.currentNodeId ?? null,
+      activeFlags: Array.isArray(parsed.activeFlags) ? parsed.activeFlags : [],
+      completedNodeIds: Array.isArray(parsed.completedNodeIds) ? parsed.completedNodeIds : [],
+      showChoices: Boolean(parsed.showChoices),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistedWalk(storyletKey: string | undefined) {
+  if (!storyletKey || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(WALK_STATE_STORAGE_PREFIX + storyletKey);
+  } catch {
+    // ignore — storage may be full or disabled
+  }
+}
 
 function findInitialNode(
   nodes: DialogueNode[],
@@ -98,13 +139,50 @@ export function DialogueNodeView({
   relationships,
   playerContext,
   disabled,
+  storyletKey,
 }: DialogueNodeViewProps) {
-  const [currentNodeId, setCurrentNodeId] = useState<string | null>(() =>
-    findInitialNode(nodes, relationships, playerContext)
-  );
-  const [activeFlags, setActiveFlags] = useState<Set<string>>(new Set());
-  const [completedNodeIds, setCompletedNodeIds] = useState<string[]>([]);
-  const [showChoices, setShowChoices] = useState(nodes.length === 0);
+  const [currentNodeId, setCurrentNodeId] = useState<string | null>(() => {
+    const persisted = loadPersistedWalk(storyletKey);
+    if (persisted) {
+      // Only honour the persisted node if it still exists in the current node set.
+      if (persisted.currentNodeId === null || nodes.some((n) => n.id === persisted.currentNodeId)) {
+        return persisted.currentNodeId;
+      }
+    }
+    return findInitialNode(nodes, relationships, playerContext);
+  });
+  const [activeFlags, setActiveFlags] = useState<Set<string>>(() => {
+    const persisted = loadPersistedWalk(storyletKey);
+    return persisted ? new Set(persisted.activeFlags) : new Set();
+  });
+  const [completedNodeIds, setCompletedNodeIds] = useState<string[]>(() => {
+    const persisted = loadPersistedWalk(storyletKey);
+    return persisted ? persisted.completedNodeIds : [];
+  });
+  const [showChoices, setShowChoices] = useState(() => {
+    const persisted = loadPersistedWalk(storyletKey);
+    if (persisted) return persisted.showChoices;
+    return nodes.length === 0;
+  });
+
+  // Persist walk state on every change so /play unmounts (e.g. nav to /skills)
+  // don't lose the player's progress through a multi-node storylet.
+  useEffect(() => {
+    if (!storyletKey || typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(
+        WALK_STATE_STORAGE_PREFIX + storyletKey,
+        JSON.stringify({
+          currentNodeId,
+          activeFlags: Array.from(activeFlags),
+          completedNodeIds,
+          showChoices,
+        }),
+      );
+    } catch {
+      // ignore — storage may be full or disabled
+    }
+  }, [storyletKey, currentNodeId, activeFlags, completedNodeIds, showChoices]);
 
   const advance = useCallback(
     (nextId: string | undefined | null, flagToSet?: string) => {
@@ -249,7 +327,10 @@ export function DialogueNodeView({
               {i > 0 && <div className="prep-divider" />}
               <button
                 disabled={disabled}
-                onClick={() => onChoice(choice.id, new Set(activeFlags))}
+                onClick={() => {
+                  clearPersistedWalk(storyletKey);
+                  onChoice(choice.id, new Set(activeFlags));
+                }}
                 className="choice-btn choice-enter"
                 style={{ animationDelay: `${i * 0.08}s` }}
               >

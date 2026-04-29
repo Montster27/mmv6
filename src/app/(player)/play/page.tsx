@@ -3317,6 +3317,10 @@ export default function PlayPage() {
                                       onMicroEffects={handleMicroEffects}
                                       playerContext={playerContext}
                                       disabled={savingChoice}
+                                      storyletKey={
+                                        (currentStorylet as { storylet_key?: string }).storylet_key
+                                          ?? currentStorylet.id
+                                      }
                                     />
                                   );
                                 }
