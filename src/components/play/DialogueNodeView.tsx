@@ -10,6 +10,7 @@ import {
   type PlayerContext,
 } from "@/lib/nodeConditions";
 import { logState } from "@/lib/stateLog";
+import { NpcColoredText } from "./NpcColoredText";
 
 type DialogueNodeViewProps = {
   preamble: string;
@@ -146,7 +147,7 @@ function NodeText({
     return (
       <div className={className}>
         <p className="whitespace-pre-line font-body text-[15px] italic leading-relaxed text-foreground/85">
-          &ldquo;{text}&rdquo;
+          &ldquo;<NpcColoredText text={text} />&rdquo;
         </p>
         <p className="mt-1 font-stat text-xs text-muted-foreground/60 tracking-wide">
           &mdash;{" "}
@@ -159,7 +160,7 @@ function NodeText({
   }
   return (
     <p className={`whitespace-pre-line font-body text-[15px] leading-relaxed text-foreground/85 ${className ?? ""}`}>
-      {text}
+      <NpcColoredText text={text} />
     </p>
   );
 }
@@ -320,7 +321,7 @@ export function DialogueNodeView({
     <div className="space-y-4">
       {/* Preamble */}
       <p className="whitespace-pre-line font-body text-base leading-relaxed text-foreground/85 max-w-[42rem]">
-        {preamble}
+        <NpcColoredText text={preamble} />
       </p>
 
       {/* Completed nodes — faded narrative scroll */}

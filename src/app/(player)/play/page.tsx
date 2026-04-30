@@ -123,6 +123,7 @@ import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { TrackStoryletCard } from "@/components/play/TrackStoryletCard";
 import { DialogueNodeView } from "@/components/play/DialogueNodeView";
+import { NpcColoredText } from "@/components/play/NpcColoredText";
 import { SleepCard } from "@/components/play/SleepCard";
 import { SegmentTransitionCard } from "@/components/play/SegmentTransitionCard";
 import { WeeklyCalendar } from "@/components/play/WeeklyCalendar";
@@ -3467,7 +3468,7 @@ export default function PlayPage() {
                                 </h3>
                                 {!currentStorylet.nodes?.length && (
                                   <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">
-                                    {displayBody}
+                                    <NpcColoredText text={displayBody} />
                                   </p>
                                 )}
                               </div>

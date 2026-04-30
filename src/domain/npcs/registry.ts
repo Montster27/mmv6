@@ -5,8 +5,14 @@ export type NpcEntry = {
   name: string;
   /** Brief parenthetical fragment for first-encounter body prepend (≤20 words). */
   short_intro: string;
-  /** Hex color (e.g. "#7c5cff") applied to the NPC's name in dialogue speaker labels. */
+  /** Hex color (e.g. "#7c5cff") applied to the NPC's name in dialogue speaker labels and inline body prose. */
   display_color?: string;
+  /**
+   * When true, this NPC's name is excluded from automatic body-prose color matching.
+   * Set for names that collide with common English words (e.g. "Will", "Mark", "Faith").
+   * Speaker-attribution coloring still fires.
+   */
+  is_ambiguous?: boolean;
 };
 
 export const NPC_REGISTRY: NpcEntry[] = [
