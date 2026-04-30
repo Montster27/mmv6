@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { RoutineActivity } from "@/types/routine";
 
+// Display priority for the weekly schedule UI:
+// classes → work → skill training (creative/physical) → social/leisure (social/practical).
+// Within a category, larger commitments sort first (half_day_cost DESC), then alphabetical.
+const CATEGORY_DISPLAY_PRIORITY: Record<string, number> = {
+  academic: 0,
+  work: 1,
+  creative: 2,
+  physical: 2,
+  social: 3,
+  practical: 4,
+};
+
 async function getUserFromToken(request: Request) {
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ")
@@ -29,14 +41,19 @@ export async function GET(request: Request) {
   const { data: activityRows, error: actErr } = await supabaseServer
     .from("routine_activities")
     .select("*")
-    .eq("is_active", true)
-    .order("half_day_cost", { ascending: true });
+    .eq("is_active", true);
 
   if (actErr) {
     return NextResponse.json({ error: "Failed to load activities" }, { status: 500 });
   }
 
-  const activities = (activityRows ?? []) as RoutineActivity[];
+  const activities = ((activityRows ?? []) as RoutineActivity[]).slice().sort((a, b) => {
+    const ap = CATEGORY_DISPLAY_PRIORITY[a.category] ?? 99;
+    const bp = CATEGORY_DISPLAY_PRIORITY[b.category] ?? 99;
+    if (ap !== bp) return ap - bp;
+    if (a.half_day_cost !== b.half_day_cost) return b.half_day_cost - a.half_day_cost;
+    return a.display_name.localeCompare(b.display_name);
+  });
 
   // Load player flags for requirement checking
   const { data: dailyState } = await supabaseServer
