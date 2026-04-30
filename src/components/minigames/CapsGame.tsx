@@ -161,6 +161,11 @@ export default function CapsGame({
   const startAiming = useCallback(() => {
     meterPosRef.current = 0;
     meterDirRef.current = 1;
+    // Sync phaseRef inline. setPhase only updates phaseRef on the next commit's
+    // useEffect (after paint), but the rAF below fires before that — so meterLoop
+    // would read a stale phase ("scored"/"missed") and bail without re-queuing.
+    // That's why round 2's slider was stuck after the 800ms pause.
+    phaseRef.current = "aiming";
     setPhase("aiming");
     animRef.current = requestAnimationFrame(meterLoop);
   }, [meterLoop]);
