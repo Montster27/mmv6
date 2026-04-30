@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import * as Sentry from "@sentry/nextjs";
 
 import type { MiniGameType, MiniGameResult } from "@/types/storylets";
 
@@ -378,6 +379,7 @@ export default function PlayPage() {
     setBootstrapIsAdmin(Boolean(bootstrapQuery.data.isAdmin));
     setBootstrapAssignments(bootstrapQuery.data.experiments ?? {});
     setUserId(bootstrapQuery.data.userId);
+    Sentry.setUser({ id: bootstrapQuery.data.userId });
     logState({
       surface: "session-restore",
       action: "sessionRestore.bootstrap.success",
