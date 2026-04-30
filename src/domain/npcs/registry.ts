@@ -5,6 +5,8 @@ export type NpcEntry = {
   name: string;
   /** Brief parenthetical fragment for first-encounter body prepend (≤20 words). */
   short_intro: string;
+  /** Hex color (e.g. "#7c5cff") applied to the NPC's name in dialogue speaker labels. */
+  display_color?: string;
 };
 
 export const NPC_REGISTRY: NpcEntry[] = [
@@ -14,6 +16,7 @@ export const NPC_REGISTRY: NpcEntry[] = [
     name: "Scott",
     short_intro:
       "Scott, your roommate — already set up when you arrived, Tigers pennant on the wall, quiet",
+    display_color: "#2e7dd1",
   },
   {
     id: "npc_ra_scott",
@@ -25,31 +28,37 @@ export const NPC_REGISTRY: NpcEntry[] = [
     id: "npc_contact_glenn",
     name: "Glenn",
     short_intro: "Glenn — an upperclassman on a bench near the chapel, knows more than he's saying",
+    display_color: "#7c5cff",
   },
   {
     id: "npc_floor_doug",
     name: "Doug",
     short_intro: "Doug, two doors down — his brother went here, he already knows where everything is",
+    display_color: "#d4742a",
   },
   {
     id: "npc_floor_mike",
     name: "Mike",
     short_intro: "Mike, down the hall — textbook under his arm on day one, precise when he talks",
+    display_color: "#3a8a6e",
   },
   {
     id: "npc_floor_keith",
     name: "Keith",
     short_intro: "Keith Hollis, end of the hall — calloused hands, gives his full name, from a farm",
+    display_color: "#b85a3c",
   },
   {
     id: "npc_anderson_bryce",
     name: "Bryce",
     short_intro: "Bryce, Anderson Hall — throws parties, greets everyone like they're already friends",
+    display_color: "#c44569",
   },
   {
     id: "npc_floor_peterson",
     name: "Peterson",
     short_intro: "Peterson, from the floor — tall, glasses, quiet voice, shuffles cards like he means it",
+    display_color: "#a08038",
   },
   // ── Later NPCs (Week 1+) ──
   {
@@ -57,23 +66,27 @@ export const NPC_REGISTRY: NpcEntry[] = [
     name: "Marsh",
     short_intro:
       "Prof. Marsh, your English lecturer — known for calling on people who look unprepared",
+    display_color: "#445566",
   },
   {
     id: "npc_studious_priya",
     name: "Priya",
     short_intro:
       "Priya, from your sociology section — always three readings ahead, rarely wastes words",
+    display_color: "#1c8d8d",
   },
   {
     id: "npc_ambiguous_jordan",
     name: "Jordan",
     short_intro:
       "Jordan, someone you keep running into — their angle isn't clear yet",
+    display_color: "#8b6f9c",
   },
   {
     id: "npc_parent_voice",
     name: "your parent",
     short_intro: "Your parent — the voice on the other end of the hallway phone",
+    display_color: "#6e6e6e",
   },
   // ── Week 2 NPCs ──
   {

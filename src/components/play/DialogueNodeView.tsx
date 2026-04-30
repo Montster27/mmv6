@@ -149,7 +149,10 @@ function NodeText({
           &ldquo;{text}&rdquo;
         </p>
         <p className="mt-1 font-stat text-xs text-muted-foreground/60 tracking-wide">
-          &mdash; {displayName}
+          &mdash;{" "}
+          <span style={entry?.display_color ? { color: entry.display_color } : undefined}>
+            {displayName}
+          </span>
         </p>
       </div>
     );
