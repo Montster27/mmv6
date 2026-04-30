@@ -52,7 +52,7 @@ export const NPC_REGISTRY: NpcEntry[] = [
     id: "npc_floor_keith",
     name: "Keith",
     short_intro: "Keith Hollis, end of the hall — calloused hands, gives his full name, from a farm",
-    display_color: "#b85a3c",
+    display_color: "#a83838",
   },
   {
     id: "npc_anderson_bryce",
