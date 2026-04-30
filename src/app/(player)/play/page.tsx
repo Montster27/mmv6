@@ -3485,6 +3485,7 @@ export default function PlayPage() {
                                       choices={choices}
                                       onChoice={handleChoice}
                                       onMicroEffects={handleMicroEffects}
+                                      relationships={relationshipsState}
                                       playerContext={playerContext}
                                       disabled={savingChoice}
                                       storyletKey={
