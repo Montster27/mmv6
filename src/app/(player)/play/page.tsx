@@ -1207,8 +1207,12 @@ export default function PlayPage() {
         }
         return;
       }
-      setSleepCardDone(false);
+      // Refetch BEFORE clearing sleepCardDone so the new dayState (morning, 16h)
+      // is in place when the SleepCard visibility condition re-evaluates.
+      // Reverse order caused a flicker: button re-appeared briefly because the
+      // pre-advance dayState (night, 0h) still satisfied the condition.
       await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
+      setSleepCardDone(false);
     } catch (e) {
       console.error("Failed to advance day via sleep", e);
       setSleepCardDone(false);
