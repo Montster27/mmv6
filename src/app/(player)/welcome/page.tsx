@@ -128,9 +128,10 @@ export default function WelcomePage() {
             and how you experience it. You can leave anything unspecified — the game will treat
             that as the default 1983 dorm experience.
           </p>
+          {/* TODO: remove this notice once period_stance content varies by identity. */}
           <p className="text-foreground/60 text-[13px]">
-            These choices are locked once you begin. They will not change the shape of the story,
-            only how specific moments land.
+            These choices don&apos;t change content yet. All paths in this build play as a cis
+            het male. Your selection is saved for future updates.
           </p>
         </div>
         <div className="space-y-5 mb-10">
