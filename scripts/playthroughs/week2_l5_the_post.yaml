@@ -57,8 +57,18 @@ steps:
     storylet_key: evening_choice
     choice_id: go_to_cards
 
-  # ── Sleep through to Day 13 morning (12 sleeps total: Day 1→2, ...→13) ──
+  # ── Day 2 afternoon: resolve terminal_first_visit so the frame-story
+  # slot doesn't perpetually surface it ahead of the_post on Day 15 PM
+  # (terminal_first_visit expires day 16 and would beat the_post's day-22
+  # expiry in opportunity's per-track best-candidate competition).
   - type: sleep
+  - type: advance_segment
+  - type: choose
+    storylet_key: terminal_first_visit
+    choice_id: leave_terminal
+  - type: advance_segment
+
+  # ── Sleep through to Day 13 morning (11 more sleeps after the Day 2 detour) ──
   - type: sleep
   - type: sleep
   - type: sleep

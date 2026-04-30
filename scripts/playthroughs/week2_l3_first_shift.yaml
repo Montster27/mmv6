@@ -38,8 +38,17 @@ steps:
     storylet_key: evening_choice
     choice_id: go_to_cards
 
-  # ── Sleep to Day 5 morning ────────────────────────────────────────────
+  # ── Day 1 afternoon: resolve terminal_first_visit so the frame-story
+  # slot is empty later (otherwise opportunity-track pool scan keeps
+  # returning terminal_first_visit and crowds out money-track storylets).
   - type: sleep
+  - type: advance_segment
+  - type: choose
+    storylet_key: terminal_first_visit
+    choice_id: leave_terminal
+  - type: advance_segment
+
+  # ── Sleep to Day 5 morning (3 more sleeps after the Day 1 PM detour) ──
   - type: sleep
   - type: sleep
   - type: sleep

@@ -982,3 +982,135 @@ describe("selectTrackStorylets — invariant 8: preclusion", () => {
     expect(result).toEqual([]);
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// Invariant 9: Frame-story slot reservation
+// (T-1777564800228 — frame_story tracks get one reserved slot when eligible)
+// ────────────────────────────────────────────────────────────────────────────
+
+describe("selectTrackStorylets — invariant 9: frame-story slot reservation", () => {
+  it("reserves a slot for a frame_story track when its long-window candidate would otherwise lose to short-window life_stream", () => {
+    const tracks = [
+      makeTrack({ id: "t1", key: "t1", category: "life_stream" }),
+      makeTrack({ id: "t2", key: "t2", category: "life_stream" }),
+      makeTrack({ id: "t3", key: "t3", category: "frame_story" }),
+    ];
+    const progress = [
+      makeProgress({ id: "p1", track_id: "t1" }),
+      makeProgress({ id: "p2", track_id: "t2" }),
+      makeProgress({ id: "p3", track_id: "t3" }),
+    ];
+    const storylets = [
+      makeStorylet("life_short", { track_id: "t1", expires_after_days: 1 }),
+      makeStorylet("life_med", { track_id: "t2", expires_after_days: 5 }),
+      makeStorylet("frame_long", { track_id: "t3", expires_after_days: 14 }),
+    ];
+
+    const result = selectTrackStorylets({
+      dayIndex: 0,
+      progress,
+      storylets,
+      tracks,
+      maxStorylets: 2,
+    });
+
+    // Pre-reservation behaviour would have been [life_short, life_med] by urgency.
+    // The carve-out swaps life_med out for frame_long.
+    expect(result).toHaveLength(2);
+    const keys = result.map((r) => r.storylet.storylet_key);
+    expect(keys).toContain("frame_long");
+    expect(keys).toContain("life_short");
+    expect(keys).not.toContain("life_med");
+  });
+
+  it("life_stream tracks fill all slots when no frame_story track has an eligible candidate", () => {
+    const tracks = [
+      makeTrack({ id: "t1", key: "t1", category: "life_stream" }),
+      makeTrack({ id: "t2", key: "t2", category: "life_stream" }),
+      makeTrack({ id: "t3", key: "t3", category: "frame_story" }),
+    ];
+    const progress = [
+      makeProgress({ id: "p1", track_id: "t1" }),
+      makeProgress({ id: "p2", track_id: "t2" }),
+      // Frame-story track has nothing eligible: only candidate is already resolved.
+      makeProgress({ id: "p3", track_id: "t3", resolved_storylet_keys: ["frame_resolved"] }),
+    ];
+    const storylets = [
+      makeStorylet("life_a", { track_id: "t1", expires_after_days: 1 }),
+      makeStorylet("life_b", { track_id: "t2", expires_after_days: 5 }),
+      makeStorylet("frame_resolved", { track_id: "t3", expires_after_days: 14 }),
+    ];
+
+    const result = selectTrackStorylets({
+      dayIndex: 0,
+      progress,
+      storylets,
+      tracks,
+      maxStorylets: 2,
+    });
+
+    // Reserved slot is not held open when no frame candidate exists — life_stream fills both.
+    expect(result).toHaveLength(2);
+    const keys = result.map((r) => r.storylet.storylet_key);
+    expect(keys).toEqual(["life_a", "life_b"]);
+  });
+
+  it("with multiple frame_story tracks eligible, only one gets the reserved slot — extra frame candidates compete with life_stream", () => {
+    const tracks = [
+      makeTrack({ id: "t1", key: "t1", category: "frame_story" }),
+      makeTrack({ id: "t2", key: "t2", category: "frame_story" }),
+      makeTrack({ id: "t3", key: "t3", category: "life_stream" }),
+    ];
+    const progress = [
+      makeProgress({ id: "p1", track_id: "t1" }),
+      makeProgress({ id: "p2", track_id: "t2" }),
+      makeProgress({ id: "p3", track_id: "t3" }),
+    ];
+    const storylets = [
+      makeStorylet("frame_long", { track_id: "t1", expires_after_days: 14 }),
+      makeStorylet("frame_med", { track_id: "t2", expires_after_days: 10 }),
+      makeStorylet("life_urgent", { track_id: "t3", expires_after_days: 3 }),
+    ];
+
+    const result = selectTrackStorylets({
+      dayIndex: 0,
+      progress,
+      storylets,
+      tracks,
+      maxStorylets: 2,
+    });
+
+    // The most-urgent frame (frame_med) takes the reserved slot. life_urgent (most
+    // urgent overall) takes the remaining slot. frame_long is dropped.
+    expect(result).toHaveLength(2);
+    const keys = result.map((r) => r.storylet.storylet_key);
+    expect(keys).toContain("frame_med");
+    expect(keys).toContain("life_urgent");
+    expect(keys).not.toContain("frame_long");
+  });
+
+  it("returns frame_story candidate alone when it is the only eligible result", () => {
+    const tracks = [
+      makeTrack({ id: "t1", key: "t1", category: "frame_story" }),
+      makeTrack({ id: "t2", key: "t2", category: "life_stream" }),
+    ];
+    const progress = [
+      makeProgress({ id: "p1", track_id: "t1" }),
+      makeProgress({ id: "p2", track_id: "t2", resolved_storylet_keys: ["life_done"] }),
+    ];
+    const storylets = [
+      makeStorylet("frame_only", { track_id: "t1", expires_after_days: 14 }),
+      makeStorylet("life_done", { track_id: "t2", expires_after_days: 5 }),
+    ];
+
+    const result = selectTrackStorylets({
+      dayIndex: 0,
+      progress,
+      storylets,
+      tracks,
+      maxStorylets: 2,
+    });
+
+    expect(result.map((r) => r.storylet.storylet_key)).toEqual(["frame_only"]);
+  });
+});

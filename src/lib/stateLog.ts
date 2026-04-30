@@ -18,6 +18,7 @@ export type StateLogSurface =
   | "time-advance"
   | "reset"
   | "track-resolve"
+  | "track-scheduler"
   | "choice-log"
   | "walk-state"
   | "session-restore"

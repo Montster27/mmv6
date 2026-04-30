@@ -263,10 +263,35 @@ export function selectTrackStorylets({
     }
   }
 
-  // Most urgent (soonest to expire) first across all tracks
-  due.sort((a, b) => a.expires_on_day - b.expires_on_day);
+  // Frame-story tracks (e.g. opportunity) get a reserved slot when they have an
+  // eligible candidate. Life-stream tracks compete for the remaining slot(s) by
+  // urgency. Without this carve-out, the longer eligibility windows on frame-
+  // story storylets are perpetually outranked by short-window life-stream
+  // candidates under a global maxStorylets cap.
+  const frameStory = due
+    .filter((d) => d.track.category === "frame_story")
+    .sort((a, b) => a.expires_on_day - b.expires_on_day);
+  const lifeStream = due
+    .filter((d) => d.track.category !== "frame_story")
+    .sort((a, b) => a.expires_on_day - b.expires_on_day);
 
-  return due.slice(0, maxStorylets);
+  const result: DueStorylet[] = [];
+  if (frameStory.length > 0 && result.length < maxStorylets) {
+    result.push(frameStory[0]);
+  }
+  for (const candidate of lifeStream) {
+    if (result.length >= maxStorylets) break;
+    result.push(candidate);
+  }
+  for (const candidate of frameStory.slice(1)) {
+    if (result.length >= maxStorylets) break;
+    result.push(candidate);
+  }
+
+  // Final ordering: most urgent first, regardless of category.
+  result.sort((a, b) => a.expires_on_day - b.expires_on_day);
+
+  return result;
 }
 
 /**

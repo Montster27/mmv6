@@ -40,8 +40,19 @@ steps:
     storylet_key: evening_choice
     choice_id: go_to_cards
 
-  # ── Sleep to Day 5 morning (4 sleeps: Day 1→2→3→4→5) ──────────────────
+  # ── Day 1 afternoon: resolve terminal_first_visit so the frame-story
+  # slot is empty for the rest of the test (otherwise opportunity-track
+  # pool scan keeps returning terminal_first_visit and crowds out
+  # job_board on Day 8 PM). The Glenn → Terminal arc is the natural Day 1
+  # PM beat once head_to_evening sets glenn_gave_direction.
   - type: sleep
+  - type: advance_segment
+  - type: choose
+    storylet_key: terminal_first_visit
+    choice_id: leave_terminal
+  - type: advance_segment
+
+  # ── Sleep to Day 5 morning (3 more sleeps: Day 1→2→3→4 evening→Day 5) ──
   - type: sleep
   - type: sleep
   - type: sleep
