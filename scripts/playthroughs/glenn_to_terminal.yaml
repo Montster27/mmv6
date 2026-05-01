@@ -1,0 +1,52 @@
+name: glenn_to_terminal
+description: >
+  Regression for T-1777564800228 — the terminal scheduler bug.
+
+  Resolves glenn_pastime_paradise with head_to_evening on Day 0 afternoon (the
+  earliest possible path) and verifies terminal_first_visit becomes available
+  via pool scan on Day 1 afternoon.
+
+  The bug: head_to_evening was missing sets_flag in the live DB despite the
+  04-17 migration applying it. Without the flag write, glenn_gave_direction
+  never reached choice_log and terminal_first_visit was perpetually gated out
+  by its requires_flag predicate.
+
+steps:
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — resolve Glenn (writes glenn_gave_direction flag) ──
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  # ── Day 0 Evening ──────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_party
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # Skip Day 1 morning (no roommate-track dependency in this test) and advance
+  # straight to afternoon where terminal_first_visit is due.
+  - type: advance_segment
+
+  # ── Day 1 PM — terminal_first_visit must be eligible via pool scan ──────
+  - type: expect_storylet_available
+    storylet_key: terminal_first_visit
+    served_by: pool

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -76,10 +76,11 @@ function updateRequirementsJson(
 export default function StoryletEditPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = use(params);
   const router = useRouter();
-  const isNew = params.id === "new";
+  const isNew = id === "new";
 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [loading, setLoading] = useState(false);
@@ -139,7 +140,7 @@ export default function StoryletEditPage({
         return;
       }
       try {
-        const res = await fetch(`/api/admin/storylets/${params.id}`, {
+        const res = await fetch(`/api/admin/storylets/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const json = await res.json();
@@ -166,7 +167,7 @@ export default function StoryletEditPage({
       }
     };
     load();
-  }, [isNew, params.id]);
+  }, [isNew, id]);
 
   const handleSave = async (opts?: { goPreview?: boolean }) => {
     setError(null);

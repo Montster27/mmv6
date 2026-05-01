@@ -747,10 +747,23 @@ export function ChoiceEditor({
             <p className="text-xs font-medium text-slate-600 mb-1">
               Events emitted <span className="text-slate-400">(preferred — triggers relationship engine)</span>
             </p>
-            <EventsEmittedEditor
-              events={choice.events_emitted ?? []}
-              onChange={(events) => onChange({ events_emitted: events })}
-            />
+            {Array.isArray(choice.events_emitted) &&
+            choice.events_emitted.length > 0 &&
+            "condition" in (choice.events_emitted[0] as object) ? (
+              <p className="rounded border border-purple-200 bg-purple-50 px-2 py-1.5 text-xs text-purple-700">
+                This choice uses conditional <code>events_emitted</code> groups (walk-flag gated).
+                Edit via migration; the studio editor only supports the flat form.
+              </p>
+            ) : (
+              <EventsEmittedEditor
+                events={
+                  (choice.events_emitted as
+                    | Array<{ npc_id: string; type: string; magnitude?: number }>
+                    | undefined) ?? []
+                }
+                onChange={(events) => onChange({ events_emitted: events })}
+              />
+            )}
           </div>
 
           <div>

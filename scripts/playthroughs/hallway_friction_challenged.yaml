@@ -1,0 +1,112 @@
+name: hallway_friction_challenged
+description: >
+  Integration test for the period-stance infrastructure (commit 6d7d1a9).
+  Exercises every new harness hook end-to-end on the first friction beat
+  (Beat 2A: hallway_morning_day3 "The Hallway Comment"):
+
+    • set_identity      — sets PlayerIdentity on characters row
+    • expect_prior_period_stance — reads choice_log PERIOD_STANCE events
+    • expect_walk_flag  — reads walkState.flags during a node walk
+    • expect_period_stance — reads daily_states.period_stance_state JSONB
+
+  Conditional events_emitted resolution on head_to_class_day3 is covered
+  by a separate unit test (src/lib/eventsEmitted.hallwayFriction.test.ts)
+  because the playthrough harness mirrors /api/tracks/resolve, which
+  doesn't apply events_emitted (that's a client-side write path).
+
+  Path: Day 0 party → Day 4 morning → hallway_morning_day3 → challenge.
+  Fixture is at Day 2 morning, started_day=1. After resolving
+  first_morning + 4 advance_segments + 2 sleeps we land on Day 4 morning,
+  where hallway_morning_day3 (due_offset_days=3, started_day=1) is due.
+extends: fixtures/after_day0_party_path.snapshot.json
+
+steps:
+  # Set the player's identity so set_identity is exercised on a fresh
+  # characters row. Values are arbitrary — the friction beat itself does
+  # not gate on identity, but the hook should write without erroring.
+  - type: set_identity
+    race: south_asian
+    gender: man
+    sexuality: gay
+
+  # Before any friction beat fires, prior_period_stance must be null
+  # (no PERIOD_STANCE event has been logged yet).
+  - type: expect_prior_period_stance
+    value: null
+
+  # Resolve first_morning to clear the roommate-track chain set up by
+  # room_214 in the fixture.
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  # Advance to Day 4 morning. Two day rollovers + intermediate segments.
+  # Day 2 morn → afternoon → evening → sleep → Day 3 morn → afternoon → evening → sleep → Day 4 morn.
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+
+  # Day 4 morning — hallway_morning_day3 should be in the belonging pool.
+  - type: expect_storylet_available
+    storylet_key: hallway_morning_day3
+    at: { day: 4, segment: morning, track: belonging }
+    served_by: pool
+
+  # Walk the entry node — Doug nods. Just nod back (lounge_callback's
+  # micro condition gates on lounge_day2 which the fixture doesn't have).
+  - type: choose_node
+    node_id: hallway_pass
+    micro_choice_id: just_nod
+
+  # The friction beat. Choose "challenge" — this should:
+  #   1. add hallway_challenged to walkState.flags
+  #   2. bump daily_states.period_stance_state.challenged from 0 → 1
+  #   3. insert a PERIOD_STANCE choice_log event (option_key=challenged)
+  - type: choose_node
+    node_id: hallway_comment
+    micro_choice_id: challenge
+
+  # Verify all three writes landed.
+  - type: expect_walk_flag
+    flag: hallway_challenged
+    present: true
+  - type: expect_walk_flag
+    flag: hallway_absorbed
+    present: false
+  - type: expect_walk_flag
+    flag: hallway_deflected
+    present: false
+
+  - type: expect_period_stance
+    tag: challenged
+    op: eq
+    value: 1
+  - type: expect_period_stance
+    tag: absorbed
+    op: eq
+    value: 0
+  - type: expect_period_stance
+    tag: deflected
+    op: eq
+    value: 0
+
+  # The PERIOD_STANCE event we just logged should now be the prior.
+  - type: expect_prior_period_stance
+    value: challenged
+
+  # Walk the aftermath node and reach the choices terminal.
+  - type: choose_node
+    node_id: friction_response
+    micro_choice_id: continue_resp
+
+  # Resolve the terminal. The harness mirrors /api/tracks/resolve so
+  # events_emitted side-effects on relationships are NOT applied here —
+  # that's covered by the focused unit test. This step verifies the
+  # choice resolves cleanly with the new conditional events_emitted
+  # JSONB structure (no parser errors, no schema violations).
+  - type: choose
+    storylet_key: hallway_morning_day3
+    choice_id: head_to_class_day3

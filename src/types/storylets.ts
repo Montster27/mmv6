@@ -19,6 +19,25 @@ export type MiniGameProps = {
   config?: Record<string, unknown>;
 };
 
+export type EventEmission = {
+  npc_id: string;
+  type: string;
+  magnitude?: number;
+};
+
+/**
+ * Conditional `events_emitted` group. When a choice's `events_emitted` is an
+ * array of these (instead of flat EventEmission[]), the engine evaluates each
+ * group top-to-bottom against the walk's active flags.  First non-else match
+ * fires. If nothing matched, all `condition.else` groups fire. Enables a
+ * single terminal choice to vary social fallout by which friction micro-choice
+ * was taken upstream (spec CODE-SPEC-period-stance-infrastructure §5, §Q3).
+ */
+export type ConditionalEmissionGroup = {
+  condition: { flag?: string; all_flags?: string[]; else?: true };
+  events: EventEmission[];
+};
+
 export type StoryletOutcome = {
   text?: string;
   deltas?: {
@@ -96,11 +115,7 @@ export type StoryletChoice = {
     relational_effects?: Record<string, Record<string, number>>;
     set_npc_memory?: Record<string, Record<string, boolean>>;
   }>;
-  events_emitted?: Array<{
-    npc_id: string;
-    type: string;
-    magnitude?: number;
-  }>;
+  events_emitted?: EventEmission[] | ConditionalEmissionGroup[];
   identity_tags?: string[];
   // ── Skill system (Phase 2) ────────────────────────────────────────────────
   /**
@@ -153,10 +168,37 @@ export type StoryletChoice = {
 
 // ── Conversational node system ───────────────────────────────────────────────
 
+/** Shared predicate shape used by node gates and by text/label variants. All
+ *  listed predicates are AND-ed together; leaving a field undefined means
+ *  "don't check this". */
+export type NodeCondition = {
+  /** Walk-local flag must be set. */
+  flag?: string;
+  /** Every walk-local flag in the list must be set. */
+  all_flags?: string[];
+  /** NPC memory key must be truthy. Format: "npc_id.memory_key". */
+  npc_memory?: string;
+  /** Player identity attribute must be one of the listed values. */
+  identity?: {
+    attribute: "race" | "gender" | "sexuality";
+    in: string[];
+  };
+  /** Current arc-cumulative period_stance counter must meet threshold. */
+  period_stance?: {
+    tag: "challenged" | "deflected" | "absorbed";
+    /** Default 1 — "at least one deposit of this tag". */
+    min?: number;
+  };
+  /** Most-recent period_stance value across choice_log. */
+  prior_period_stance?: "challenged" | "deflected" | "absorbed";
+};
+
 export type MicroChoice = {
   id: string;
   /** 3-8 words. Dialogue in quotes, actions as physical verbs. */
   label: string;
+  /** Conditional overrides for label. First matching entry wins; falls back to `label`. */
+  label_variants?: Array<{ condition: NodeCondition; label: string }>;
   /** Target node id, "choices" to show terminal choices, or "exit" to end. */
   next: string;
   /** Local flag set when this micro-choice is taken (persists only during node walk). */
@@ -164,23 +206,22 @@ export type MicroChoice = {
   set_npc_memory?: Record<string, Record<string, boolean>>;
   relational_effect?: Record<string, Record<string, number>>;
   identity_tags?: string[];
+  /** Period-stance tag deposited when this micro-choice is taken. Bumps the
+   *  counter on daily_states.period_stance_state and writes a PERIOD_STANCE
+   *  event to choice_log. */
+  period_stance?: "challenged" | "deflected" | "absorbed";
 };
 
 export type DialogueNode = {
   id: string;
-  /** 1-4 sentences max. */
+  /** 1-4 sentences max. Fallback when no `text_variants` match. */
   text: string;
+  /** Conditional overrides for body text. First matching entry wins; falls back to `text`. */
+  text_variants?: Array<{ condition: NodeCondition; text: string }>;
   /** NPC id when this node is spoken by an NPC. Absent = narrator. */
   speaker?: string;
   /** Gate: node is skipped if condition not met. */
-  condition?: {
-    /** Walk-local flag must be set. */
-    flag?: string;
-    /** Every walk-local flag in the list must be set. Used for quiz-style compound gates. */
-    all_flags?: string[];
-    /** NPC memory key must be truthy. Format: "npc_id.memory_key". */
-    npc_memory?: string;
-  };
+  condition?: NodeCondition;
   /** If present: show these micro-choices. If absent: show "Continue" auto-advance. */
   micro_choices?: MicroChoice[];
   /** Auto-advance target when no micro_choices. "choices" or null = show terminal choices. */

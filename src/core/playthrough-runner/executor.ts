@@ -65,6 +65,19 @@ function describeStep(step: ScriptStep): string {
       return `choose(${step.storylet_key}, ${step.choice_id})`;
     case "choose_node":
       return `choose_node(${step.node_id}, ${step.micro_choice_id})`;
+    case "set_identity": {
+      const parts: string[] = [];
+      if (step.race !== undefined) parts.push(`race=${step.race}`);
+      if (step.gender !== undefined) parts.push(`gender=${step.gender}`);
+      if (step.sexuality !== undefined) parts.push(`sexuality=${step.sexuality}`);
+      return `set_identity(${parts.join(", ")})`;
+    }
+    case "expect_period_stance":
+      return `expect_period_stance(${step.tag} ${step.op} ${step.value})`;
+    case "expect_walk_flag":
+      return `expect_walk_flag(${step.flag}, present=${step.present})`;
+    case "expect_prior_period_stance":
+      return `expect_prior_period_stance(${step.value ?? "null"})`;
     case "advance_segment":
       return "advance_segment";
     case "sleep":
@@ -426,6 +439,79 @@ async function executeStep(
         new_segment: harness.currentSegment,
         new_hours_remaining: harness.hoursRemaining,
       });
+      return null;
+    }
+
+    case "set_identity": {
+      await harness.setIdentity({
+        race: step.race,
+        gender: step.gender,
+        sexuality: step.sexuality,
+      });
+      pushTrace({
+        race: step.race ?? null,
+        gender: step.gender ?? null,
+        sexuality: step.sexuality ?? null,
+      });
+      return null;
+    }
+
+    case "expect_period_stance": {
+      const actual = await harness.getPeriodStanceCount(step.tag);
+      if (!compareOp(actual, step.op, step.value)) {
+        return {
+          stepIndex,
+          step,
+          expected: `period_stance.${step.tag} ${step.op} ${step.value}`,
+          observed: `period_stance.${step.tag} = ${actual}`,
+          context: {
+            day: harness.dayIndex,
+            segment: harness.currentSegment,
+          },
+          priorSteps,
+        };
+      }
+      pushTrace({ tag: step.tag, value: actual });
+      return null;
+    }
+
+    case "expect_walk_flag": {
+      const flags = harness.getWalkFlags();
+      const isPresent = flags.has(step.flag);
+      if (isPresent !== step.present) {
+        return {
+          stepIndex,
+          step,
+          expected: `walk_flag "${step.flag}" ${step.present ? "present" : "absent"}`,
+          observed: `walk_flag "${step.flag}" ${isPresent ? "present" : "absent"}`,
+          context: {
+            day: harness.dayIndex,
+            segment: harness.currentSegment,
+            active_walk_flags: Array.from(flags),
+          },
+          priorSteps,
+        };
+      }
+      pushTrace({ flag: step.flag, present: isPresent });
+      return null;
+    }
+
+    case "expect_prior_period_stance": {
+      const actual = await harness.getPriorPeriodStance();
+      if (actual !== step.value) {
+        return {
+          stepIndex,
+          step,
+          expected: `prior_period_stance = ${step.value ?? "null"}`,
+          observed: `prior_period_stance = ${actual ?? "null"}`,
+          context: {
+            day: harness.dayIndex,
+            segment: harness.currentSegment,
+          },
+          priorSteps,
+        };
+      }
+      pushTrace({ value: actual });
       return null;
     }
 

@@ -11,6 +11,7 @@ import {
 import { resourceLabel } from "@/core/resources/resourceMap";
 import type { ResourceKey } from "@/core/resources/resourceKeys";
 import { tickPracticeCredit } from "@/core/skills/practice";
+import { logState } from "@/lib/stateLog";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -76,9 +77,27 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (dailyErr || !dailyStateRow) {
+    logState({
+      surface: "track-resolve",
+      action: "resolveTerminalChoice.noDailyState",
+      userId: user.id,
+      details: { progressId, optionKey: option_key, error: dailyErr?.message ?? null },
+    });
     return NextResponse.json({ error: "No daily state found" }, { status: 404 });
   }
   const day_index = dailyStateRow.day_index as number;
+
+  logState({
+    surface: "track-resolve",
+    action: "resolveTerminalChoice.start",
+    userId: user.id,
+    details: {
+      progressId,
+      clientStoryletKey: clientStoryletKey ?? null,
+      optionKey: option_key,
+      dayIndexCanonical: day_index,
+    },
+  });
 
   // --- 2. Load progress and verify ownership ---
   const { data: progressRow, error: progressErr } = await supabaseServer
@@ -163,6 +182,12 @@ export async function POST(request: Request) {
   const newTrackState = setsTrackState?.state ?? null;
 
   if (newTrackState) {
+    logState({
+      surface: "track-resolve",
+      action: "trackProgress.stateUpdate",
+      userId: user.id,
+      details: { progressId, trackId: progressRow.track_id, newTrackState, dayIndex: day_index },
+    });
     // Update track_progress.track_state
     const { error: stateErr } = await supabaseServer
       .from("track_progress")
@@ -241,6 +266,12 @@ export async function POST(request: Request) {
     console.warn(
       `[track-resolve] Storylet "${effectiveStoryletKey}" already in resolved_storylet_keys — skipping duplicate resolve.`
     );
+    logState({
+      surface: "track-resolve",
+      action: "resolveTerminalChoice.duplicate",
+      userId: user.id,
+      details: { progressId, effectiveStoryletKey, optionKey: option_key, resolvedKeysLength: currentResolvedKeys.length },
+    });
     return NextResponse.json({
       ok: true,
       next_key: null,
@@ -265,6 +296,22 @@ export async function POST(request: Request) {
     if (nextStoryletRow) {
       validNextKey = nextKey;
       const nextDueDay = progressRow.started_day + (nextStoryletRow.due_offset_days ?? 1);
+
+      logState({
+        surface: "track-resolve",
+        action: "trackProgress.advanceNext",
+        userId: user.id,
+        details: {
+          progressId,
+          trackId: progressRow.track_id,
+          effectiveStoryletKey,
+          nextKey,
+          nextDueDay,
+          dayIndex: day_index,
+          prevResolvedLength: currentResolvedKeys.length,
+          newResolvedLength: newResolvedKeys.length,
+        },
+      });
 
       const { error: updateErr } = await supabaseServer
         .from("track_progress")
@@ -304,6 +351,19 @@ export async function POST(request: Request) {
     );
 
     if (hasFutureContent) {
+      logState({
+        surface: "track-resolve",
+        action: "trackProgress.stayActive",
+        userId: user.id,
+        details: {
+          progressId,
+          trackId: progressRow.track_id,
+          effectiveStoryletKey,
+          dayIndex: day_index,
+          prevResolvedLength: currentResolvedKeys.length,
+          newResolvedLength: newResolvedKeys.length,
+        },
+      });
       // Stay ACTIVE — pool scan will surface future content when it becomes due.
       const { error: updateErr } = await supabaseServer
         .from("track_progress")
@@ -319,6 +379,18 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Failed to update track progress" }, { status: 500 });
       }
     } else {
+      logState({
+        surface: "track-resolve",
+        action: "trackProgress.complete",
+        userId: user.id,
+        details: {
+          progressId,
+          trackId: progressRow.track_id,
+          effectiveStoryletKey,
+          dayIndex: day_index,
+          newResolvedLength: newResolvedKeys.length,
+        },
+      });
       // No future content — track complete.
       const { error: updateErr } = await supabaseServer
         .from("track_progress")
@@ -374,6 +446,12 @@ export async function POST(request: Request) {
           if (firstStorylet) {
             const key = firstStorylet.storylet_key;
             const dueDay = day_index + (firstStorylet.due_offset_days ?? 0);
+            logState({
+              surface: "track-resolve",
+              action: "trackProgress.activate",
+              userId: user.id,
+              details: { targetTrackKey: targetTrack.key, targetTrackId: targetTrack.id, firstStoryletKey: key, dueDay, dayIndex: day_index },
+            });
             await supabaseServer.from("track_progress").insert({
               user_id: user.id,
               track_id: targetTrack.id,
@@ -414,6 +492,21 @@ export async function POST(request: Request) {
   }
 
   // --- 8. Record to choice_log ---
+  logState({
+    surface: "choice-log",
+    action: "choiceLog.storyletResolved",
+    userId: user.id,
+    details: {
+      dayIndex: day_index,
+      trackId: progressRow.track_id,
+      progressId,
+      stepKey: effectiveStoryletKey,
+      optionKey: option_key,
+      nextKey: validNextKey ?? null,
+      activatedTrack: activatedTrackKey,
+      hasResourceDeltas: !!resourceResult,
+    },
+  });
   await supabaseServer.from("choice_log").insert({
     user_id: user.id,
     day: day_index,
@@ -432,6 +525,19 @@ export async function POST(request: Request) {
   // --- 8b. Write persistent flags (sets_flag on choice) ---
   const setsFlag = chosenOption.sets_flag as string[] | undefined;
   if (Array.isArray(setsFlag) && setsFlag.length > 0) {
+    logState({
+      surface: "choice-log",
+      action: "choiceLog.flagSet",
+      userId: user.id,
+      details: {
+        dayIndex: day_index,
+        trackId: progressRow.track_id,
+        progressId,
+        stepKey: effectiveStoryletKey,
+        sourceChoice: option_key,
+        flags: setsFlag,
+      },
+    });
     const flagInserts = setsFlag.map((flag) => ({
       user_id: user.id,
       day: day_index,
@@ -459,6 +565,13 @@ export async function POST(request: Request) {
       : [];
     const merged = [...new Set([...current, ...precludes])];
 
+    logState({
+      surface: "track-resolve",
+      action: "preclusionGates.update",
+      userId: user.id,
+      details: { sourceChoice: option_key, addedKeys: precludes, prevCount: current.length, newCount: merged.length },
+    });
+
     await supabaseServer
       .from("daily_states")
       .update({ preclusion_gates: merged })
@@ -478,6 +591,20 @@ export async function POST(request: Request) {
     choiceLabel: typeof (chosenOption as any).label === "string"
       ? (chosenOption as any).label
       : option_key,
+  });
+
+  logState({
+    surface: "track-resolve",
+    action: "resolveTerminalChoice.complete",
+    userId: user.id,
+    details: {
+      progressId,
+      effectiveStoryletKey,
+      optionKey: option_key,
+      dayIndex: day_index,
+      validNextKey,
+      activatedTrack: activatedTrackKey,
+    },
   });
 
   return NextResponse.json({

@@ -1,0 +1,60 @@
+name: glenn_to_terminal_late
+description: >
+  Regression for T-1777564800228 — variant B (delayed-Glenn path).
+
+  Mirrors the 2026-04-29 playtest capture in docs/PLAYTHROUGH-LOG.md: player
+  skips Glenn on Day 0, idles through Day 1, resolves Glenn on Day 2 afternoon.
+  Asserts terminal_first_visit becomes available on Day 3 afternoon.
+
+  This variant exercises the same flag → terminal path as glenn_to_terminal.yaml
+  but with a delayed started_day-relative offset, so a started_day-dependent bug
+  in the eligibility window calculation would only show here.
+
+steps:
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — skip Glenn, choose lunch_floor ────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  # ── Day 0 Evening ──────────────────────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_party
+
+  # ── Sleep → Day 1 ──────────────────────────────────────────────────────
+  - type: sleep
+
+  # ── Day 1 — fast-forward through the day, resolving nothing on opportunity
+  - type: advance_segment   # to afternoon
+  - type: advance_segment   # to evening
+  - type: sleep
+
+  # ── Day 2 Afternoon — finally resolve Glenn (fires the flag write) ──────
+  - type: advance_segment   # to afternoon
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+
+  - type: advance_segment   # to evening
+  - type: sleep
+
+  # ── Day 3 Afternoon — terminal must be eligible via pool scan ───────────
+  - type: advance_segment   # to afternoon
+
+  - type: expect_storylet_available
+    storylet_key: terminal_first_visit
+    served_by: pool

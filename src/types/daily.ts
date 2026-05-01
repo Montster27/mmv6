@@ -8,6 +8,7 @@ export type DailyState = {
   stress: number;
   vectors: SevenVectors | JsonObject;
   life_pressure_state?: JsonObject;
+  period_stance_state?: JsonObject;
   energy_level?: "high" | "moderate" | "low";
   money_band?: "tight" | "okay" | "comfortable";
   skill_flags?: JsonObject;

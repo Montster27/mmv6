@@ -22,6 +22,7 @@ import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 import type { Track, TrackStoryletRow, TrackProgress, DueStorylet } from "@/types/tracks";
 import type { DialogueNode, MicroChoice } from "@/types/storylets";
 import type { FixtureSnapshot } from "./types";
+import { logState } from "@/lib/stateLog";
 
 const SEGMENT_ORDER = ["morning", "afternoon", "evening", "night"] as const;
 
@@ -307,6 +308,20 @@ export class PlaythroughHarness {
     }
 
     // Record to choice_log (drives requires_choice pool gating)
+    logState({
+      surface: "choice-log",
+      action: "choiceLog.storyletResolved",
+      userId: this.userId,
+      details: {
+        harness: true,
+        dayIndex: this.dayIndex,
+        trackId: storylet.track_id,
+        progressId: progressRow.id,
+        stepKey: storyletKey,
+        optionKey: choiceId,
+        nextKey: validNextKey,
+      },
+    });
     await db.from("choice_log").insert({
       user_id: this.userId,
       day: this.dayIndex,
@@ -321,6 +336,20 @@ export class PlaythroughHarness {
     // Write persistent flags (sets_flag on choice)
     const setsFlag = choice.sets_flag as string[] | undefined;
     if (Array.isArray(setsFlag) && setsFlag.length > 0) {
+      logState({
+        surface: "choice-log",
+        action: "choiceLog.flagSet",
+        userId: this.userId,
+        details: {
+          harness: true,
+          dayIndex: this.dayIndex,
+          trackId: storylet.track_id,
+          progressId: progressRow.id,
+          stepKey: storyletKey,
+          sourceChoice: choiceId,
+          flags: setsFlag,
+        },
+      });
       const flagInserts = setsFlag.map((flag) => ({
         user_id: this.userId,
         day: this.dayIndex,
@@ -417,51 +446,142 @@ export class PlaythroughHarness {
         .eq("user_id", this.userId);
     }
 
-    // Navigate to next
-    const dest = micro.next;
+    // Apply period_stance: bump counter on daily_states + log temporal event
+    // Mirrors the render-time write path in src/app/(player)/play/page.tsx so
+    // harness-driven tests exercise the same surface the UI does.
+    if (micro.period_stance) {
+      const tag = micro.period_stance;
+      const { data: daily } = await db
+        .from("daily_states")
+        .select("period_stance_state")
+        .eq("user_id", this.userId)
+        .maybeSingle();
+      const current =
+        (daily?.period_stance_state as Record<string, number>) ?? {};
+      const next = { ...current, [tag]: (current[tag] ?? 0) + 1 };
+      await db
+        .from("daily_states")
+        .update({
+          period_stance_state: next,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", this.userId);
+      logState({
+        surface: "choice-log",
+        action: "choiceLog.periodStance",
+        userId: this.userId,
+        details: {
+          harness: true,
+          dayIndex: this.dayIndex,
+          tag,
+          storyletKey: ws.storyletKey,
+          nodeId,
+          microChoiceId,
+        },
+      });
+      await db.from("choice_log").insert({
+        user_id: this.userId,
+        day: this.dayIndex,
+        event_type: "PERIOD_STANCE",
+        option_key: tag,
+        step_key: ws.storyletKey,
+        meta: { node_id: nodeId, micro_choice_id: microChoiceId },
+      });
+    }
+
+    // Navigate to next — auto-advance through text-only and condition-failed nodes.
+    this.navigateTo(micro.next);
+    return {
+      nextNodeId: ws.currentNodeId,
+      terminal: ws.terminal,
+    };
+  }
+
+  /**
+   * Walk-internal navigation. Auto-advances through text-only intro/coda nodes
+   * and skips nodes whose condition does not hold, until landing on either:
+   *   - a node with `micro_choices` (player input point), or
+   *   - a terminal ("choices" or "exit").
+   *
+   * Condition predicates evaluated against `walkState.flags`:
+   *   - `flag`, `all_flags`
+   * Condition predicates treated as met (real game writes the underlying state
+   * on each micro-choice; harness scripts test specific paths):
+   *   - `npc_memory`, `period_stance`, `prior_period_stance`, `identity`
+   *
+   * Mutates `walkState.currentNodeId` and/or `walkState.terminal`. Throws if
+   * recursion exceeds 32 hops (indicates malformed content).
+   */
+  private navigateTo(dest: string, depth = 0): void {
+    const ws = this.walkState;
+    if (!ws) {
+      throw new Error("navigateTo called without an active walkState");
+    }
+
+    if (depth >= 32) {
+      throw new Error(
+        `navigateTo recursion cap exceeded (32 hops) in storylet "${ws.storyletKey}" — likely malformed content`
+      );
+    }
+
     if (dest === "choices" || dest === "exit") {
       ws.terminal = dest;
       ws.currentNodeId = null;
-      return { nextNodeId: null, terminal: dest };
+      return;
     }
 
-    // Find next node, check condition gate
-    const nextNode = ws.nodes.find((n) => n.id === dest);
-    if (!nextNode) {
-      // Unknown target — fall through to choices
+    const node = ws.nodes.find((n) => n.id === dest);
+    if (!node) {
+      // Unknown destination — fall through to choices
       ws.terminal = "choices";
       ws.currentNodeId = null;
-      return { nextNodeId: null, terminal: "choices" };
+      return;
     }
 
-    // Skip nodes whose condition is not met
-    const cond = nextNode.condition;
-    const conditionMet =
-      !cond ||
-      ((!cond.flag || ws.flags.has(cond.flag)) &&
-        (!cond.all_flags || cond.all_flags.every((f) => ws.flags.has(f))));
+    // Evaluate condition. Only flag / all_flags read walkState.flags here.
+    // Other predicates (npc_memory, period_stance, prior_period_stance,
+    // identity) are treated as met — scripts test specific paths.
+    const cond = node.condition;
+    let conditionMet = true;
+    if (cond) {
+      const flagOk = !cond.flag || ws.flags.has(cond.flag);
+      const allFlagsOk =
+        !cond.all_flags || cond.all_flags.every((f) => ws.flags.has(f));
+      conditionMet = flagOk && allFlagsOk;
+    }
+
     if (!conditionMet) {
-      // Advance past this node via its explicit else_next, else fall through to .next
-      ws.currentNodeId = nextNode.else_next ?? nextNode.next ?? null;
-      if (!ws.currentNodeId || ws.currentNodeId === "choices") {
+      const fallback = node.else_next ?? node.next;
+      if (!fallback) {
         ws.terminal = "choices";
         ws.currentNodeId = null;
-        return { nextNodeId: null, terminal: "choices" };
+        return;
       }
-      if (ws.currentNodeId === "exit") {
-        ws.terminal = "exit";
-        ws.currentNodeId = null;
-        return { nextNodeId: null, terminal: "exit" };
-      }
-      return { nextNodeId: ws.currentNodeId, terminal: null };
+      this.navigateTo(fallback, depth + 1);
+      return;
     }
 
-    ws.currentNodeId = dest;
-    return { nextNodeId: dest, terminal: null };
+    // Condition met (or absent). If the node has player input, land here.
+    if (node.micro_choices && node.micro_choices.length > 0) {
+      ws.currentNodeId = dest;
+      ws.terminal = null;
+      return;
+    }
+
+    // Text-only node — auto-advance through .next. No `next` means the walk
+    // has run off the end of the node tree → exit.
+    if (!node.next) {
+      ws.terminal = "exit";
+      ws.currentNodeId = null;
+      return;
+    }
+    this.navigateTo(node.next, depth + 1);
   }
 
   /**
    * Begin a node walk for a storylet. Called by the executor before choose_node steps.
+   * The walk's starting `currentNodeId` is whatever `navigateTo` lands on after
+   * auto-advancing through any text-only intro nodes — not necessarily nodes[0].
    */
   beginNodeWalk(storyletKey: string): void {
     const storylet = this.storylets.find((s) => s.storylet_key === storyletKey);
@@ -474,11 +594,12 @@ export class PlaythroughHarness {
 
     this.walkState = {
       storyletKey,
-      currentNodeId: nodes[0].id,
+      currentNodeId: null,
       flags: new Set(),
       nodes,
       terminal: null,
     };
+    this.navigateTo(nodes[0].id);
   }
 
   /**
@@ -670,6 +791,81 @@ export class PlaythroughHarness {
   }
 
   /**
+   * Write identity attributes to the characters row. Any omitted attribute is
+   * left at its current value (or DB default if the row is fresh).
+   * Upserts to tolerate the seed path, which does not create a characters row.
+   */
+  async setIdentity(identity: {
+    race?: string;
+    gender?: string;
+    sexuality?: string;
+  }): Promise<void> {
+    const patch: Record<string, string> = {};
+    if (identity.race !== undefined) patch.identity_race = identity.race;
+    if (identity.gender !== undefined) patch.identity_gender = identity.gender;
+    if (identity.sexuality !== undefined) {
+      patch.identity_sexuality = identity.sexuality;
+    }
+
+    const { data: existing } = await db
+      .from("characters")
+      .select("id")
+      .eq("user_id", this.userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      await db
+        .from("characters")
+        .update(patch)
+        .eq("user_id", this.userId);
+    } else {
+      await db
+        .from("characters")
+        .insert({ user_id: this.userId, name: null, ...patch });
+    }
+  }
+
+  /**
+   * Read the counter for a single period_stance tag from daily_states.
+   * Mirrors periodStanceCount() but sourced from DB, not an in-memory state.
+   */
+  async getPeriodStanceCount(
+    tag: "challenged" | "deflected" | "absorbed"
+  ): Promise<number> {
+    const { data } = await db
+      .from("daily_states")
+      .select("period_stance_state")
+      .eq("user_id", this.userId)
+      .maybeSingle();
+    const state =
+      (data?.period_stance_state as Record<string, number>) ?? {};
+    return state[tag] ?? 0;
+  }
+
+  /**
+   * Read the most recent PERIOD_STANCE choice_log event for this user.
+   * Returns null if no such event has ever been logged.
+   */
+  async getPriorPeriodStance(): Promise<
+    "challenged" | "deflected" | "absorbed" | null
+  > {
+    const { data } = await db
+      .from("choice_log")
+      .select("option_key")
+      .eq("user_id", this.userId)
+      .eq("event_type", "PERIOD_STANCE")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const raw = data?.option_key;
+    if (raw === "challenged" || raw === "deflected" || raw === "absorbed") {
+      return raw;
+    }
+    return null;
+  }
+
+  /**
    * Get track_progress for a given track key. Used by executor for context.
    */
   async getTrackProgress(
@@ -704,6 +900,7 @@ export class PlaythroughHarness {
       stress: 0,
       vectors: {},
       life_pressure_state: {},
+      period_stance_state: {},
       energy_level: "high",
       money_band: "okay",
       skill_flags: {},

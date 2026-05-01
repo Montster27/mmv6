@@ -23,7 +23,7 @@ export function SkillsPanel({
 }: {
   onStartTraining?: () => void;
 }) {
-  const { loading, active, trained, definitions } = useSkillQueue();
+  const { loading, active, queued, trained, definitions, availableToTrain } = useSkillQueue();
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -126,6 +126,16 @@ export function SkillsPanel({
             className="text-xs text-primary underline hover:text-primary/80"
           >
             No skill in training — start one
+          </button>
+        )}
+
+        {/* Active set but no queued — let the player queue a second skill */}
+        {active && !queued && availableToTrain.length > 0 && onStartTraining && (
+          <button
+            onClick={onStartTraining}
+            className="text-xs text-primary underline hover:text-primary/80"
+          >
+            Queue your next skill
           </button>
         )}
       </CardContent>

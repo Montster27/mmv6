@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import * as Sentry from "@sentry/nextjs";
 
 import type { MiniGameType, MiniGameResult } from "@/types/storylets";
 
@@ -27,6 +28,7 @@ import { TesterFeedback } from "@/components/play/TesterFeedback";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
 // All time advancement (segment + day) goes through /api/time/advance.
 import { trackEvent } from "@/lib/events";
+import { resolveEventsEmitted } from "@/lib/eventsEmitted";
 import { supabase } from "@/lib/supabase/browser";
 import { getOrCreateDailyRun } from "@/core/engine/dailyLoop";
 import { awardAnomalies } from "@/lib/anomalies";
@@ -50,6 +52,9 @@ import {
   toChoices,
   updateRelationships,
   updateLifePressureState,
+  updatePeriodStanceState,
+  logPeriodStanceEvent,
+  getPriorPeriodStance,
   updateSkillFlags,
   updatePreclusionGates,
   type AllocationPayload,
@@ -70,7 +75,16 @@ import {
   type CompareSnapshot,
 } from "@/lib/afterActionCompare";
 import { mapLegacyResourceKey, resourceLabel } from "@/core/resources/resourceMap";
-import { getChapterOneState, bumpLifePressure, updateSkillFlag } from "@/core/chapter/state";
+import {
+  getChapterOneState,
+  bumpLifePressure,
+  bumpPeriodStance,
+  updateSkillFlag,
+} from "@/core/chapter/state";
+import { fetchPlayerIdentity } from "@/lib/playerIdentity";
+import type { PlayerIdentity } from "@/types/identity";
+import type { PeriodStanceTag } from "@/core/chapter/types";
+import type { PlayerContext } from "@/lib/nodeConditions";
 import {
   applyRelationshipEvents,
   ensureRelationshipDefaults,
@@ -109,6 +123,7 @@ import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { TrackStoryletCard } from "@/components/play/TrackStoryletCard";
 import { DialogueNodeView } from "@/components/play/DialogueNodeView";
+import { NpcColoredText } from "@/components/play/NpcColoredText";
 import { SleepCard } from "@/components/play/SleepCard";
 import { SegmentTransitionCard } from "@/components/play/SegmentTransitionCard";
 import { WeeklyCalendar } from "@/components/play/WeeklyCalendar";
@@ -121,6 +136,7 @@ import type { Segment as BridgeSegment } from "@/lib/segmentBridge";
 import type { TrackStorylet } from "@/types/tracks";
 import type { StoryletChoice } from "@/types/storylets";
 import { useQueryClient } from "@tanstack/react-query";
+import { logState } from "@/lib/stateLog";
 
 const DevMenu = dynamic(() => import("./DevMenu"), { ssr: false });
 
@@ -140,6 +156,9 @@ export default function PlayPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [userId, setUserId] = useState<string | null>(null);
+  const [playerIdentity, setPlayerIdentity] = useState<PlayerIdentity | null>(null);
+  const [priorPeriodStance, setPriorPeriodStance] =
+    useState<PeriodStanceTag | null>(null);
   const bootstrapQuery = useBootstrap();
   const {
     dailyState,
@@ -348,6 +367,11 @@ export default function PlayPage() {
   useEffect(() => {
     if (bootstrapQuery.isError) {
       setError("Failed to load play state.");
+      logState({
+        surface: "session-restore",
+        action: "sessionRestore.bootstrap.error",
+        details: {},
+      });
       return;
     }
     if (!bootstrapQuery.data) return;
@@ -356,6 +380,16 @@ export default function PlayPage() {
     setBootstrapIsAdmin(Boolean(bootstrapQuery.data.isAdmin));
     setBootstrapAssignments(bootstrapQuery.data.experiments ?? {});
     setUserId(bootstrapQuery.data.userId);
+    Sentry.setUser({ id: bootstrapQuery.data.userId });
+    logState({
+      surface: "session-restore",
+      action: "sessionRestore.bootstrap.success",
+      userId: bootstrapQuery.data.userId,
+      details: {
+        isAdmin: Boolean(bootstrapQuery.data.isAdmin),
+        experimentCount: Object.keys(bootstrapQuery.data.experiments ?? {}).length,
+      },
+    });
   }, [bootstrapQuery.data, bootstrapQuery.isError]);
 
   // Fetch skill web on bootstrap
@@ -372,6 +406,31 @@ export default function PlayPage() {
       })
       .catch(() => {});
   }, [bootstrapUserId, session?.access_token]);
+
+  // Fetch player identity + prior period_stance once userId is known. Both
+  // feed the DialogueNodeView playerContext for gate and variant evaluation.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      const [identity, prior] = await Promise.all([
+        fetchPlayerIdentity(userId),
+        getPriorPeriodStance(userId),
+      ]);
+      if (cancelled) return;
+      setPlayerIdentity(identity);
+      setPriorPeriodStance(prior);
+      logState({
+        surface: "session-restore",
+        action: "sessionRestore.identityStance",
+        userId,
+        details: { identityFetched: !!identity, priorPeriodStance: prior },
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const testerMode = useMemo(() => getAppMode().testerMode, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -825,6 +884,21 @@ export default function PlayPage() {
         if (USE_DAILY_LOOP_ORCHESTRATOR) {
           const run = dailyRunQuery.data;
           if (!run) return;
+          logState({
+            surface: "session-restore",
+            action: "sessionRestore.dailyRun.success",
+            userId: bootstrapUserId ?? undefined,
+            details: {
+              dayIndex: run.dayIndex,
+              stage: run.stage,
+              storyletCount: run.storylets?.length ?? 0,
+              hasDayState: !!run.dayState,
+              hasDailyState: !!run.dailyState,
+              gameMode: run.gameMode ?? null,
+              prevDayIndexRef: lastRunDayIndexRef.current,
+              refreshTick,
+            },
+          });
           if (
             typeof lastRunDayIndexRef.current === "number" &&
             lastRunDayIndexRef.current !== run.dayIndex
@@ -874,6 +948,18 @@ export default function PlayPage() {
           const ds =
             run.dailyState ?? (await fetchDailyState(bootstrapUserId));
           if (ds) {
+            logState({
+              surface: "daily-state-mutation",
+              action: "sessionRestore.hydrate",
+              userId: bootstrapUserId ?? undefined,
+              details: {
+                dailyStateDayIndex: (ds as any)?.day_index ?? null,
+                runDayIndex: run.dayIndex,
+                source: run.dailyState ? "dailyRunQuery" : "fetchDailyState",
+                currentSegment: (ds as any)?.current_segment ?? null,
+                hoursRemaining: (ds as any)?.hours_remaining ?? null,
+              },
+            });
             setDailyState({ ...ds, day_index: run.dayIndex });
             if (!run.dayState) {
               setDayState({
@@ -1121,8 +1207,12 @@ export default function PlayPage() {
         }
         return;
       }
-      setSleepCardDone(false);
+      // Refetch BEFORE clearing sleepCardDone so the new dayState (morning, 16h)
+      // is in place when the SleepCard visibility condition re-evaluates.
+      // Reverse order caused a flicker: button re-appeared briefly because the
+      // pre-advance dayState (night, 0h) still satisfied the condition.
       await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
+      setSleepCardDone(false);
     } catch (e) {
       console.error("Failed to advance day via sleep", e);
       setSleepCardDone(false);
@@ -1686,15 +1776,29 @@ export default function PlayPage() {
 
   // ── Micro-choice persistent effects (node walk) ─────────────────────────
   // Called by DialogueNodeView when a micro-choice carries set_npc_memory,
-  // relational_effect, or identity_tags. Effects commit immediately — not
-  // deferred to terminal choice resolution.
+  // relational_effect, identity_tags, or period_stance. Effects commit
+  // immediately — not deferred to terminal choice resolution.
   const handleMicroEffects = useCallback(
     async (effects: {
       set_npc_memory?: Record<string, Record<string, boolean>>;
       relational_effect?: Record<string, Record<string, number>>;
       identity_tags?: string[];
+      period_stance?: "challenged" | "deflected" | "absorbed";
     }) => {
       if (!userId) return;
+      logState({
+        surface: "micro-choice",
+        action: "microChoice.start",
+        userId,
+        details: {
+          storyletSlug: currentStorylet?.slug ?? null,
+          dayIndex,
+          hasNpcMemory: !!effects.set_npc_memory,
+          hasRelational: !!effects.relational_effect,
+          identityTagsCount: (effects.identity_tags ?? []).length,
+          periodStance: effects.period_stance ?? null,
+        },
+      });
       const events: RelationshipEvent[] = [
         ...mapLegacyRelationalEffects(effects.relational_effect),
         ...mapLegacyNpcKnowledge(effects.set_npc_memory),
@@ -1707,6 +1811,12 @@ export default function PlayPage() {
         );
         await updateRelationships(userId, nextRelationships, dayIndex);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "microChoice.relationships",
+            userId,
+            details: { storyletSlug: currentStorylet?.slug ?? null, npcCount: Object.keys(nextRelationships).length },
+          });
           setDailyState({ ...dailyState, relationships: nextRelationships });
         }
       }
@@ -1715,14 +1825,58 @@ export default function PlayPage() {
         const nextLp = bumpLifePressure(chapterOneState.lifePressureState, tags);
         await updateLifePressureState(userId, nextLp);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "microChoice.lifePressure",
+            userId,
+            details: { storyletSlug: currentStorylet?.slug ?? null, identityTags: tags },
+          });
           setDailyState({ ...dailyState, life_pressure_state: nextLp });
         }
       }
+      const stance = effects.period_stance;
+      if (stance && chapterOneState) {
+        const nextStance = bumpPeriodStance(chapterOneState.periodStanceState, stance);
+        await Promise.all([
+          updatePeriodStanceState(userId, nextStance),
+          logPeriodStanceEvent(userId, dayIndex, stance, {
+            storylet_slug: currentStorylet?.slug ?? "",
+          }),
+        ]);
+        setPriorPeriodStance(stance);
+        if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "microChoice.periodStance",
+            userId,
+            details: { storyletSlug: currentStorylet?.slug ?? null, stance, nextStance },
+          });
+          setDailyState({ ...dailyState, period_stance_state: nextStance });
+        }
+      }
+      logState({
+        surface: "micro-choice",
+        action: "microChoice.complete",
+        userId,
+        details: { storyletSlug: currentStorylet?.slug ?? null },
+      });
     },
     [userId, relationshipsState, currentStorylet, dayIndex, dailyState, chapterOneState]
   );
 
-  const handleChoice = async (choiceId: string) => {
+  const playerContext = useMemo<PlayerContext>(
+    () => ({
+      identity: playerIdentity,
+      periodStance: chapterOneState?.periodStanceState ?? null,
+      priorPeriodStance,
+    }),
+    [playerIdentity, chapterOneState?.periodStanceState, priorPeriodStance]
+  );
+
+  const handleChoice = async (
+    choiceId: string,
+    activeFlags: Set<string> = new Set()
+  ) => {
     if (!userId || !currentStorylet) return;
     if (pendingReactionText) return;
     recordInteraction();
@@ -2077,7 +2231,7 @@ export default function PlayPage() {
 
       const relationshipEvents = [
         ...introEvents,
-        ...((selectedChoice?.events_emitted ?? []) as any),
+        ...resolveEventsEmitted(selectedChoice?.events_emitted, activeFlags),
         ...mapLegacyRelationalEffects(selectedChoice?.relational_effects),
         ...mapLegacyNpcKnowledge(selectedChoice?.set_npc_memory),
         ...mapLegacyRelationalEffects(matchedCondition?.relational_effects),
@@ -2091,6 +2245,12 @@ export default function PlayPage() {
         );
         await updateRelationships(userId, nextRelationships, dayIndex);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.relationships",
+            userId,
+            details: { storyletSlug: currentStorylet.slug, choiceId, npcCount: Object.keys(nextRelationships).length },
+          });
           setDailyState({ ...dailyState, relationships: nextRelationships });
         }
         const summary = logs.map((entry) => {
@@ -2146,6 +2306,12 @@ export default function PlayPage() {
         const nextLp = bumpLifePressure(chapterOneState.lifePressureState, choiceIdentityTags);
         await updateLifePressureState(userId, nextLp);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.lifePressure",
+            userId,
+            details: { storyletSlug: currentStorylet.slug, choiceId, identityTags: choiceIdentityTags },
+          });
           setDailyState({ ...dailyState, life_pressure_state: nextLp });
         }
       }
@@ -2156,6 +2322,12 @@ export default function PlayPage() {
         const nextFlags = updateSkillFlag(chapterOneState.skillFlags, skillModifier as any);
         await updateSkillFlags(userId, nextFlags);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.skillFlags",
+            userId,
+            details: { storyletSlug: currentStorylet.slug, choiceId, skillModifier },
+          });
           setDailyState({ ...dailyState, skill_flags: nextFlags });
         }
       }
@@ -2167,6 +2339,12 @@ export default function PlayPage() {
         const nextGates = [...new Set([...currentGates, ...precludes])];
         await updatePreclusionGates(userId, nextGates);
         if (dailyState) {
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.preclusionGates",
+            userId,
+            details: { storyletSlug: currentStorylet.slug, choiceId, addedKeys: precludes, prevCount: currentGates.length, newCount: nextGates.length },
+          });
           setDailyState({ ...dailyState, preclusion_gates: nextGates });
         }
       }
@@ -2345,7 +2523,11 @@ export default function PlayPage() {
   };
 
   const handleTrackStoryletChoice = useCallback(
-    async (beat: TrackStorylet, option: StoryletChoice) => {
+    async (
+      beat: TrackStorylet,
+      option: StoryletChoice,
+      activeFlags: Set<string> = new Set()
+    ) => {
       // ── Mini-game intercept for track storylets ─────────────────────────
       if (option.mini_game && !activeMiniGame) {
         setActiveMiniGame({
@@ -2362,6 +2544,18 @@ export default function PlayPage() {
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("No session");
 
+      logState({
+        surface: "track-resolve",
+        action: "resolveTerminalChoice.clientStart",
+        userId: userId ?? undefined,
+        details: {
+          progressId: beat.progress_id,
+          storyletKey: beat.storylet_key,
+          optionKey: option.id,
+          dayIndex,
+        },
+      });
+
       const res = await fetch("/api/tracks/resolve", {
         method: "POST",
         headers: {
@@ -2376,6 +2570,18 @@ export default function PlayPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+        logState({
+          surface: "track-resolve",
+          action: "resolveTerminalChoice.clientError",
+          userId: userId ?? undefined,
+          details: {
+            progressId: beat.progress_id,
+            storyletKey: beat.storylet_key,
+            optionKey: option.id,
+            status: res.status,
+            error: body.error ?? null,
+          },
+        });
         if (body.error === "insufficient_resources") {
           toast(
             (body.message as string) ?? "Not enough resources for this choice.",
@@ -2388,6 +2594,20 @@ export default function PlayPage() {
       }
 
       const resBody = await res.json().catch(() => ({ next_key: null }));
+
+      logState({
+        surface: "track-resolve",
+        action: "resolveTerminalChoice.clientComplete",
+        userId: userId ?? undefined,
+        details: {
+          progressId: beat.progress_id,
+          storyletKey: beat.storylet_key,
+          optionKey: option.id,
+          nextKey: (resBody as any)?.next_key ?? null,
+          activatedTrack: (resBody as any)?.activated_track ?? null,
+          duplicate: (resBody as any)?.duplicate ?? false,
+        },
+      });
 
       // --- Resolve conditional reaction text (e.g. money_band conditions) ---
       // Computed BEFORE the optimistic UI flip so the outcome card opens with
@@ -2442,6 +2662,18 @@ export default function PlayPage() {
             ? Math.max(0, Math.min(100, dayState.stress + outcomeDeltas.stress))
             : dayState.stress;
         const res = outcomeDeltas.resources ?? {};
+        logState({
+          surface: "daily-state-mutation",
+          action: "terminalResolve.optimisticDayState",
+          userId: userId ?? undefined,
+          details: {
+            storyletKey: beat.storylet_key,
+            optionKey: option.id,
+            energyDelta: outcomeDeltas.energy ?? 0,
+            stressDelta: outcomeDeltas.stress ?? 0,
+            resourceKeys: Object.keys(res),
+          },
+        });
         setDayState({
           ...dayState,
           energy: nextEnergy,
@@ -2472,7 +2704,7 @@ export default function PlayPage() {
 
         const relationshipEvents = [
           ...introEvents,
-          ...((option.events_emitted ?? []) as any),
+          ...resolveEventsEmitted(option.events_emitted, activeFlags),
           ...mapLegacyRelationalEffects(option.relational_effects),
           ...mapLegacyNpcKnowledge(option.set_npc_memory),
         ] as any;
@@ -2489,8 +2721,17 @@ export default function PlayPage() {
             );
             await updateRelationships(userId, nextRelationships, dayIndex);
             if (dailyState) {
+              logState({
+                surface: "daily-state-mutation",
+                action: "trackStoryletChoice.relationships",
+                userId,
+                details: { storyletKey: beat.storylet_key, optionKey: option.id, npcCount: Object.keys(nextRelationships).length, eventCount: relationshipEvents.length },
+              });
               setDailyState({ ...dailyState, relationships: nextRelationships });
             }
+            // PHASE-2-NOTE: [surface 6b, line 2743] choice_log insert here is
+            // a fire-and-forget client-side write outside the resolve route —
+            // potentially an under-instrumented surface for state-divergence.
             // Log each relationship change
             logs.forEach((entry) => {
               const flagChanged =
@@ -2766,13 +3007,16 @@ export default function PlayPage() {
     setRefreshTick((t) => t + 1);
   }, [chapterOneMode, visibleTrackCount, userId, dayIndex, loading, alreadyCompletedToday, dailyRunDataLoaded, resolvedTrackStoryletIds.size, stage, sleepCardDone]);
 
-  // Segment transitions auto-advance from inside SegmentTransitionCard (300ms
-  // fade on mount → onAdvance → handleAdvanceSegment). The page-level effect
-  // that previously auto-advanced via a 400ms timer was removed because it
-  // fired with state captured at render time; the in-card timer fires from
-  // the render that already decided the card should show, so the race is
-  // closed. advanceInFlightRef guards against concurrent advances.
-  // See commits 07c047d, 22b3b46, 9bbde1c for the earlier patch chain.
+  // Segment transitions are explicit player clicks: SegmentTransitionCard
+  // renders a "Continue to <next>" button that calls handleAdvanceSegment
+  // when the player is between segments with no beats to surface.
+  // advanceInFlightRef guards against double-clicks racing two
+  // /api/time/advance calls. No timer-based auto-advance — that pattern
+  // (page-level 400ms timer, then later in-card 300ms timer) repeatedly
+  // produced cascade bugs (skip-through-empty-segments) and stuck-card
+  // bugs (re-render cancels timeout) because both fired with state
+  // snapshotted at scheduling time. See 00edffc for the rework rationale
+  // and 07c047d / 22b3b46 / 9bbde1c for the earlier patch chain.
 
   return (
         <div className="p-4 space-y-4 min-h-screen bg-background">
@@ -3228,7 +3472,7 @@ export default function PlayPage() {
                                 </h3>
                                 {!currentStorylet.nodes?.length && (
                                   <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">
-                                    {displayBody}
+                                    <NpcColoredText text={displayBody} />
                                   </p>
                                 )}
                               </div>
@@ -3246,7 +3490,13 @@ export default function PlayPage() {
                                       choices={choices}
                                       onChoice={handleChoice}
                                       onMicroEffects={handleMicroEffects}
+                                      relationships={relationshipsState}
+                                      playerContext={playerContext}
                                       disabled={savingChoice}
+                                      storyletKey={
+                                        (currentStorylet as { storylet_key?: string }).storylet_key
+                                          ?? currentStorylet.id
+                                      }
                                     />
                                   );
                                 }
@@ -3685,6 +3935,8 @@ export default function PlayPage() {
                                       : () => handleDismissTrackStorylet(card.beat, false)
                                   }
                                   relationships={relationshipsState}
+                                  playerContext={playerContext}
+                                  onMicroEffects={handleMicroEffects}
                                 />
                               ) : (
                                 <TrackStoryletCard
@@ -3702,6 +3954,8 @@ export default function PlayPage() {
                                     socialLeverage: dayState.socialLeverage,
                                     physicalResilience: dayState.physicalResilience,
                                   } : null}
+                                  playerContext={playerContext}
+                                  onMicroEffects={handleMicroEffects}
                                 />
                               ),
                             )}
@@ -3726,13 +3980,24 @@ export default function PlayPage() {
                     </section>
                   )}
 
-                  {/* Segment transition card — morning/afternoon/evening done, advance to next */}
+                  {/* Segment transition card — explicit Continue button advances to next.
+                      Gated on `!dailyRunQuery.isFetching` so the card only renders against
+                      settled data: this prevents fresh-load and post-advance refetch windows
+                      from showing a Continue button against stale (or not-yet-arrived) beat
+                      data — without that gate the player could click past content that's
+                      about to render. Same gate pattern as the prior page-level auto-advance
+                      effect from commit 22b3b46. (Earlier we tried gating on
+                      resolvedTrackStoryletIds.size, which is incorrect: line 559-566 wipes
+                      that Set on every refetch by design, so the gate evaluated false at
+                      every empty intermediate segment — the Day 2 evening hang.) */}
                   {USE_DAILY_LOOP_ORCHESTRATOR && chapterOneMode &&
                     visibleTrackCount === 0 && pendingDismissalBeats.length === 0 &&
                     !sleepCardDone &&
                     dayState?.current_segment !== 'night' &&
-                    (dayState?.hours_remaining ?? 16) > 0 && (
+                    (dayState?.hours_remaining ?? 16) > 0 &&
+                    !dailyRunQuery.isFetching && (
                     <SegmentTransitionCard
+                      key={`${dayIndex}-${dayState?.current_segment ?? 'morning'}`}
                       currentSegment={(dayState?.current_segment ?? 'morning') as 'morning' | 'afternoon' | 'evening' | 'night'}
                       hoursRemaining={dayState?.hours_remaining ?? 16}
                       onAdvance={handleAdvanceSegment}

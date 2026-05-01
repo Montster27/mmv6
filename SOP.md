@@ -1,7 +1,7 @@
 # MMV — Standard Operating Procedures
 > The one file you look at when you forget the process.
 > Lives in the repo root so every Code session sees it.
-> Last updated: 2026-04-16
+> Last updated: 2026-04-27
 
 ---
 
@@ -14,11 +14,13 @@ Paste this at the top of every Claude Code session:
 
 ```
 Read SOP.md, HANDOFF.md, and GLOSSARY.md.
-Check MAPPING.md at ~/Documents/MMV/_assets/MMV_Docs/Kanban data/MAPPING.md
+Check MAPPING.md at ~/Projects/MMV/_assets/MMV_Docs/Kanban data/MAPPING.md
 for current sprint tickets.
 Tell me: top of stack, any vocabulary drift, any blocked tickets.
 Today I'm working on: [describe what you want to do]
 ```
+
+When reading HANDOFF.md, scan the **Branches in flight** section near the top — it lists every non-main branch with its merge gate and gate owner. If anything you're about to do touches one of those branches, surface the gate to the user before starting.
 
 For claude.ai (PM) sessions, just say "Start session" — the PM knows this file.
 
@@ -32,12 +34,13 @@ Today I need to [specific task — write a spec / produce a deck / organize docs
 Say this at the end of every Claude Code session. Code should:
 
 1. **Update HANDOFF.md** — what we did, what's next, any new decisions
-2. **Update Kanban tickets** — move completed tickets to `col_done`, create new tickets for work discovered, update `modified` and `modifiedBy: claude-code`
-3. **Log decisions** to `docs/DECISIONS.md` if any design calls were made
-4. **Write one MemPalace note** if a non-obvious rationale needs preserving (the "why", not the "what")
-5. **Flag** anything that needs attention in the next session
+2. **Update "Branches in flight"** — if any branch was created, advanced, merged, or had its gate change this session, edit the table near the top of HANDOFF.md to match. When a branch merges to main, remove its row.
+3. **Update Kanban tickets** — move completed tickets to `col_done`, create new tickets for work discovered, update `modified` and `modifiedBy: claude-code`. **Before writing `status: col_done` on any ticket, paste the verifying shell output (test result, SQL scan, file listing) into the close note.** Don't close on intent — close on evidence. The ticket body should be a report of what happened, not a summary of what should have happened.
+4. **Log decisions** to `docs/DECISIONS.md` if any design calls were made
+5. **Write one MemPalace note** if a non-obvious rationale needs preserving (the "why", not the "what")
+6. **Flag** anything that needs attention in the next session
 
-The Kanban board lives at: `~/Documents/MMV/_assets/MMV_Docs/Kanban data/`
+The Kanban board lives at: `~/Projects/MMV/_assets/MMV_Docs/Kanban data/`
 Ticket conventions: see `claude.md` in that directory. Key rules:
 - Filename = ticket ID (`T-<13-digit-timestamp>.md`)
 - `modifiedBy: claude-code` (never use Monty's profile name)
@@ -63,6 +66,7 @@ Say this in claude.ai when things feel fuzzy. The PM will audit:
 - **MemPalace health**: is it being queried or just written to?
 - **Doc freshness**: are HANDOFF.md, CHAIN-MAP.md, ENGINE-SPEC.md current?
 - **Test health**: are playthrough traces passing? Any new content without coverage?
+- **Ticket-vs-disk audit** *(added 2026-04-27 after the T-1777215600001/002 fabricated-work incident)*: run `npx tsx scripts/audit-closed-tickets.ts` from the repo root. The script walks every `col_done` ticket, regex-extracts file references (migrations, playthrough scripts, source paths, docs), and reports any reference whose target file is missing from disk. Triage findings — most are real (file was claimed but not written); some are false positives ("replaces planned `docs/X.md`" phrasing matches the regex). Either delete the dead reference or reopen the ticket. See `docs/AUDIT-PATTERN.md` for the protocol.
 
 ---
 
@@ -80,7 +84,7 @@ Say this in claude.ai when things feel fuzzy. The PM will audit:
 | **docs/CHAIN-MAP.md** | Current chain wiring + flags | Code (after content changes) | `docs/` |
 | **docs/ENGINE-SPEC.md** | Engine behavior spec (partially outdated — see HANDOFF) | Code (needs refresh) | `docs/` |
 | **CLAUDE.md** | Claude Code project bible — auto-read by Code | Code (when conventions change) | repo root |
-| **Kanban MAPPING.md** | Ticket index — read-first triage view | Kanban Pro (auto-generated) | `~/Documents/MMV/_assets/MMV_Docs/Kanban data/` |
+| **Kanban MAPPING.md** | Ticket index — read-first triage view | Kanban Pro (auto-generated) | `~/Projects/MMV/_assets/MMV_Docs/Kanban data/` |
 | **Kanban board.json** | Board topology, epics, sprints | Kanban Pro UI or PM | `.kanban/` in Kanban dir |
 | **MemPalace** | Decision memory — rationale that would get re-explained | Code or PM (after non-obvious decisions) | Obsidian vault |
 

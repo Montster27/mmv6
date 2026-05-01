@@ -17,6 +17,7 @@ import { fetchSkillLevels, fetchPosture } from "@/lib/dailyInteractions";
 import { applyResourceDelta } from "@/lib/resources";
 import type { CheckResult, CheckSkillLevels } from "@/types/checks";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { logState } from "@/lib/stateLog";
 
 export type StoryletListItem = Storylet;
 export type AllocationPayload = AllocationMap;
@@ -760,6 +761,12 @@ export async function updateLifePressureState(
   userId: string,
   lifePressureState: Record<string, number>
 ): Promise<void> {
+  logState({
+    surface: "daily-state-mutation",
+    action: "dailyStates.lifePressureState",
+    userId,
+    details: { keys: Object.keys(lifePressureState), valueCount: Object.keys(lifePressureState).length },
+  });
   const { error } = await supabase
     .from("daily_states")
     .update({ life_pressure_state: lifePressureState, updated_at: new Date().toISOString() })
@@ -767,10 +774,75 @@ export async function updateLifePressureState(
   if (error) console.error("Failed to update life_pressure_state", error);
 }
 
+export async function updatePeriodStanceState(
+  userId: string,
+  periodStanceState: Record<string, number>
+): Promise<void> {
+  logState({
+    surface: "daily-state-mutation",
+    action: "dailyStates.periodStanceState",
+    userId,
+    details: { state: periodStanceState },
+  });
+  const { error } = await supabase
+    .from("daily_states")
+    .update({ period_stance_state: periodStanceState, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) console.error("Failed to update period_stance_state", error);
+}
+
+export async function logPeriodStanceEvent(
+  userId: string,
+  dayIndex: number,
+  tag: "challenged" | "deflected" | "absorbed",
+  meta: Record<string, unknown> = {}
+): Promise<void> {
+  logState({
+    surface: "choice-log",
+    action: "choiceLog.periodStance",
+    userId,
+    details: { dayIndex, tag, meta },
+  });
+  const { error } = await supabase.from("choice_log").insert({
+    user_id: userId,
+    day: dayIndex,
+    event_type: "PERIOD_STANCE",
+    option_key: tag,
+    meta,
+  });
+  if (error) console.error("Failed to log PERIOD_STANCE event", error);
+}
+
+export async function getPriorPeriodStance(
+  userId: string
+): Promise<"challenged" | "deflected" | "absorbed" | null> {
+  const { data, error } = await supabase
+    .from("choice_log")
+    .select("option_key")
+    .eq("user_id", userId)
+    .eq("event_type", "PERIOD_STANCE")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("Failed to read prior PERIOD_STANCE event", error);
+    return null;
+  }
+  const raw = data?.option_key;
+  if (raw === "challenged" || raw === "deflected" || raw === "absorbed") return raw;
+  return null;
+}
+
 export async function updateSkillFlags(
   userId: string,
   skillFlags: Record<string, number>
 ): Promise<void> {
+  logState({
+    surface: "daily-state-mutation",
+    action: "dailyStates.skillFlags",
+    userId,
+    details: { keys: Object.keys(skillFlags) },
+  });
   const { error } = await supabase
     .from("daily_states")
     .update({ skill_flags: skillFlags, updated_at: new Date().toISOString() })
@@ -782,6 +854,12 @@ export async function updatePreclusionGates(
   userId: string,
   gates: string[]
 ): Promise<void> {
+  logState({
+    surface: "daily-state-mutation",
+    action: "dailyStates.preclusionGates",
+    userId,
+    details: { count: gates.length },
+  });
   const { error } = await supabase
     .from("daily_states")
     .update({ preclusion_gates: gates, updated_at: new Date().toISOString() })

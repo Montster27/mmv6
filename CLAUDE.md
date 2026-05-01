@@ -19,7 +19,7 @@
 | **Type definitions** | `src/types/` |
 | **Domain logic** | `src/domain/` |
 | **Content creation agent** | `agents/content-creator/` (has its own CLAUDE.md) |
-| **Task tracker** | Kanban Pro board at `~/Documents/MMV/_assets/MMV_Docs/Kanban data/` (MAPPING.md for triage) |
+| **Task tracker** | Kanban Pro board at `~/Projects/MMV/_assets/MMV_Docs/Kanban data/` (MAPPING.md for triage) |
 | **Process & vocabulary** | `SOP.md` (root), `GLOSSARY.md` (root) |
 | **Session handoff** | `HANDOFF.md` (root), `docs/END-OF-SESSION-PROTOCOL.md` |
 | **Design docs** | `docs/` |
@@ -29,7 +29,7 @@
 ## Before Every Session
 
 1. Read `SOP.md` and `GLOSSARY.md` for process and vocabulary
-2. Read `HANDOFF.md` to understand current state
+2. Read `HANDOFF.md` to understand current state — including the **Branches in flight** section near the top, which lists every non-main branch with its merge gate and gate owner. Surface any gate to the user before working on its branch.
 3. Read this file for project rules
 4. Before writing any migration, read `docs/CONTENT-RULES.md`
 5. For content work, also read `agents/content-creator/CLAUDE.md`

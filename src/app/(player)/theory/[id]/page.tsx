@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 
 import { useSession } from "@/contexts/SessionContext";
@@ -327,6 +327,7 @@ function TheoryDetailContent({
   );
 }
 
-export default function TheoryDetailPage({ params }: { params: { id: string } }) {
-  return <TheoryDetailContent params={params} />;
+export default function TheoryDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params);
+  return <TheoryDetailContent params={resolvedParams} />;
 }

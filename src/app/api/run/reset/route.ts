@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 import { supabaseServer } from "@/lib/supabase/server";
+import { logState } from "@/lib/stateLog";
 
 function utcToday(): string {
   const now = new Date();
@@ -36,6 +37,13 @@ export async function POST(request: Request) {
   const today = utcToday();
   const now = new Date().toISOString();
 
+  logState({
+    surface: "reset",
+    action: "resetUser.start",
+    userId,
+    details: { route: "run-reset" },
+  });
+
   // Determine the currently active season so we can sync user_seasons in one
   // shot. This prevents performSeasonReset from firing on the first page load
   // after a reset and overwriting day_index back to 0.
@@ -55,6 +63,29 @@ export async function POST(request: Request) {
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
+
+  logState({
+    surface: "reset",
+    action: "resetUser.priorState",
+    userId,
+    details: { priorDayIndex: dailyState?.day_index ?? null, currentSeasonIndex },
+  });
+
+  const deleteTables = [
+    "storylet_runs", "reflections", "time_allocations", "daily_tensions",
+    "skill_bank", "daily_posture", "skill_point_allocations", "track_progress",
+    "arc_offers", "player_dispositions", "choice_log", "chapter_summaries",
+    "player_day_state", "events", "user_anomalies", "player_routine_schedules",
+    "routine_week_state", "player_skills", "skill_practice_events",
+    "player_skill_web", "player_composites", "social_actions",
+  ];
+
+  logState({
+    surface: "reset",
+    action: "resetUser.deletes.before",
+    userId,
+    details: { tables: deleteTables },
+  });
 
   // Run all deletes in parallel — no FK CASCADE DELETE between these tables.
   // (choice_log.arc_instance_id has ON DELETE SET NULL, so both can run in parallel.)
@@ -86,14 +117,41 @@ export async function POST(request: Request) {
       .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`),
   ]);
 
+  logState({
+    surface: "reset",
+    action: "resetUser.deletes.after",
+    userId,
+    details: { tables: deleteTables },
+  });
+
+  logState({
+    surface: "reset",
+    action: "resetUser.dailyStates.before",
+    userId,
+    details: {
+      newDayIndex: 1,
+      newCurrentSegment: "morning",
+      newHoursRemaining: 16,
+      newHoursCommitted: 0,
+      bcfc171Coverage: ["current_segment", "hours_remaining", "hours_committed"],
+    },
+  });
+
   await supabaseServer
     .from("daily_states")
     .update({
       day_index: 1,
+      // Match /api/time/advance day-rollover semantics: segment + hours must
+      // be reset alongside day_index, otherwise a player who reset while at
+      // night carries 'night' / 0h forward and lands at SleepCard on Day 1.
+      current_segment: "morning",
+      hours_remaining: 16,
+      hours_committed: 0,
       energy: 100,
       stress: 0,
       vectors: {},
       life_pressure_state: {},
+      period_stance_state: {},
       energy_level: "high",
       money_band: "okay",
       skill_flags: {},
@@ -141,6 +199,13 @@ export async function POST(request: Request) {
       },
       { onConflict: "user_id" }
     );
+
+  logState({
+    surface: "reset",
+    action: "resetUser.complete",
+    userId,
+    details: { route: "run-reset", currentSeasonIndex },
+  });
 
   return NextResponse.json({ ok: true });
 }

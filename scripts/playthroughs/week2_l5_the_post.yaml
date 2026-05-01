@@ -1,0 +1,187 @@
+name: week2_l5_the_post
+description: >
+  L5 Week 2 landmark — the_post (opportunity track, Day 15 afternoon).
+  Quiz path with all three answers correct, archive read, log off shaken.
+
+  This script is the cross-track-flag-union regression check. The_post
+  is gated by requires_flag: tuesday_terminal, set on the belonging
+  track via L4 (tuesday_commitment.tuesday_decided_terminal). The
+  globalFlags union from the 2026-04-22 engine fix is what makes
+  the_post reachable from a non-opportunity-track flag — if it stops
+  reaching, the engine has regressed.
+
+  Path: Day 1 chain (room_214 → dorm_hallmates → glenn_pastime_paradise
+  → lunch_floor → evening_choice) → sleep through Day 13 → resolve
+  doug_coach_story (clears Day 14 belonging blocker) → resolve
+  tuesday_commitment with commit_terminal (sets tuesday_terminal walk
+  flag) → tuesday_decided_terminal (persists tuesday_terminal as
+  FLAG_SET in choice_log) → sleep → Day 15 afternoon → the_post quiz
+  (q1_b, q2_b, q3_b — all correct) → archive_content keep_reading
+  (sets delphi_archive_seen walk flag) → log_off_shaken terminal
+  (requires delphi_archive_seen, persists the_post_resolved +
+  delphi_archive_accessed).
+
+  Engine extensions exercised:
+    • Cross-track globalFlags union (tuesday_terminal → the_post pool)
+    • condition.all_flags on submit_answers (delphi_q{1,2,3}_correct)
+    • else_next on submit_answers (routes to fail node when not all set)
+    • navigateTo auto-advance through text-only intro/coda nodes
+      (schedule_scan, choice_made, submit_answers, access_granted,
+      the_realization)
+
+steps:
+  # ── Day 1 chain: clear roommate / belonging / opportunity chains ──────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  - type: advance_segment
+
+  # Day 1 afternoon: glenn_pastime_paradise (opportunity chain entry,
+  # clearing this puts opportunity into pool mode) + lunch_floor
+  # (belonging chain after dorm_hallmates).
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+
+  - type: advance_segment
+
+  # Day 1 evening: clear belonging chain to evening_choice.
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+
+  # ── Day 2 afternoon: resolve terminal_first_visit so the frame-story
+  # slot doesn't perpetually surface it ahead of the_post on Day 15 PM
+  # (terminal_first_visit expires day 16 and would beat the_post's day-22
+  # expiry in opportunity's per-track best-candidate competition).
+  - type: sleep
+  - type: advance_segment
+  - type: choose
+    storylet_key: terminal_first_visit
+    choice_id: leave_terminal
+  - type: advance_segment
+
+  # ── Sleep through to Day 13 morning (11 more sleeps after the Day 2 detour) ──
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+  - type: sleep
+
+  # ── Day 13 evening: resolve doug_coach_story so it doesn't block
+  #    tuesday_commitment on Day 14 (doug expires Day 14, would win
+  #    expiry-soonest tiebreak in belonging pool scan).
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: doug_coach_story
+    at: { day: 13, segment: evening, track: belonging }
+
+  - type: choose
+    storylet_key: doug_coach_story
+    choice_id: doug_story_end
+
+  # ── Day 14 evening: tuesday_commitment ────────────────────────────────
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+
+  - type: expect_storylet_available
+    storylet_key: tuesday_commitment
+    at: { day: 14, segment: evening, track: belonging }
+    served_by: pool
+
+  # schedule_scan is text-only (next: the_choice). navigateTo auto-
+  # advances to the_choice, which has the four micro-choices.
+  - type: choose_node
+    node_id: the_choice
+    micro_choice_id: commit_terminal
+
+  # commit_terminal sets walk flag tuesday_terminal.
+  - type: expect_walk_flag
+    flag: tuesday_terminal
+    present: true
+
+  # choice_made is text-only (next: choices). navigateTo terminates the
+  # walk; we resolve the terminal that matches the walk flag.
+  - type: choose
+    storylet_key: tuesday_commitment
+    choice_id: tuesday_decided_terminal
+
+  # ── Day 15 afternoon: the_post (cross-track via globalFlags) ──────────
+  - type: sleep
+  - type: advance_segment
+
+  # The cross-track regression check. tuesday_terminal was set on the
+  # belonging track via tuesday_decided_terminal's persistent sets_flag;
+  # the_post (opportunity track, requires_flag: tuesday_terminal) only
+  # reaches the pool via the globalFlags union of all FLAG_SET events.
+  - type: expect_storylet_available
+    storylet_key: the_post
+    at: { day: 15, segment: afternoon, track: opportunity }
+    served_by: pool
+
+  # browse_delphi has micro_choices (open_challenge, read_posts_first).
+  # Take the direct route to the challenge.
+  - type: choose_node
+    node_id: browse_delphi
+    micro_choice_id: open_challenge
+
+  - type: choose_node
+    node_id: challenge_intro
+    micro_choice_id: take_challenge
+
+  # Quiz: pick the correct answer on each (q1_b, q2_b, q3_b).
+  - type: choose_node
+    node_id: question_1
+    micro_choice_id: q1_b
+  - type: choose_node
+    node_id: question_2
+    micro_choice_id: q2_b
+  - type: choose_node
+    node_id: question_3
+    micro_choice_id: q3_b
+
+  # All three correct flags should be set in walkState.
+  - type: expect_walk_flag
+    flag: delphi_q1_correct
+    present: true
+  - type: expect_walk_flag
+    flag: delphi_q2_correct
+    present: true
+  - type: expect_walk_flag
+    flag: delphi_q3_correct
+    present: true
+
+  # After q3_b → submit_answers (text-only with condition.all_flags
+  # satisfied → access_granted → archive_content). navigateTo auto-
+  # advances through submit_answers and access_granted (both text-only)
+  # and lands on archive_content (has micro_choices).
+  - type: choose_node
+    node_id: archive_content
+    micro_choice_id: keep_reading
+
+  # keep_reading sets walk flag delphi_archive_seen.
+  - type: expect_walk_flag
+    flag: delphi_archive_seen
+    present: true
+
+  # Terminal log_off_shaken requires the walk flag we just set, and
+  # persists the_post_resolved + delphi_archive_accessed via sets_flag.
+  - type: choose
+    storylet_key: the_post
+    choice_id: log_off_shaken

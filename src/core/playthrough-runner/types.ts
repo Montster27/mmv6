@@ -49,6 +49,51 @@ export type ChooseNodeStep = {
   /** Which micro-choice to pick. */
   micro_choice_id: string;
 };
+
+/**
+ * Set the player identity attributes on the characters row. Any omitted
+ * attribute is left unchanged. Used to drive `condition.identity` predicates
+ * in node walks without running the character-creation UI flow.
+ */
+export type SetIdentityStep = {
+  type: "set_identity";
+  race?: string;
+  gender?: string;
+  sexuality?: string;
+};
+
+/**
+ * Assert the current period_stance counter for a given tag. Reads
+ * `daily_states.period_stance_state[tag]` — the same surface the render-time
+ * evaluator consults.
+ */
+export type ExpectPeriodStanceStep = {
+  type: "expect_period_stance";
+  tag: "challenged" | "deflected" | "absorbed";
+  op: "eq" | "gt" | "gte" | "lt" | "lte";
+  value: number;
+};
+
+/**
+ * Assert that a walk-local flag is present (or absent) in the active node walk.
+ * Used to verify that a micro-choice's `sets_flag` took effect mid-walk.
+ */
+export type ExpectWalkFlagStep = {
+  type: "expect_walk_flag";
+  flag: string;
+  present: boolean;
+};
+
+/**
+ * Assert the most recent PERIOD_STANCE choice_log event for this user. Used
+ * to verify that variant prose gated on `prior_period_stance` will select
+ * the expected branch on the next beat.
+ */
+export type ExpectPriorPeriodStanceStep = {
+  type: "expect_prior_period_stance";
+  value: "challenged" | "deflected" | "absorbed" | null;
+};
+
 export type CommitRoutineStep = { type: "commit_routine"; [key: string]: unknown };
 export type AdvanceDayStep = { type: "advance_day"; [key: string]: unknown };
 
@@ -60,6 +105,10 @@ export type ScriptStep =
   | AdvanceSegmentStep
   | SleepStep
   | ChooseNodeStep
+  | SetIdentityStep
+  | ExpectPeriodStanceStep
+  | ExpectWalkFlagStep
+  | ExpectPriorPeriodStanceStep
   | CommitRoutineStep
   | AdvanceDayStep;
 

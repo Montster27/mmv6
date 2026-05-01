@@ -63,7 +63,7 @@
 
 | Term | Definition | ~~Don't say~~ |
 |------|-----------|---------------|
-| **Kanban Pro** | The markdown-based ticket board at `~/Documents/MMV/_assets/MMV_Docs/Kanban data/`. Tickets are `.md` files with YAML frontmatter. Watched by Chokidar. | ~~the board~~, ~~task board~~ (acceptable informally) |
+| **Kanban Pro** | The markdown-based ticket board at `~/Projects/MMV/_assets/MMV_Docs/Kanban data/`. Tickets are `.md` files with YAML frontmatter. Watched by Chokidar. | ~~the board~~, ~~task board~~ (acceptable informally) |
 | **MAPPING.md** | Auto-generated ticket index in the Kanban directory. Read this first for board triage — it's the token-efficient overview. | ~~ticket list~~, ~~board summary~~ |
 | **Epic** | A large grouping of related tickets in Kanban Pro. Each epic corresponds to a milestone or major system. Defined in `board.json`. | ~~milestone~~ (overlaps but not identical — an epic can be a milestone, but not all are) |
 | **Sprint** | A time-boxed iteration (1-2 weeks) in Kanban Pro. Tickets pulled from backlog into sprint during sprint planning. Defined in `board.json`. | ~~cycle~~, ~~iteration~~ |

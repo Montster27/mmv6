@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { AuthGate } from "@/ui/components/AuthGate";
 import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
 import type { Storylet } from "@/types/storylets";
+import { flattenAllEvents } from "@/lib/eventsEmitted";
 import { Stat } from "@/components/contentStudio/Stat";
 
 // ── NPC extraction ────────────────────────────────────────────────────────────
@@ -109,8 +110,8 @@ function extractNpcs(storylets: Storylet[]): Map<string, NpcEntry> {
         }
       }
 
-      // 4. events_emitted
-      for (const ev of c.events_emitted ?? []) {
+      // 4. events_emitted (flat or conditional-group form)
+      for (const ev of flattenAllEvents(c.events_emitted)) {
         const entry = ensure(ev.npc_id);
         const ref = ensureRef(ev.npc_id, s.id, s.title);
         const existing = ref.sources.find((x) => x.kind === "events_emitted") as

@@ -7,6 +7,14 @@ export type LifePressureState = {
   avoid: number;
 };
 
+export type PeriodStanceTag = "challenged" | "deflected" | "absorbed";
+
+export type PeriodStanceState = {
+  challenged: number;
+  deflected: number;
+  absorbed: number;
+};
+
 export type EnergyLevel = "high" | "moderate" | "low";
 
 export type MoneyBand = "tight" | "okay" | "comfortable";
@@ -55,6 +63,7 @@ export type ExpiredOpportunity = {
 
 export type ChapterOneState = {
   lifePressureState: LifePressureState;
+  periodStanceState: PeriodStanceState;
   energyLevel: EnergyLevel;
   moneyBand: MoneyBand;
   skillFlags: SkillFlags;
