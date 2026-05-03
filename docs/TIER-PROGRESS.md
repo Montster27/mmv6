@@ -12,7 +12,7 @@
 
 | Tier | Theme | Effort | Status |
 |------|-------|--------|--------|
-| **Tier 1** | Quick wins — token baseline, model alias, hygiene, first worktree | ~6 hrs | ⏳ 3 of 4 shipped |
+| **Tier 1** | Quick wins — token baseline, model alias, hygiene, first worktree | ~6 hrs | ✅ 4 of 4 shipped |
 | **Tier 2** | Structural — local LLM router, preview branching, PR review action, state.json, pre-commit hooks | 1–2 weeks | ❌ all pending |
 | **Tier 3** | Workflow polish — gstack roles, multi-worktree, Scheduled Tasks, storylet sim | After 1+2 plateau | ❌ all pending |
 
@@ -73,18 +73,19 @@
 
 ### Tier 1.4 — First parallel worktree
 
-**Status.** ❌ pending.
+**Status.** ✅ shipped.
 
-**What it should land.** `.worktreeinclude` (whitelist of paths copied into each worktree), `WORKTREES.md` (operator runbook), and a 2-concurrent-session cap.
+**What it does.** Establishes the operator-spun parallel worktree workflow: a `.worktreeinclude` whitelist that auto-copies untracked env files into each new worktree, and `WORKTREES.md` codifying the 6 hard rules (2-concurrent cap, single migration writer, single dev-server owner, single Kanban writer, non-overlapping file scopes, `/start-session` discipline). Distinct from the agent-isolation worktrees Claude Code creates under `.claude/worktrees/` for its own internal agents.
 
-**Current state.** The 4 directories under `.claude/worktrees/` are auto-created **agent isolation** worktrees (one per agent invocation), not operator-designed parallel worktrees. The Tier 1.4 design specifies **operator-spun** worktrees via `claude --worktree <name>` for parallel session work, with a `.worktreeinclude` file and written rules in `WORKTREES.md`. Neither file exists yet.
+| Commit | Message | What it landed |
+|--------|---------|----------------|
+| `2e24a20` | chore(tier1): worktree config + parallel-session rules | `.worktreeinclude` (11 lines, new) — `.env.local`, `.env.development.local`, `.env.test.local`, `.vercel/` · `WORKTREES.md` (81 lines, new) — operator runbook · `.gitignore` (+5 lines) — explicit `.git/worktrees/` ignore |
 
-- `.worktreeinclude` — does not exist
-- `WORKTREES.md` (root or `docs/`) — does not exist
-- `.claude/worktrees/` — interesting-thompson, quirky-mclaren, suspicious-shannon-2d9a47, vigilant-hermann (all dormant, Feb–Apr 2026)
-- `git worktree list` confirms 5 active worktrees (main + 4 dormant agent worktrees + 1 prunable `/private/tmp/mmv-signal-hunt`); none are operator-driven
+**Verification.** Approval gate honored before commit. Env-file existence check at install time: `.env.local` ✅, `.vercel/` ✅, `.env.development.local` ❌, `.env.test.local` ❌ (the missing ones are forward-looking — `.worktreeinclude` will pick them up if/when created).
 
-**Next step when picked up.** Decide cap (2 concurrent), draft `.worktreeinclude` (likely: `.claude/`, `supabase/migrations/`, `docs/`, `MMV-CONVENTIONS.md`, `SOP.md`, `GLOSSARY.md`, `HANDOFF.md`), write `WORKTREES.md` with the create/cleanup commands, prune the 4 dormant agent worktrees.
+**Deviations from plan.**
+
+- The original Tier 1.4 sketch suggested whitelisting tracked content paths (`.claude/`, `supabase/migrations/`, `docs/`, etc.) in `.worktreeinclude`. That was a misread of the file's purpose: `git worktree add` already copies all tracked files. `.worktreeinclude` is for *untracked* files that each worktree needs to actually run (env vars, Vercel link). Final whitelist is just env files + `.vercel/`.
 
 ---
 
