@@ -56,3 +56,10 @@ sim-log-*.json
 
 # Phase 1 instrumentation captures (T-1777400000001) — local diagnostic dumps, not for repo
 /docs/captures/
+
+# Kanban Pro auto-generated agent instruction files. Regenerated on every project load
+# with no project-specific content. CLAUDE.md and README.md are also auto-overwritten
+# but their HEAD versions hold real MMV content; left tracked until Tier 1 cleanup
+# migrates them to MMV-CONVENTIONS.md.
+AGENTS.md
+/.github/copilot-instructions.md
