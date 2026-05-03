@@ -1,9 +1,38 @@
 {
-  "script_name": "glenn_directive_people",
-  "total_steps": 7,
+  "script_name": "skill_modifier_smoke",
+  "total_steps": 9,
   "entries": [
     {
       "step_index": 0,
+      "step_type": "train_skill",
+      "step_summary": "train_skill(musical_ear, state=trained)",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "skill_id": "musical_ear",
+        "state": "trained"
+      }
+    },
+    {
+      "step_index": 1,
+      "step_type": "expect_active_skill_progress",
+      "step_summary": "expect_active_skill_progress(musical_ear, state=trained)",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "skill_id": "musical_ear",
+        "state": "trained",
+        "remaining_seconds": null
+      }
+    },
+    {
+      "step_index": 2,
       "step_type": "choose",
       "step_summary": "choose(room_214, head_out)",
       "state_before": {
@@ -19,7 +48,7 @@
       }
     },
     {
-      "step_index": 1,
+      "step_index": 3,
       "step_type": "choose",
       "step_summary": "choose(dorm_hallmates, lunch_first)",
       "state_before": {
@@ -42,7 +71,7 @@
       }
     },
     {
-      "step_index": 2,
+      "step_index": 4,
       "step_type": "advance_segment",
       "step_summary": "advance_segment",
       "state_before": {
@@ -53,38 +82,6 @@
       "observed": {
         "new_segment": "afternoon",
         "new_hours_remaining": 12
-      }
-    },
-    {
-      "step_index": 3,
-      "step_type": "expect_storylet_available",
-      "step_summary": "expect_storylet_available(glenn_pastime_paradise)",
-      "state_before": {
-        "day": 1,
-        "segment": "afternoon",
-        "hours_remaining": 12
-      },
-      "observed": {
-        "served_storylet_key": "glenn_pastime_paradise",
-        "served_by": "chain",
-        "track_key": "opportunity",
-        "expires_on_day": 8
-      }
-    },
-    {
-      "step_index": 4,
-      "step_type": "expect_storylet_available",
-      "step_summary": "expect_storylet_available(lunch_floor)",
-      "state_before": {
-        "day": 1,
-        "segment": "afternoon",
-        "hours_remaining": 12
-      },
-      "observed": {
-        "served_storylet_key": "lunch_floor",
-        "served_by": "chain",
-        "track_key": "belonging",
-        "expires_on_day": 8
       }
     },
     {
@@ -104,8 +101,8 @@
         "skill_modifier": {
           "skill_id": "musical_ear",
           "effect": "soften",
-          "matched": false,
-          "variant": "neither"
+          "matched": true,
+          "variant": "skill_modified"
         },
         "identity_tags": [
           "risk"
@@ -120,33 +117,43 @@
     },
     {
       "step_index": 6,
-      "step_type": "choose",
-      "step_summary": "choose(lunch_floor, laugh_with_doug)",
+      "step_type": "expect_reaction_text",
+      "step_summary": "expect_reaction_text(variant=skill_modified, contains=\"harmonic progression\")",
       "state_before": {
         "day": 1,
         "segment": "afternoon",
         "hours_remaining": 12
       },
       "observed": {
-        "storylet_key": "lunch_floor",
-        "choice_id": "laugh_with_doug",
-        "next_key": "evening_choice",
-        "track_completed": false,
-        "skill_modifier": {
-          "skill_id": "small_talk",
-          "effect": "soften",
-          "matched": false,
-          "variant": "default"
-        },
-        "identity_tags": [
-          "people"
-        ],
-        "identity_axes_bumped": [
-          "people"
-        ],
-        "practiced_skills": [
-          "small_talk"
-        ]
+        "variant": "skill_modified"
+      }
+    },
+    {
+      "step_index": 7,
+      "step_type": "expect_identity_axis",
+      "step_summary": "expect_identity_axis(risk eq 1)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "axis": "risk",
+        "value": 1
+      }
+    },
+    {
+      "step_index": 8,
+      "step_type": "expect_flag_set",
+      "step_summary": "expect_flag_set(glenn_gave_direction)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "flag": "glenn_gave_direction",
+        "present": true
       }
     }
   ]

@@ -1,0 +1,63 @@
+name: skill_modifier_smoke
+description: >
+  Regression test for skill_modifier resolution surfacing in the headless
+  trace (T-1777320000007). Trains musical_ear, walks Day 0 morning to the
+  Glenn afternoon beat, and asserts that glenn_pastime_paradise.head_to_evening
+  resolves to the skill-modified reaction text rather than the default.
+
+  This script is also the regression gate for T-1777400000002 (skill effects
+  do not surface). The headless harness mirrors the engine's
+  serve-time annotation in `dailyLoop.ts:processChoicesForSkills`, so the
+  assertion verifies the resolution layer the API serves to the UI. If the
+  variant ever regresses to `default` or `neither`, this script fails.
+
+  Side effects asserted on the same choice:
+    • identity_tags=["risk"]   → life_pressure_state.risk bumps by 1
+    • sets_flag=["glenn_gave_direction"] → FLAG_SET event in choice_log
+
+steps:
+  # Train musical_ear without wall-clock waiting. setSkillState clears any
+  # prior row and inserts with status='trained' + trained_at=now.
+  - type: train_skill
+    skill_id: musical_ear
+    state: trained
+
+  - type: expect_active_skill_progress
+    skill_id: musical_ear
+    state: trained
+
+  # ── Day 0 Morning ──────────────────────────────────────────────────────
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+
+  # ── Day 0 Afternoon — Glenn beat 1 ─────────────────────────────────────
+  - type: advance_segment
+
+  - type: choose
+    storylet_key: glenn_pastime_paradise
+    choice_id: head_to_evening
+
+  # THE LOAD-BEARING ASSERTION — fails if the harness/engine's skill_modifier
+  # annotation regresses or if the choice content drifts.
+  - type: expect_reaction_text
+    variant: skill_modified
+    contains: "harmonic progression"
+
+  # Identity-tag accumulation: choice carries identity_tags=["risk"], so
+  # life_pressure_state.risk should bump from 0 → 1.
+  - type: expect_identity_axis
+    axis: risk
+    op: eq
+    value: 1
+
+  # FLAG_SET visibility: terminal-choice sets_flag=["glenn_gave_direction"]
+  # writes a FLAG_SET event on choice_log. Asserting it via this hook
+  # (rather than inferring from a later state query) is the polish item
+  # from the T-1777320000007 brief.
+  - type: expect_flag_set
+    flag: glenn_gave_direction

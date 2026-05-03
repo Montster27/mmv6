@@ -78,6 +78,28 @@ function describeStep(step: ScriptStep): string {
       return `expect_walk_flag(${step.flag}, present=${step.present})`;
     case "expect_prior_period_stance":
       return `expect_prior_period_stance(${step.value ?? "null"})`;
+    case "train_skill":
+      return `train_skill(${step.skill_id}, state=${step.state})`;
+    case "expect_reaction_text": {
+      const sub = step.contains ? `, contains="${step.contains}"` : "";
+      return `expect_reaction_text(variant=${step.variant}${sub})`;
+    }
+    case "expect_identity_axis":
+      return `expect_identity_axis(${step.axis} ${step.op} ${step.value})`;
+    case "expect_practice_credit": {
+      const cs = step.credit_seconds !== undefined ? `, ${step.credit_seconds}s` : "";
+      return `expect_practice_credit(${step.skill_id}${cs})`;
+    }
+    case "expect_active_skill_progress": {
+      const parts: string[] = [step.skill_id];
+      if (step.state) parts.push(`state=${step.state}`);
+      if (step.remaining_seconds) {
+        parts.push(`remaining ${step.remaining_seconds.op} ${step.remaining_seconds.value}`);
+      }
+      return `expect_active_skill_progress(${parts.join(", ")})`;
+    }
+    case "expect_flag_set":
+      return `expect_flag_set(${step.flag}${step.present === false ? ", absent" : ""})`;
     case "advance_segment":
       return "advance_segment";
     case "sleep":
@@ -375,12 +397,43 @@ async function executeStep(
       // Clear walk state on terminal choice (walk flags consumed)
       harness.walkState = null;
       const outcome = await harness.choose(step.storylet_key, step.choice_id);
-      pushTrace({
+      const eff = harness.lastChoiceEffects;
+      const observed: Record<string, unknown> = {
         storylet_key: step.storylet_key,
         choice_id: step.choice_id,
         next_key: outcome.nextKey,
         track_completed: outcome.trackCompleted,
-      });
+      };
+      // Auto-trace render-state effects of this terminal choice.
+      // These lines surface what the UI would have shown / written, without
+      // the script needing to assert them explicitly. Omit any that are
+      // empty so the trace stays focused.
+      if (eff && eff.storyletKey === step.storylet_key && eff.choiceId === step.choice_id) {
+        if (eff.skillModifier) {
+          observed.skill_modifier = {
+            skill_id: eff.skillModifier.skill_id,
+            effect: eff.skillModifier.effect,
+            matched: eff.skillModifier.matched,
+            variant: eff.reactionVariant,
+          };
+        } else if (eff.reactionVariant !== "neither") {
+          observed.reaction_variant = eff.reactionVariant;
+        }
+        if (eff.identityTags.length > 0) {
+          observed.identity_tags = eff.identityTags;
+          observed.identity_axes_bumped = eff.identityAxesBumped;
+        }
+        if (eff.practicedSkills.length > 0) {
+          observed.practiced_skills = eff.practicedSkills;
+          if (eff.practicedSkillCredits.length > 0) {
+            observed.practice_credits = eff.practicedSkillCredits;
+          }
+        }
+        if (eff.setsFlag.length > 0) {
+          observed.sets_flag = eff.setsFlag;
+        }
+      }
+      pushTrace(observed);
       return null;
     }
 
@@ -512,6 +565,198 @@ async function executeStep(
         };
       }
       pushTrace({ value: actual });
+      return null;
+    }
+
+    case "train_skill": {
+      await harness.setSkillState(step.skill_id, step.state);
+      pushTrace({ skill_id: step.skill_id, state: step.state });
+      return null;
+    }
+
+    case "expect_reaction_text": {
+      const eff = harness.lastChoiceEffects;
+      if (!eff) {
+        return {
+          stepIndex,
+          step,
+          expected: `reaction text variant=${step.variant}`,
+          observed: `no prior choose() to evaluate against — add a choose step first`,
+          context: { day: harness.dayIndex, segment: harness.currentSegment },
+          priorSteps,
+        };
+      }
+      const actual = eff.reactionVariant;
+      if (actual !== step.variant) {
+        return {
+          stepIndex,
+          step,
+          expected: `reaction text variant=${step.variant}`,
+          observed: `reaction text variant=${actual} (default=${
+            eff.reactionDefault ? `"${eff.reactionDefault.slice(0, 40)}…"` : "null"
+          }, modified=${
+            eff.reactionModified ? `"${eff.reactionModified.slice(0, 40)}…"` : "null"
+          })`,
+          context: {
+            day: harness.dayIndex,
+            segment: harness.currentSegment,
+            storylet_key: eff.storyletKey,
+            choice_id: eff.choiceId,
+            skill_modifier: eff.skillModifier,
+          },
+          priorSteps,
+        };
+      }
+      // Optional substring check on the resolved text.
+      if (step.contains) {
+        const resolvedText =
+          actual === "skill_modified"
+            ? eff.reactionModified
+            : actual === "default"
+              ? eff.reactionDefault
+              : null;
+        if (!resolvedText || !resolvedText.includes(step.contains)) {
+          return {
+            stepIndex,
+            step,
+            expected: `reaction text variant=${step.variant} contains "${step.contains}"`,
+            observed: `text does not contain "${step.contains}" (got: ${
+              resolvedText ? `"${resolvedText.slice(0, 80)}…"` : "null"
+            })`,
+            context: {
+              day: harness.dayIndex,
+              segment: harness.currentSegment,
+              storylet_key: eff.storyletKey,
+              choice_id: eff.choiceId,
+            },
+            priorSteps,
+          };
+        }
+      }
+      pushTrace({ variant: actual });
+      return null;
+    }
+
+    case "expect_identity_axis": {
+      const actual = await harness.getIdentityAxis(step.axis);
+      if (!compareOp(actual, step.op, step.value)) {
+        return {
+          stepIndex,
+          step,
+          expected: `life_pressure_state.${step.axis} ${step.op} ${step.value}`,
+          observed: `life_pressure_state.${step.axis} = ${actual}`,
+          context: {
+            day: harness.dayIndex,
+            segment: harness.currentSegment,
+          },
+          priorSteps,
+        };
+      }
+      pushTrace({ axis: step.axis, value: actual });
+      return null;
+    }
+
+    case "expect_practice_credit": {
+      const credit = await harness.getMostRecentPracticeCredit(step.skill_id);
+      if (!credit) {
+        return {
+          stepIndex,
+          step,
+          expected: `practice credit on ${step.skill_id}`,
+          observed: `no skill_practice_events row for ${step.skill_id}`,
+          context: { day: harness.dayIndex, segment: harness.currentSegment },
+          priorSteps,
+        };
+      }
+      if (
+        step.credit_seconds !== undefined &&
+        credit.credit_seconds !== step.credit_seconds
+      ) {
+        return {
+          stepIndex,
+          step,
+          expected: `practice credit on ${step.skill_id} = ${step.credit_seconds}s`,
+          observed: `credit_seconds=${credit.credit_seconds}`,
+          context: {
+            day: harness.dayIndex,
+            segment: harness.currentSegment,
+            storylet_key: credit.storylet_key,
+            choice_id: credit.choice_id,
+          },
+          priorSteps,
+        };
+      }
+      pushTrace({
+        skill_id: step.skill_id,
+        credit_seconds: credit.credit_seconds,
+        storylet_key: credit.storylet_key,
+        choice_id: credit.choice_id,
+      });
+      return null;
+    }
+
+    case "expect_active_skill_progress": {
+      const prog = await harness.getActiveSkillProgress(step.skill_id);
+      if (step.state && prog.state !== step.state) {
+        return {
+          stepIndex,
+          step,
+          expected: `${step.skill_id} state=${step.state}`,
+          observed: `${step.skill_id} state=${prog.state}`,
+          context: { day: harness.dayIndex, segment: harness.currentSegment },
+          priorSteps,
+        };
+      }
+      if (step.remaining_seconds) {
+        if (prog.remainingSeconds === null) {
+          return {
+            stepIndex,
+            step,
+            expected: `${step.skill_id} remaining_seconds ${step.remaining_seconds.op} ${step.remaining_seconds.value}`,
+            observed: `${step.skill_id} has no completes_at (state=${prog.state})`,
+            context: { day: harness.dayIndex, segment: harness.currentSegment },
+            priorSteps,
+          };
+        }
+        if (
+          !compareOp(
+            prog.remainingSeconds,
+            step.remaining_seconds.op,
+            step.remaining_seconds.value
+          )
+        ) {
+          return {
+            stepIndex,
+            step,
+            expected: `${step.skill_id} remaining_seconds ${step.remaining_seconds.op} ${step.remaining_seconds.value}`,
+            observed: `${step.skill_id} remaining_seconds = ${prog.remainingSeconds}`,
+            context: { day: harness.dayIndex, segment: harness.currentSegment },
+            priorSteps,
+          };
+        }
+      }
+      pushTrace({
+        skill_id: step.skill_id,
+        state: prog.state,
+        remaining_seconds: prog.remainingSeconds,
+      });
+      return null;
+    }
+
+    case "expect_flag_set": {
+      const want = step.present !== false; // default true
+      const present = await harness.hasFlagSet(step.flag);
+      if (present !== want) {
+        return {
+          stepIndex,
+          step,
+          expected: `FLAG_SET "${step.flag}" ${want ? "present" : "absent"}`,
+          observed: `FLAG_SET "${step.flag}" ${present ? "present" : "absent"}`,
+          context: { day: harness.dayIndex, segment: harness.currentSegment },
+          priorSteps,
+        };
+      }
+      pushTrace({ flag: step.flag, present });
       return null;
     }
 

@@ -94,6 +94,90 @@ export type ExpectPriorPeriodStanceStep = {
   value: "challenged" | "deflected" | "absorbed" | null;
 };
 
+/**
+ * Put a skill in a target state without waiting wall-clock time. Used to set
+ * up `requires_skill` / `skill_modifier` paths in regression scripts.
+ *
+ * - `trained`: status='trained', completes_at=null, trained_at=now.
+ * - `active`:  status='active', completes_at=now+base_train_seconds.
+ * - `queued`:  status='queued', no timestamps.
+ *
+ * Upserts so the same skill_id can be re-stated within a script.
+ */
+export type TrainSkillStep = {
+  type: "train_skill";
+  skill_id: string;
+  state: "trained" | "active" | "queued";
+};
+
+/**
+ * Assert which reaction-text variant a choice would render in the UI for the
+ * player's current trained-skill set. Mirrors the `processChoicesForSkills`
+ * annotation in `dailyLoop.ts` so headless tests catch regressions in
+ * skill_modifier resolution.
+ *
+ * Variants:
+ *   - `skill_modified`: choice has a matching `skill_modifier` and the player
+ *     has the skill trained → `reaction_with_skill` is what the UI shows.
+ *   - `default`:        no modifier active → `reaction_text` is what shows.
+ *   - `neither`:        the choice has no reaction text in either field.
+ *
+ * `contains` is an optional substring check on the resolved text.
+ */
+export type ExpectReactionTextStep = {
+  type: "expect_reaction_text";
+  variant: "default" | "skill_modified" | "neither";
+  contains?: string;
+};
+
+/**
+ * Assert the value of a `life_pressure_state` axis on `daily_states`. Axes
+ * are bumped by terminal-choice `identity_tags` via `bumpLifePressure`.
+ */
+export type ExpectIdentityAxisStep = {
+  type: "expect_identity_axis";
+  axis: "risk" | "safety" | "people" | "achievement" | "confront" | "avoid";
+  op: "eq" | "gt" | "gte" | "lt" | "lte";
+  value: number;
+};
+
+/**
+ * Assert that the most recent terminal choice triggered a practice-credit
+ * deposit on the named skill. Reads from `skill_practice_events` ordered by
+ * `applied_at`. `credit_seconds` defaults to 900 (PRACTICE_CREDIT_SECONDS env
+ * default) — pass the override here when running with a non-default env.
+ */
+export type ExpectPracticeCreditStep = {
+  type: "expect_practice_credit";
+  skill_id: string;
+  credit_seconds?: number;
+};
+
+/**
+ * Assert the queue state of a skill. `state` checks the discrete queue slot;
+ * `remaining_seconds` checks `completes_at - now` for an active skill (only
+ * meaningful when state='active').
+ */
+export type ExpectActiveSkillProgressStep = {
+  type: "expect_active_skill_progress";
+  skill_id: string;
+  state?: "trained" | "active" | "queued" | "none";
+  remaining_seconds?: {
+    op: "eq" | "gt" | "gte" | "lt" | "lte";
+    value: number;
+  };
+};
+
+/**
+ * Assert that a persistent FLAG_SET event was logged to `choice_log` for the
+ * given flag name. Looks at FLAG_SET rows where `option_key=flag`.
+ */
+export type ExpectFlagSetStep = {
+  type: "expect_flag_set";
+  flag: string;
+  present?: boolean;
+};
+
 export type CommitRoutineStep = { type: "commit_routine"; [key: string]: unknown };
 export type AdvanceDayStep = { type: "advance_day"; [key: string]: unknown };
 
@@ -109,6 +193,12 @@ export type ScriptStep =
   | ExpectPeriodStanceStep
   | ExpectWalkFlagStep
   | ExpectPriorPeriodStanceStep
+  | TrainSkillStep
+  | ExpectReactionTextStep
+  | ExpectIdentityAxisStep
+  | ExpectPracticeCreditStep
+  | ExpectActiveSkillProgressStep
+  | ExpectFlagSetStep
   | CommitRoutineStep
   | AdvanceDayStep;
 

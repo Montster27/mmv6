@@ -31,7 +31,14 @@
         "storylet_key": "dorm_hallmates",
         "choice_id": "lunch_first",
         "next_key": "lunch_floor",
-        "track_completed": false
+        "track_completed": false,
+        "reaction_variant": "default",
+        "identity_tags": [
+          "people"
+        ],
+        "identity_axes_bumped": [
+          "people"
+        ]
       }
     },
     {
@@ -61,7 +68,22 @@
         "storylet_key": "glenn_pastime_paradise",
         "choice_id": "head_to_evening",
         "next_key": null,
-        "track_completed": false
+        "track_completed": false,
+        "skill_modifier": {
+          "skill_id": "musical_ear",
+          "effect": "soften",
+          "matched": false,
+          "variant": "neither"
+        },
+        "identity_tags": [
+          "risk"
+        ],
+        "identity_axes_bumped": [
+          "risk"
+        ],
+        "sets_flag": [
+          "glenn_gave_direction"
+        ]
       }
     },
     {
@@ -106,7 +128,22 @@
         "storylet_key": "lunch_floor",
         "choice_id": "laugh_with_doug",
         "next_key": "evening_choice",
-        "track_completed": false
+        "track_completed": false,
+        "skill_modifier": {
+          "skill_id": "small_talk",
+          "effect": "soften",
+          "matched": false,
+          "variant": "default"
+        },
+        "identity_tags": [
+          "people"
+        ],
+        "identity_axes_bumped": [
+          "people"
+        ],
+        "practiced_skills": [
+          "small_talk"
+        ]
       }
     },
     {
@@ -152,7 +189,16 @@
         "storylet_key": "evening_choice",
         "choice_id": "go_to_party",
         "next_key": null,
-        "track_completed": false
+        "track_completed": false,
+        "reaction_variant": "default",
+        "identity_tags": [
+          "risk",
+          "people"
+        ],
+        "identity_axes_bumped": [
+          "risk",
+          "people"
+        ]
       }
     },
     {

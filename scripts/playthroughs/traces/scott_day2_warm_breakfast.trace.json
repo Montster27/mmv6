@@ -1,0 +1,136 @@
+{
+  "script_name": "scott_day2_warm_breakfast",
+  "total_steps": 8,
+  "entries": [
+    {
+      "step_index": 0,
+      "step_type": "choose",
+      "step_summary": "choose(first_morning, head_to_orientation)",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "first_morning",
+        "choice_id": "head_to_orientation",
+        "next_key": null,
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 1,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 2,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 2,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 3,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 2,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 3,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 4,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(scott_day2_morning, served_by=pool)",
+      "state_before": {
+        "day": 3,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "served_storylet_key": "scott_day2_morning",
+        "served_by": "pool",
+        "track_key": "roommate",
+        "expires_on_day": 10
+      }
+    },
+    {
+      "step_index": 5,
+      "step_type": "choose_node",
+      "step_summary": "choose_node(entry_warm, tell_him_about_night)",
+      "state_before": {
+        "day": 3,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "node_id": "entry_warm",
+        "micro_choice_id": "tell_him_about_night",
+        "next_node_id": "warm_engaged",
+        "terminal": null
+      }
+    },
+    {
+      "step_index": 6,
+      "step_type": "choose_node",
+      "step_summary": "choose_node(warm_engaged, next_time)",
+      "state_before": {
+        "day": 3,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "node_id": "warm_engaged",
+        "micro_choice_id": "next_time",
+        "next_node_id": null,
+        "terminal": "choices"
+      }
+    },
+    {
+      "step_index": 7,
+      "step_type": "choose",
+      "step_summary": "choose(scott_day2_morning, breakfast_with_scott)",
+      "state_before": {
+        "day": 3,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "scott_day2_morning",
+        "choice_id": "breakfast_with_scott",
+        "next_key": null,
+        "track_completed": false,
+        "reaction_variant": "default",
+        "identity_tags": [
+          "people"
+        ],
+        "identity_axes_bumped": [
+          "people"
+        ]
+      }
+    }
+  ]
+}

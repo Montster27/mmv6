@@ -1,5 +1,14 @@
 # Decisions Log
 
+## Headless trace surfaces render-state automatically; explicit asserts are opt-in (T-1777320000007)
+
+- **Date:** 2026-05-01
+- **Context:** Extending the playthrough trace to surface skill modifier resolution, identity tag accumulation, practice credit, and `sets_flag` writes. Two implementation patterns were possible: (a) require scripts to opt in via explicit `expect_*` steps for any state to appear in the trace, or (b) make the executor enrich `choose` step trace entries automatically with whatever effects the choice carried, and have explicit asserts gate progress on the same data when needed.
+- **Decision:** Pattern (b). The `choose` step's `observed` blob now contains `skill_modifier`, `reaction_variant`, `identity_tags`, `identity_axes_bumped`, `practiced_skills`, `practice_credits`, `sets_flag` automatically — each present only when the choice carries the corresponding field. Explicit `expect_reaction_text` / `expect_identity_axis` / `expect_practice_credit` / `expect_active_skill_progress` / `expect_flag_set` steps remain available for scripts that want to gate or assert on the value.
+- **Why:** Trace files are the regression-detection surface — golden-file diff in PR review surfaces drift even when the script author didn't think to assert. With pattern (a), a content edit that subtly changed which reaction variant fires would land silently; the script would still pass because no assertion covered it. With pattern (b), the trace diff makes it visible: `variant: skill_modified → variant: default` shows up in the next playthrough run regardless of whether the script asserted on it. Explicit step types stay valuable for two cases: (1) scripts that want to gate later steps on the value, (2) scripts that want a substring check (`contains:`) the auto-trace doesn't perform.
+- **Tradeoff:** Pattern (b) means re-baselining existing golden traces on this commit (11 new files committed, 7 existing files updated to gain the new fields). The cost is one-time; the benefit (silent regressions surface in PR review) is permanent.
+- **Source-of-truth note:** The harness's `resolveReactionVariant` mirrors `dailyLoop.ts:processChoicesForSkills` exactly. If the engine annotation logic changes, the harness must follow. Documented in `src/core/playthrough-runner/README.md`.
+
 ## `feature/period-stance-infrastructure` merged to main
 
 - **Date:** 2026-05-01

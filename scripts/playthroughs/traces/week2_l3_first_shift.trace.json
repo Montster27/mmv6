@@ -1,0 +1,715 @@
+{
+  "script_name": "week2_l3_first_shift",
+  "total_steps": 41,
+  "entries": [
+    {
+      "step_index": 0,
+      "step_type": "choose",
+      "step_summary": "choose(room_214, head_out)",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "room_214",
+        "choice_id": "head_out",
+        "next_key": "first_morning",
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 1,
+      "step_type": "choose",
+      "step_summary": "choose(dorm_hallmates, lunch_first)",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "dorm_hallmates",
+        "choice_id": "lunch_first",
+        "next_key": "lunch_floor",
+        "track_completed": false,
+        "reaction_variant": "default",
+        "identity_tags": [
+          "people"
+        ],
+        "identity_axes_bumped": [
+          "people"
+        ]
+      }
+    },
+    {
+      "step_index": 2,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 1,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 3,
+      "step_type": "choose",
+      "step_summary": "choose(glenn_pastime_paradise, head_to_evening)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "storylet_key": "glenn_pastime_paradise",
+        "choice_id": "head_to_evening",
+        "next_key": null,
+        "track_completed": false,
+        "skill_modifier": {
+          "skill_id": "musical_ear",
+          "effect": "soften",
+          "matched": false,
+          "variant": "neither"
+        },
+        "identity_tags": [
+          "risk"
+        ],
+        "identity_axes_bumped": [
+          "risk"
+        ],
+        "sets_flag": [
+          "glenn_gave_direction"
+        ]
+      }
+    },
+    {
+      "step_index": 4,
+      "step_type": "choose",
+      "step_summary": "choose(lunch_floor, laugh_with_doug)",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "storylet_key": "lunch_floor",
+        "choice_id": "laugh_with_doug",
+        "next_key": "evening_choice",
+        "track_completed": false,
+        "skill_modifier": {
+          "skill_id": "small_talk",
+          "effect": "soften",
+          "matched": false,
+          "variant": "default"
+        },
+        "identity_tags": [
+          "people"
+        ],
+        "identity_axes_bumped": [
+          "people"
+        ],
+        "practiced_skills": [
+          "small_talk"
+        ]
+      }
+    },
+    {
+      "step_index": 5,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 1,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 6,
+      "step_type": "choose",
+      "step_summary": "choose(evening_choice, go_to_cards)",
+      "state_before": {
+        "day": 1,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "storylet_key": "evening_choice",
+        "choice_id": "go_to_cards",
+        "next_key": null,
+        "track_completed": false,
+        "skill_modifier": {
+          "skill_id": "active_listening",
+          "effect": "soften",
+          "matched": false,
+          "variant": "default"
+        },
+        "identity_tags": [
+          "people",
+          "achieve"
+        ],
+        "identity_axes_bumped": [
+          "people"
+        ],
+        "practiced_skills": [
+          "active_listening"
+        ]
+      }
+    },
+    {
+      "step_index": 7,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 1,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 2,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 8,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 9,
+      "step_type": "choose",
+      "step_summary": "choose(terminal_first_visit, leave_terminal)",
+      "state_before": {
+        "day": 2,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "storylet_key": "terminal_first_visit",
+        "choice_id": "leave_terminal",
+        "next_key": null,
+        "track_completed": false,
+        "identity_tags": [
+          "risk",
+          "achieve"
+        ],
+        "identity_axes_bumped": [
+          "risk"
+        ],
+        "sets_flag": [
+          "found_terminal"
+        ]
+      }
+    },
+    {
+      "step_index": 10,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 2,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 11,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 2,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 3,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 12,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 3,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_day": 4,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 13,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_day": 5,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 14,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 5,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 15,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 5,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 16,
+      "step_type": "choose",
+      "step_summary": "choose(money_reality_check, go_out)",
+      "state_before": {
+        "day": 5,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "storylet_key": "money_reality_check",
+        "choice_id": "go_out",
+        "next_key": null,
+        "track_completed": false,
+        "reaction_variant": "default",
+        "identity_tags": [
+          "people",
+          "risk"
+        ],
+        "identity_axes_bumped": [
+          "people",
+          "risk"
+        ]
+      }
+    },
+    {
+      "step_index": 17,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 5,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 6,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 18,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 6,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_day": 7,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 19,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 7,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_day": 8,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 20,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 8,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 21,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(job_board, served_by=pool)",
+      "state_before": {
+        "day": 8,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "served_storylet_key": "job_board",
+        "served_by": "pool",
+        "track_key": "money",
+        "expires_on_day": 11
+      }
+    },
+    {
+      "step_index": 22,
+      "step_type": "choose_node",
+      "step_summary": "choose_node(pick_card, job_library)",
+      "state_before": {
+        "day": 8,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "node_id": "pick_card",
+        "micro_choice_id": "job_library",
+        "next_node_id": null,
+        "terminal": "choices"
+      }
+    },
+    {
+      "step_index": 23,
+      "step_type": "choose",
+      "step_summary": "choose(job_board, leave_board_library)",
+      "state_before": {
+        "day": 8,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "storylet_key": "job_board",
+        "choice_id": "leave_board_library",
+        "next_key": null,
+        "track_completed": false,
+        "identity_tags": [
+          "safety",
+          "achieve"
+        ],
+        "identity_axes_bumped": [
+          "safety"
+        ],
+        "sets_flag": [
+          "has_job_library"
+        ]
+      }
+    },
+    {
+      "step_index": 24,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 8,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 25,
+      "step_type": "choose",
+      "step_summary": "choose(pay_phone_line, phone_continue)",
+      "state_before": {
+        "day": 8,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "storylet_key": "pay_phone_line",
+        "choice_id": "phone_continue",
+        "next_key": null,
+        "track_completed": true
+      }
+    },
+    {
+      "step_index": 26,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 8,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 9,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 27,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 9,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 28,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 9,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 29,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(dana_cereal)",
+      "state_before": {
+        "day": 9,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "served_storylet_key": "dana_cereal",
+        "served_by": "pool",
+        "track_key": "roommate",
+        "expires_on_day": 11
+      }
+    },
+    {
+      "step_index": 30,
+      "step_type": "choose_node",
+      "step_summary": "choose_node(cereal_offer, no_thanks)",
+      "state_before": {
+        "day": 9,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "node_id": "cereal_offer",
+        "micro_choice_id": "no_thanks",
+        "next_node_id": null,
+        "terminal": "choices"
+      }
+    },
+    {
+      "step_index": 31,
+      "step_type": "choose",
+      "step_summary": "choose(dana_cereal, cereal_continue_neutral)",
+      "state_before": {
+        "day": 9,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "storylet_key": "dana_cereal",
+        "choice_id": "cereal_continue_neutral",
+        "next_key": null,
+        "track_completed": false,
+        "sets_flag": [
+          "dana_cereal_neutral"
+        ]
+      }
+    },
+    {
+      "step_index": 32,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 9,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 10,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 33,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 10,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 34,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 10,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 35,
+      "step_type": "choose",
+      "step_summary": "choose(dana_letter_surface, dana_surface_end)",
+      "state_before": {
+        "day": 10,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "storylet_key": "dana_letter_surface",
+        "choice_id": "dana_surface_end",
+        "next_key": null,
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 36,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 10,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 11,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 37,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 11,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 38,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 11,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 39,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(first_shift_library, served_by=pool)",
+      "state_before": {
+        "day": 11,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "served_storylet_key": "first_shift_library",
+        "served_by": "pool",
+        "track_key": "money",
+        "expires_on_day": 14
+      }
+    },
+    {
+      "step_index": 40,
+      "step_type": "choose",
+      "step_summary": "choose(first_shift_library, finish_shift_library)",
+      "state_before": {
+        "day": 11,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "storylet_key": "first_shift_library",
+        "choice_id": "finish_shift_library",
+        "next_key": null,
+        "track_completed": false,
+        "identity_tags": [
+          "safety"
+        ],
+        "identity_axes_bumped": [
+          "safety"
+        ]
+      }
+    }
+  ]
+}

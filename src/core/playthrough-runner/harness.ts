@@ -20,9 +20,11 @@ import {
 } from "@/core/resources/applyResourcesServer";
 import { toLegacyResourceUpdates } from "@/core/resources/resourceMap";
 import type { Track, TrackStoryletRow, TrackProgress, DueStorylet } from "@/types/tracks";
-import type { DialogueNode, MicroChoice } from "@/types/storylets";
+import type { DialogueNode } from "@/types/storylets";
 import type { FixtureSnapshot } from "./types";
 import { logState } from "@/lib/stateLog";
+import { tickPracticeCredit } from "@/core/skills/practice";
+import { bumpLifePressure } from "@/core/chapter/state";
 
 const SEGMENT_ORDER = ["morning", "afternoon", "evening", "night"] as const;
 
@@ -48,6 +50,27 @@ export class PlaythroughHarness {
 
   /** Active node walk (set by chooseNode, cleared by choose or sleep). */
   walkState: WalkState | null = null;
+
+  /**
+   * Last terminal-choice render-state snapshot. Populated on every choose()
+   * call. Read by the executor's auto-trace formatter so a `choose` step
+   * trace line surfaces what the UI would have shown — skill_modifier
+   * resolution, identity_tags, practiced skills, FLAG_SET writes — without
+   * the script needing an explicit assertion to log it.
+   */
+  lastChoiceEffects: {
+    storyletKey: string;
+    choiceId: string;
+    reactionVariant: "default" | "skill_modified" | "neither";
+    reactionDefault: string | null;
+    reactionModified: string | null;
+    skillModifier: { skill_id: string; effect: string; matched: boolean } | null;
+    identityTags: string[];
+    identityAxesBumped: string[];
+    practicedSkills: string[];
+    practicedSkillCredits: { skill_id: string; credit_seconds: number }[];
+    setsFlag: string[];
+  } | null = null;
 
   // -------------------------------------------------------------------------
   // Lifecycle
@@ -197,6 +220,22 @@ export class PlaythroughHarness {
     if (currentResolvedKeys.includes(storyletKey)) {
       return { nextKey: null, trackCompleted: false };
     }
+
+    // Resolve render-state for the trace BEFORE applying any side effects.
+    // Mirrors dailyLoop.ts:processChoicesForSkills so the trace records what
+    // the UI would have shown if the player saw this choice.
+    const reactionResolution = await this.resolveReactionVariant(
+      choice as Record<string, unknown>
+    );
+    const setsFlagList = Array.isArray(choice.sets_flag)
+      ? (choice.sets_flag as string[])
+      : [];
+    const identityTagsList = Array.isArray(choice.identity_tags)
+      ? (choice.identity_tags as string[])
+      : [];
+    const practicesSkillsList = Array.isArray(choice.practices_skills)
+      ? (choice.practices_skills as string[])
+      : [];
 
     // Apply resource deltas
     const rawDeltas = collectChoiceResourceDeltas(choice);
@@ -382,6 +421,90 @@ export class PlaythroughHarness {
         .update({ preclusion_gates: merged })
         .eq("user_id", this.userId);
     }
+
+    // Diegetic-practice credit (mirrors /api/tracks/resolve §7.5).
+    const practicedSkillCredits: { skill_id: string; credit_seconds: number }[] = [];
+    if (practicesSkillsList.length > 0) {
+      const creditSeconds = (() => {
+        const env = process.env.PRACTICE_CREDIT_SECONDS;
+        if (env) {
+          const n = parseInt(env, 10);
+          if (!Number.isNaN(n) && n > 0) return n;
+        }
+        return 900;
+      })();
+      const { data: activeBefore } = await db
+        .from("player_skills")
+        .select("skill_id")
+        .eq("user_id", this.userId)
+        .eq("status", "active")
+        .maybeSingle();
+      const credited = await tickPracticeCredit(
+        db as unknown as Parameters<typeof tickPracticeCredit>[0],
+        this.userId,
+        practicesSkillsList,
+        new Date(),
+        { storylet_key: storyletKey, choice_id: choiceId }
+      );
+      if (credited > 0 && activeBefore?.skill_id) {
+        practicedSkillCredits.push({
+          skill_id: activeBefore.skill_id as string,
+          credit_seconds: creditSeconds,
+        });
+      }
+    }
+
+    // Identity-tag accumulation onto life_pressure_state (mirrors play/page.tsx).
+    const identityAxesBumped: string[] = [];
+    if (identityTagsList.length > 0) {
+      const { data: dailyRow } = await db
+        .from("daily_states")
+        .select("life_pressure_state")
+        .eq("user_id", this.userId)
+        .maybeSingle();
+      const current = (dailyRow?.life_pressure_state as Record<string, number>) ?? {};
+      const normalized = {
+        risk: current.risk ?? 0,
+        safety: current.safety ?? 0,
+        people: current.people ?? 0,
+        achievement: current.achievement ?? 0,
+        confront: current.confront ?? 0,
+        avoid: current.avoid ?? 0,
+      };
+      const next = bumpLifePressure(normalized, identityTagsList);
+      const VALID_AXES = [
+        "risk",
+        "safety",
+        "people",
+        "achievement",
+        "confront",
+        "avoid",
+      ] as const;
+      for (const tag of identityTagsList) {
+        if ((VALID_AXES as readonly string[]).includes(tag)) {
+          identityAxesBumped.push(tag);
+        }
+      }
+      await db
+        .from("daily_states")
+        .update({ life_pressure_state: next, updated_at: new Date().toISOString() })
+        .eq("user_id", this.userId);
+    }
+
+    // Capture render-state snapshot for the executor's auto-trace.
+    this.lastChoiceEffects = {
+      storyletKey,
+      choiceId,
+      reactionVariant: reactionResolution.which,
+      reactionDefault: reactionResolution.default,
+      reactionModified: reactionResolution.modified,
+      skillModifier: reactionResolution.skillModifier,
+      identityTags: identityTagsList,
+      identityAxesBumped,
+      practicedSkills: practicesSkillsList,
+      practicedSkillCredits,
+      setsFlag: setsFlagList,
+    };
 
     return { nextKey: validNextKey, trackCompleted };
   }
@@ -880,6 +1003,229 @@ export class PlaythroughHarness {
       .eq("track_id", track.id)
       .maybeSingle();
     return data as Record<string, unknown> | null;
+  }
+
+  /**
+   * Resolve which reaction-text variant the UI would render for a choice
+   * given the player's current trained-skill set. Mirrors the annotation
+   * in `dailyLoop.ts:processChoicesForSkills`. Used by `choose()` to
+   * snapshot the variant into `lastChoiceEffects` (the trace surface) and
+   * by `expect_reaction_text`.
+   */
+  private async resolveReactionVariant(
+    choice: Record<string, unknown>
+  ): Promise<{
+    which: "default" | "skill_modified" | "neither";
+    default: string | null;
+    modified: string | null;
+    skillModifier: { skill_id: string; effect: string; matched: boolean } | null;
+  }> {
+    const reactionDefault =
+      typeof choice.reaction_text === "string" ? (choice.reaction_text as string) : null;
+    const reactionModified =
+      typeof choice.reaction_with_skill === "string"
+        ? (choice.reaction_with_skill as string)
+        : null;
+    const sm = choice.skill_modifier as
+      | { skill_id?: string; effect?: string }
+      | undefined;
+
+    if (!sm?.skill_id) {
+      const which: "default" | "neither" = reactionDefault ? "default" : "neither";
+      return {
+        which,
+        default: reactionDefault,
+        modified: reactionModified,
+        skillModifier: null,
+      };
+    }
+
+    const { data: trainedRows } = await db
+      .from("player_skills")
+      .select("skill_id")
+      .eq("user_id", this.userId)
+      .eq("status", "trained");
+    const trained = new Set((trainedRows ?? []).map((r) => r.skill_id as string));
+    const matched = trained.has(sm.skill_id);
+
+    let which: "default" | "skill_modified" | "neither";
+    if (matched && reactionModified) {
+      which = "skill_modified";
+    } else if (reactionDefault) {
+      which = "default";
+    } else {
+      which = "neither";
+    }
+
+    return {
+      which,
+      default: reactionDefault,
+      modified: reactionModified,
+      skillModifier: {
+        skill_id: sm.skill_id,
+        effect: sm.effect ?? "soften",
+        matched,
+      },
+    };
+  }
+
+  /**
+   * Public variant of resolveReactionVariant: looks the choice up by ID and
+   * returns the same shape. Used directly by `expect_reaction_text` when
+   * scripts want to assert resolution without resolving the choice via
+   * `choose()`.
+   */
+  async getResolvedReactionText(
+    storyletKey: string,
+    choiceId: string
+  ): Promise<{
+    which: "default" | "skill_modified" | "neither";
+    default: string | null;
+    modified: string | null;
+    skillModifier: { skill_id: string; effect: string; matched: boolean } | null;
+  }> {
+    const storylet = this.storylets.find((s) => s.storylet_key === storyletKey);
+    if (!storylet) throw new Error(`Storylet not found: ${storyletKey}`);
+    const choices: Array<Record<string, unknown>> = Array.isArray(storylet.choices)
+      ? (storylet.choices as Array<Record<string, unknown>>)
+      : [];
+    const choice = choices.find(
+      (c) => c.id === choiceId || c.option_key === choiceId
+    );
+    if (!choice) {
+      throw new Error(`Choice "${choiceId}" not found on ${storyletKey}`);
+    }
+    return this.resolveReactionVariant(choice);
+  }
+
+  /**
+   * Put a player_skills row in a target state without wall-clock waiting.
+   * Used by scripts to set up `requires_skill` / `skill_modifier` paths.
+   */
+  async setSkillState(
+    skillId: string,
+    state: "trained" | "active" | "queued"
+  ): Promise<void> {
+    const { data: def } = await db
+      .from("skill_definitions")
+      .select("base_train_seconds")
+      .eq("skill_id", skillId)
+      .maybeSingle();
+    if (!def) {
+      throw new Error(`Unknown skill_id: ${skillId} (not in skill_definitions)`);
+    }
+    const baseTrainSeconds = (def.base_train_seconds as number) ?? 120;
+    const now = new Date();
+    const completesAt = new Date(now.getTime() + baseTrainSeconds * 1000).toISOString();
+
+    // Clear any existing row for this skill (the table's per-user uniqueness
+    // is enforced by status, so we delete + insert to keep things simple).
+    await db
+      .from("player_skills")
+      .delete()
+      .eq("user_id", this.userId)
+      .eq("skill_id", skillId);
+
+    const row: Record<string, unknown> = {
+      user_id: this.userId,
+      skill_id: skillId,
+      status: state,
+    };
+    if (state === "trained") {
+      row.trained_at = now.toISOString();
+      row.completes_at = null;
+      row.started_at = now.toISOString();
+    } else if (state === "active") {
+      row.started_at = now.toISOString();
+      row.completes_at = completesAt;
+    }
+    const { error } = await db.from("player_skills").insert(row);
+    if (error) {
+      throw new Error(`Failed to setSkillState(${skillId}, ${state}): ${error.message}`);
+    }
+  }
+
+  /**
+   * Read the queue state of a skill: trained / active / queued / none. When
+   * active, also returns the seconds remaining until `completes_at`.
+   */
+  async getActiveSkillProgress(skillId: string): Promise<{
+    state: "trained" | "active" | "queued" | "none";
+    remainingSeconds: number | null;
+  }> {
+    const { data } = await db
+      .from("player_skills")
+      .select("status,completes_at")
+      .eq("user_id", this.userId)
+      .eq("skill_id", skillId)
+      .maybeSingle();
+    if (!data) return { state: "none", remainingSeconds: null };
+    const status = data.status as string;
+    if (status !== "trained" && status !== "active" && status !== "queued") {
+      return { state: "none", remainingSeconds: null };
+    }
+    let remainingSeconds: number | null = null;
+    if (status === "active" && data.completes_at) {
+      const completesMs = new Date(data.completes_at as string).getTime();
+      remainingSeconds = Math.max(
+        0,
+        Math.round((completesMs - Date.now()) / 1000)
+      );
+    }
+    return { state: status, remainingSeconds };
+  }
+
+  /**
+   * Read a single life_pressure_state axis from daily_states. Defaults to 0.
+   */
+  async getIdentityAxis(
+    axis: "risk" | "safety" | "people" | "achievement" | "confront" | "avoid"
+  ): Promise<number> {
+    const { data } = await db
+      .from("daily_states")
+      .select("life_pressure_state")
+      .eq("user_id", this.userId)
+      .maybeSingle();
+    const lp = (data?.life_pressure_state as Record<string, number>) ?? {};
+    return lp[axis] ?? 0;
+  }
+
+  /**
+   * Read the most recent skill_practice_events row for the given skill_id
+   * (for asserting that a `practices_skills` choice deposited credit).
+   */
+  async getMostRecentPracticeCredit(
+    skillId: string
+  ): Promise<{ credit_seconds: number; storylet_key: string; choice_id: string } | null> {
+    const { data } = await db
+      .from("skill_practice_events")
+      .select("credit_seconds,storylet_key,choice_id")
+      .eq("user_id", this.userId)
+      .eq("skill_id", skillId)
+      .order("applied_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      credit_seconds: data.credit_seconds as number,
+      storylet_key: data.storylet_key as string,
+      choice_id: data.choice_id as string,
+    };
+  }
+
+  /**
+   * Check whether a FLAG_SET event for the given flag exists in choice_log.
+   */
+  async hasFlagSet(flag: string): Promise<boolean> {
+    const { data } = await db
+      .from("choice_log")
+      .select("id")
+      .eq("user_id", this.userId)
+      .eq("event_type", "FLAG_SET")
+      .eq("option_key", flag)
+      .limit(1)
+      .maybeSingle();
+    return !!data;
   }
 
   // -------------------------------------------------------------------------

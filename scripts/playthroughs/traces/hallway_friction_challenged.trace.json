@@ -1,0 +1,314 @@
+{
+  "script_name": "hallway_friction_challenged",
+  "total_steps": 21,
+  "entries": [
+    {
+      "step_index": 0,
+      "step_type": "set_identity",
+      "step_summary": "set_identity(race=south_asian, gender=man, sexuality=gay)",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "race": "south_asian",
+        "gender": "man",
+        "sexuality": "gay"
+      }
+    },
+    {
+      "step_index": 1,
+      "step_type": "expect_prior_period_stance",
+      "step_summary": "expect_prior_period_stance(null)",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "value": null
+      }
+    },
+    {
+      "step_index": 2,
+      "step_type": "choose",
+      "step_summary": "choose(first_morning, head_to_orientation)",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "first_morning",
+        "choice_id": "head_to_orientation",
+        "next_key": null,
+        "track_completed": false
+      }
+    },
+    {
+      "step_index": 3,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 2,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 4,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 2,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 5,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 2,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 3,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 6,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 3,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "new_segment": "afternoon",
+        "new_hours_remaining": 12
+      }
+    },
+    {
+      "step_index": 7,
+      "step_type": "advance_segment",
+      "step_summary": "advance_segment",
+      "state_before": {
+        "day": 3,
+        "segment": "afternoon",
+        "hours_remaining": 12
+      },
+      "observed": {
+        "new_segment": "evening",
+        "new_hours_remaining": 8
+      }
+    },
+    {
+      "step_index": 8,
+      "step_type": "sleep",
+      "step_summary": "sleep",
+      "state_before": {
+        "day": 3,
+        "segment": "evening",
+        "hours_remaining": 8
+      },
+      "observed": {
+        "new_day": 4,
+        "new_segment": "morning",
+        "new_hours_remaining": 16
+      }
+    },
+    {
+      "step_index": 9,
+      "step_type": "expect_storylet_available",
+      "step_summary": "expect_storylet_available(hallway_morning_day3, served_by=pool)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "served_storylet_key": "hallway_morning_day3",
+        "served_by": "pool",
+        "track_key": "belonging",
+        "expires_on_day": 5
+      }
+    },
+    {
+      "step_index": 10,
+      "step_type": "choose_node",
+      "step_summary": "choose_node(hallway_pass, just_nod)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "node_id": "hallway_pass",
+        "micro_choice_id": "just_nod",
+        "next_node_id": "hallway_comment",
+        "terminal": null
+      }
+    },
+    {
+      "step_index": 11,
+      "step_type": "choose_node",
+      "step_summary": "choose_node(hallway_comment, challenge)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "node_id": "hallway_comment",
+        "micro_choice_id": "challenge",
+        "next_node_id": "friction_response",
+        "terminal": null
+      }
+    },
+    {
+      "step_index": 12,
+      "step_type": "expect_walk_flag",
+      "step_summary": "expect_walk_flag(hallway_challenged, present=true)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "flag": "hallway_challenged",
+        "present": true
+      }
+    },
+    {
+      "step_index": 13,
+      "step_type": "expect_walk_flag",
+      "step_summary": "expect_walk_flag(hallway_absorbed, present=false)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "flag": "hallway_absorbed",
+        "present": false
+      }
+    },
+    {
+      "step_index": 14,
+      "step_type": "expect_walk_flag",
+      "step_summary": "expect_walk_flag(hallway_deflected, present=false)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "flag": "hallway_deflected",
+        "present": false
+      }
+    },
+    {
+      "step_index": 15,
+      "step_type": "expect_period_stance",
+      "step_summary": "expect_period_stance(challenged eq 1)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "tag": "challenged",
+        "value": 1
+      }
+    },
+    {
+      "step_index": 16,
+      "step_type": "expect_period_stance",
+      "step_summary": "expect_period_stance(absorbed eq 0)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "tag": "absorbed",
+        "value": 0
+      }
+    },
+    {
+      "step_index": 17,
+      "step_type": "expect_period_stance",
+      "step_summary": "expect_period_stance(deflected eq 0)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "tag": "deflected",
+        "value": 0
+      }
+    },
+    {
+      "step_index": 18,
+      "step_type": "expect_prior_period_stance",
+      "step_summary": "expect_prior_period_stance(challenged)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "value": "challenged"
+      }
+    },
+    {
+      "step_index": 19,
+      "step_type": "choose_node",
+      "step_summary": "choose_node(friction_response, continue_resp)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "node_id": "friction_response",
+        "micro_choice_id": "continue_resp",
+        "next_node_id": null,
+        "terminal": "choices"
+      }
+    },
+    {
+      "step_index": 20,
+      "step_type": "choose",
+      "step_summary": "choose(hallway_morning_day3, head_to_class_day3)",
+      "state_before": {
+        "day": 4,
+        "segment": "morning",
+        "hours_remaining": 16
+      },
+      "observed": {
+        "storylet_key": "hallway_morning_day3",
+        "choice_id": "head_to_class_day3",
+        "next_key": null,
+        "track_completed": false,
+        "reaction_variant": "default"
+      }
+    }
+  ]
+}
