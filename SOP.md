@@ -13,10 +13,11 @@ You have four standard phrases. Use them literally — they're designed so any e
 Paste this at the top of every Claude Code session:
 
 ```
-Read SOP.md, HANDOFF.md, and GLOSSARY.md.
+Read MMV-CONVENTIONS.md, SOP.md, HANDOFF.md, GLOSSARY.md.
+Do NOT read HANDOFF-archive.md unless I ask.
 Check MAPPING.md at ~/Projects/MMV/_assets/MMV_Docs/Kanban data/MAPPING.md
 for current sprint tickets.
-Tell me: top of stack, any vocabulary drift, any blocked tickets.
+Tell me: top of stack, branches in flight, any blocked tickets.
 Today I'm working on: [describe what you want to do]
 ```
 
@@ -33,7 +34,7 @@ Today I need to [specific task — write a spec / produce a deck / organize docs
 ### 2. "End session"
 Say this at the end of every Claude Code session. Code should:
 
-1. **Update HANDOFF.md** — what we did, what's next, any new decisions
+1. **Update HANDOFF.md** — replace "Top of stack" with the next concrete thing; add 1-line entries to "Recently merged"; trim "Recently merged" to last 7 days, moving older entries to HANDOFF-archive.md (append, never edit). HANDOFF.md should stay under 1 page (~600 words). The detailed narrative of what happened goes into HANDOFF-archive.md, NOT HANDOFF.md.
 2. **Update "Branches in flight"** — if any branch was created, advanced, merged, or had its gate change this session, edit the table near the top of HANDOFF.md to match. When a branch merges to main, remove its row.
 3. **Update Kanban tickets** — move completed tickets to `col_done`, create new tickets for work discovered, update `modified` and `modifiedBy: claude-code`. **Before writing `status: col_done` on any ticket, paste the verifying shell output (test result, SQL scan, file listing) into the close note.** Don't close on intent — close on evidence. The ticket body should be a report of what happened, not a summary of what should have happened.
 4. **Log decisions** to `docs/DECISIONS.md` if any design calls were made
@@ -142,3 +143,7 @@ If you can't remember a term: **read GLOSSARY.md.**
 If you can't remember what's been done: **read HANDOFF.md.**
 If you can't remember what's next: **read MAPPING.md** (Kanban triage view).
 If you can't remember why a decision was made: **check docs/DECISIONS.md or ask the PM to check MemPalace.**
+
+## 5. "Drift check"
+Run when something feels off — file references stale, build broken, vocabulary drifting.
+See `MMV-CONVENTIONS.md` → "Drift checks" for the exact commands.

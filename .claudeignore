@@ -1,0 +1,51 @@
+# Build / dependency / cache
+node_modules/
+.next/
+.vercel/
+dist/
+out/
+.turbo/
+coverage/
+.cache/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Generated assets / large content dumps
+public/assets/generated/
+docs/captures/
+*.mp4
+*.mp3
+*.wav
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+
+# Lockfiles (Claude almost never needs these)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Test output / generated artifacts
+test_output.json
+playthrough-results/
+*.tsbuildinfo
+
+# The archive (huge; only read on demand)
+HANDOFF-archive.md
