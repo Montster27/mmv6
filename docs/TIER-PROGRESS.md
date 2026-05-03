@@ -73,15 +73,26 @@
 
 ### Tier 1.4 — First parallel worktree
 
-**Status.** ✅ shipped.
+**Status:** ✅ Shipped (files in place; live verification deferred)
 
 **What it does.** Establishes the operator-spun parallel worktree workflow: a `.worktreeinclude` whitelist that auto-copies untracked env files into each new worktree, and `WORKTREES.md` codifying the 6 hard rules (2-concurrent cap, single migration writer, single dev-server owner, single Kanban writer, non-overlapping file scopes, `/start-session` discipline). Distinct from the agent-isolation worktrees Claude Code creates under `.claude/worktrees/` for its own internal agents.
 
 | Commit | Message | What it landed |
 |--------|---------|----------------|
 | `2e24a20` | chore(tier1): worktree config + parallel-session rules | `.worktreeinclude` (11 lines, new) — `.env.local`, `.env.development.local`, `.env.test.local`, `.vercel/` · `WORKTREES.md` (81 lines, new) — operator runbook · `.gitignore` (+5 lines) — explicit `.git/worktrees/` ignore |
+| `0caa54f` | docs(worktrees): document headless -p auth limitation | `WORKTREES.md` (+1 line) — failure mode entry: `claude --worktree <name> -p "..."` returns "Not logged in" because OAuth tokens aren't passed to headless child processes |
 
-**Verification.** Approval gate honored before commit. Env-file existence check at install time: `.env.local` ✅, `.vercel/` ✅, `.env.development.local` ❌, `.env.test.local` ❌ (the missing ones are forward-looking — `.worktreeinclude` will pick them up if/when created).
+**What's verified:**
+- `.worktreeinclude` correctly auto-copies env files (proven during failed verification spin-up — `.env.local` and `.vercel/` copied to `sop-heading-cleanup` worktree)
+- Worktree creation works
+- Multiple worktrees can coexist on the repo
+- Headless `-p` flow has OAuth auth wall (documented in `WORKTREES.md` failure modes)
+
+**What's deferred:**
+- Full merge/cleanup cycle from a parallel worktree to main
+- First real use will exercise this; if anything's wrong we learn at the moment we actually need it
+
+**Next test will be opportunistic:** when an actual piece of parallel work comes up, do it through a worktree and observe what happens.
 
 **Deviations from plan.**
 
