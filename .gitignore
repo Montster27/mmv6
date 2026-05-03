@@ -23,6 +23,11 @@
 # misc
 .DS_Store
 *.pem
+
+# Worktree config — shared
+# (.worktreeinclude IS tracked; .git/worktrees/ is not)
+.git/worktrees/
+
 # .claude/ — ship project-shared parts, ignore per-machine state
 .claude/*
 !.claude/commands/

@@ -1,0 +1,11 @@
+# Files that should auto-copy into every new worktree.
+# Same syntax as .gitignore (but inverted meaning: "include these untracked files").
+# Read by `claude --worktree <name>` (Claude Code v2.1.50+).
+
+# Environment files (untracked, but each worktree needs them to actually run)
+.env.local
+.env.development.local
+.env.test.local
+
+# Vercel link (untracked; each worktree needs to know it's the same Vercel project)
+.vercel/
