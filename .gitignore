@@ -23,7 +23,18 @@
 # misc
 .DS_Store
 *.pem
-.claude/
+# .claude/ — ship project-shared parts, ignore per-machine state
+.claude/*
+!.claude/commands/
+!.claude/commands/**
+!.claude/settings.json
+!.claude/agents/
+!.claude/agents/**
+# Per-machine state stays ignored:
+.claude/settings.local.json
+.claude/worktrees/
+.claude/logs/
+.claude/cache/
 
 # debug
 npm-debug.log*
