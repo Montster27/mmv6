@@ -79,3 +79,4 @@ Two parallel sessions burn roughly 2x the tokens. The win comes from compressing
 - **.env.local missing in new worktree** — fix: ensure it's listed in .worktreeinclude
 - **Vercel deploy from wrong worktree** — fix: only the migration-owner worktree pushes to deploy branches
 - **Cognitive ping-pong** — fix: 25-minute Pomodoro per worktree before checking the other
+- **Headless `-p` flow can't read OAuth credentials** — `claude --worktree <name> -p "..."` fails with "Not logged in" because OAuth tokens aren't passed to headless child processes. Fix: open the worktree directory in a separate Code window/tab (the intended operator pattern), or export ANTHROPIC_API_KEY for true headless use.
