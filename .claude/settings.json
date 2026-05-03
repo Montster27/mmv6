@@ -1,0 +1,27 @@
+{
+  "model": "opusplan",
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git branch*)",
+      "Bash(git show*)",
+      "Bash(git stash list)",
+      "Bash(git push*)",
+      "Bash(ls*)",
+      "Bash(cat*)",
+      "Bash(find*)",
+      "Bash(grep*)",
+      "Bash(pwd)",
+      "Bash(echo*)",
+      "Bash(wc*)",
+      "Bash(head*)",
+      "Bash(tail*)",
+      "Bash(npx vitest*)",
+      "Bash(npx tsc*)",
+      "Bash(npm run dev*)",
+      "Bash(npm run build*)"
+    ]
+  }
+}
