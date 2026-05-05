@@ -1,0 +1,90 @@
+name: study_group_assumption_challenged
+description: >
+  Beat 2D regression: study_group_forming (Day 3 afternoon academic,
+  misogyny friction beat — Bryce assumes Priya will take notes).
+  Walks join_or_not (sit_and_listen), auto-advances through
+  study_passive + paper_assignment, picks challenged on priya_takes_paper,
+  asserts the walk flag + period_stance bump, resolves the terminal.
+
+  Path: fixture (dayIndex=2 morning, started_day=1) → clear roommate
+  chain → resolve advisor_visit (Day 2 afternoon, academic chain)
+  so the academic track enters pool mode → Day 4 afternoon
+  (storylet-keyed "Day 3") → study_group_forming served from pool.
+extends: fixtures/after_day0_party_path.snapshot.json
+
+steps:
+  - type: set_identity
+    race: white
+    gender: woman
+    sexuality: straight
+
+  # Day 2 morning — clear roommate chain.
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  # Day 2 afternoon — clear academic chain (advisor_visit, default_next_key
+  # NULL → academic falls to pool mode after this).
+  - type: advance_segment
+  - type: choose
+    storylet_key: advisor_visit
+    choice_id: defer
+
+  # Advance Day 2 afternoon → Day 4 afternoon (storylet-keyed "Day 3").
+  - type: advance_segment   # Day 2 evening
+  - type: sleep             # Day 3 morning
+  - type: advance_segment   # Day 3 afternoon
+  - type: advance_segment   # Day 3 evening
+  - type: sleep             # Day 4 morning
+  - type: advance_segment   # Day 4 afternoon
+
+  # Day 4 afternoon — clear belonging-afternoon competitors so academic's
+  # study_group_forming wins the remaining life-stream slot (frame_story
+  # slot is occupied by opportunity track's glenn chain). Both
+  # floor_lunch_day2 (last day = 4) and miguel_afternoon_day3 (window 4-5)
+  # are eligible and would otherwise dominate.
+  - type: choose
+    storylet_key: floor_lunch_day2
+    choice_id: walk_back_with_doug
+  - type: choose
+    storylet_key: miguel_afternoon_day3
+    choice_id: miguel_done
+
+  # Now study_group_forming should be available.
+  - type: expect_storylet_available
+    storylet_key: study_group_forming
+    at: { day: 4, segment: afternoon, track: academic }
+    served_by: pool
+
+  # Walk: join_or_not has 3 micros. Take sit_and_listen (no requires_flag,
+  # leads to study_passive). study_passive (text-only) auto-advances to
+  # paper_assignment (text-only, speaker bryce) → priya_takes_paper.
+  - type: choose_node
+    node_id: join_or_not
+    micro_choice_id: sit_and_listen
+
+  # priya_takes_paper is the friction node. Pick challenged.
+  - type: choose_node
+    node_id: priya_takes_paper
+    micro_choice_id: study_challenged
+
+  # Verify.
+  - type: expect_walk_flag
+    flag: study_challenged
+    present: true
+  - type: expect_walk_flag
+    flag: joined_study_group
+    present: true
+
+  - type: expect_period_stance
+    tag: challenged
+    op: eq
+    value: 1
+
+  - type: expect_prior_period_stance
+    value: challenged
+
+  # Resolve. study_resolves auto-advances to choices.
+  - type: choose
+    storylet_key: study_group_forming
+    choice_id: head_back_to_dorm
