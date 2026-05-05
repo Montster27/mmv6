@@ -1,0 +1,135 @@
+name: peterson_joke_challenged
+description: >
+  Beat 2B regression: lounge_cards_night (Day 9 evening belonging,
+  homophobia friction beat — Peterson's joke). Walks the conversation
+  tree, picks the challenged micro-choice on peterson_lands_joke, asserts
+  the walk flag + period_stance bump.
+
+  Path: fixture (dayIndex=2 morning, started_day=1) → clear roommate
+  chain → resolve hallway_morning_day3 (Day 4) → clear belonging-evening
+  competitors floor_hallway_day6 (Day 7) and floor_lounge_tv_day7 (Day 8)
+  → Day 10 evening → lounge_cards_night served from belonging pool.
+
+  Also exercises the prior_period_stance signal — settle_in's text_variant
+  fires when period_stance.challenged ≥ 1 (cumulative counter, not walk flag).
+  The challenge here is the player's first deposit, so the variant doesn't
+  fire on settle_in this run; that path is covered by extending sessions
+  that chain Beat 2A into Beat 2B (out of scope here).
+extends: fixtures/after_day0_party_path.snapshot.json
+
+steps:
+  - type: set_identity
+    race: white
+    gender: man
+    sexuality: gay
+
+  # Day 2 morning — clear roommate chain.
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  # Advance Day 2 → Day 4 morning.
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+
+  # Day 4 morning — resolve hallway_morning_day3 (expires today; would
+  # otherwise dominate belonging-morning slot through Day 5).
+  - type: choose
+    storylet_key: hallway_morning_day3
+    choice_id: head_to_class_day3
+
+  # Advance Day 4 → Day 7 evening.
+  - type: advance_segment   # Day 4 afternoon
+  - type: advance_segment   # Day 4 evening
+  - type: sleep             # Day 5 morning
+  - type: advance_segment   # Day 5 afternoon
+  - type: advance_segment   # Day 5 evening
+  - type: sleep             # Day 6 morning
+  - type: advance_segment   # Day 6 afternoon
+  - type: advance_segment   # Day 6 evening
+  - type: sleep             # Day 7 morning
+  - type: advance_segment   # Day 7 afternoon
+  - type: advance_segment   # Day 7 evening
+
+  # Day 7 evening — floor_hallway_day6 wins belonging evening (expires
+  # today). Clear it.
+  - type: choose
+    storylet_key: floor_hallway_day6
+    choice_id: keep_walking
+
+  # Advance Day 7 evening → Day 8 evening.
+  - type: sleep             # Day 8 morning
+  - type: advance_segment   # Day 8 afternoon
+  - type: advance_segment   # Day 8 evening
+
+  # Day 8 evening — clear three competitors: floor_lounge_tv_day7 (belonging),
+  # dana_cereal (roommate, eligible Day 8-10 — would dominate the 2-slot
+  # global cap on Day 10), pay_phone_line (home, eligible Day 8-10 — same
+  # cap pressure). All three resolved with neutral choices.
+  - type: choose
+    storylet_key: floor_lounge_tv_day7
+    choice_id: leave_for_room
+  - type: choose
+    storylet_key: dana_cereal
+    choice_id: cereal_continue_neutral
+  - type: choose
+    storylet_key: pay_phone_line
+    choice_id: phone_continue
+
+  # Advance Day 8 evening → Day 9 evening.
+  - type: sleep             # Day 9 morning
+  - type: advance_segment   # Day 9 afternoon
+  - type: advance_segment   # Day 9 evening
+
+  # Day 9 evening — dana_letter_surface (roommate, eligible Day 9-11) is now
+  # the only roommate-evening competitor. Clear it so Day 10 evening's
+  # 2-slot global cap doesn't push lounge_cards_night out.
+  - type: choose
+    storylet_key: dana_letter_surface
+    choice_id: dana_surface_end
+
+  # Advance Day 9 evening → Day 10 evening.
+  - type: sleep             # Day 10 morning
+  - type: advance_segment   # Day 10 afternoon
+  - type: advance_segment   # Day 10 evening
+
+  # Day 10 evening — lounge_cards_night should be the belonging evening
+  # candidate (window 10-12).
+  - type: expect_storylet_available
+    storylet_key: lounge_cards_night
+    at: { day: 10, segment: evening, track: belonging }
+    served_by: pool
+
+  # Walk: settle_in (auto), peterson_setup_joke (auto), peterson_lands_joke
+  # (THE FRICTION). Pick challenged.
+  - type: choose_node
+    node_id: peterson_lands_joke
+    micro_choice_id: peterson_challenged
+
+  # Verify.
+  - type: expect_walk_flag
+    flag: peterson_challenged
+    present: true
+  - type: expect_walk_flag
+    flag: peterson_absorbed
+    present: false
+  - type: expect_walk_flag
+    flag: peterson_deflected
+    present: false
+
+  - type: expect_period_stance
+    tag: challenged
+    op: eq
+    value: 1
+
+  - type: expect_prior_period_stance
+    value: challenged
+
+  # Resolve. jordan_glance auto-advances to choices.
+  - type: choose
+    storylet_key: lounge_cards_night
+    choice_id: stay_play
