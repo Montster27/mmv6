@@ -1,0 +1,97 @@
+name: quad_walk_challenged
+description: >
+  Beat 2C regression: walk_to_class_day4 (Day 4 morning belonging, misogyny
+  friction). Mirrors hallway_friction_challenged.yaml — fresh fixture, walks
+  the conversation tree, picks the challenged micro-choice, asserts the
+  walk flag + period_stance bump + prior_period_stance write, then resolves
+  the terminal.
+
+  Path: fixture (Day 2 morning, started_day=1) → clear roommate chain →
+  Day 4 morning → resolve hallway_morning_day3 (so it's not the urgent
+  belonging morning candidate) → Day 5 morning (dayIndex=5) →
+  walk_to_class_day4 served from belonging pool.
+
+  walk_to_class_day4 has expires_after_days=2 with due=4 → window dayIndex
+  5-7. hallway_morning_day3 (due=3, expires=1) has earlier expiry on
+  dayIndex=4 morning, so it must be resolved before walk_to_class_day4 is
+  served.
+extends: fixtures/after_day0_party_path.snapshot.json
+
+steps:
+  - type: set_identity
+    race: south_asian
+    gender: man
+    sexuality: straight
+
+  # Day 2 morning — clear the roommate-track chain (room_214 →) first_morning.
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  # Advance Day 2 morning → Day 4 morning (dayIndex=4).
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+
+  # Day 4 morning — hallway_morning_day3 wins the belonging morning slot
+  # (expires today). Resolve it to clear it, no friction beat exercised.
+  - type: expect_storylet_available
+    storylet_key: hallway_morning_day3
+    at: { day: 4, segment: morning, track: belonging }
+
+  - type: choose
+    storylet_key: hallway_morning_day3
+    choice_id: head_to_class_day3
+
+  # Advance to Day 5 morning (dayIndex=5).
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+
+  # Day 5 morning — walk_to_class_day4 should now be the belonging morning
+  # candidate (hallway_morning_day3 expired+resolved).
+  - type: expect_storylet_available
+    storylet_key: walk_to_class_day4
+    at: { day: 5, segment: morning, track: belonging }
+    served_by: pool
+
+  # Walk the node tree. leave_dorm and women_pass are text-only — the
+  # harness auto-advances through them to she_glances (the friction node).
+  - type: choose_node
+    node_id: she_glances
+    micro_choice_id: quad_challenged
+
+  # Verify: walk flag set, period_stance.challenged bumped, prior write.
+  - type: expect_walk_flag
+    flag: quad_challenged
+    present: true
+  - type: expect_walk_flag
+    flag: quad_absorbed
+    present: false
+  - type: expect_walk_flag
+    flag: quad_deflected
+    present: false
+
+  - type: expect_period_stance
+    tag: challenged
+    op: eq
+    value: 1
+  - type: expect_period_stance
+    tag: absorbed
+    op: eq
+    value: 0
+  - type: expect_period_stance
+    tag: deflected
+    op: eq
+    value: 0
+
+  - type: expect_prior_period_stance
+    value: challenged
+
+  # Resolve the terminal. walk_continues auto-advances to choices.
+  - type: choose
+    storylet_key: walk_to_class_day4
+    choice_id: walk_in_with_them
