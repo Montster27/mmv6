@@ -1,0 +1,91 @@
+name: floor_hallway_day6_smoke
+description: >
+  Beat 2G smoke test: floor_hallway_day6 (Day 6 evening belonging,
+  texture beat — Jordan in the hallway). NO friction micro-choice; the
+  storylet's nodes auto-advance from hallway_walk → pass_jordan_room →
+  hallway_observation → choices. Verifies the storylet is served, the
+  terminal writes the persistent flags (noticed_jordan_room,
+  jordan_thread_seeded), and the storylet's introduces_npc field for
+  npc_ambiguous_jordan is exercised on terminal resolve.
+
+  Path: fixture (dayIndex=2 morning, started_day=1) → clear roommate
+  chain → resolve hallway_morning_day3 → Day 7 evening
+  (storylet-keyed "Day 6") → floor_hallway_day6 served from belonging
+  pool. Texture beat — terminal-only resolution, no node walk.
+
+  Note: the brief makes Beat 2G the canonical Jordan introduction. Any
+  later jordan.witnessed_pushback memory deposit (Beat 2B) lands on an
+  already-introduced NPC.
+extends: fixtures/after_day0_party_path.snapshot.json
+
+steps:
+  - type: set_identity
+    race: white
+    gender: man
+    sexuality: straight
+
+  # Day 2 morning — clear roommate chain.
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  # Advance Day 2 → Day 4 morning.
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+  - type: advance_segment
+  - type: advance_segment
+  - type: sleep
+
+  # Day 4 morning — clear hallway_morning_day3.
+  - type: choose
+    storylet_key: hallway_morning_day3
+    choice_id: head_to_class_day3
+
+  # Advance Day 4 → Day 7 evening.
+  - type: advance_segment   # Day 4 afternoon
+  - type: advance_segment   # Day 4 evening
+  - type: sleep             # Day 5 morning
+  - type: advance_segment   # Day 5 afternoon
+  - type: advance_segment   # Day 5 evening
+  - type: sleep             # Day 6 morning
+  - type: advance_segment   # Day 6 afternoon
+  - type: advance_segment   # Day 6 evening
+  - type: sleep             # Day 7 morning
+  - type: advance_segment   # Day 7 afternoon
+  - type: advance_segment   # Day 7 evening
+
+  # Day 7 evening — floor_hallway_day6 should be the belonging-evening
+  # urgent candidate (window 7-8, expires Day 8).
+  - type: expect_storylet_available
+    storylet_key: floor_hallway_day6
+    at: { day: 7, segment: evening, track: belonging }
+    served_by: pool
+
+  # Resolve the terminal directly. The storylet has no micros — pure
+  # texture. The terminal's sets_flag writes both flags to choice_log.
+  - type: choose
+    storylet_key: floor_hallway_day6
+    choice_id: keep_walking
+
+  # Verify the persistent flags landed in choice_log.
+  - type: expect_flag_set
+    flag: jordan_thread_seeded
+    present: true
+  - type: expect_flag_set
+    flag: noticed_jordan_room
+    present: true
+
+  # Verify period_stance is untouched — Beat 2G is texture, not friction.
+  - type: expect_period_stance
+    tag: challenged
+    op: eq
+    value: 0
+  - type: expect_period_stance
+    tag: deflected
+    op: eq
+    value: 0
+  - type: expect_period_stance
+    tag: absorbed
+    op: eq
+    value: 0
