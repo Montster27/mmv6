@@ -48,10 +48,18 @@ Day 1 morning    morning_after_party      requires_choice: go_to_party
 Day 1 morning    morning_after_cards      requires_choice: go_to_cards  [introduces npc_floor_peterson]
 Day 1 morning    morning_after_union      requires_choice: go_to_union
 Day 2 afternoon  floor_lunch_day2
-Day 3 morning    hallway_morning_day3
+Day 3 morning    hallway_morning_day3     [Beat 2A — homophobia friction beat: hallway_*]
 Day 3 afternoon  miguel_afternoon_day3
+Day 4 morning    walk_to_class_day4       [Beat 2C — misogyny friction beat: quad_*]
+Day 4 afternoon  priya_dining_hall        [Beat 2E — racism friction beat: priya_* (Bryce intrusion)]
+                                          [introduces npc_anderson_bryce, npc_studious_priya]
+                                          [moved 2026-05-04 from Day 11; see DECISIONS.md 2026-05-04]
+Day 6 evening    floor_hallway_day6       [Beat 2G — TEXTURE; introduces npc_ambiguous_jordan]
+                                          (sets_flag: noticed_jordan_room, jordan_thread_seeded)
+Day 7 evening    floor_lounge_tv_day7     [Beat 2F — racism friction beat: tv_*]
+Day 9 evening    lounge_cards_night       [Beat 2B — homophobia friction beat: peterson_*]
+                                          (peterson_challenged micro: set_npc_memory jordan.witnessed_pushback)
 Day 10 afternoon miguel_guitar
-Day 11 afternoon priya_dining_hall
 Day 12 evening   doug_coach_story
 Day 13 evening   tuesday_commitment       (4 walk-flag-gated terminals; each persists its flag)
                    tuesday_decided_study    sets_flag: tuesday_study_group
@@ -60,6 +68,15 @@ Day 13 evening   tuesday_commitment       (4 walk-flag-gated terminals; each per
                    tuesday_decided_movie    sets_flag: tuesday_dana_movie
 Day 14 evening   tuesday_night_study      requires_flag: tuesday_study_group
 ```
+
+**Period-friction infrastructure** (period_stance system, merged `3f0b420` 2026-05-01):
+each friction-beat micro deposits a `period_stance` tag (`absorbed | deflected
+| challenged`) onto `daily_states.period_stance_state` and writes a
+PERIOD_STANCE event to `choice_log`. Beat 2B's `settle_in` and
+`peterson_lands_joke.label_variants` read the cumulative counter via
+`period_stance: { tag: challenged, min: 1 }` predicate; Beat 2G's
+`hallway_observation` reads `{ tag: challenged, min: 2 }`. See ENGINE-SPEC.md
+§period-stance and `src/lib/nodeConditions.ts:60-73` for the predicate impl.
 
 **Preclusion in `evening_choice`:** old `precludes` entries referenced
 non-existent slugs (`s_d1_evening_party` etc.). The chain now relies on
@@ -80,7 +97,8 @@ Day 2 evening    reading_or_lounge
                    do_the_reading   sets_flag: did_reading
                    go_to_lounge     sets_flag: skipped_reading, lounge_day2
 Day 3 morning    second_morning_class
-Day 3 afternoon  study_group_forming
+Day 3 afternoon  study_group_forming      [Beat 2D — misogyny friction beat: study_*]
+                                          [introduces npc_anderson_bryce, npc_studious_priya]
                    stay_and_review  sets_flag: extra_study
 Day 3 evening    catch_up_or_coast        requires_flag: skipped_reading
                    catch_up_now     sets_flag: did_reading_late
@@ -136,6 +154,8 @@ Prior to 2026-04-22 this gate silently failed.
 
 ```
 Day 7 evening    pay_phone_line   (single storylet; no chain beyond it yet)
+                                  [Phys-B — phone_line texture node prepended:
+                                   payphone, three guys with rolls of dimes, "look, MOM"]
 ```
 
 ---

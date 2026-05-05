@@ -3,7 +3,7 @@
 > **One-page current state.** Everything older than the last entry below moves to `HANDOFF-archive.md`.
 > Read in: `Start session` (SOP.md §1).
 > Update at: `End session` (SOP.md §2).
-> Last touched: 2026-05-03
+> Last touched: 2026-05-05
 
 ---
 
@@ -32,6 +32,7 @@ Phase 2 root-cause investigation of the Day-2-evening state-resume bug. Phase 1 
 ## Recently merged (last 7 days)
 <!-- One line per merge. Trim weekly. Older entries go to HANDOFF-archive.md. -->
 
+- 2026-05-05 — T-1776329282001 period friction content shipped: 4 new belonging pool storylets (walk_to_class_day4, lounge_cards_night, floor_hallway_day6 — Jordan canonical intro, floor_lounge_tv_day7), 3 retrofits (study_group_forming + Beat 2D, priya_dining_hall + Beat 2E + day-window move 11→4, pay_phone_line + Phys-B smoke). 6 new regression playthroughs all passing. Two implementation deltas: `floor_hallway_day6.expires_after_days = 0` (single-day window — texture beat doesn't need carry-over; flagged as a "Week-1-2 evening slot pressure audit" backlog signal); `scripts/playthroughs/home_pay_phone.yaml` updated to clear `floor_lounge_tv_day7` competitor on Day 8 evening (test reactive to new content's slot-cap pressure, not a T-1776329282001 deliverable). Future enhancement: add `expect_npc_memory` step type to playthrough executor (deferred — covered by unit tests at events_emitted layer).
 - 2026-05-01 — `3f0b420` merge `feature/period-stance-infrastructure` → main (48 commits absorbed)
 - 2026-04-29 — `a1c807d` Phase 1 instrumentation landed on main; Vercel preview READY
 - 2026-04-29 — `cb10dc2`..`a1c807d` SegmentTransitionCard fixes + reset endpoint parity (`bcfc171`, `5c224ee`, `6f1723f`, `6a11f53`)
