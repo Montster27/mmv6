@@ -1,0 +1,102 @@
+name: priya_dining_challenged
+description: >
+  Beat 2E regression: priya_dining_hall (Day 4-6 afternoon belonging,
+  racism friction beat — Bryce's "where are your *parents* from").
+  Walks the new Bryce-intrusion arc (where_youre_from, priya_says_jersey,
+  bryce_pushes auto-advance), picks challenged on priya_responds, then
+  walks through the existing Priya-invitation arc, asserts walk flag +
+  period_stance bump, resolves the terminal.
+
+  Path: fixture (dayIndex=2 morning, started_day=1) → clear roommate
+  chain → clear advisor_visit (academic chain) → clear competing
+  belonging-afternoon storylets across Day 3 + Day 4 → Day 5 afternoon
+  (storylet-keyed "Day 4") → priya_dining_hall served from belonging pool.
+
+  Day-window note: priya_dining_hall.due_offset_days was moved 11 → 4 in
+  migration 20260503150000_priya_dining_hall_friction_retrofit.sql per
+  session decision 2026-05-04. The brief positions Beat 2E as Day 4-6
+  belonging, colliding with walk_to_class_day4 and study_group_forming.
+extends: fixtures/after_day0_party_path.snapshot.json
+
+steps:
+  - type: set_identity
+    race: south_asian
+    gender: woman
+    sexuality: straight
+
+  # Day 2 morning — clear roommate chain.
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
+
+  # Day 2 afternoon — clear academic chain so it doesn't dominate.
+  - type: advance_segment
+  - type: choose
+    storylet_key: advisor_visit
+    choice_id: defer
+
+  # Advance Day 2 afternoon → Day 4 afternoon.
+  - type: advance_segment   # Day 2 evening
+  - type: sleep             # Day 3 morning
+  - type: advance_segment   # Day 3 afternoon
+  - type: advance_segment   # Day 3 evening
+  - type: sleep             # Day 4 morning
+  - type: advance_segment   # Day 4 afternoon
+
+  # Day 4 afternoon — clear study_group_forming (academic-pool, would
+  # otherwise dominate the life-stream slot on Day 5 since it expires
+  # Day 6 vs priya_dining_hall Day 7). Resolve via terminal-only (no
+  # walk through nodes).
+  - type: choose
+    storylet_key: study_group_forming
+    choice_id: head_back_to_dorm
+
+  # Advance Day 4 afternoon → Day 5 afternoon.
+  - type: advance_segment   # Day 4 evening
+  - type: sleep             # Day 5 morning
+  - type: advance_segment   # Day 5 afternoon
+
+  # Day 5 afternoon — clear miguel_afternoon_day3 (belonging, last day 5).
+  # By now, floor_lunch_day2 has expired naturally (last day 4).
+  - type: choose
+    storylet_key: miguel_afternoon_day3
+    choice_id: miguel_done
+
+  # priya_dining_hall should be the belonging-afternoon candidate.
+  - type: expect_storylet_available
+    storylet_key: priya_dining_hall
+    at: { day: 5, segment: afternoon, track: belonging }
+    served_by: pool
+
+  # Walk: where_youre_from (auto, speaker bryce), priya_says_jersey (auto),
+  # bryce_pushes (auto) → priya_responds (HAS micros — pick challenged).
+  - type: choose_node
+    node_id: priya_responds
+    micro_choice_id: priya_challenged
+
+  # priya_aftermath (auto, text_variants) → study_invite (HAS micros —
+  # pick say_yes_study to continue the existing scene).
+  - type: choose_node
+    node_id: study_invite
+    micro_choice_id: say_yes_study
+
+  # Verify.
+  - type: expect_walk_flag
+    flag: priya_challenged
+    present: true
+  - type: expect_walk_flag
+    flag: study_group_invited
+    present: true
+
+  - type: expect_period_stance
+    tag: challenged
+    op: eq
+    value: 1
+
+  - type: expect_prior_period_stance
+    value: challenged
+
+  # Resolve. priya_nods (speaker priya, text-only) auto-advances to choices.
+  - type: choose
+    storylet_key: priya_dining_hall
+    choice_id: priya_continue
