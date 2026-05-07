@@ -1,5 +1,15 @@
 # Decisions Log
 
+## `daily_states.life_pressure_state` is canonical identity store; `.vectors` is legacy (T-1778077549003)
+
+- **Date:** 2026-05-07
+- **Context:** The 2026-05-06 audit (REPORT.md §2.1) found ProgressPanel rendered "No vectors yet" for 9 days despite `stateLog` confirming `microChoice.lifePressure` firing. Root cause: two parallel systems exist. `daily_states.vectors` (`VECTOR_KEYS`: reflection/focus/ambition/social/stability/curiosity/agency; 0-100 normalized) is updated by `applyOutcomeToDailyState` only when a choice carries `outcome.deltas.vectors`. No current content does this. `daily_states.life_pressure_state` (Bible §3.2 axes: risk/safety/people/achievement/confront/avoid; integer counters) is updated by `bumpLifePressure` on every `identity_tags` choice — the active system.
+- **Decision:** `life_pressure_state` is canonical going forward. ProgressPanel reads LP as primary; `.vectors` is retained as fallback for backward compat only (shows if LP is all-zero). LP keys render as numerals — integer counters are not 0-100 normalized, bars would misrepresent the data. `vectorSummary.ts` no longer filters by `VECTOR_KEYS` so LP axis names are valid summary targets.
+- **If `.vectors` is ever revived** (i.e., content starts writing `outcome.deltas.vectors` again): both systems will be live simultaneously. ProgressPanel shows LP if any LP > 0, `.vectors` only if LP is all-zero. At that point reconcile into one canonical store rather than carrying both.
+- **Silent LP drop in track storylets (fixed this ticket):** Prior to T-1778077549003 landing, `handleTrackStoryletChoice` did not wire `identity_tags` → `bumpLifePressure` / `updateLifePressureState`. Pool storylets (`handleChoice`) and node walks (`handleMicroEffects`) did. Track storylets silently dropped LP writes. All Day 1 content (room_214, dorm_hallmates, lunch_floor, evening_choice, Glenn, etc.) is served as track storylets, so LP state never accumulated from the Arc One opening regardless of what ProgressPanel rendered.
+- **Implication for trace data:** Any walk traces, stateLog captures, or playtest reports from before this commit that show "LP accumulation isn't working" or an empty VECTORS sidebar were observing reality — track-served `identity_tags` writes were not landing. Older traces must not be used as a baseline for LP behavior.
+- **Implication for reflection spike (T-1778077549001):** LP accumulation on track-served paths only became reliable as of this commit. Treat T-1778077549003's merge SHA as the earliest trustworthy LP baseline for reflection's input data.
+
 ## Period-friction content shape: Jordan = closeted queer in 1983 (T-1776329282001)
 
 - **Date:** 2026-05-04

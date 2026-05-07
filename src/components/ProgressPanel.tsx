@@ -19,7 +19,7 @@ type DeltaInfo = {
 type Props = {
   dailyState?: Pick<
     DailyState,
-    "energy" | "stress" | "vectors" | "money_band"
+    "energy" | "stress" | "vectors" | "money_band" | "life_pressure_state"
   > | null;
   dayState?: DailyRun["dayState"] | null;
   skillBank?: { available_points: number; cap: number } | null;
@@ -123,7 +123,17 @@ function ProgressPanelComponent({
     typeof energy === "number" && typeof stress === "number"
       ? clamp(Math.round(50 + energy - stress))
       : undefined;
-  const vectors = toVectors(dailyState?.vectors ?? {});
+  // life_pressure_state (Bible §3.2 axes: risk/safety/people/achievement/confront/avoid)
+  // is the canonical identity store. dailyState.vectors is the legacy 0-100 system;
+  // no current content writes to it, so it is kept only as a fallback.
+  const lpRaw = (dailyState?.life_pressure_state ?? {}) as Record<string, unknown>;
+  const lpVectors: Record<string, number> = Object.fromEntries(
+    Object.entries(lpRaw).filter((e): e is [string, number] => typeof e[1] === "number")
+  );
+  const legacyVectors = toVectors(dailyState?.vectors ?? {});
+  const useLifePressure = Object.values(lpVectors).some((v) => v > 0);
+  const vectors = useLifePressure ? lpVectors : legacyVectors;
+
   const skillLevels = skills ?? {
     focus: 0,
     memory: 0,
@@ -134,6 +144,7 @@ function ProgressPanelComponent({
   const vectorKeys =
     Object.keys(vectors).length > 0
       ? Object.keys(vectors)
+          .filter((k) => vectors[k] > 0)
           .sort((a, b) => a.localeCompare(b))
           .slice(0, 7)
       : [];
@@ -270,6 +281,15 @@ function ProgressPanelComponent({
           <p className="prep-label">Vectors</p>
           {vectorKeys.length === 0 ? (
             <p className="text-sm text-muted-foreground italic font-body">No vectors yet.</p>
+          ) : useLifePressure ? (
+            <div className="space-y-1.5">
+              {vectorKeys.map((key) => (
+                <div key={key} className="flex items-center justify-between text-sm text-foreground/70">
+                  <span className="capitalize font-body">{key}</span>
+                  <span className="font-stat text-xs">{vectors[key] ?? 0}</span>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="space-y-2.5">
               {vectorKeys.map((key) => {

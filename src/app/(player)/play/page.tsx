@@ -2765,6 +2765,19 @@ export default function PlayPage() {
             console.error("[track-storylet-choice] relationship update failed (non-fatal):", relErr);
           }
         }
+        // Wire identity_tags → lifePressureState
+        const trackChoiceIdentityTags = (option.identity_tags ?? []) as string[];
+        if (trackChoiceIdentityTags.length > 0 && chapterOneState && dailyState) {
+          const nextLp = bumpLifePressure(chapterOneState.lifePressureState, trackChoiceIdentityTags);
+          await updateLifePressureState(userId, nextLp);
+          logState({
+            surface: "daily-state-mutation",
+            action: "terminalResolve.lifePressure",
+            userId,
+            details: { storyletSlug: beat.storylet_key, choiceId: option.id, identityTags: trackChoiceIdentityTags },
+          });
+          setDailyState({ ...dailyState, life_pressure_state: nextLp });
+        }
       }
 
       // Only mark day complete when all beats are resolved AND no more steps are queued
