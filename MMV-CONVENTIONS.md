@@ -61,6 +61,17 @@ PLAN (claude.ai)  →  SPEC (claude.ai or Cowork)  →  BUILD (Code)  →  LOOK 
 ```
 Most content cycles 2–3 times. Detail in `docs/CONTENT-PROCESS.md`.
 
+## Content Studio v2 CSS approach
+
+The studio CSS lives at `src/app/(admin)/studio/studio.css`. Key rules:
+
+- **Token scope**: `--bg`, `--ink`, `--line`, etc. are defined on `.studio-root`, not `:root`. All components inside `StudioShell` inherit them via cascade.
+- **No `@import url()`**: Fonts (JetBrains Mono, Source Serif 4) are loaded by `next/font/google` in `content/layout.tsx` as `--font-jetbrains-mono` and `--font-source-serif`. Reference them as `var(--font-jetbrains-mono)` in CSS; the variables are available throughout `.studio-root`.
+- **Per-track colors**: `--track-ink`, `--track-soft`, `--track-line`, `--track-chip` are set inline via `trackStyle(key: TrackKey)` from `src/lib/trackPalette.ts`. Never hardcode track colors in JSX — always call `trackStyle()`.
+- **Tailwind for structure; CSS classes for token-heavy components**: Use Tailwind (`flex`, `grid`, `overflow-hidden`) for structural layout. Use `.sl-card`, `.track-chip`, `.stance-bar`, `.tabbar`, `.topbar`, etc. CSS classes for components that consume palette tokens.
+
+---
+
 ## Drift checks (run when something feels off)
 - **Audit closed tickets vs disk**: `npx tsx scripts/audit-closed-tickets.ts` — exits 1 if any `col_done` ticket references a missing file.
 - **Build state**: `npx tsc --noEmit && npx vitest run && npm run playthrough:all` should all be green.
