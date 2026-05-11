@@ -3,20 +3,20 @@
 > **One-page current state.** Everything older than the last entry below moves to `HANDOFF-archive.md`.
 > Read in: `Start session` (SOP.md §1).
 > Update at: `End session` (SOP.md §2).
-> Last touched: 2026-05-08
+> Last touched: 2026-05-11
 
 ---
 
 ## Top of stack
 <!-- One sentence. What is the very next concrete thing to do. -->
-T-1778077549001 (slot-guarantee policy spike) is the central unblocker — its policy decision determines closure of T-1778077549002 and T-1778077549004 AND determines the crowd-out write surface for both reflection (T-1778100000005) and money-as-band transition beats (T-1778100000001). Next: PM design pass on the three engine-policy options (strict expiry / pool-yields-routine / typed-slot priority), produce `docs/SLOT-GUARANTEE-SPEC.md`.
+`docs/SLOT-GUARANTEE-SPEC.md` committed (`ba4158c`); Option 3 (typed-slot priority) recommended. Next: PM decision on T-1778077549001 §6 open questions (confirm Option 3, started_day clamp approach, binary vs. continuous priority scale, Beat 2B Day 9 content review) — then build Phase A (started_day fix) + Phase B (priority column + engine sort).
 
 ## Branches in flight
 <!-- Every non-main branch with its merge gate. Empty rows are fine; remove a branch when it merges to main. -->
 
 | Branch | Status | Gate | Gate owner | Ticket |
 |--------|--------|------|------------|--------|
-| `content-studio-v2-visual` | T-CS-001–006 committed; Vercel preview deploying | Visual QA in browser | PM | T-CS-001–006 |
+| `content-studio-v2-visual` | T-CS-001–006 done + SLOT-GUARANTEE-SPEC committed (`ba4158c`); 272 tests passing | Visual QA in browser → merge to main | PM | T-CS-001–006, T-1778077549001 spike |
 | `worktree/interesting-margulis-809d6f` | Spike doc committed `ff9f4e0` | Merge to main | Code | T-1778077549005 |
 
 *(`feature/period-stance-infrastructure` merged 2026-05-01 as `3f0b420`. `time_skill` merged 2026-04-27.)*
@@ -24,7 +24,7 @@ T-1778077549001 (slot-guarantee policy spike) is the central unblocker — its p
 ## Active tickets
 <!-- 1-5 tickets. Just IDs + one-line status. Full detail lives in Kanban. -->
 
-- T-1778077549001 — Slot-guarantee policy spike — TODO; PM design surface, central unblocker
+- T-1778077549001 — Slot-guarantee policy spike — SPIKE DOC COMMITTED (`ba4158c`); awaiting PM decision on §6 open questions before build tickets filed
 - T-1778077549002 — `expires_after_days: 0` not honored — TODO; blocked on T-1778077549001
 - T-1778077549004 — Beat 2B silently dropped — TODO; blocked on T-1778077549001
 - T-1778100000001 — Money-as-band engine + sidebar + transition trigger — TODO; spec landed `docs/MONEY-AS-BAND-SPEC.md`, ready for Code
@@ -41,7 +41,7 @@ T-1778077549001 (slot-guarantee policy spike) is the central unblocker — its p
 ## Recently merged (last 7 days)
 <!-- One line per merge. Trim weekly. Older entries go to HANDOFF-archive.md. -->
 
-- 2026-05-11 — `content-studio-v2-visual` branch: T-CS-001 shell+nav+tokens (`d3c...`), T-CS-002/003/004 Calendar+Swimlane+Constellation (`57a...`), T-CS-005/006 4-tab editor+side panel (`771acfd`). Full visual revamp port from design prototype. 9 new components, 2 new libs (trackPalette, trackShapes), studio.css scoped to `.studio-root`. TypeScript clean, 260/260 tests. Awaiting Vercel preview QA and main merge.
+- 2026-05-11 — `content-studio-v2-visual` branch: T-CS-001 shell+nav+tokens (`0008966`), T-CS-002/003/004 Calendar+Swimlane+Constellation (`bc364ef`), T-CS-005/006 4-tab editor+side panel (`771acfd`), `getScriptModeGaps` unit tests (`dcaf320`), SLOT-GUARANTEE-SPEC (`ba4158c`). Full visual revamp + slot-guarantee spike. 9 new components, 2 new libs (trackPalette, trackShapes), `getScriptModeGaps()` + 12 tests, `docs/SLOT-GUARANTEE-SPEC.md`. TypeScript clean, 272/272 tests. Awaiting Vercel preview QA and main merge.
 - 2026-05-08 — `caece42` T-1778077549003 vectors sidebar surfacing closed. Two-part fix: ProgressPanel.tsx reads `life_pressure_state` as canonical (was reading dead `vectors` field), `handleTrackStoryletChoice` now writes LP via `bumpLifePressure` (was silently dropping all track-storylet identity_tags writes — pre-`caece42` traces from track-served paths cannot be trusted as evidence of LP accumulation behavior). Tests parity: tsc clean, vitest 260/1, playthrough 23/6. DECISIONS.md entry filed.
 - 2026-05-08 — Money-as-band design spec landed at `docs/MONEY-AS-BAND-SPEC.md`. Resolves audit §6 #2 (Bible §3.1.3 violation) and the Current_design.md §XI line 702 open question (visible band, not friction-events-only). 4 tickets filed under epic_mmv03mc_breathes: T-1778100000001 (engine), T-1778100000002 (bite storylet), T-1778100000003 (relief storylet, 3 source variants), T-1778100000004 (8 NPC commentary lines).
 - 2026-05-08 — `ff9f4e0` `docs/REFLECTION-DESIGN-SPIKE.md` committed (worktree `interesting-margulis-809d6f`). T-1778077549005 reflection spike closed; Shape 1.5 (template-registry) approved by PM. Build ticket T-1778100000005 filed (sprint_audit2). PM editorial pass landed on the prose templates — registry hard rule added (§5): "Templates must end on a concrete noun, named action, or specific physical detail — never on an abstract noun, generalized verb, or evaluative claim." `docs/CRYSTALLIZER-FLAGS.md` filed with initial `scott_noticed_something` row + deferred-crystallizers section + authoring contract. Two Kanban corruption events repaired in same session: T-1778077549001 body had reflection content pasted over slot-guarantee body; T-1778077549005 augmentation had partially-merged duplicate content. Both restored, frontmatter preserved. T-1778100000005 sprint tag corrected `sprint_2` → `sprint_audit2` (the former didn't exist in board.json).
