@@ -1,5 +1,66 @@
 # Decisions Log
 
+## Reflection engine: Shape 1.5 selected — minimal Arc One scope, template-registry architecture (T-1778077549005)
+
+- **Date:** 2026-05-08
+- **Context:** Audit 2026-05-06 §3.1 surfaced reflection as the only BLACK finding — Bible §8 specifies a reflection layer; grep across `src/` for `ReflectionScene` / `computeReflection` / `endOfArc` returned zero matches. T-1778077549005 spike chartered to pick a shape. Three canonical shapes considered: minimal Arc One (2–3 weeks, no forward-compat hooks), staged (4–6 weeks, framework + Arc One, hooks for Mid-Semester / Chapter-End), full (months, replay-intention writeback + dialogue feedback).
+- **Decision:** Shape 1.5 — Shape 1 implementation scope (minimal Arc One reflection, fires once at Day 14 sleep) with the generation logic structured as a **named-slot template registry**. Each Bible §8 element (identity pattern, what slipped, energy/money pressure, relational lines) is a named slot in a data-declarative registry; templates are keyed to state-pattern thresholds. Adding a Mid-Semester slot later means appending a `slot_type` enum value and templates, not extending TypeScript subclasses.
+- **Why not Shape 1 strict:** Bible §8 explicitly stages reflection across arcs. Shipping inline generation logic as Shape 1 would force a refactor when Mid-Semester layer wants to add money-pattern, skill-pattern, or trust slots. The 2–3 days of design effort to make the registry data-declarative now is cheap insurance against weeks of refactor at Mid-Semester build time.
+- **Why not Shape 2 staged:** Building the framework AND the slots simultaneously couples Arc One ship to Mid-Semester scope decisions that haven't been made yet. Shape 1.5 separates them: ship Arc One slots now, decide Mid-Semester slots when there's mid-arc content to reflect on.
+- **Why not Shape 3:** Replay intention writeback (Bible §9) and dialogue feedback shifts are downstream of basic reflection working at all. Don't pre-commit to them.
+- **Crystallizer scope position — downstream:** Crystallizer flags (`scott_noticed_something` initially; Mike's private / Priya's invitation / Jordan's / Karen-leadership when those ship) are labeled inputs to reflection. Reflection reads flag presence/absence and produces retrospective prose; it does NOT re-render the crystallizer moment. The "absent" case is as meaningful as the "present" case — a player who never hit `scott_noticed_something` should produce different prose than one who did, not the same prose minus one line.
+- **What-slipped scope position — crowd-out IS in-scope:** The audit §4.1 collision finding (Beat 2B dropped, others slid) is exactly the kind of slippage Bible §8 describes. Spike proposes wiring the existing `daily_states.expired_opportunities` column (schema-ready, currently never written) at pool-scan time, with a `reason` enum (`slot_cap`, `routine_displaced`, `pool_exhausted`). The crowd-out write coordinates with T-1778077549001 (slot-guarantee policy) — same pool-scan code path; do not implement crowd-out write twice.
+- **Prose registry hard rule (added during PM editorial pass):** "Templates must end on a concrete noun, named action, or specific physical detail — never on an abstract noun, generalized verb, or evaluative claim." This pattern surfaced because every Code-drafted template (5 of 7) hit a strong observational middle and closed on an evaluative epigram — exactly the failure mode the design constraints in the spike body explicitly forbid. The rule is encoded in `docs/REFLECTION-DESIGN-SPIKE.md` §5 and replicated in the build ticket T-1778100000005's "Prose template constraint" section. Future template authors (Mid-Semester, Chapter-End) commit to it. Lint-check at template-load time is recommended for the easy automatable cases ("Some [noun]...", "That's [adjective]...").
+- **State surfaces confirmed/discovered during schema work:**
+  - `player_day_state` is append-per-day — energy/stress/money trajectory available without additional schema
+  - `arc_one_reflection_done` already exists on `daily_states` — no migration needed for the gate
+  - `expired_opportunities` column exists but is never written by engine — the designed crowd-out surface is schema-ready, just unwired
+  - `scott_noticed_something` writes to `choice_log` FLAG_SET + `daily_states.npc_memory.npc_roommate_scott.noticed_something`, NOT to `player_arc_flags` (initial draft of spike had this wrong; corrected before close)
+- **Implementation:** `docs/REFLECTION-DESIGN-SPIKE.md` committed `ff9f4e0`. Build ticket T-1778100000005 filed (sprint_audit2). `docs/CRYSTALLIZER-FLAGS.md` filed alongside with initial registry + deferred crystallizers (Mike, Priya, Jordan).
+- **Out of scope:** Mid-Semester / Chapter-End reflection layers (add slots when content exists), replay intention writeback (Bible §9, deferred), dialogue availability shifts based on reflection feedback (Shape 3), narrative drift / Scar & Strength tags (Chapter-End scope), harvest-pool / time-travel flags in reflection portrait (deferred; registry hook stub only).
+
+---
+
+## Audit response re-rank: "all major functions working" lens, mid-arc texture priority (audit 2026-05-06 §6)
+
+- **Date:** 2026-05-07
+- **Context:** Audit 2026-05-06 closed with §6 verdict "Do not ship the playtest in current state. Reflection first, then ship." Five-item rank: (1) reflection engine, (2) money-as-band rewrite, (3) vectors sidebar, (4) friction-beat slot guarantee, (5) defer §2 polish. PM session 2026-05-07 re-examined the rank because the audit's order is build-sequence-shaped (do reflection first because it's the foundation); under a different lens — "what does the next playtest need to be functionally complete" — the rank shifts.
+- **Decision:** Re-rank under "all major functions including resources and skills working" + "next playtest tests mid-arc texture and accumulation" lenses. New order:
+  1. **Vectors sidebar surfacing** (T-1778077549003) — fast visible win, surface fix
+  2. **Friction-beat slot guarantee** (T-1778077549001 spike) — fixes regression on already-shipped friction-beat content
+  3. **Money-as-band rewrite** (new tickets T-1778100000001–4) — resources rendering correctly per Bible §3.1.3 is part of "all major functions working"
+  4. **Reflection engine** (T-1778077549005 spike → T-1778100000005 build) — design surface ships parallel to Code work; build joins sprint_audit2
+  5. Defer §2 polish
+- **Why not the audit's order:** Reflection is end-of-arc. The next playtest isn't testing arc-end portrait quality; it's testing mid-arc texture (does the friction beat fire, does the vectors sidebar surface accumulation, does money render as scarcity). Under that lens, blocking the next playtest on reflection means the playtest can't ship until ~2 weeks of reflection build lands, even though every visible item the playtest WOULD test (vectors, slots, money) can ship in days.
+- **What this loses:** The auditor's "ship-blocked until reflection lands" verdict. The next playtest will produce a stats dashboard (`/season-recap`), not a Bible §8 portrait, at arc-end. Players reaching Day 14 will not see retrospective prose. Acceptable tradeoff for this playtest because the playtest's purpose is mid-arc texture validation, not arc-end portrait quality.
+- **What this gains:** Three items shippable in days (vectors closed `caece42` 2026-05-08; money-as-band engine + content tickets filed and ready; slot-guarantee spike pending PM design), reflection design moves in parallel without blocking ship. Net: a more functionally complete playtest sooner, with arc-end portrait deferred to the playtest after.
+- **Sequencing for next 2 weeks:**
+  - T-1778077549001 (slot-guarantee policy) is the central unblocker — its decision determines T-1778077549002, T-1778077549004, AND the crowd-out write surface in T-1778100000005. PM design pass next.
+  - T-1778100000001 money-as-band engine can ship before slot-guarantee lands (interim known degradation: transition beats may be crowded out). Spec §5 makes this handoff explicit.
+  - Reflection build (T-1778100000005) joins sprint_audit2; build can stub against slot-guarantee proposed write spec without waiting for policy lock.
+- **Implementation:** Three Sprint 1 (sprint_audit1) tickets reordered by priority. Money-as-band tickets filed under epic_mmv03mc_breathes (Milestone C — It Breathes). Reflection build ticket joins sprint_audit2.
+
+---
+
+## Identity-axis writes: track-storylet handler was silently dropping LP writes pre-caece42 (T-1778077549003)
+
+- **Date:** 2026-05-08
+- **Context:** Audit 2026-05-06 §2.1 found that `ProgressPanel.tsx:272` rendered "No vectors yet" for the full 9-day walk despite stateLog confirming `microChoice.lifePressure` events with identity_tags accumulating server-side. Initial framing: render-layer fix, ProgressPanel hardcoded inert. Code's diagnosis during the fix surfaced a deeper bug.
+- **Decision: two-part fix.**
+  - **Part 1 (render layer):** ProgressPanel was reading `daily_states.vectors` (the legacy 0-100 normalized field, no current content writes to it). Rewired to read `life_pressure_state` (Bible §3.2 canonical, integer counters). LP keys render as numeral rows ("People 1") not as 0-100 bars — bars on integer counters are dishonest to data shape (a count of 3 rendering as a 3% bar reads as broken). Numerals + the dominant-axis summary line ("You lean toward people.") are the honest treatment.
+  - **Part 2 (data layer):** `handleTrackStoryletChoice` in `src/app/(player)/play/page.tsx` did NOT wire `option.identity_tags` to `bumpLifePressure` + `updateLifePressureState`. Pool storylets and node walks did. Track-served storylets silently dropped LP writes. Since all Day 1 content is track storylets, LP state never accumulated from the Arc One opening regardless of what ProgressPanel rendered. Fixed in same commit.
+- **Two parallel identity-tracking systems exist as architectural fact:**
+  - `daily_states.vectors` — old, 0-100 normalized, currently NO content writes to it. Legacy.
+  - `daily_states.life_pressure_state` — Bible §3.2, integer counters, all current content writes here. Canonical.
+  - ProgressPanel reads LP, with `vectors` retained as fallback for backward-compat only. If the old `vectors` system ever gets revived, both must be reconciled.
+- **Implication for trace data:** Any walk traces, stateLog captures, or playtest reports from BEFORE `caece42` (2026-05-08) that suggested "LP accumulation isn't working" on track-served paths were observing reality, not a misread. Track-storylet writes weren't landing. Older traces should NOT be used as a baseline for LP-related behavior on track-served paths.
+- **Implication for downstream design:** The reflection spike (T-1778077549005) lists `life_pressure_state` as a state surface reflection reads. Per the above, reflection's input data on track-served paths only becomes reliable as of `caece42`. The reflection spike's LP zero-state fallback slot (`identity.dominant_axis` falls through to `period_stance_state` when LP all-zero) handles both pre-`caece42` runs and genuinely-Avoid-dominant runs gracefully.
+- **Implementation:** `caece42` on main 2026-05-08. Verification: tsc clean, vitest 260/1 skipped, `npm run playthrough:all` 23 passed / 6 failed (count unchanged from pre-fix baseline; 6 are pre-existing day0/glenn per T-1777297557482). Browser verification: `terminalResolve.lifePressure` fired in stateLog with `identityTags: ["people"]` for `lunch_floor/catch_keiths_eye`; sidebar shows "People 1 / You lean toward people."
+- **Why this matters as a recorded decision:** The instinct on a "render-layer fix" is to ship the surface change and move on. Code's discipline of "the click didn't fire what I expected, why" — going from console to stateLog to grep to find which handler wasn't wiring — is what made this a real fix instead of a cosmetic one. Worth reinforcing the pattern: when shipping a surface fix, verify the data is actually flowing to the surface; "the surface is hardcoded inert" can be a symptom of "the data isn't reaching the surface."
+- **Disambiguation note:** This entry is filed under T-1778077549003 (the audit-id ticket where the fix landed). The audit ticket re-rank (entry above) ranks vectors as #1 because of this fix's combined render+data-layer scope. The two entries share context but record different decisions.
+
+---
+
 ## Period-friction content shape: Jordan = closeted queer in 1983 (T-1776329282001)
 
 - **Date:** 2026-05-04
