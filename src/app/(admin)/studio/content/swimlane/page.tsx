@@ -5,9 +5,9 @@ import { AuthGate } from "@/ui/components/AuthGate";
 import { useStoryletsAPI } from "@/hooks/contentStudio/useStoryletsAPI";
 import { useArcsAPI } from "@/hooks/contentStudio/useArcsAPI";
 import type { Storylet } from "@/types/storylets";
-import { CalendarView } from "@/components/contentStudio/CalendarView";
+import { SwimlaneView } from "@/components/contentStudio/SwimlaneView";
 
-export default function CalendarPage() {
+export default function SwimlanePage() {
   const { loadStorylets } = useStoryletsAPI();
   const { arcDefinitions, loadArcDefinitions } = useArcsAPI();
   const [storylets, setStorylets] = useState<Storylet[]>([]);
@@ -24,7 +24,7 @@ export default function CalendarPage() {
   return (
     <AuthGate>
       {() => (
-        <CalendarView
+        <SwimlaneView
           storylets={storylets}
           arcDefinitions={arcDefinitions}
           loading={loading}
