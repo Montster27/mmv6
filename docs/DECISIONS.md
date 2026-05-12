@@ -1,5 +1,17 @@
 # Decisions Log
 
+## Content Studio v2: Option B — 4-tab wrapper, Structured tab preserves existing 6-tab editor
+
+- **Date:** 2026-05-11
+- **Context:** Content Studio v2 visual revamp (`content-studio-v2-visual` branch, T-CS-001–006). When rewriting `StoryletEditor/index.tsx` as the new 4-tab shell (Script / Node Graph / Preview / Structured), a choice was required: (A) merge the existing 6 tabs into the 4-tab shell's primary nav bar (10 tabs total, confusing), or (B) keep the 6-tab form editor verbatim as a sub-editor inside the Structured tab (nested tabs, clean separation of concerns).
+- **Decision:** Option B. The Structured tab renders `StructuredEditor.tsx` (extracted verbatim from the old index.tsx) with its own 6 sub-tabs. The 4 outer tabs address *mode* (how you see the content: prose, graph, sim, form); the 6 inner Structured tabs address *fields* (what data you're editing).
+- **Why not Option A:** Merging 10 tabs into one flat bar mixes navigation concerns (mode vs. field). Script and Node Graph and Preview have no per-field substructure; flattening them with Requirements/Choices/etc. would make the bar too long and conceptually incoherent.
+- **Why Option B is acceptable:** Nested tabs are a known UI compromise, but the outer/inner split maps cleanly to: "what lens am I using?" vs. "which field am I editing?" Most users working in Structured stay in it; the outer tabs are a mode switcher, not a primary nav. The badge count on the Structured tab ("Structured (3)") signals that there is structured data the Script view can't represent, pulling the user to investigate.
+- **Consequence for future work:** The `getScriptModeGaps()` function is the source of truth for what Script mode can't represent. If new structured fields are added (e.g., `crystallizer_flag`, `flags_set`), they should be added to `getScriptModeGaps` so the badge stays accurate.
+- **Implementation:** `StoryletEditor/index.tsx` (4-tab shell), `StoryletEditor/StructuredEditor.tsx` (extracted 6-tab form), `StoryletEditor/getScriptModeGaps.ts` (pure function). Commit `771acfd` on `content-studio-v2-visual`.
+
+---
+
 ## Reflection engine: Shape 1.5 selected — minimal Arc One scope, template-registry architecture (T-1778077549005)
 
 - **Date:** 2026-05-08

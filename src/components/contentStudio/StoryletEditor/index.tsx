@@ -2,28 +2,36 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Storylet } from "@/types/storylets";
-import { BasicFields } from "./BasicFields";
-import { RequirementsPanel } from "./RequirementsPanel";
-import { ChoiceList } from "./ChoiceList";
-import { ArcPanel } from "./ArcPanel";
-import { NodesEditor } from "./NodesEditor";
-import { ValidationPanel } from "../ValidationPanel";
+import { TRACK_LABELS, trackStyle, type TrackKey } from "@/lib/trackPalette";
+import { ScriptMode } from "../ScriptMode";
+import { NodeGraphMode } from "../NodeGraphMode";
+import { PreviewMode } from "../PreviewMode";
+import { StudioSidePanel } from "../StudioSidePanel";
+import { StructuredEditor } from "./StructuredEditor";
+import { getScriptModeGaps, defaultEditorTab } from "./getScriptModeGaps";
 
-type Tab = "basic" | "requirements" | "choices" | "nodes" | "arc" | "raw";
+type OuterTab = "script" | "nodegraph" | "preview" | "structured";
 
-interface StoryletEditorProps {
+const TRACK_ORDER: TrackKey[] = [
+  "roommate", "academic", "money", "belonging", "opportunity", "home",
+];
+
+function resolveTrackKey(arcKey: string): TrackKey | null {
+  return TRACK_ORDER.find((k) => k === arcKey || arcKey.includes(k)) ?? null;
+}
+
+export interface StoryletEditorProps {
   storylet: Storylet;
   isNew?: boolean;
   allTags?: string[];
   storyletOptions?: { value: string; label?: string }[];
   stepKeyOptions?: { value: string; label?: string }[];
-  /** Available arc definitions for the Arc tab dropdown. */
   arcOptions?: { id: string; key: string; title: string }[];
+  allStorylets?: Storylet[];
   onSave: (updated: Storylet) => Promise<void>;
   onDelete?: () => Promise<void>;
   onCancel?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
-  /** Called when user wants to create a new storylet linked by default_next_key. */
   onCreateLinkedStorylet?: (stepKey: string) => void;
   saving?: boolean;
   saveError?: string | null;
@@ -36,6 +44,7 @@ export function StoryletEditor({
   storyletOptions = [],
   stepKeyOptions = [],
   arcOptions = [],
+  allStorylets = [],
   onSave,
   onDelete,
   onCancel,
@@ -44,26 +53,19 @@ export function StoryletEditor({
   saving = false,
   saveError = null,
 }: StoryletEditorProps) {
-  const [tab, setTab] = useState<Tab>("basic");
+  const [tab, setTab] = useState<OuterTab>(() =>
+    defaultEditorTab(initial) === "script" ? "script" : "structured"
+  );
   const [draft, setDraft] = useState<Storylet>(initial);
-  const [rawError, setRawError] = useState<string | null>(null);
+  const [rawError, setRawError] = useState(false);
 
   const initialRef = useRef(JSON.stringify(initial));
-  const isDirty = useMemo(
-    () => JSON.stringify(draft) !== initialRef.current,
-    [draft]
-  );
+  const isDirty = useMemo(() => JSON.stringify(draft) !== initialRef.current, [draft]);
 
-  // Notify parent of dirty state changes
-  useEffect(() => {
-    onDirtyChange?.(isDirty);
-  }, [isDirty, onDirtyChange]);
+  useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
 
-  // Warn on browser close/refresh with unsaved changes
   useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty) e.preventDefault();
-    };
+    const handler = (e: BeforeUnloadEvent) => { if (isDirty) e.preventDefault(); };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
@@ -75,12 +77,9 @@ export function StoryletEditor({
   const handleSave = useCallback(async () => {
     if (saving || rawError) return;
     await onSave(draft);
-    // Reset the dirty baseline immediately so the guard doesn't fire
-    // on subsequent navigation even if the parent hasn't reloaded yet.
     initialRef.current = JSON.stringify(draft);
   }, [draft, onSave, saving, rawError]);
 
-  // Cmd+S / Ctrl+S keyboard shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
@@ -92,171 +91,158 @@ export function StoryletEditor({
     return () => document.removeEventListener("keydown", handler);
   }, [handleSave]);
 
-  const nodeCount = Array.isArray(draft.nodes) ? draft.nodes.length : 0;
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "basic", label: "Basic" },
-    { id: "requirements", label: "Requirements" },
-    { id: "choices", label: `Choices (${draft.choices?.length ?? 0})` },
-    { id: "nodes", label: nodeCount > 0 ? `Nodes (${nodeCount})` : "Nodes" },
-    { id: "arc", label: draft.track_id ? "Track \u25cf" : "Track" },
-    { id: "raw", label: "Raw JSON" },
+  // Derive track info for chip display
+  const arc = arcOptions.find((a) => a.id === draft.track_id);
+  const trackKey = arc ? resolveTrackKey(arc.key) : null;
+  const trackLabel = trackKey
+    ? (TRACK_LABELS.find((t) => t.key === trackKey)?.label ?? trackKey)
+    : null;
+
+  const gaps = useMemo(() => getScriptModeGaps(draft), [draft]);
+
+  const outerTabs: { id: OuterTab; label: string }[] = [
+    { id: "script", label: "Script" },
+    { id: "nodegraph", label: "Node Graph" },
+    { id: "preview", label: "Preview" },
+    { id: "structured", label: gaps.length > 0 ? `Structured (${gaps.length})` : "Structured" },
   ];
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tab bar */}
-      <div className="flex border-b border-slate-200 bg-white shrink-0">
-        {tabs.map((t) => (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Canvas head */}
+      <div className="canvas-head">
+        {onCancel && (
+          <button className="btn ghost" onClick={onCancel} title="Back to list"
+            style={{ fontSize: 16, padding: "2px 8px" }}>
+            ←
+          </button>
+        )}
+        <h2>
+          {draft.title || "Untitled"}
+          {isDirty && (
+            <span style={{ color: "var(--warn)", marginLeft: 5, fontSize: 12, fontWeight: 400 }}>
+              unsaved
+            </span>
+          )}
+        </h2>
+        {trackLabel && (
+          <span className="track-chip" style={trackStyle(trackKey)}>
+            <span className="dot" />
+            {trackLabel}
+          </span>
+        )}
+        {draft.storylet_key && (
+          <span className="sub mono">{draft.storylet_key}</span>
+        )}
+        {draft.due_offset_days != null && (
+          <span className="sub">
+            D{draft.due_offset_days}
+            {draft.segment ? `/${draft.segment.slice(0, 3)}` : ""}
+          </span>
+        )}
+        {!isNew && (
+          <span
+            style={{
+              fontSize: 10, padding: "2px 6px", borderRadius: 4,
+              background: draft.is_active ? "#dcfce7" : "#f1f5f9",
+              color: draft.is_active ? "#15803d" : "var(--ink-4)",
+            }}
+          >
+            {draft.is_active ? "active" : "draft"}
+          </span>
+        )}
+
+        <div className="right">
+          {onDelete && !isNew && (
+            <button
+              className="btn"
+              style={{ color: "var(--bad)", borderColor: "#fca5a5" }}
+              onClick={() => {
+                if (confirm(`Delete "${draft.title}"? This cannot be undone.`)) onDelete();
+              }}
+              disabled={saving}
+            >
+              Delete
+            </button>
+          )}
+          <button
+            className="btn primary"
+            onClick={handleSave}
+            disabled={saving || rawError}
+          >
+            {saving ? "Saving…" : isNew ? "Create" : "Save"}
+          </button>
+          <span className="kbd">⌘S</span>
+        </div>
+      </div>
+
+      {/* Outer tab bar */}
+      <div className="tabbar">
+        {outerTabs.map((t) => (
           <button
             key={t.id}
             type="button"
+            className={`tab${tab === t.id ? " active" : ""}`}
             onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t.id
-                ? "border-b-2 border-indigo-600 text-indigo-700"
-                : "text-slate-500 hover:text-slate-800"
-            }`}
           >
             {t.label}
           </button>
         ))}
-        {/* Dirty indicator in tab bar */}
-        {isDirty && !isNew && (
-          <span className="ml-auto flex items-center text-xs text-amber-600 px-3">
-            Unsaved changes
-          </span>
-        )}
       </div>
 
-      {/* Tab content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {tab === "basic" && (
-          <BasicFields
-            storylet={draft}
-            isNew={isNew}
-            allTags={allTags}
-            onChange={patch}
-          />
-        )}
-
-        {tab === "requirements" && (
-          <RequirementsPanel
-            storylet={draft}
-            onChange={patch}
-          />
-        )}
-
-        {tab === "choices" && (
-          <ChoiceList
-            choices={draft.choices ?? []}
-            storyletOptions={storyletOptions}
-            stepKeyOptions={stepKeyOptions}
-            onChange={(choices) => patch({ choices })}
-            onCreateLinkedStorylet={onCreateLinkedStorylet}
-          />
-        )}
-
-        {tab === "nodes" && (
-          <NodesEditor
-            nodes={draft.nodes}
-            onChange={(nodes) => patch({ nodes })}
-          />
-        )}
-
-        {tab === "arc" && (
-          <ArcPanel
-            storylet={draft}
-            arcOptions={arcOptions}
-            stepKeyOptions={stepKeyOptions}
-            onChange={patch}
-          />
-        )}
-
-        {tab === "raw" && (
-          <div className="space-y-2">
-            <p className="text-xs text-slate-500">
-              Edit raw JSON directly. Changes here override form edits on save.
-            </p>
-            {rawError && (
-              <p className="text-xs text-red-600 bg-red-50 rounded p-2">{rawError}</p>
-            )}
-            <textarea
-              className="w-full rounded-md border border-slate-300 font-mono text-xs p-2 leading-relaxed"
-              rows={30}
-              defaultValue={JSON.stringify(draft, null, 2)}
-              onChange={(e) => {
-                try {
-                  const parsed = JSON.parse(e.target.value) as Storylet;
-                  setDraft(parsed);
-                  setRawError(null);
-                } catch {
-                  setRawError("Invalid JSON \u2014 fix before saving.");
-                }
-              }}
+      {/* Editor shell: main pane + side panel */}
+      <div className="editor-shell">
+        <div className="editor-pane">
+          {tab === "script" && (
+            <ScriptMode draft={draft} onChange={patch} />
+          )}
+          {tab === "nodegraph" && (
+            <NodeGraphMode draft={draft} allStorylets={allStorylets} />
+          )}
+          {tab === "preview" && (
+            <PreviewMode
+              draft={draft}
+              allStorylets={allStorylets}
+              arcDefinitions={arcOptions}
             />
-          </div>
-        )}
-      </div>
+          )}
+          {tab === "structured" && (
+            <StructuredEditor
+              draft={draft}
+              isNew={isNew}
+              allTags={allTags}
+              storyletOptions={storyletOptions}
+              stepKeyOptions={stepKeyOptions}
+              arcOptions={arcOptions}
+              onChange={patch}
+              onReplaceAll={(full) => setDraft(full)}
+              onCreateLinkedStorylet={onCreateLinkedStorylet}
+              onRawError={setRawError}
+            />
+          )}
+        </div>
 
-      {/* Validation + save */}
-      <div className="shrink-0 border-t border-slate-200 bg-slate-50 p-4 space-y-3">
-        <ValidationPanel storylet={draft} />
-        {saveError && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
-            Save failed: {saveError}
-          </p>
-        )}
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            {onDelete && !isNew && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm(`Delete "${draft.title}"? This cannot be undone.`)) {
-                    onDelete();
-                  }
-                }}
-                disabled={saving}
-                className="rounded-md border border-red-300 px-4 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
-              >
-                Delete
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="rounded-md border border-slate-300 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-100"
-            >
-              Cancel
-            </button>
-          )}
-          {!isNew && (
-            <a
-              href={`/studio/content/preview?storylet=${draft.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-md border border-indigo-300 px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50"
-            >
-              Preview
-            </a>
-          )}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !!rawError}
-              className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {saving ? "Saving\u2026" : isNew ? "Create storylet" : "Save changes"}
-            </button>
-            <span className="text-xs text-slate-400">\u2318S</span>
-          </div>
+        <div className="editor-side">
+          <StudioSidePanel
+            draft={draft}
+            allStorylets={allStorylets}
+            arcOptions={arcOptions}
+            trackKey={trackKey}
+          />
         </div>
       </div>
+
+      {saveError && (
+        <div
+          style={{
+            padding: "8px 16px", flexShrink: 0,
+            background: "#fff5f5", borderTop: "1px solid #fca5a5",
+            color: "var(--bad)", fontSize: 12,
+          }}
+        >
+          Save failed: {saveError}
+        </div>
+      )}
     </div>
-  </div>
   );
 }

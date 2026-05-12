@@ -346,6 +346,7 @@ function StoryletsContent() {
                 storyletOptions={storyletOptions}
                 stepKeyOptions={stepKeyOptions}
                 arcOptions={arcOptions}
+                allStorylets={storylets}
                 saving={saving}
                 saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
@@ -360,6 +361,7 @@ function StoryletsContent() {
                 storyletOptions={storyletOptions}
                 stepKeyOptions={stepKeyOptions}
                 arcOptions={arcOptions}
+                allStorylets={storylets}
                 saving={saving}
                 saveError={saveError}
                 onSave={(updated) => handleSave(updated, session)}
