@@ -268,7 +268,7 @@ export default function LandingPage() {
             </a>
             <a
               className="text-[#40484c] tracking-wider hover:text-[#003061] underline decoration-2 min-h-[44px] flex items-center"
-              href="#"
+              href="/privacy"
             >
               Privacy Policy
             </a>
