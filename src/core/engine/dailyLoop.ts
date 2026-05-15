@@ -738,10 +738,18 @@ export async function getOrCreateDailyRun(
       const { data: activityRows } = await supabase
         .from("routine_activities")
         .select("*")
-        .eq("is_active", true)
-        .order("half_day_cost", { ascending: true });
+        .eq("is_active", true);
 
-      routineActivities = (activityRows ?? []) as RoutineActivity[];
+      const CATEGORY_DISPLAY_PRIORITY: Record<string, number> = {
+        academic: 0, work: 1, creative: 2, physical: 2, social: 3, practical: 4,
+      };
+      routineActivities = ((activityRows ?? []) as RoutineActivity[]).slice().sort((a, b) => {
+        const ap = CATEGORY_DISPLAY_PRIORITY[a.category] ?? 99;
+        const bp = CATEGORY_DISPLAY_PRIORITY[b.category] ?? 99;
+        if (ap !== bp) return ap - bp;
+        if (a.half_day_cost !== b.half_day_cost) return b.half_day_cost - a.half_day_cost;
+        return a.display_name.localeCompare(b.display_name);
+      });
     }
 
     // Load committed schedule if exists
