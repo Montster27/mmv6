@@ -1,5 +1,11 @@
 # Decisions Log
 
+## Orphan route handler `/api/routine/activities` — keep, no cleanup ticket (2026-05-15)
+
+The `src/app/api/routine/activities/route.ts` route has zero UI consumers; the live data path runs through `dailyLoop.ts`. The route was kept (not deleted) when T-1777400000005 landed: it has the correct sort, is harmless, and deleting it is a separate concern from the bug fix. File a cleanup ticket only if it causes confusion or a future caller wires to it incorrectly.
+
+---
+
 ## Content Studio v2: Option B — 4-tab wrapper, Structured tab preserves existing 6-tab editor
 
 - **Date:** 2026-05-11
