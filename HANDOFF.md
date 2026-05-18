@@ -3,13 +3,13 @@
 > **One-page current state.** Everything older than the last entry below moves to `HANDOFF-archive.md`.
 > Read in: `Start session` (SOP.md §1).
 > Update at: `End session` (SOP.md §2).
-> Last touched: 2026-05-11
+> Last touched: 2026-05-14
 
 ---
 
 ## Top of stack
 <!-- One sentence. What is the very next concrete thing to do. -->
-`docs/SLOT-GUARANTEE-SPEC.md` committed (`ba4158c`); Option 3 (typed-slot priority) recommended. Next: PM decision on T-1778077549001 §6 open questions (confirm Option 3, started_day clamp approach, binary vs. continuous priority scale, Beat 2B Day 9 content review) — then build Phase A (started_day fix) + Phase B (priority column + engine sort).
+T-1777320000004 diagnosis complete (`docs/DIAGNOSIS-T-1777320000004.md`). Fix session next: (1) `play/page.tsx:2777` `b.progress_id` → `b.storylet_key` one-char fix, (2) instrument React Query race, (3) verify `markDailyComplete` fires. Then: PM decision on T-1778077549001 §6 open questions.
 
 ## Branches in flight
 <!-- Every non-main branch with its merge gate. Empty rows are fine; remove a branch when it merges to main. -->
@@ -41,6 +41,7 @@
 ## Recently merged (last 7 days)
 <!-- One line per merge. Trim weekly. Older entries go to HANDOFF-archive.md. -->
 
+- 2026-05-14 — T-1777320000004 diagnosis session. `docs/DIAGNOSIS-T-1777320000004.md` written. Ruled out: DB duplicate keys, duplicate track_progress rows, broken choice wiring, effectiveStoryletKey mismatch, double-resolution, pool scan dedup, globalFlags widening. Ghost key corrected: `s01_dining_first_dinner` → `lunch_floor`. Two HIGH candidates identified: (A) React Query refetch race briefly re-surfaces resolved storylets; (B) `play/page.tsx:2777` `newResolved.has(b.progress_id)` always false (Set is keyed on storylet_key) → `markDailyComplete` never fires. No fix this session per explicit brief.
 - 2026-05-15 — `804418d` T-1777400000005 closed. Activity sort fix in `src/core/engine/dailyLoop.ts:738–744`: removed `.order("half_day_cost", ascending: true)` DB sort, replaced with JS comparator (academic→work→creative/physical→social→practical, then half_day_cost DESC, then alpha). Attend Classes moves from position 13 to position 1. tsc clean, vitest 272/1, playthrough 22/7 (pre/post identical — 22/7 is current main baseline, was 23/6 on 2026-05-08). Visual verification deferred to next browser playtest. DECISIONS.md entry filed for orphan route handler kept. Note: HANDOFF previously referenced `src/lib/dailyLoop.ts` — correct path is `src/core/engine/dailyLoop.ts`.
 - 2026-05-11 — `content-studio-v2-visual` branch: T-CS-001 shell+nav+tokens (`0008966`), T-CS-002/003/004 Calendar+Swimlane+Constellation (`bc364ef`), T-CS-005/006 4-tab editor+side panel (`771acfd`), `getScriptModeGaps` unit tests (`dcaf320`), SLOT-GUARANTEE-SPEC (`ba4158c`). Full visual revamp + slot-guarantee spike. 9 new components, 2 new libs (trackPalette, trackShapes), `getScriptModeGaps()` + 12 tests, `docs/SLOT-GUARANTEE-SPEC.md`. TypeScript clean, 272/272 tests. Awaiting Vercel preview QA and main merge.
 - 2026-05-08 — `caece42` T-1778077549003 vectors sidebar surfacing closed. Two-part fix: ProgressPanel.tsx reads `life_pressure_state` as canonical (was reading dead `vectors` field), `handleTrackStoryletChoice` now writes LP via `bumpLifePressure` (was silently dropping all track-storylet identity_tags writes — pre-`caece42` traces from track-served paths cannot be trusted as evidence of LP accumulation behavior). Tests parity: tsc clean, vitest 260/1, playthrough 23/6. DECISIONS.md entry filed.

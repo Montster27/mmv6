@@ -2774,7 +2774,9 @@ export default function PlayPage() {
         chapterOneMode &&
         userId &&
         !hasMoreSteps &&
-        trackStorylets.every((b) => newResolved.has(b.progress_id))
+        // newResolved is Set<storylet_key> (see line 326-330 comment). b.progress_id is a UUID —
+        // using it here would never match and this branch would silently never fire.
+        trackStorylets.every((b) => newResolved.has(b.storylet_key))
       ) {
         if (!allocationSaved) {
           // Gate daily-complete behind allocation — show it after beats are dismissed

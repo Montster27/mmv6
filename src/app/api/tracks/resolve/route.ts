@@ -119,6 +119,10 @@ export async function POST(request: Request) {
   // Pool-based selection may serve a storylet that differs from current_storylet_key
   // (which only tracks chain-based progression). Trust the client-provided storylet_key
   // when available, falling back to the override/current chain for older clients.
+  // PHASE-2-NOTE [T-1777320000004 Candidate C]: if clientStoryletKey is ever absent,
+  // this falls back to current_storylet_key (stale chain endpoint). Current client always
+  // sends storylet_key (play/page.tsx:2567), so the fallback is dormant. If the client
+  // payload changes, verify this chain resolves the correct key before removing the guard.
   const effectiveStoryletKey: string =
     clientStoryletKey
     ?? (progressRow.next_key_override as string | null)
@@ -344,6 +348,10 @@ export async function POST(request: Request) {
       .eq("is_active", true);
 
     const currentDayOffset = day_index - progressRow.started_day;
+    // PHASE-2-NOTE [T-1777320000004 Candidate D]: strict `>` misses same-day unresolved
+    // storylets (due_offset_days === currentDayOffset). Causes premature track close on the
+    // day of the storylet itself; does not directly cause repeats but can cause content gaps.
+    // Fix: change `>` to `>=`. Diagnose with the SQL in docs/DIAGNOSIS-T-1777320000004.md §3.D.
     const hasFutureContent = (remainingStorylets ?? []).some(
       (s) =>
         !newResolvedKeys.includes(s.storylet_key) &&
