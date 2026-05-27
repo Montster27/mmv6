@@ -26,6 +26,7 @@ import { ReflectionSection } from "@/components/play/ReflectionSection";
 import { ChapterOneReflection } from "@/components/play/ChapterOneReflection";
 import { TesterFeedback } from "@/components/play/TesterFeedback";
 import { NarrativeFeedback } from "@/components/play/NarrativeFeedback";
+import { NewsNetButton } from "@/components/newsnet/NewsNetButton";
 // All time advancement (segment + day) goes through /api/time/advance.
 import { trackEvent } from "@/lib/events";
 import { resolveEventsEmitted } from "@/lib/eventsEmitted";
@@ -3206,6 +3207,7 @@ export default function PlayPage() {
               ) : null}
             </div>
             <div className="flex items-center gap-2">
+              <NewsNetButton />
               {isEmailAllowed(session.user.email) || devIsAdmin ? (
                 <Button
                   variant="secondary"
