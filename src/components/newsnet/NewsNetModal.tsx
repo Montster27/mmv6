@@ -42,13 +42,24 @@ export function NewsNetModal({ open, onOpenChange }: NewsNetModalProps) {
   const [handleState, setHandleState] = useState<HandleState>({ kind: "loading" });
   const [prependedPosts, setPrependedPosts] = useState<NewsNetFeedPost[]>([]);
 
-  // Load handle on first open; reset prepended posts when the modal closes.
+  // Load handle when the modal opens; reset prepended posts when it closes.
+  //
+  // IMPORTANT: do NOT include handleState.kind in the deps. Earlier versions
+  // did, with a `kind === "set"` early-exit to skip refetches. That created
+  // an infinite loop on the "missing" path: the effect wrote kind → "loading"
+  // → fetched → wrote kind → "missing" → kind dep changed → effect re-fired →
+  // kind → "loading" again → loop. User saw rapid HandleSetupModal/loading
+  // flicker and couldn't interact.
+  //
+  // Fix per the React best-practices `rerender-move-effect-to-event` rule:
+  // the fetch is triggered by the OPEN transition, not by state derived from
+  // it. Refetching on every open is cheap (one indexed SELECT per modal-open)
+  // and avoids closure-staleness.
   useEffect(() => {
     if (!open) {
       setPrependedPosts([]);
       return;
     }
-    if (handleState.kind === "set") return;
     let cancelled = false;
     setHandleState({ kind: "loading" });
     fetchHandle()
@@ -65,7 +76,7 @@ export function NewsNetModal({ open, onOpenChange }: NewsNetModalProps) {
     return () => {
       cancelled = true;
     };
-  }, [open, fetchHandle, handleState.kind]);
+  }, [open, fetchHandle]);
 
   function handleHandleSet(handle: string) {
     setHandleState({ kind: "set", handle });
