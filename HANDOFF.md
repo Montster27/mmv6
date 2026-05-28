@@ -3,13 +3,13 @@
 > **One-page current state.** Everything older than the last entry below moves to `HANDOFF-archive.md`.
 > Read in: `Start session` (SOP.md §1).
 > Update at: `End session` (SOP.md §2).
-> Last touched: 2026-05-18
+> Last touched: 2026-05-28
 
 ---
 
 ## Top of stack
 <!-- One sentence. What is the very next concrete thing to do. -->
-T-1777320000004 Candidate B shipped (`03d3803`); ticket stays open (repeat symptom still live). Next: T-1779062400001 — instrument React Query refetch race (console logs + network timing in browser) to confirm or rule out Candidate A as the actual repeat cause.
+T-1776329282002 NewsNet shipped to main (`65680ff`). Next: tester walkthrough by the 5–8 hand-picked Gate-2 testers — pull main (or use the Vercel deployment), fresh-account → handle → board → post → reload — to close AC#8 fully and surface real-use feedback on the board mix. Before tester session: ~5-min curl pass against the Vercel URL to upgrade AC#2 (reserved-handle 422) and AC#4 (server-stamped `in_game_day`) from code-inspection to live-server evidence.
 
 ## Branches in flight
 <!-- Every non-main branch with its merge gate. Empty rows are fine; remove a branch when it merges to main. -->
@@ -19,44 +19,37 @@ T-1777320000004 Candidate B shipped (`03d3803`); ticket stays open (repeat sympt
 | `content-studio-v2-visual` | T-CS-001–006 done + SLOT-GUARANTEE-SPEC committed (`ba4158c`); 272 tests passing | Visual QA in browser → merge to main | PM | T-CS-001–006, T-1778077549001 spike |
 | `worktree/interesting-margulis-809d6f` | Spike doc committed `ff9f4e0` | Merge to main | Code | T-1778077549005 |
 
-*(`feature/period-stance-infrastructure` merged 2026-05-01 as `3f0b420`. `time_skill` merged 2026-04-27.)*
+*(`feature/newsnet-multiuser` merged 2026-05-28 as `65680ff` and deleted. `feature/period-stance-infrastructure` merged 2026-05-01 as `3f0b420`.)*
 
 ## Active tickets
 <!-- 1-5 tickets. Just IDs + one-line status. Full detail lives in Kanban. -->
 
-- T-1778077549001 — Slot-guarantee policy spike — SPIKE DOC COMMITTED (`ba4158c`); awaiting PM decision on §6 open questions before build tickets filed
+- T-1779926400001 — Resolve `20260503*` migration divergence (next `db push` will sweep or conflict on 7 files) — TODO; recommend back-apply
+- T-1778077549001 — Slot-guarantee policy spike — SPIKE DOC COMMITTED (`ba4158c`); awaiting PM decision on §6 open questions
 - T-1778077549002 — `expires_after_days: 0` not honored — TODO; blocked on T-1778077549001
 - T-1778077549004 — Beat 2B silently dropped — TODO; blocked on T-1778077549001
 - T-1778100000001 — Money-as-band engine + sidebar + transition trigger — TODO; spec landed `docs/MONEY-AS-BAND-SPEC.md`, ready for Code
-- T-1778100000002–4 — Money-as-band content (2 storylets + 8 NPC commentary lines) — TODO; ready for content authoring
-- T-1778100000005 — Reflection engine build (Shape 1.5, sprint_audit2) — TODO; spike closed `ff9f4e0`, ready for Sprint 2 start
+- T-1778100000005 — Reflection engine build (Shape 1.5, sprint_audit2) — TODO; spike closed `ff9f4e0`, ready for Sprint 2
 
 ## Open questions for next session
 <!-- Things that need a decision before progress. Not bugs — decisions. -->
 
 - T-1778077549001 slot-guarantee policy (Options 1/2/3) must be decided before T-1778077549002 and T-1778077549004 can close, and before the crowd-out write surface in T-1778100000005 can be implemented (vs stubbed against proposed spec).
-- Whether T-1778100000001 (money engine) ships before T-1778077549001 lands. Spec §5 says yes — known/acceptable interim that transition beats may be crowded out until slot guarantee ships. Confirm at sprint plan.
-- Possible Karen swap in T-1778100000004 NPC cast (Karen 4th-deferred on Herald track; her money-only commentary lines don't conflict with the deferral, but PM may prefer Danny/Miguel substitution out of caution).
+- Whether T-1778100000001 (money engine) ships before T-1778077549001 lands. Spec §5 says yes — known/acceptable interim that transition beats may be crowded out until slot guarantee ships.
+- NewsNet `rec.music` thinness is structural, not polish: only 2 of 14 NPC rows mapped there cleanly (`texture_002` Police review, `texture_006` Patti Smith carpool). PM call on whether to seed more music textures, accept it as an organic-growth board, or revisit the topic→board mapping.
+- NewsNet follow-ons from spec §7 (threading, moderation, diegetic entry, handle-protection list, rate limit) are NOT yet filed as tickets — sprint plan input needed before filing.
 
 ## Recently merged (last 7 days)
 <!-- One line per merge. Trim weekly. Older entries go to HANDOFF-archive.md. -->
 
-- 2026-05-18 — `03d3803` T-1777320000004 Candidate B fixed. `play/page.tsx:2777` `b.progress_id` → `b.storylet_key` (one-char fix). Restores immediate day-complete + allocation-gating (`setAwaitingAllocation` → `DaySummaryCard`) that had been dead since the branch was written. Backup paths at lines 2971+3005 unchanged. PHASE-2-NOTE comments in `resolve/route.ts` for Candidates C+D. New test: `src/lib/play.trackCompletion.test.ts` (4 cases). tsc clean, vitest 276/1 (+4), playthrough 22/7 parity. Ticket stays `col_doing` — Candidate A (React Query race) is primary repeat suspect, open as T-1779062400001. T-1779062400002 filed for SegmentTransitionCard/SleepCard missing `!awaitingAllocation` guard.
-- 2026-05-14 — T-1777320000004 diagnosis session. `docs/DIAGNOSIS-T-1777320000004.md` written. Ruled out: DB duplicate keys, duplicate track_progress rows, broken choice wiring, effectiveStoryletKey mismatch, double-resolution, pool scan dedup, globalFlags widening. Ghost key corrected: `s01_dining_first_dinner` → `lunch_floor`. Two HIGH candidates identified: (A) React Query refetch race briefly re-surfaces resolved storylets; (B) `play/page.tsx:2777` `newResolved.has(b.progress_id)` always false (Set is keyed on storylet_key) → `markDailyComplete` never fires. No fix this session per explicit brief.
-- 2026-05-15 — `804418d` T-1777400000005 closed. Activity sort fix in `src/core/engine/dailyLoop.ts:738–744`: removed `.order("half_day_cost", ascending: true)` DB sort, replaced with JS comparator (academic→work→creative/physical→social→practical, then half_day_cost DESC, then alpha). Attend Classes moves from position 13 to position 1. tsc clean, vitest 272/1, playthrough 22/7 (pre/post identical — 22/7 is current main baseline, was 23/6 on 2026-05-08). Visual verification deferred to next browser playtest. DECISIONS.md entry filed for orphan route handler kept. Note: HANDOFF previously referenced `src/lib/dailyLoop.ts` — correct path is `src/core/engine/dailyLoop.ts`.
-- 2026-05-11 — `content-studio-v2-visual` branch: T-CS-001 shell+nav+tokens (`0008966`), T-CS-002/003/004 Calendar+Swimlane+Constellation (`bc364ef`), T-CS-005/006 4-tab editor+side panel (`771acfd`), `getScriptModeGaps` unit tests (`dcaf320`), SLOT-GUARANTEE-SPEC (`ba4158c`). Full visual revamp + slot-guarantee spike. 9 new components, 2 new libs (trackPalette, trackShapes), `getScriptModeGaps()` + 12 tests, `docs/SLOT-GUARANTEE-SPEC.md`. TypeScript clean, 272/272 tests. Awaiting Vercel preview QA and main merge.
-- 2026-05-08 — `caece42` T-1778077549003 vectors sidebar surfacing closed. Two-part fix: ProgressPanel.tsx reads `life_pressure_state` as canonical (was reading dead `vectors` field), `handleTrackStoryletChoice` now writes LP via `bumpLifePressure` (was silently dropping all track-storylet identity_tags writes — pre-`caece42` traces from track-served paths cannot be trusted as evidence of LP accumulation behavior). Tests parity: tsc clean, vitest 260/1, playthrough 23/6. DECISIONS.md entry filed.
-- 2026-05-08 — Money-as-band design spec landed at `docs/MONEY-AS-BAND-SPEC.md`. Resolves audit §6 #2 (Bible §3.1.3 violation) and the Current_design.md §XI line 702 open question (visible band, not friction-events-only). 4 tickets filed under epic_mmv03mc_breathes: T-1778100000001 (engine), T-1778100000002 (bite storylet), T-1778100000003 (relief storylet, 3 source variants), T-1778100000004 (8 NPC commentary lines).
-- 2026-05-08 — `ff9f4e0` `docs/REFLECTION-DESIGN-SPIKE.md` committed (worktree `interesting-margulis-809d6f`). T-1778077549005 reflection spike closed; Shape 1.5 (template-registry) approved by PM. Build ticket T-1778100000005 filed (sprint_audit2). PM editorial pass landed on the prose templates — registry hard rule added (§5): "Templates must end on a concrete noun, named action, or specific physical detail — never on an abstract noun, generalized verb, or evaluative claim." `docs/CRYSTALLIZER-FLAGS.md` filed with initial `scott_noticed_something` row + deferred-crystallizers section + authoring contract. Two Kanban corruption events repaired in same session: T-1778077549001 body had reflection content pasted over slot-guarantee body; T-1778077549005 augmentation had partially-merged duplicate content. Both restored, frontmatter preserved. T-1778100000005 sprint tag corrected `sprint_2` → `sprint_audit2` (the former didn't exist in board.json).
-- 2026-05-05 — T-1776329282001 period friction content shipped: 4 new belonging pool storylets, 3 retrofits, 6 new regression playthroughs passing.
-- 2026-05-01 — `3f0b420` merge `feature/period-stance-infrastructure` → main (48 commits absorbed).
-- 2026-04-29 — `a1c807d` Phase 1 instrumentation landed on main.
-- 2026-04-28 (PATH B) — Repo + Kanban relocated `~/Documents/` (iCloud) → `~/Projects/` (local-only).
+- 2026-05-28 — `65680ff` merge `feature/newsnet-multiuser` → main (T-1776329282002). 4 commits absorbed: Phase A migrations (`b824a30` — newsnet_posts, player_handles, harvest_items.board column + 14-row backfill 6/6/2 across net.philosophy/net.misc/rec.music), Phase B API (`561fb2c` — GET/POST /api/newsnet/{posts,handle}, JS-side merge of player + NPC harvest_items, server-stamped in_game_day, case-insensitive handle uniqueness, NPC-attribution reservation list, 28 new vitest tests), Phase C UI (`8817b6d` — modal/tabs/feed/compose/handle-setup, NewsNetButton wired into play/page.tsx header), flicker fix (`90a2289` — `handleState.kind` removed from NewsNetModal useEffect deps; was infinite-loop on no-handle path). tsc clean, vitest 305/1 (+28). SQL acceptance evidence captured per AC against fixture user `f208bd3e`. Migration files named for actual application timestamps (`20260527154342`, `20260527154400`) because applied via MCP, not `db push`, to avoid sweeping up the 7 pre-existing unpushed `20260503*` migrations (now tracked as T-1779926400001). Two pre-existing unpushed main commits caught up: `03d3803` fix, `5b4ec3d` EOD.
+
+*(All earlier entries moved to HANDOFF-archive.md.)*
 
 ---
 
 ## Project Summary
-**MMV (Many More Versions of You)** is a narrative-driven life simulation set in 1983. Players wake in a college dorm, gradually discover they've been sent back in time, and make choices that shape personal journey while uncovering what went wrong in the world. Target audience: adults 55+. Multiplayer/social planned for later phases.
+**MMV (Many More Versions of You)** is a narrative-driven life simulation set in 1983. Players wake in a college dorm, gradually discover they've been sent back in time, and make choices that shape personal journey while uncovering what went wrong in the world. Target audience: adults 55+. **NewsNet (Gate 2) is the first multiplayer surface, shipped 2026-05-28.**
 
 ## Stack
 - **Framework:** Next.js 16 + React 19 + TypeScript
@@ -67,7 +60,7 @@ T-1777320000004 Candidate B shipped (`03d3803`); ticket stays open (repeat sympt
 - **Package manager:** npm
 
 ## Current Milestone
-**Milestone A — "It Runs"** is complete. Engine supports chain mode, pool mode (with `requires_choice` gating), skill queue, skills-in-storylets, routine-week mode (activates Day 3 since Week 2 push), server-authoritative day advancement. Content runs through Day 14+ landmarks (L1–L5 PASS). Audit 2026-05-06 surfaced 19 findings; closures in progress.
+**Milestone A — "It Runs"** is complete. Engine supports chain mode, pool mode (with `requires_choice` gating), skill queue, skills-in-storylets, routine-week mode (activates Day 3 since Week 2 push), server-authoritative day advancement. Content runs through Day 14+ landmarks (L1–L5 PASS). Gate 2 (NewsNet async board) shipped 2026-05-28.
 
 ## Where Things Live
 | Layer | Location | Tool |
