@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/lib/auth";
+import { useBootstrap } from "@/hooks/queries/useBootstrap";
 
 const navItems = [
   { href: "/play", label: "Play" },
@@ -10,10 +11,12 @@ const navItems = [
   { href: "/journal", label: "Journal" },
   { href: "/theory", label: "Theory" },
   { href: "/group", label: "Group" },
+  { href: "/clubs", label: "Clubs" },
 ];
 
 export function PlayerNav() {
   const pathname = usePathname();
+  const club = useBootstrap().data?.club ?? null;
 
   return (
     <nav className="nav-collegiate flex items-center justify-between px-5 py-2.5">
@@ -35,12 +38,23 @@ export function PlayerNav() {
           );
         })}
       </div>
-      <button
-        onClick={signOut}
-        className="nav-link text-primary-foreground/40 hover:text-primary-foreground/70"
-      >
-        Sign out
-      </button>
+      <div className="flex items-center gap-4">
+        {club ? (
+          <Link
+            href={`/clubs/${club.id}`}
+            className="nav-link text-primary-foreground/70 hover:text-primary-foreground"
+            title="Your current club"
+          >
+            {club.name}
+          </Link>
+        ) : null}
+        <button
+          onClick={signOut}
+          className="nav-link text-primary-foreground/40 hover:text-primary-foreground/70"
+        >
+          Sign out
+        </button>
+      </div>
     </nav>
   );
 }
