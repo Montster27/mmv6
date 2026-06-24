@@ -18,6 +18,7 @@ import {
   computeRemainingSeconds,
   fetchEventDetailFull,
   moveMember,
+  resetEvent,
   resolveRound,
   startRound,
 } from "@/lib/mpRounds";
@@ -262,6 +263,7 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const [, setTick] = useState(0);
   const resolveTriggeredRef = useRef(false);
@@ -456,6 +458,8 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
     run(() => unassignMember(token, eventId, { player_id: playerId }));
   const handleStartRound  = () => run(() => startRound(token, eventId));
   const handleEndRound    = () => run(() => resolveRound(token, eventId).then(() => ({})));
+  const handleReset       = () =>
+    run(() => resetEvent(token, eventId).then(() => { setConfirmReset(false); return {}; }));
 
   // ─── Render ───────────────────────────────────────────────────────────
   const showEncounter =
@@ -533,6 +537,52 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
           >
             Waiting for coordinator…
           </span>
+        ) : null}
+
+        {/* Reset — coordinator only, with inline confirm */}
+        {isCoord ? (
+          confirmReset ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 11, color: "hsl(42 47% 96% / .7)", fontFamily: "var(--font-space-mono, monospace)" }}>
+                Reset all state?
+              </span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleReset}
+                style={{
+                  fontFamily: "var(--font-space-mono, monospace)",
+                  fontSize: 11,
+                  padding: "4px 10px",
+                  borderRadius: 3,
+                  border: 0,
+                  background: "hsl(14 73% 56%)",
+                  color: "hsl(42 47% 96%)",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  letterSpacing: ".06em",
+                }}
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmReset(false)}
+                className={s.navbtn}
+              >
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmReset(true)}
+              className={s.navbtn}
+              style={{ color: "hsl(42 47% 96% / .45)" }}
+            >
+              Reset
+            </button>
+          )
         ) : null}
       </div>
 

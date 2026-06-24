@@ -222,5 +222,13 @@ export function moveMember(
   );
 }
 
+export function resetEvent(token: string, eventId: string) {
+  return requestJson<{ ok: true }>(
+    `/api/events/${eventId}/reset`,
+    token,
+    { method: "POST", body: {} }
+  );
+}
+
 // Re-export EventPhaseState so board page imports are one-stop.
 export type { EventPhaseState };
