@@ -52,21 +52,55 @@ export function applyStateDelta(
 ): MpEventLocationState {
   switch (state) {
     case "contested":
-      if (netPro >= PRESSURE_THRESHOLD) return "leaning_pro";
-      if (netCon >= PRESSURE_THRESHOLD) return "leaning_con";
+      if (netPro >= PRESSURE_THRESHOLD) return "leaning_yes";
+      if (netCon >= PRESSURE_THRESHOLD) return "leaning_no";
       return "contested";
-    case "leaning_pro":
-      if (netPro >= PRESSURE_THRESHOLD) return "locked_pro";
+    case "leaning_yes":
+      if (netPro >= PRESSURE_THRESHOLD) return "won";
       if (netCon >= PRESSURE_THRESHOLD) return "contested";
-      return "leaning_pro";
-    case "leaning_con":
-      if (netCon >= PRESSURE_THRESHOLD) return "locked_con";
+      return "leaning_yes";
+    case "leaning_no":
+      if (netCon >= PRESSURE_THRESHOLD) return "lost";
       if (netPro >= PRESSURE_THRESHOLD) return "contested";
-      return "leaning_con";
-    case "locked_pro":
-    case "locked_con":
+      return "leaning_no";
+    case "won":
+    case "lost":
       return state; // terminal — not reversed in this slice
   }
+}
+
+// ─── Risk cost and split/state helpers ───────────────────────────────
+// RISK_COST drives exposure accrual at round resolution (server-side) and
+// the Deploy screen's exposure forecast (client-side).
+// stateToSplit / splitToState translate between the discrete state FSM and
+// the continuous 0–100 split display value. In this slice, stateToSplit
+// snaps split to the midpoint of each band; a later slice inverts this so
+// split drives state via threshold comparison.
+
+export const RISK_COST = {
+  safe:         6,
+  risk_covered: 10, // risk lane with ≥1 clubmate on the ground
+  risk_solo:    22, // risk lane alone
+} as const;
+
+const STATE_SPLIT_MIDPOINT: Record<MpEventLocationState, number> = {
+  won:         90,
+  leaning_yes: 70,
+  contested:   50,
+  leaning_no:  30,
+  lost:        10,
+};
+
+export function stateToSplit(state: MpEventLocationState): number {
+  return STATE_SPLIT_MIDPOINT[state] ?? 50;
+}
+
+export function splitToState(split: number): MpEventLocationState {
+  if (split >= 80) return "won";
+  if (split >= 60) return "leaning_yes";
+  if (split >= 40) return "contested";
+  if (split >= 20) return "leaning_no";
+  return "lost";
 }
 
 // ─── AI opposition (minimal placeholder) ─────────────────────────────
@@ -79,17 +113,17 @@ type AiInputLocation = {
 
 // Returns per-location con bumps and the one "committed" escalation ID.
 //
-// Con drift applies to all non-locked locations. Escalation priority:
-//   1. leaning_con  (about to tip — most impactful push for a legible demo)
-//   2. contested    (adding visible pressure)
-//   3. leaning_pro  (fighting back)
+// Con drift applies to all non-terminal locations. Escalation priority:
+//   1. leaning_no  (about to tip — most impactful push for a legible demo)
+//   2. contested   (adding visible pressure)
+//   3. leaning_yes (fighting back)
 // Within each tier, lowest display_order wins (predictable, demo-friendly).
 export function computeAiDrift(locations: AiInputLocation[]): {
   conBumps: Record<string, number>;
   escalated_id: string | null;
 } {
   const eligible = locations.filter(
-    (l) => l.state !== "locked_pro" && l.state !== "locked_con"
+    (l) => l.state !== "won" && l.state !== "lost"
   );
 
   const conBumps: Record<string, number> = {};
@@ -98,9 +132,9 @@ export function computeAiDrift(locations: AiInputLocation[]): {
   }
 
   const TIER: Record<string, number> = {
-    leaning_con: 0,
-    contested: 1,
-    leaning_pro: 2,
+    leaning_no:  0,
+    contested:   1,
+    leaning_yes: 2,
   };
   const sorted = [...eligible].sort((a, b) => {
     const ta = TIER[a.state] ?? 99;

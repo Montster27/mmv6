@@ -8,11 +8,13 @@ import { getEventCoordinator } from "@/lib/mpAssignments.server";
 import { isCoordinator } from "@/lib/mpAssignments";
 import {
   TRANSIT_LAG_SECONDS,
+  RISK_COST,
   applyStateDelta,
   computeAiDrift,
   computeRemainingSeconds,
   isRoundExpired,
   placeholderPresenceScore,
+  stateToSplit,
 } from "@/lib/mpRounds";
 import type { MpEventLocationState } from "@/types/mpEvents";
 import type {
@@ -325,7 +327,7 @@ export async function resolveRound(
   // Step 4: fetch location states + compute AI drift.
   const { data: locations, error: locErr } = await client
     .from("mp_event_locations")
-    .select("id,state,display_order")
+    .select("id,state,display_order,lane,split,prev_split")
     .eq("event_id", eventId);
   if (locErr) {
     console.error("[rounds] failed to fetch locations", locErr);
@@ -334,14 +336,22 @@ export async function resolveRound(
     id: string;
     state: MpEventLocationState;
     display_order: number;
+    lane: "safe" | "risk";
+    split: number;
+    prev_split: number;
   }[];
 
   const { conBumps, escalated_id } = computeAiDrift(locRows);
 
-  // Step 5: apply net deltas (pro pressure from players, con from AI drift).
-  // Merchant Row uses real encounter pressure; all other locations use the
+  // Step 5: apply net deltas — update state, split, and prev_split for every
+  // location. Merchant Row uses real encounter pressure; all others use the
   // placeholder flat presence score.
-  const stateUpdates: { id: string; state: MpEventLocationState }[] = [];
+  const locationUpdates: {
+    id: string;
+    state: MpEventLocationState;
+    split: number;
+    prev_split: number;
+  }[] = [];
   for (const loc of locRows) {
     let proScore: number;
     let conScore: number;
@@ -355,18 +365,92 @@ export async function resolveRound(
       conScore = conBumps[loc.id] ?? 0;
     }
     const newState = applyStateDelta(loc.state, proScore, conScore);
-    if (newState !== loc.state) {
-      stateUpdates.push({ id: loc.id, state: newState });
-    }
+    locationUpdates.push({
+      id: loc.id,
+      state: newState,
+      split: stateToSplit(newState),
+      prev_split: loc.split,
+    });
   }
 
-  for (const update of stateUpdates) {
+  for (const update of locationUpdates) {
     const { error: updateErr } = await client
       .from("mp_event_locations")
-      .update({ state: update.state })
+      .update({ state: update.state, split: update.split, prev_split: update.prev_split })
       .eq("id", update.id);
     if (updateErr) {
       console.error("[rounds] failed to update location state", updateErr);
+    }
+  }
+
+  // Step 5b: accrue exposure for each assigned player based on the lane they
+  // worked this round. Risk lanes cost more; a clubmate on the ground reduces
+  // the solo cost to RISK_COST.risk_covered.
+  {
+    const playersByLocation = new Map<string, string[]>();
+    for (const a of (assignments ?? []) as {
+      location_id: string;
+      player_id: string;
+    }[]) {
+      const bucket = playersByLocation.get(a.location_id) ?? [];
+      bucket.push(a.player_id);
+      playersByLocation.set(a.location_id, bucket);
+    }
+    const laneByLocation = new Map(locRows.map((l) => [l.id, l.lane]));
+
+    const exposureIncrements: { player_id: string; cost: number }[] = [];
+    for (const a of (assignments ?? []) as {
+      location_id: string;
+      player_id: string;
+    }[]) {
+      const lane = laneByLocation.get(a.location_id) ?? "safe";
+      const othersHere = (
+        playersByLocation.get(a.location_id) ?? []
+      ).filter((id) => id !== a.player_id).length;
+      const cost =
+        lane === "risk"
+          ? othersHere > 0
+            ? RISK_COST.risk_covered
+            : RISK_COST.risk_solo
+          : RISK_COST.safe;
+      exposureIncrements.push({ player_id: a.player_id, cost });
+    }
+
+    if (exposureIncrements.length > 0) {
+      const { data: currentRows } = await client
+        .from("mp_event_exposure")
+        .select("player_id,exposure")
+        .eq("event_id", eventId)
+        .in(
+          "player_id",
+          exposureIncrements.map((e) => e.player_id)
+        );
+      const currentByPlayer = new Map(
+        (
+          (currentRows ?? []) as { player_id: string; exposure: number }[]
+        ).map((r) => [r.player_id, r.exposure])
+      );
+
+      for (const inc of exposureIncrements) {
+        const newExposure = Math.min(
+          100,
+          (currentByPlayer.get(inc.player_id) ?? 0) + inc.cost
+        );
+        const { error: expErr } = await client
+          .from("mp_event_exposure")
+          .upsert(
+            {
+              event_id: eventId,
+              player_id: inc.player_id,
+              exposure: newExposure,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "event_id,player_id" }
+          );
+        if (expErr) {
+          console.error("[rounds] failed to upsert exposure", expErr);
+        }
+      }
     }
   }
 

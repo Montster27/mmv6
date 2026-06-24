@@ -27,62 +27,54 @@ describe("placeholderPresenceScore", () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe("applyStateDelta", () => {
-  it("moves contested → leaning_pro when pro meets threshold", () => {
+  it("moves contested → leaning_yes when pro meets threshold", () => {
     expect(applyStateDelta("contested", PRESSURE_THRESHOLD, 0)).toBe(
-      "leaning_pro"
+      "leaning_yes"
     );
   });
 
-  it("moves contested → leaning_con when con meets threshold", () => {
+  it("moves contested → leaning_no when con meets threshold", () => {
     expect(applyStateDelta("contested", 0, PRESSURE_THRESHOLD)).toBe(
-      "leaning_con"
+      "leaning_no"
     );
   });
 
-  it("does not skip steps: contested + heavy pro stays leaning_pro (no double-jump)", () => {
+  it("does not skip steps: contested + heavy pro stays leaning_yes (no double-jump)", () => {
     expect(applyStateDelta("contested", PRESSURE_THRESHOLD * 10, 0)).toBe(
-      "leaning_pro"
+      "leaning_yes"
     );
   });
 
-  it("moves leaning_pro → locked_pro when pro meets threshold", () => {
-    expect(applyStateDelta("leaning_pro", PRESSURE_THRESHOLD, 0)).toBe(
-      "locked_pro"
-    );
+  it("moves leaning_yes → won when pro meets threshold", () => {
+    expect(applyStateDelta("leaning_yes", PRESSURE_THRESHOLD, 0)).toBe("won");
   });
 
-  it("moves leaning_pro → contested when con meets threshold (pushback)", () => {
-    expect(applyStateDelta("leaning_pro", 0, PRESSURE_THRESHOLD)).toBe(
+  it("moves leaning_yes → contested when con meets threshold (pushback)", () => {
+    expect(applyStateDelta("leaning_yes", 0, PRESSURE_THRESHOLD)).toBe(
       "contested"
     );
   });
 
-  it("moves leaning_con → locked_con when con meets threshold", () => {
-    expect(applyStateDelta("leaning_con", 0, PRESSURE_THRESHOLD)).toBe(
-      "locked_con"
-    );
+  it("moves leaning_no → lost when con meets threshold", () => {
+    expect(applyStateDelta("leaning_no", 0, PRESSURE_THRESHOLD)).toBe("lost");
   });
 
-  it("moves leaning_con → contested when pro meets threshold (recovery)", () => {
-    expect(applyStateDelta("leaning_con", PRESSURE_THRESHOLD, 0)).toBe(
+  it("moves leaning_no → contested when pro meets threshold (recovery)", () => {
+    expect(applyStateDelta("leaning_no", PRESSURE_THRESHOLD, 0)).toBe(
       "contested"
     );
   });
 
   it("leaves state unchanged when neither threshold is met", () => {
     expect(applyStateDelta("contested", 0, 0)).toBe("contested");
-    expect(applyStateDelta("leaning_pro", PRESSURE_THRESHOLD - 1, 0)).toBe(
-      "leaning_pro"
+    expect(applyStateDelta("leaning_yes", PRESSURE_THRESHOLD - 1, 0)).toBe(
+      "leaning_yes"
     );
   });
 
   it("terminal states are not reversed in this slice", () => {
-    expect(applyStateDelta("locked_pro", PRESSURE_THRESHOLD * 10, 0)).toBe(
-      "locked_pro"
-    );
-    expect(applyStateDelta("locked_con", PRESSURE_THRESHOLD * 10, 0)).toBe(
-      "locked_con"
-    );
+    expect(applyStateDelta("won", PRESSURE_THRESHOLD * 10, 0)).toBe("won");
+    expect(applyStateDelta("lost", PRESSURE_THRESHOLD * 10, 0)).toBe("lost");
   });
 });
 
@@ -97,13 +89,13 @@ describe("computeAiDrift", () => {
     display_order: number
   ) => ({ id, state, display_order });
 
-  it("applies AI_CON_DRIFT to every non-locked location", () => {
+  it("applies AI_CON_DRIFT to every non-terminal location", () => {
     const locations = [
       loc("a", "contested", 1),
-      loc("b", "leaning_pro", 2),
-      loc("c", "leaning_con", 3),
-      loc("d", "locked_pro", 4),
-      loc("e", "locked_con", 5),
+      loc("b", "leaning_yes", 2),
+      loc("c", "leaning_no", 3),
+      loc("d", "won", 4),
+      loc("e", "lost", 5),
     ];
     const { conBumps } = computeAiDrift(locations);
     expect(conBumps["a"]).toBe(AI_CON_DRIFT);
@@ -113,18 +105,18 @@ describe("computeAiDrift", () => {
     expect(conBumps["e"]).toBeUndefined();
   });
 
-  it("picks leaning_con as escalation target over contested (tier priority)", () => {
+  it("picks leaning_no as escalation target over contested (tier priority)", () => {
     const locations = [
       loc("contested-loc", "contested", 1),
-      loc("leancon-loc", "leaning_con", 2),
+      loc("leanno-loc", "leaning_no", 2),
     ];
     const { escalated_id } = computeAiDrift(locations);
-    expect(escalated_id).toBe("leancon-loc");
+    expect(escalated_id).toBe("leanno-loc");
   });
 
-  it("picks contested over leaning_pro as escalation target", () => {
+  it("picks contested over leaning_yes as escalation target", () => {
     const locations = [
-      loc("leanpro-loc", "leaning_pro", 1),
+      loc("leanyes-loc", "leaning_yes", 1),
       loc("contested-loc", "contested", 2),
     ];
     const { escalated_id } = computeAiDrift(locations);
@@ -133,31 +125,31 @@ describe("computeAiDrift", () => {
 
   it("breaks ties within a tier by lowest display_order", () => {
     const locations = [
-      loc("c-high", "leaning_con", 5),
-      loc("c-low", "leaning_con", 2),
+      loc("c-high", "leaning_no", 5),
+      loc("c-low", "leaning_no", 2),
     ];
     const { escalated_id } = computeAiDrift(locations);
     expect(escalated_id).toBe("c-low");
   });
 
-  it("returns null escalation when all locations are locked", () => {
+  it("returns null escalation when all locations are terminal", () => {
     const locations = [
-      loc("a", "locked_pro", 1),
-      loc("b", "locked_con", 2),
+      loc("a", "won", 1),
+      loc("b", "lost", 2),
     ];
     const { escalated_id, conBumps } = computeAiDrift(locations);
     expect(escalated_id).toBeNull();
     expect(Object.keys(conBumps)).toHaveLength(0);
   });
 
-  it("demo scenario: West Dorm (leaning_con) is the escalation target", () => {
+  it("demo scenario: West Dorm (leaning_no) is the escalation target", () => {
     // Mirrors the First Renfaire starting state.
     const locations = [
-      loc("1c000000-0000-4000-a000-000000000001", "locked_con", 1),  // Admin Building
+      loc("1c000000-0000-4000-a000-000000000001", "lost", 1),        // Admin Building
       loc("1c000000-0000-4000-a000-000000000002", "contested", 2),   // Merchant Row
-      loc("1c000000-0000-4000-a000-000000000003", "leaning_pro", 3), // South Dorm
+      loc("1c000000-0000-4000-a000-000000000003", "leaning_yes", 3), // South Dorm
       loc("1c000000-0000-4000-a000-000000000004", "contested", 4),   // North Dorm
-      loc("1c000000-0000-4000-a000-000000000005", "leaning_con", 5), // West Dorm
+      loc("1c000000-0000-4000-a000-000000000005", "leaning_no", 5),  // West Dorm
       loc("1c000000-0000-4000-a000-000000000006", "contested", 6),   // Dining Hall
     ];
     const { escalated_id } = computeAiDrift(locations);

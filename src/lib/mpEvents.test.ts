@@ -17,11 +17,11 @@ import type {
 describe("locationStateLabel", () => {
   it("labels every state", () => {
     const expected: Record<MpEventLocationState, string> = {
-      contested: "Contested",
-      leaning_pro: "Leaning pro",
-      leaning_con: "Leaning con",
-      locked_pro: "Locked pro",
-      locked_con: "Locked con",
+      contested:   "Contested",
+      leaning_yes: "Warming",
+      leaning_no:  "Cooling",
+      won:         "With you",
+      lost:        "Against",
     };
     for (const [state, label] of Object.entries(expected)) {
       expect(locationStateLabel(state as MpEventLocationState)).toBe(label);
@@ -34,30 +34,30 @@ describe("locationStateLabel", () => {
 // ─────────────────────────────────────────────────────────────────────
 
 describe("locationStateClasses", () => {
-  it("maps contested to neutral gray, pro to green, con to red", () => {
+  it("maps contested to neutral gray, yes-side to green, no-side to red", () => {
     expect(locationStateClasses("contested")).toContain("slate");
-    expect(locationStateClasses("leaning_pro")).toContain("green");
-    expect(locationStateClasses("locked_pro")).toContain("green");
-    expect(locationStateClasses("leaning_con")).toContain("red");
-    expect(locationStateClasses("locked_con")).toContain("red");
+    expect(locationStateClasses("leaning_yes")).toContain("green");
+    expect(locationStateClasses("won")).toContain("green");
+    expect(locationStateClasses("leaning_no")).toContain("red");
+    expect(locationStateClasses("lost")).toContain("red");
   });
 
-  it("uses light tints for leaning and solid fills for locked", () => {
-    expect(locationStateClasses("leaning_pro")).toContain("bg-green-100");
-    expect(locationStateClasses("leaning_con")).toContain("bg-red-100");
-    expect(locationStateClasses("locked_pro")).toContain("bg-green-600");
-    expect(locationStateClasses("locked_pro")).toContain("text-white");
-    expect(locationStateClasses("locked_con")).toContain("bg-red-600");
-    expect(locationStateClasses("locked_con")).toContain("text-white");
+  it("uses light tints for leaning and solid fills for won/lost", () => {
+    expect(locationStateClasses("leaning_yes")).toContain("bg-green-100");
+    expect(locationStateClasses("leaning_no")).toContain("bg-red-100");
+    expect(locationStateClasses("won")).toContain("bg-green-600");
+    expect(locationStateClasses("won")).toContain("text-white");
+    expect(locationStateClasses("lost")).toContain("bg-red-600");
+    expect(locationStateClasses("lost")).toContain("text-white");
   });
 
   it("gives every state a distinct class string", () => {
     const states: MpEventLocationState[] = [
       "contested",
-      "leaning_pro",
-      "leaning_con",
-      "locked_pro",
-      "locked_con",
+      "leaning_yes",
+      "leaning_no",
+      "won",
+      "lost",
     ];
     const classes = states.map(locationStateClasses);
     expect(new Set(classes).size).toBe(states.length);
