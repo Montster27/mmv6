@@ -26,7 +26,12 @@ ALTER TABLE public.mp_event_locations
   ADD COLUMN IF NOT EXISTS map_x INT,
   ADD COLUMN IF NOT EXISTS map_y INT;
 
--- 2. Migrate existing state values to new vocabulary ----------------------
+-- 2. Drop old constraint BEFORE renaming values (constraint fires on UPDATE) -
+
+ALTER TABLE public.mp_event_locations
+  DROP CONSTRAINT IF EXISTS mp_event_locations_state_check;
+
+-- 3. Rename state values to new vocabulary --------------------------------
 
 UPDATE public.mp_event_locations
   SET state = CASE state
@@ -37,10 +42,7 @@ UPDATE public.mp_event_locations
     ELSE state
   END;
 
--- 3. Replace CHECK constraint with new vocabulary -------------------------
-
-ALTER TABLE public.mp_event_locations
-  DROP CONSTRAINT IF EXISTS mp_event_locations_state_check;
+-- 4. Add new constraint with updated vocabulary ---------------------------
 
 ALTER TABLE public.mp_event_locations
   ADD CONSTRAINT mp_event_locations_state_check
