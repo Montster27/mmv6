@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { isUserAdmin } from "@/lib/adminAuthServer";
+import { getCurrentClub } from "@/lib/clubs.server";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -56,6 +57,30 @@ async function ensurePlayerRecords(userId: string, email: string | null) {
       .from("public_profiles")
       .insert({ user_id: userId, display_name: displayName });
   }
+
+  // Every new character defaults into the seeded SCA club (MP-01). One club
+  // per player, so only join when they have no membership yet. The SCA is
+  // identified by is_system_seeded = true (robust to name changes).
+  const { data: clubMembership } = await supabaseServer
+    .from("club_members")
+    .select("id")
+    .eq("player_id", userId)
+    .limit(1)
+    .maybeSingle();
+  if (!clubMembership) {
+    const { data: sca } = await supabaseServer
+      .from("clubs")
+      .select("id")
+      .eq("is_system_seeded", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (sca) {
+      await supabaseServer
+        .from("club_members")
+        .insert({ club_id: (sca as { id: string }).id, player_id: userId });
+    }
+  }
 }
 
 export async function GET(request: Request) {
@@ -64,7 +89,7 @@ export async function GET(request: Request) {
 
   await ensurePlayerRecords(user.id, user.email ?? null);
 
-  const [isAdmin, experiments, membership] = await Promise.all([
+  const [isAdmin, experiments, membership, club] = await Promise.all([
     isUserAdmin(user),
     supabaseServer
       .from("user_experiments")
@@ -76,6 +101,7 @@ export async function GET(request: Request) {
       .eq("user_id", user.id)
       .limit(1)
       .maybeSingle(),
+    getCurrentClub(supabaseServer, user.id),
   ]);
 
   const assignments = (experiments.data ?? []).reduce<Record<string, string>>(
@@ -103,5 +129,6 @@ export async function GET(request: Request) {
     isAdmin,
     experiments: assignments,
     group,
+    club,
   });
 }

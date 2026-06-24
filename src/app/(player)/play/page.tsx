@@ -3207,6 +3207,12 @@ export default function PlayPage() {
               ) : null}
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" onClick={() => router.push("/clubs")}>
+                Clubs
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => router.push("/events")}>
+                Events
+              </Button>
               <NewsNetButton />
               {isEmailAllowed(session.user.email) || devIsAdmin ? (
                 <Button

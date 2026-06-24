@@ -1,0 +1,830 @@
+/* Campaign UI — ported from design handoff mp.css.
+   Scoped to the multiplayer campaign board only.
+   Global texture (body::before grain) and font classes live in globals.css. */
+
+/* ── Campaign CSS vars (on the root wrapper) ─────────────────────────── */
+.root {
+  --prep-coral:  hsl(14 73% 56%);
+  --prep-green:  hsl(145 52% 30%);
+  --prep-gold:   hsl(43 70% 48%);
+  --prep-blush:  hsl(336 52% 56%);
+  --c-fg:        214 55% 15%;
+}
+
+/* ── Gamebar ─────────────────────────────────────────────────────────── */
+.gamebar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(to right, hsl(14 73% 56%) 33%, hsl(145 52% 30%) 33% 66%, hsl(43 70% 46%) 66%) 1;
+  border-image-width: 0 0 3px 0;
+  padding: 9px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.logo {
+  font-family: var(--font-playfair, Georgia, serif);
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crest {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, hsl(14 73% 61%), hsl(43 70% 48%));
+  flex-shrink: 0;
+}
+
+.spacer { flex: 1; }
+
+.clock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-space-mono, monospace);
+  font-size: 11px;
+  color: hsl(42 47% 96% / .85);
+  letter-spacing: .04em;
+}
+
+.clockRound { font-weight: 700; }
+
+.pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(43 70% 60%);
+  box-shadow: 0 0 0 3px hsl(43 70% 60% / .2);
+}
+
+.rounddots { display: inline-flex; gap: 4px; }
+.rounddots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: hsl(42 47% 96% / .25);
+  display: block;
+}
+.rounddots i.done { background: hsl(43 70% 60%); }
+.rounddots i.now  { background: hsl(42 47% 96%); box-shadow: 0 0 0 2px hsl(42 47% 96% / .3); }
+
+/* Signal 1 — exposure meter (warm amber→red palette, on the actor) */
+.exposure {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+  margin-left: 4px;
+  border-left: 1px solid hsl(42 47% 96% / .2);
+}
+.exposureLbl {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: hsl(42 47% 96% / .55);
+}
+.meter {
+  width: 64px;
+  height: 6px;
+  border-radius: 999px;
+  background: hsl(42 47% 96% / .16);
+  overflow: hidden;
+}
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width .5s ease;
+}
+.tierLabel {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.emberDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  animation: emberFlicker 1.6s ease-in-out infinite;
+}
+
+@keyframes emberFlicker {
+  0%, 100% { opacity: .85; }
+  50%       { opacity: 1; }
+}
+
+/* ── Layout ──────────────────────────────────────────────────────────── */
+.stage {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px 22px 90px;
+}
+
+.boardGrid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 920px) {
+  .boardGrid { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(27,58,92,.06), 0 4px 12px rgba(27,58,92,.04);
+  padding: 16px 18px;
+}
+
+.panel + .panel { margin-top: 16px; }
+
+.panelH {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+/* ── Blueprint map ───────────────────────────────────────────────────── */
+.mapWrap { position: relative; }
+
+.map {
+  position: relative;
+  border: 1px solid hsl(var(--border));
+  border-top: 4px solid transparent;
+  border-image: linear-gradient(to right, hsl(14 73% 56%) 33%, hsl(214 55% 22%) 33% 66%, hsl(145 52% 30%) 66%) 1;
+  border-image-slice: 1;
+  border-image-width: 4px 0 0 0;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(27,58,92,.06), 0 4px 12px rgba(27,58,92,.04);
+  background:
+    repeating-linear-gradient(0deg,   hsl(214 30% 50% / .035) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg,  hsl(214 30% 50% / .035) 0 1px, transparent 1px 28px),
+    hsl(42 44% 96%);
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+}
+
+.mapTitle {
+  position: absolute;
+  left: 16px;
+  top: 14px;
+  z-index: 3;
+}
+.mapTitleName {
+  font-family: var(--font-playfair, Georgia, serif);
+  font-weight: 700;
+  font-size: 17px;
+}
+.mapTitleSub {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  margin-top: 2px;
+}
+
+.mapLegend {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  gap: 12px;
+  background: hsl(42 44% 98% / .9);
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+.lgItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+.lgSwatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+/* decorative quad */
+.quadShape {
+  position: absolute;
+  left: 38%; top: 30%; width: 26%; height: 30%;
+  border: 1.5px dashed hsl(145 30% 40% / .4);
+  border-radius: 6px;
+  background: hsl(145 35% 55% / .06);
+}
+
+/* ── Constituency spot (pin on the map) ──────────────────────────────── */
+.spot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  cursor: pointer;
+}
+
+.pin {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--spot-color, hsl(var(--border)));
+  background: var(--spot-tone, hsl(var(--card)));
+  box-shadow: 0 2px 6px rgba(27,58,92,.18);
+  font-family: var(--font-space-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  color: hsl(214 55% 22%);
+  transition: transform .12s, box-shadow .2s;
+}
+
+.spot:hover .pin { transform: scale(1.12); box-shadow: 0 4px 12px rgba(27,58,92,.25); }
+
+.spotRisk .pin { border-style: dashed; }
+
+.spotSelected .pin {
+  box-shadow: 0 0 0 3px hsl(214 55% 22% / .5), 0 4px 12px rgba(27,58,92,.25);
+}
+
+.flag {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: hsl(42 44% 98% / .96);
+  border: 1px solid hsl(var(--border));
+  border-left: 3px solid var(--spot-color, hsl(var(--border)));
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-family: var(--font-lora, Georgia, serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 3px rgba(27,58,92,.12);
+}
+
+.flagSt {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--spot-color, hsl(var(--muted-foreground)));
+  display: block;
+  font-weight: 700;
+}
+
+.who {
+  position: absolute;
+  left: 50%;
+  top: 30px;
+  transform: translateX(-50%);
+  display: flex;
+}
+
+.heat {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--prep-coral);
+  color: white;
+  font-size: 9px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-space-mono, monospace);
+  font-weight: 700;
+  box-shadow: 0 0 0 2px hsl(var(--card));
+}
+
+.youHere {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  color: hsl(42 47% 96%);
+  font-size: 9px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-playfair, Georgia, serif);
+  font-weight: 700;
+  box-shadow: 0 0 0 2px hsl(var(--card));
+}
+
+/* Avatar chips */
+.ava {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-playfair, Georgia, serif);
+  font-size: 9px;
+  font-weight: 700;
+  color: hsl(42 47% 96%);
+  border: 1.5px solid hsl(var(--card));
+  margin-left: -5px;
+}
+
+/* Signal 2 — contention tug on the flag */
+.contend {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tugmini {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  background: hsl(14 60% 80%);
+  min-width: 40px;
+}
+.tugOurs {
+  background: linear-gradient(90deg, hsl(145 50% 42%), hsl(145 52% 32%));
+  height: 100%;
+}
+.drift {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.driftUp   { color: hsl(145 52% 32%); }
+.driftDown { color: hsl(14 70% 46%); }
+.driftFlat { color: hsl(214 16% 60%); }
+
+/* Knife-edge pulse: split near 50 and drifting against you */
+@keyframes edgePulse {
+  0%, 100% { box-shadow: 0 2px 6px rgba(27,58,92,.18); }
+  50%       { box-shadow: 0 0 0 3px hsl(43 80% 55% / .35), 0 2px 6px rgba(27,58,92,.18); }
+}
+.spotKnife .pin { animation: edgePulse 1.8s ease-in-out infinite; }
+
+/* ── Standing bar (right sidebar) ────────────────────────────────────── */
+.standing { display: flex; flex-direction: column; gap: 8px; }
+.standingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.tug {
+  height: 12px;
+  border-radius: 999px;
+  background: hsl(var(--muted));
+  overflow: hidden;
+  display: flex;
+}
+.tugOursBar   { background: linear-gradient(90deg, hsl(145 52% 40%), hsl(145 52% 30%)); height: 100%; }
+.tugTheirsBar { background: linear-gradient(90deg, hsl(14 65% 58%), hsl(14 70% 50%));   height: 100%; }
+.tugNeutral   { background: hsl(42 30% 86%); height: 100%; }
+
+/* ── Constituency roster list ────────────────────────────────────────── */
+.clist { display: flex; flex-direction: column; gap: 2px; }
+
+.crow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.crow:hover { background: hsl(42 30% 92% / .5); }
+.crowSel {
+  border-color: hsl(214 55% 22% / .3);
+  background: hsl(214 55% 22% / .04);
+}
+.crowDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.crowNm { flex: 1; font-size: 13px; }
+.crowKind {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+.crowStt {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.riskTag {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 8.5px;
+  color: var(--prep-coral);
+  border: 1px solid hsl(14 73% 56% / .4);
+  border-radius: 2px;
+  padding: 0 4px;
+  letter-spacing: .06em;
+}
+.tugcell { width: 54px; flex-shrink: 0; }
+.tugcell .rosterTugmini {
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  background: hsl(14 60% 82%);
+}
+.tugcell .rosterTugmini .rosterOurs {
+  background: hsl(145 52% 36%);
+  height: 100%;
+}
+.rosterDrift {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.rosterDrift.driftUp   { color: hsl(145 52% 32%); }
+.rosterDrift.driftDown { color: hsl(14 70% 46%); }
+.rosterDrift.driftFlat { color: hsl(214 16% 62%); }
+
+/* ── Phase controls / gamebar buttons ───────────────────────────────── */
+.navbtn {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: hsl(42 47% 96% / .6);
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+.navbtn:hover { color: hsl(42 47% 96% / .9); background: hsl(42 47% 96% / .08); }
+.navbtnActive { color: hsl(42 47% 96%); background: hsl(42 47% 96% / .14); font-weight: 700; }
+
+.phasePrimary {
+  font-family: var(--font-lora, Georgia, serif);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 3px;
+  border: 0;
+  cursor: pointer;
+  background: hsl(42 47% 96%);
+  color: hsl(214 55% 22%);
+  font-weight: 600;
+  transition: background-color .15s;
+}
+.phasePrimary:hover    { background: hsl(42 47% 90%); }
+.phasePrimary:disabled { opacity: .45; cursor: not-allowed; }
+
+.phaseOutline {
+  font-family: var(--font-lora, Georgia, serif);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 3px;
+  border: 1px solid hsl(42 47% 96% / .4);
+  cursor: pointer;
+  background: transparent;
+  color: hsl(42 47% 96% / .85);
+  transition: background-color .15s, border-color .15s;
+}
+.phaseOutline:hover    { background: hsl(42 47% 96% / .1); border-color: hsl(42 47% 96% / .6); }
+.phaseOutline:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── Placement banner (coordinator mid-assign) ───────────────────────── */
+.placeBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: hsl(42 44% 96%);
+  border: 1px solid hsl(214 55% 22% / .25);
+  border-radius: 4px;
+  padding: 8px 14px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.placeBannerCancel {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  border: 1px solid hsl(var(--border));
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+}
+.placeBannerCancel:hover { color: hsl(var(--foreground)); }
+
+/* ── Roster sidebar (coordinator) ────────────────────────────────────── */
+.rosterAside { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
+.rosterRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.rosterRow:hover { background: hsl(42 30% 92% / .5); }
+.rosterRowSel {
+  background: hsl(214 55% 22% / .04);
+  border-color: hsl(214 55% 22% / .2);
+}
+.rosterRowName  { flex: 1; font-size: 13px; font-weight: 500; }
+.rosterRowMeta  { font-size: 11px; color: hsl(var(--muted-foreground)); }
+.rosterUnassign {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid hsl(14 73% 56% / .35);
+  background: transparent;
+  color: hsl(14 73% 40%);
+  cursor: pointer;
+}
+.rosterUnassign:hover { background: hsl(14 73% 96%); }
+
+/* ── Encounter card ──────────────────────────────────────────────────── */
+.encWrap { max-width: 660px; margin: 24px auto 0; }
+
+.encCard {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-top: 4px solid transparent;
+  border-image: linear-gradient(to right, hsl(14 73% 56%) 33%, hsl(214 55% 22%) 33% 66%, hsl(145 52% 30%) 66%) 1;
+  border-image-slice: 1;
+  border-image-width: 4px 0 0 0;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(27,58,92,.08), 0 8px 24px rgba(27,58,92,.06);
+  padding: 28px 32px 26px;
+}
+
+.secLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.secLabelLn {
+  flex: 1;
+  height: 1px;
+  background: repeating-linear-gradient(90deg, hsl(214 30% 78%) 0 4px, transparent 4px 8px);
+}
+.secLabelText {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.objection {
+  font-family: var(--font-lora, Georgia, serif);
+  font-size: 21px;
+  line-height: 1.55;
+  font-style: italic;
+  color: hsl(var(--c-fg, 214 55% 15%) / .92);
+  margin: 0;
+  position: relative;
+  padding-left: 22px;
+}
+.objection::before {
+  content: '\201C';
+  position: absolute;
+  left: -6px;
+  top: -10px;
+  font-family: var(--font-playfair, Georgia, serif);
+  font-size: 54px;
+  line-height: 1;
+  color: hsl(14 73% 56% / .35);
+}
+
+.attribution {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  margin-top: 12px;
+  padding-left: 22px;
+}
+
+.insight {
+  margin: 20px 0 4px;
+  padding: 2px 0 2px 20px;
+  border-left: 2px solid hsl(336 44% 52% / .4);
+  animation: insIn .7s ease-out both;
+}
+.insightMarker {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--prep-blush);
+  opacity: .8;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.insightMarker::before { content: '\25E6'; font-size: 13px; }
+.insight p {
+  margin: 0;
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.72;
+  color: hsl(var(--muted-foreground));
+}
+
+@keyframes insIn {
+  from { opacity: 0; transform: translateX(-5px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Options */
+.options { display: flex; flex-direction: column; gap: 11px; margin-top: 20px; }
+
+.option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 15px 18px;
+  border-radius: 4px;
+  border: 1.5px solid hsl(214 55% 22% / .2);
+  background: hsl(42 44% 98%);
+  color: hsl(var(--foreground));
+  font-family: var(--font-lora, Georgia, serif);
+  font-size: 16px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: transform .14s, box-shadow .2s, border-color .2s;
+}
+.option:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: hsl(214 55% 22% / .5);
+  box-shadow: 0 3px 10px rgba(27,58,92,.09);
+}
+.option:disabled { opacity: .55; cursor: not-allowed; }
+
+.optionSelected {
+  border-color: hsl(var(--primary));
+  background: hsl(214 55% 22% / .04);
+  box-shadow: 0 3px 12px rgba(27,58,92,.12);
+}
+
+.optionKnack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  font-family: var(--font-space-mono, monospace);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--prep-coral);
+  opacity: .85;
+}
+.optionKnack::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--prep-coral); }
+
+/* Resolve outcome */
+.resolveBox {
+  border-radius: 4px;
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.7;
+  margin-top: 12px;
+  animation: fadeUp .4s ease-out both;
+}
+.resolvePos { background: hsl(145 35% 96%); border: 1px solid hsl(145 35% 80%); color: hsl(145 52% 24%); }
+.resolveNeg { background: hsl(14 50% 96%);  border: 1px solid hsl(14 50% 82%);  color: hsl(14 73% 32%); }
+
+.felt { margin-top: 24px; }
+.feltCap {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 12px;
+}
+.gauge { position: relative; height: 26px; }
+.gaugeRail {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, hsl(214 30% 78%) 0 5px, transparent 5px 10px);
+}
+.gaugeTicks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  top: 18px;
+}
+.gaugeTicks span {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: hsl(214 20% 48% / .6);
+}
+.gaugeDot {
+  position: absolute;
+  top: 6px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  transition: left .9s cubic-bezier(.2,.8,.2,1);
+  box-shadow: 0 0 0 4px hsl(var(--background)), 0 1px 4px rgba(27,58,92,.25);
+}
+.feltRead {
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 16px 0 0;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Divider ─────────────────────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: repeating-linear-gradient(90deg, hsl(214 30% 78%) 0 4px, transparent 4px 8px);
+  margin: 12px 0;
+}
+
+/* ── Escalation toast ────────────────────────────────────────────────── */
+.escalationNote {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: hsl(14 73% 40%);
+  font-style: italic;
+}
+
+/* ── Shared fade-up animation ────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fadeIn { animation: fadeUp .45s ease-out both; }
+
+/* Error banner */
+.errorBanner {
+  border: 1px solid hsl(14 50% 82%);
+  background: hsl(14 50% 96%);
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: hsl(14 73% 32%);
+  margin-top: 12px;
+}
+
+/* Transit incoming */
+.transitList {
+  font-family: var(--font-space-mono, monospace);
+  font-size: 11px;
+  color: hsl(43 70% 38%);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed hsl(43 70% 70%);
+}

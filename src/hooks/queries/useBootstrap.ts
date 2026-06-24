@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase/browser";
+import type { CurrentClub } from "@/types/clubs";
 
 type BootstrapData = {
   userId: string;
   email: string | null;
   isAdmin: boolean;
   experiments: Record<string, string>;
+  club: CurrentClub | null;
 };
 
 export function useBootstrap() {
@@ -26,6 +28,7 @@ export function useBootstrap() {
         email: json.email ?? null,
         isAdmin: json.isAdmin ?? false,
         experiments: json.experiments ?? {},
+        club: json.club ?? null,
       };
     },
     staleTime: Infinity,
