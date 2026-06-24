@@ -134,11 +134,21 @@ async function fetchDisplayNames(
 
 export async function getEventPhaseState(
   client: SupabaseClient,
-  eventId: string
+  eventId: string,
+  viewerId?: string
 ): Promise<EventPhaseState> {
-  const [roundRow, transitRows] = await Promise.all([
+  const [roundRow, transitRows, exposureRow] = await Promise.all([
     fetchRoundRow(client, eventId),
     fetchTransitRows(client, eventId),
+    viewerId
+      ? client
+          .from("mp_event_exposure")
+          .select("exposure")
+          .eq("event_id", eventId)
+          .eq("player_id", viewerId)
+          .maybeSingle()
+          .then((r) => (r.data as { exposure: number } | null))
+      : Promise.resolve(null),
   ]);
 
   // If no round row exists yet (e.g. the event predates this migration),
@@ -153,6 +163,7 @@ export async function getEventPhaseState(
       active_started_at: null,
       ai_last_escalation_location_id: null,
       transit: [],
+      viewer_exposure: exposureRow?.exposure ?? 0,
     };
   }
 
@@ -184,6 +195,7 @@ export async function getEventPhaseState(
     active_started_at: roundRow.active_started_at,
     ai_last_escalation_location_id: roundRow.ai_last_escalation_location_id,
     transit,
+    viewer_exposure: exposureRow?.exposure ?? 0,
   };
 }
 

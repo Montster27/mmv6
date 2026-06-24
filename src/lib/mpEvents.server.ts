@@ -110,7 +110,7 @@ export async function getEventDetail(
   const [locationsResp, names] = await Promise.all([
     client
       .from("mp_event_locations")
-      .select("id,event_id,name,location_type,state,display_order")
+      .select("id,event_id,name,location_type,state,display_order,split,prev_split,lane,kind,blurb,map_x,map_y")
       .eq("event_id", eventId)
       .order("display_order", { ascending: true }),
     fetchClubNames(client, [event.sponsoring_club_id]),

@@ -41,6 +41,7 @@ export type EventPhaseState = {
   active_started_at: string | null;
   ai_last_escalation_location_id: string | null;
   transit: MpTransitState[];
+  viewer_exposure: number;
 };
 
 // Full response shape for GET /api/events/[id] — MP-05 extends the MP-03

@@ -5,16 +5,11 @@ import Link from "next/link";
 
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { useSession } from "@/contexts/SessionContext";
-import {
-  locationStateClasses,
-  locationStateLabel,
-  locationTypeLabel,
-} from "@/lib/mpEvents";
+import { EXPOSURE_TIERS, exposureTier } from "@/lib/mpEvents";
 import {
   assignMember,
   assignmentSourceLabel,
   leaveLocation,
-  presenceCountLabel,
   selfSelectLocation,
   summarizePresence,
   unassignMember,
@@ -23,7 +18,6 @@ import {
   computeRemainingSeconds,
   fetchEventDetailFull,
   moveMember,
-  phaseLabel,
   resolveRound,
   startRound,
 } from "@/lib/mpRounds";
@@ -34,33 +28,66 @@ import {
 } from "@/lib/mpEncounters";
 import type { EventDetailFull, MpTransitState } from "@/types/mpRounds";
 import type { PresentPlayer } from "@/types/mpAssignments";
-import type { MpEventLocation, MpEventStatus } from "@/types/mpEvents";
+import type { MpEventLocation, MpEventLocationState } from "@/types/mpEvents";
 import type { EncounterResult, EncounterView } from "@/types/mpEncounters";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 
-const STATUS_BADGE: Record<MpEventStatus, "info" | "success" | "default"> = {
-  upcoming: "info",
-  active: "success",
-  resolved: "default",
+import s from "./mp.module.css";
+
+// ─── State color/tone mapping (Signal 2 — contention) ────────────────
+const STATE_META: Record<
+  MpEventLocationState,
+  { color: string; tone: string; label: string }
+> = {
+  won:         { color: "hsl(145 52% 30%)",  tone: "#dcebdd", label: "With you"  },
+  leaning_yes: { color: "hsl(145 38% 46%)",  tone: "#e6efe5", label: "Warming"   },
+  contested:   { color: "hsl(43 70% 48%)",   tone: "#f3ead7", label: "Contested" },
+  leaning_no:  { color: "hsl(14 60% 52%)",   tone: "#f6e0d6", label: "Cooling"   },
+  lost:        { color: "hsl(14 73% 46%)",   tone: "#f6dad3", label: "Against"   },
 };
+
+function shortCode(name: string): string {
+  const words = name.replace(/^The\s+/i, "").split(/\s+/);
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0]! + words[1]![0]!).toUpperCase();
+}
+
+function avatarColor(id: string): string {
+  const palette = ["#6b7a99", "#a8763e", "#4f7257", "#8a6f9b", "#9a5430", "#536683", "#b07a64"];
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h << 5) - h + id.charCodeAt(i);
+  return palette[Math.abs(h) % palette.length]!;
+}
 
 function nameOf(displayName: string | null): string {
   return displayName && displayName.length > 0 ? displayName : "Unnamed player";
 }
 
-// Seconds until a transit player arrives (client clock, display-only).
 function transitEta(t: MpTransitState): number {
   return Math.max(0, Math.ceil((new Date(t.arrives_at).getTime() - Date.now()) / 1000));
 }
 
-// ─── Encounter panel ──────────────────────────────────────────────────
-// Shown when the viewer is present at Merchant Row during an active round.
-// Fetches the encounter view on mount and re-fetches when round_number changes
-// (resets state between rounds). Private-until-resolve: the player sees their
-// own resolve text immediately; pressure is only applied at round boundary.
+// ─── Drift glyph ──────────────────────────────────────────────────────
+function Drift({ d, roster = false }: { d: number; roster?: boolean }) {
+  const base = roster ? s.rosterDrift : s.drift;
+  if (d > 0) return <span className={`${base} ${s.driftUp}`}>▲</span>;
+  if (d < 0) return <span className={`${base} ${s.driftDown}`}>▼</span>;
+  return <span className={`${base} ${s.driftFlat}`}>—</span>;
+}
 
+// ─── Round dots ──────────────────────────────────────────────────────
+function RoundDots({ current, total = 5 }: { current: number; total?: number }) {
+  return (
+    <span className={s.rounddots}>
+      {Array.from({ length: total }, (_, i) => {
+        const n = i + 1;
+        const cls = n < current ? "done" : n === current ? "now" : "";
+        return <i key={n} className={cls} />;
+      })}
+    </span>
+  );
+}
+
+// ─── Encounter panel ──────────────────────────────────────────────────
 function EncounterPanel({
   token,
   eventId,
@@ -81,23 +108,16 @@ function EncounterPanel({
     setErr(null);
     fetchEncounter(token, eventId, MERCHANT_ROW_LOCATION_ID)
       .then(setView)
-      .catch((e) =>
-        setErr(
-          e instanceof Error ? e.message : "Failed to load encounter."
-        )
-      );
+      .catch((e) => setErr(e instanceof Error ? e.message : "Failed to load encounter."));
   }, [token, eventId, roundNumber]);
 
   const handleRun = async (optionId: string) => {
     setBusy(true);
     setErr(null);
     try {
-      const result = await runEncounter(
-        token,
-        eventId,
-        MERCHANT_ROW_LOCATION_ID,
-        { option_id: optionId }
-      );
+      const result = await runEncounter(token, eventId, MERCHANT_ROW_LOCATION_ID, {
+        option_id: optionId,
+      });
       setRunResult(result);
       setView((v) => (v ? { ...v, already_run_this_round: true } : v));
     } catch (e) {
@@ -109,84 +129,128 @@ function EncounterPanel({
 
   if (!view && !err) {
     return (
-      <p className="mt-2 text-xs text-slate-400 italic">Loading encounter…</p>
+      <p className="mt-2 text-xs italic" style={{ color: "hsl(var(--muted-foreground))" }}>
+        Loading encounter…
+      </p>
     );
   }
 
-  const displayRun: { pressure_contribution: number; resolved_text: string } | null =
+  const displayRun =
     runResult ?? (view?.my_run ?? null);
 
+  // Gauge position: against=10%, holds=50%, toward=85%
+  const gaugePos =
+    displayRun === null
+      ? null
+      : displayRun.pressure_contribution > 0
+      ? "85%"
+      : displayRun.pressure_contribution < 0
+      ? "10%"
+      : "50%";
+
+  const gaugeBg =
+    gaugePos === "85%"
+      ? "hsl(145 52% 30%)"
+      : gaugePos === "10%"
+      ? "hsl(14 73% 46%)"
+      : "hsl(43 70% 48%)";
+
   return (
-    <div className="mt-3 space-y-3 rounded-md border border-slate-300 bg-white p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        Constituency Encounter
-      </p>
-
-      {view ? (
-        <>
-          <blockquote className="border-l-2 border-slate-300 pl-3 text-sm italic text-slate-700">
-            &ldquo;{view.game.objection_text}&rdquo;
-          </blockquote>
-
-          {view.insight_unlocked && view.game.insight_text ? (
-            <p className="border-l-2 border-emerald-400 pl-2 text-xs italic text-slate-600">
-              {view.game.insight_text}
-            </p>
-          ) : null}
-
-          {displayRun ? (
-            <div
-              className={`rounded border p-3 text-sm ${
-                displayRun.pressure_contribution > 0
-                  ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                  : "bg-amber-50 border-amber-300 text-amber-800"
-              }`}
-            >
-              <p>{displayRun.resolved_text}</p>
-              <p className="mt-1 font-mono text-xs">
-                {displayRun.pressure_contribution > 0
-                  ? `+${displayRun.pressure_contribution}`
-                  : displayRun.pressure_contribution}{" "}
-                pressure this round
-              </p>
+    <div className={`${s.encWrap} ${s.fadeIn}`}>
+      <div className={s.encCard}>
+        {view ? (
+          <>
+            <div className={s.secLabel}>
+              <span className={s.secLabelText}>Constituency encounter</span>
+              <span className={s.secLabelLn}></span>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-xs text-slate-500">Choose a reframe:</p>
-              {view.options_with_skill.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  disabled={view.already_run_this_round || busy}
-                  onClick={() => handleRun(opt.id)}
-                  className="w-full space-y-1 rounded border border-slate-200 bg-white px-3 py-2.5 text-left text-sm hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50"
+
+            <blockquote className={s.objection}>
+              {view.game.objection_text}
+            </blockquote>
+
+            {view.insight_unlocked && view.game.insight_text ? (
+              <div className={s.insight}>
+                <div className={s.insightMarker}>Skill insight</div>
+                <p>{view.game.insight_text}</p>
+              </div>
+            ) : null}
+
+            {displayRun ? (
+              <>
+                <div
+                  className={`${s.resolveBox} ${
+                    displayRun.pressure_contribution > 0 ? s.resolvePos : s.resolveNeg
+                  }`}
                 >
-                  <p className="font-medium">{opt.label}</p>
-                  <p className="text-xs text-slate-500">{opt.body}</p>
-                  {opt.skill_key ? (
-                    <span
-                      className={
-                        opt.has_skill
-                          ? "inline-block rounded px-1 py-0.5 text-xs bg-emerald-100 text-emerald-700"
-                          : "inline-block text-xs text-slate-400"
-                      }
-                    >
-                      {opt.has_skill ? "✓ " : ""}
-                      {opt.skill_key.replace(/_/g, " ")}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          )}
-        </>
-      ) : null}
+                  <p>{displayRun.resolved_text}</p>
+                </div>
+                <div className={s.felt}>
+                  <div className={s.feltCap}>How it landed</div>
+                  <div className={s.gauge}>
+                    <div className={s.gaugeRail}></div>
+                    <div className={s.gaugeTicks}>
+                      <span>against</span>
+                      <span>holds</span>
+                      <span>toward</span>
+                    </div>
+                    <div
+                      className={s.gaugeDot}
+                      style={{ left: gaugePos ?? "50%", background: gaugeBg }}
+                    />
+                  </div>
+                  <p className={s.feltRead}>
+                    {displayRun.pressure_contribution > 0
+                      ? "They shifted. Something you said opened a door."
+                      : displayRun.pressure_contribution < 0
+                      ? "It landed wrong. You confirmed the concern they already had."
+                      : "No movement. They heard you out. Nothing changed."}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className={s.options}>
+                {view.options_with_skill.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={view.already_run_this_round || busy}
+                    onClick={() => handleRun(opt.id)}
+                    className={s.option}
+                  >
+                    <span>{opt.label}</span>
+                    {opt.body ? (
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: 13,
+                          marginTop: 4,
+                          opacity: 0.75,
+                        }}
+                      >
+                        {opt.body}
+                      </span>
+                    ) : null}
+                    {opt.skill_key ? (
+                      <span className={s.optionKnack}>
+                        {opt.has_skill ? "✓ " : ""}
+                        {opt.skill_key.replace(/_/g, " ")}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : null}
 
-      {err ? <p className="text-xs text-red-600">{err}</p> : null}
+        {err ? <p className={s.errorBanner}>{err}</p> : null}
+      </div>
     </div>
   );
 }
 
+// ─── Main board ───────────────────────────────────────────────────────
 function EventHeatmapContent({ eventId }: { eventId: string }) {
   const session = useSession();
   const token = session.access_token;
@@ -196,19 +260,16 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Drives re-render for the live countdown and transit ETAs.
   const [, setTick] = useState(0);
-
-  // Guards the lazy-expiry auto-resolve so only one call fires per round.
   const resolveTriggeredRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
       const data = await fetchEventDetailFull(token, eventId);
       setDetail(data);
-      // Reset the expiry guard when the phase changes (new round).
       resolveTriggeredRef.current = false;
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to load event.";
@@ -219,85 +280,45 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
     }
   }, [token, eventId]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  // ─── Realtime subscription ────────────────────────────────────────
-  // Subscribes to mp_event_locations and mp_event_rounds for this event.
-  // Any INSERT/UPDATE/DELETE on either table triggers a full re-fetch so
-  // all participants see board-state and phase changes without a manual
-  // refresh. The supabaseBrowser anon client is authenticated via
-  // setAuth so the server delivers postgres_changes events under RLS.
+  // Realtime subscription
   useEffect(() => {
     supabaseBrowser.realtime.setAuth(token);
-
     const channel = supabaseBrowser
       .channel(`event-board-${eventId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "mp_event_locations",
-          filter: `event_id=eq.${eventId}`,
-        },
-        () => load()
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "mp_event_rounds",
-          filter: `event_id=eq.${eventId}`,
-        },
-        () => load()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "mp_event_locations", filter: `event_id=eq.${eventId}` }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "mp_event_rounds",    filter: `event_id=eq.${eventId}` }, () => load())
       .subscribe();
-
-    return () => {
-      supabaseBrowser.removeChannel(channel);
-    };
+    return () => { supabaseBrowser.removeChannel(channel); };
   }, [eventId, token, load]);
 
-  // ─── Countdown tick ───────────────────────────────────────────────
-  // Fires every second while the round is active. Drives the countdown
-  // display and transit ETAs. The server owns actual expiry — this is
-  // display-only.
+  // Countdown tick
   useEffect(() => {
     if (detail?.phase !== "active") return;
     const interval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, [detail?.phase]);
 
-  // ─── Lazy-expiry trigger ──────────────────────────────────────────
-  // When the server-authoritative clock expires, any active client fires
-  // POST .../round/resolve exactly once (the server's conditional UPDATE
-  // guards against concurrent calls). Documented limitation: if no client
-  // is active, the round only resolves when a client next connects.
+  // Lazy-expiry trigger
   useEffect(() => {
     if (!detail?.is_expired || detail.phase !== "active") return;
     if (resolveTriggeredRef.current) return;
     resolveTriggeredRef.current = true;
-    resolveRound(token, eventId).then(() => load()).catch((e) => {
-      // 409 = already resolved by another client — not an error.
-      if (!(e instanceof Error && e.message.includes("409"))) {
-        console.error("[board] lazy-expiry resolve failed", e);
-      }
-    });
+    resolveRound(token, eventId)
+      .then(() => load())
+      .catch((e) => {
+        if (!(e instanceof Error && e.message.includes("409"))) {
+          console.error("[board] lazy-expiry resolve failed", e);
+        }
+      });
   }, [detail?.is_expired, detail?.phase, token, eventId, load]);
 
-  // Countdown computed fresh on every render tick.
   const countdown =
     detail?.phase === "active"
-      ? computeRemainingSeconds(
-          detail.active_started_at,
-          detail.round_duration_seconds
-        )
+      ? computeRemainingSeconds(detail.active_started_at, detail.round_duration_seconds)
       : null;
 
-  // Run a mutation then refresh.
   const run = useCallback(
     async (fn: () => Promise<unknown>) => {
       setBusy(true);
@@ -314,7 +335,7 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
     [load]
   );
 
-  // ─── Derived lookups ──────────────────────────────────────────────
+  // Derived lookups
   const presenceByLoc = useMemo(() => {
     const map = new Map<string, PresentPlayer[]>();
     if (detail) {
@@ -331,7 +352,6 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
     return map;
   }, [detail]);
 
-  // Transit players by destination location.
   const transitByDest = useMemo(() => {
     const map = new Map<string, MpTransitState[]>();
     if (detail) {
@@ -344,7 +364,6 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
     return map;
   }, [detail]);
 
-  // Transit lookup by player (for roster panel).
   const transitByPlayer = useMemo(() => {
     const map = new Map<string, MpTransitState>();
     if (detail) {
@@ -353,397 +372,522 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
     return map;
   }, [detail]);
 
+  // Tally for standing bar
+  const tally = useMemo(() => {
+    if (!detail) return { ours: 0, theirs: 0, neutral: 0, total: 0 };
+    const locs = detail.locations;
+    return {
+      ours:    locs.filter((l) => l.state === "won" || l.state === "leaning_yes").length,
+      theirs:  locs.filter((l) => l.state === "lost" || l.state === "leaning_no").length,
+      neutral: locs.filter((l) => l.state === "contested").length,
+      total:   locs.length,
+    };
+  }, [detail]);
+
   if (loading) {
-    return <p className="p-6 text-sm text-slate-500">Loading event…</p>;
+    return (
+      <div className={s.root}>
+        <p style={{ padding: "24px", fontSize: 13, color: "hsl(var(--muted-foreground))" }}>
+          Loading event…
+        </p>
+      </div>
+    );
   }
   if (notFound || !detail) {
     return (
-      <div className="p-6 space-y-3">
-        <p className="text-sm text-slate-600">Event not found.</p>
-        <Link href="/events" className="text-sm text-primary hover:underline">
-          Back to events
+      <div className={s.root} style={{ padding: 24 }}>
+        <p style={{ fontSize: 13 }}>Event not found.</p>
+        <Link href="/events" style={{ fontSize: 13, textDecoration: "underline" }}>
+          ← Back to events
         </Link>
       </div>
     );
   }
 
-  const isCoord = detail.viewer_is_coordinator;
-  const viewerLoc = detail.viewer_assignment?.location_id ?? null;
-  const viewerSource = detail.viewer_assignment?.source ?? null;
+  const isCoord       = detail.viewer_is_coordinator;
+  const viewerLoc     = detail.viewer_assignment?.location_id ?? null;
+  const viewerSource  = detail.viewer_assignment?.source ?? null;
+  const selectedLoc   = selectedLocId
+    ? detail.locations.find((l) => l.id === selectedLocId) ?? null
+    : null;
   const selectedMember = isCoord
     ? detail.roster.find((m) => m.player_id === selectedMemberId) ?? null
     : null;
 
-  // ─── Action handlers ─────────────────────────────────────────────
+  // Exposure
+  const exposure    = detail.viewer_exposure ?? 0;
+  const tier        = exposureTier(exposure);
 
-  const handleAssign = (locationId: string) => {
-    if (!selectedMemberId) return;
-    const playerId = selectedMemberId;
-    setSelectedMemberId(null);
-    if (detail.phase === "active") {
-      // Active phase: coordinator move triggers transit lag.
-      run(() =>
-        moveMember(token, eventId, { player_id: playerId, to_location_id: locationId })
-      );
-    } else {
-      // Planning (or other): immediate assignment.
-      run(() =>
-        assignMember(token, eventId, { location_id: locationId, player_id: playerId })
-      );
-    }
-  };
+  // Countdown display
+  const countdownDisplay =
+    countdown !== null
+      ? countdown > 0
+        ? `${countdown}s`
+        : "Resolving…"
+      : null;
 
-  const handleUnassign = (playerId: string) =>
-    run(() => unassignMember(token, eventId, { player_id: playerId }));
-  const handleSelfSelect = (locationId: string) =>
-    run(() => selfSelectLocation(token, eventId, { location_id: locationId }));
-  const handleLeave = () => run(() => leaveLocation(token, eventId));
-  const handleStartRound = () => run(() => startRound(token, eventId));
-  const handleEndRound = () => run(() => resolveRound(token, eventId).then(() => ({})));
-
-  // ─── Phase banner ─────────────────────────────────────────────────
+  // Escalation location name
   const escalationLoc =
     detail.phase === "planning" && detail.ai_last_escalation_location_id
       ? locationNameById.get(detail.ai_last_escalation_location_id) ?? null
       : null;
 
-  const countdownDisplay =
-    countdown !== null
-      ? countdown > 0
-        ? `${countdown}s remaining`
-        : "Resolving…"
-      : null;
-
-  const phaseBanner = (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-      <span className="font-semibold">
-        {phaseLabel(detail.phase)} · Round {detail.round_number}
-      </span>
-      {countdownDisplay ? (
-        <span
-          className={
-            countdown !== null && countdown <= 10
-              ? "font-mono text-red-600 font-bold"
-              : "font-mono text-slate-600"
-          }
-        >
-          {countdownDisplay}
-        </span>
-      ) : null}
-      {detail.phase === "resolving" ? (
-        <span className="text-slate-500 italic">Applying round results…</span>
-      ) : null}
-      {escalationLoc ? (
-        <span className="text-red-700 italic">
-          {escalationLoc} secured by opposition last round.
-        </span>
-      ) : null}
-    </div>
-  );
-
-  // ─── Phase controls (above the grid) ─────────────────────────────
-  const phaseControls = (() => {
-    if (detail.phase === "planning") {
-      if (isCoord) {
-        return (
-          <Button
-            variant="default"
-            size="sm"
-            disabled={busy}
-            onClick={handleStartRound}
-          >
-            Start round {detail.round_number}
-          </Button>
-        );
-      }
-      return (
-        <p className="text-sm text-slate-500 italic">
-          Waiting for coordinator to start round {detail.round_number}.
-        </p>
-      );
-    }
-    if (detail.phase === "active" && isCoord) {
-      return (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={handleEndRound}
-        >
-          End round early
-        </Button>
-      );
-    }
-    return null;
-  })();
-
-  // ─── Self-select control on non-coordinator cards ─────────────────
-  const renderSelfSelect = (loc: MpEventLocation, isViewerHere: boolean) => {
-    if (viewerSource === "coordinator") {
-      return (
-        <Button variant="secondary" size="sm" className="w-full" disabled>
-          {isViewerHere ? "Coordinator placed you here" : "Coordinator placed you"}
-        </Button>
-      );
-    }
-    if (isViewerHere) {
-      return (
-        <div className="flex items-center gap-2">
-          <Badge variant="success" size="label">
-            You&rsquo;re here
-          </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy}
-            onClick={handleLeave}
-          >
-            Leave
-          </Button>
-        </div>
-      );
-    }
-    return (
-      <Button
-        variant="secondary"
-        size="sm"
-        className="w-full"
-        disabled={busy}
-        onClick={() => handleSelfSelect(loc.id)}
-      >
-        {viewerLoc ? "Move here" : "Show up here"}
-      </Button>
-    );
-  };
-
-  const renderCard = (loc: MpEventLocation) => {
-    const players = presenceByLoc.get(loc.id) ?? [];
-    const summary = summarizePresence(players);
-    const isViewerHere = loc.id === viewerLoc;
-    const incoming = transitByDest.get(loc.id) ?? [];
-
-    const inner = (
-      <>
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="text-lg font-semibold">{loc.name}</h2>
-          <span className="shrink-0 text-[0.6rem] font-bold uppercase tracking-wider opacity-80">
-            {locationTypeLabel(loc.location_type)}
-          </span>
-        </div>
-        <p className="text-sm font-medium">{locationStateLabel(loc.state)}</p>
-        <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
-          {presenceCountLabel(summary)}
-        </p>
-        {players.length > 0 ? (
-          <ul className="space-y-0.5 text-xs">
-            {players.map((p) => (
-              <li
-                key={p.player_id}
-                className="flex items-center justify-between gap-2"
-              >
-                <span className="truncate">{nameOf(p.display_name)}</span>
-                <span className="shrink-0 opacity-70">
-                  {assignmentSourceLabel(p.source)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {incoming.length > 0 ? (
-          <ul className="space-y-0.5 text-xs text-amber-700 border-t border-amber-200 pt-1 mt-1">
-            {incoming.map((t) => (
-              <li key={t.player_id} className="flex items-center gap-1">
-                <span className="font-mono">→</span>
-                <span className="truncate">
-                  {nameOf(t.display_name)} arriving in {transitEta(t)}s
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </>
-    );
-
-    // Coordinator mid-placement: every card is an assign/move target.
+  // ─── Handlers ────────────────────────────────────────────────────────
+  const handleSpotClick = (locId: string) => {
     if (isCoord && selectedMemberId) {
-      const actionLabel =
-        detail.phase === "active" ? "Move here (transit)" : "Place here";
-      return (
-        <button
-          key={loc.id}
-          type="button"
-          disabled={busy}
-          onClick={() => handleAssign(loc.id)}
-          title={actionLabel}
-          className={`${locationStateClasses(
-            loc.state
-          )} space-y-2 rounded border-2 px-5 py-5 text-left ring-2 ring-primary ring-offset-2 transition hover:brightness-105 disabled:opacity-60`}
-        >
-          {inner}
-        </button>
-      );
+      // Assign mode — click a spot to place the selected member
+      const playerId = selectedMemberId;
+      setSelectedMemberId(null);
+      setSelectedLocId(null);
+      if (detail.phase === "active") {
+        run(() => moveMember(token, eventId, { player_id: playerId, to_location_id: locId }));
+      } else {
+        run(() => assignMember(token, eventId, { location_id: locId, player_id: playerId }));
+      }
+    } else {
+      setSelectedLocId((prev) => (prev === locId ? null : locId));
     }
-
-    return (
-      <Card
-        key={loc.id}
-        padding="lg"
-        className={`${locationStateClasses(loc.state)} space-y-2 ${
-          isViewerHere ? "ring-2 ring-primary ring-offset-2" : ""
-        }`}
-      >
-        {inner}
-        {!isCoord ? renderSelfSelect(loc, isViewerHere) : null}
-        {isViewerHere &&
-        loc.id === MERCHANT_ROW_LOCATION_ID &&
-        detail.phase === "active" ? (
-          <EncounterPanel
-            token={token}
-            eventId={eventId}
-            roundNumber={detail.round_number}
-          />
-        ) : null}
-      </Card>
-    );
   };
 
-  // ─── Coordinator roster side panel ───────────────────────────────
-  const rosterAside = (
-    <aside className="w-full shrink-0 space-y-3 lg:w-72">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Sponsoring club roster
-      </h2>
-      {detail.roster.length === 0 ? (
-        <p className="text-sm text-slate-500">No club members yet.</p>
-      ) : (
-        <ul className="space-y-2">
-          {detail.roster.map((m) => {
-            const selected = m.player_id === selectedMemberId;
-            const transit = transitByPlayer.get(m.player_id) ?? null;
-            const current = m.current;
-            const here = current
-              ? locationNameById.get(current.location_id) ?? "a location"
-              : null;
-            const destName = transit
-              ? locationNameById.get(transit.to_location_id) ?? "a location"
-              : null;
+  const handleSelfSelect = (locationId: string) =>
+    run(() => selfSelectLocation(token, eventId, { location_id: locationId }));
+  const handleLeave       = () => run(() => leaveLocation(token, eventId));
+  const handleUnassign    = (playerId: string) =>
+    run(() => unassignMember(token, eventId, { player_id: playerId }));
+  const handleStartRound  = () => run(() => startRound(token, eventId));
+  const handleEndRound    = () => run(() => resolveRound(token, eventId).then(() => ({})));
 
-            return (
-              <li key={m.player_id}>
-                <Card
-                  padding="sm"
-                  variant={selected ? "highlight" : "default"}
-                  className="space-y-1"
-                >
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      setSelectedMemberId(selected ? null : m.player_id)
-                    }
-                    className="w-full text-left disabled:opacity-60"
-                  >
-                    <p className="text-sm font-medium">
-                      {nameOf(m.display_name)}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {transit
-                        ? `→ ${destName} (${transitEta(transit)}s)`
-                        : current
-                        ? `${here} · ${assignmentSourceLabel(current.source)}`
-                        : "Unassigned"}
-                    </p>
-                  </button>
-                  {current && !transit ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => handleUnassign(m.player_id)}
-                      className="h-7 w-full justify-start px-2 text-xs text-red-700 hover:bg-red-50"
-                    >
-                      Unassign
-                    </Button>
-                  ) : null}
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </aside>
-  );
+  // ─── Render ───────────────────────────────────────────────────────────
+  const showEncounter =
+    viewerLoc === MERCHANT_ROW_LOCATION_ID &&
+    detail.phase === "active";
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <Link href="/events" className="text-sm text-slate-500 hover:underline">
-          ← Events
-        </Link>
-        <div className="mt-1 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{detail.name}</h1>
-          <Badge variant={STATUS_BADGE[detail.status]} size="label">
-            {detail.status}
-          </Badge>
-          {isCoord ? (
-            <Badge variant="navy" size="label">
-              Coordinator
-            </Badge>
+    <div className={s.root}>
+      {/* ── GAMEBAR ─────────────────────────────────────────────── */}
+      <div className={s.gamebar}>
+        <div className={s.logo}>
+          <span className={s.crest}></span>
+          {detail.name}
+        </div>
+
+        <div className={s.spacer}></div>
+
+        {/* Clock + round */}
+        <div className={s.clock}>
+          <span className={s.clockRound}>Round {detail.round_number}</span>
+          <span className={s.pip}></span>
+          <RoundDots current={detail.round_number} />
+          {countdownDisplay ? (
+            <span
+              style={
+                countdown !== null && countdown <= 10
+                  ? { color: "hsl(14 73% 75%)", fontWeight: 700 }
+                  : undefined
+              }
+            >
+              {countdownDisplay}
+            </span>
           ) : null}
         </div>
-        {detail.description ? (
-          <p className="mt-1 text-sm text-slate-600">{detail.description}</p>
+
+        {/* Signal 1 — exposure meter */}
+        <div className={s.exposure}>
+          <span className={s.exposureLbl}>Exposure</span>
+          <div className={s.meter}>
+            <span style={{ width: `${exposure}%`, background: tier.glow }} />
+          </div>
+          <span className={s.tierLabel} style={{ color: tier.glow }}>
+            {tier.label}
+          </span>
+          <span className={s.emberDot} style={{ background: tier.glow }} />
+        </div>
+
+        {/* Phase controls */}
+        {detail.phase === "planning" && isCoord ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleStartRound}
+            className={s.phasePrimary}
+          >
+            Start round {detail.round_number}
+          </button>
+        ) : detail.phase === "active" && isCoord ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleEndRound}
+            className={s.phaseOutline}
+          >
+            End round early
+          </button>
+        ) : detail.phase === "planning" ? (
+          <span
+            style={{
+              fontSize: 11,
+              color: "hsl(42 47% 96% / .55)",
+              fontStyle: "italic",
+              fontFamily: "var(--font-space-mono, monospace)",
+            }}
+          >
+            Waiting for coordinator…
+          </span>
         ) : null}
-        <p className="mt-1 text-xs text-slate-500">
-          Sponsored by {detail.sponsoring_club_name ?? "Unknown club"}
-        </p>
       </div>
 
-      {phaseBanner}
+      {/* ── STAGE ───────────────────────────────────────────────── */}
+      <div className={s.stage}>
+        {error ? <div className={s.errorBanner}>{error}</div> : null}
+        {escalationLoc ? (
+          <p className={`${s.escalationNote} ${s.fadeIn}`} style={{ marginBottom: 12 }}>
+            {escalationLoc} secured by opposition last round.
+          </p>
+        ) : null}
 
-      {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
+        <div className={s.boardGrid}>
+          {/* ── LEFT: MAP ─────────────────────────────────────── */}
+          <div className={s.mapWrap}>
+            <div className={s.map}>
+              <div className={s.mapTitle}>
+                <div className={s.mapTitleName}>Harwick University</div>
+                <div className={s.mapTitleSub}>
+                  Constituency map · {detail.phase === "active" ? "Round active" : "Planning"}
+                </div>
+              </div>
 
-      {detail.locations.length === 0 ? (
-        <p className="text-sm text-slate-500">No locations yet.</p>
-      ) : isCoord ? (
-        <div className="flex flex-col gap-6 lg:flex-row">
-          {rosterAside}
-          <div className="flex-1 space-y-4">
-            {phaseControls}
-            {selectedMember ? (
-              <div className="flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <div className={s.quadShape}></div>
+
+              {detail.locations.map((loc) => {
+                if (loc.map_x === null || loc.map_y === null) return null;
+                const players     = presenceByLoc.get(loc.id) ?? [];
+                const meta        = STATE_META[loc.state];
+                const isViewerHere = loc.id === viewerLoc;
+                const drift        = loc.split - loc.prev_split;
+                const knife        = Math.abs(loc.split - 50) <= 6 && drift <= 0;
+                const incoming     = transitByDest.get(loc.id) ?? [];
+                const isSelected   = loc.id === selectedLocId;
+                const isAssignTarget = isCoord && !!selectedMemberId;
+
+                const spotCls = [
+                  s.spot,
+                  loc.lane === "risk"   ? s.spotRisk     : "",
+                  knife                 ? s.spotKnife    : "",
+                  isSelected            ? s.spotSelected : "",
+                  isAssignTarget        ? s.spotRisk     : "", // ring hint when assigning
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+
+                return (
+                  <div
+                    key={loc.id}
+                    className={spotCls}
+                    style={{
+                      left: `${loc.map_x}%`,
+                      top: `${loc.map_y}%`,
+                      "--spot-color": meta.color,
+                      "--spot-tone": meta.tone,
+                    } as React.CSSProperties}
+                    onClick={() => handleSpotClick(loc.id)}
+                    title={isAssignTarget ? `Place here (${loc.name})` : loc.name}
+                  >
+                    {/* Flag label above */}
+                    <div className={s.flag}>
+                      {loc.name}
+                      <span className={s.flagSt}>{meta.label}</span>
+                      <div className={s.contend}>
+                        <span className={s.tugmini}>
+                          <span
+                            className={s.tugOurs}
+                            style={{ width: `${loc.split}%` }}
+                          />
+                        </span>
+                        <Drift d={drift} />
+                      </div>
+                    </div>
+
+                    {/* Pin */}
+                    <div className={s.pin}>{shortCode(loc.name)}</div>
+
+                    {/* Risk heat badge */}
+                    {loc.lane === "risk" ? (
+                      <div className={s.heat} title="Risk lane — exposure cost">!</div>
+                    ) : null}
+
+                    {/* You-are-here */}
+                    {isViewerHere ? <div className={s.youHere}>★</div> : null}
+
+                    {/* Clubmate avatars */}
+                    {players.length > 0 ? (
+                      <div className={s.who}>
+                        {players.slice(0, 3).map((p) => (
+                          <div
+                            key={p.player_id}
+                            className={s.ava}
+                            style={{ background: avatarColor(p.player_id) }}
+                            title={nameOf(p.display_name)}
+                          >
+                            {nameOf(p.display_name)[0]?.toUpperCase() ?? "?"}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {/* Transit incoming */}
+                    {incoming.length > 0 ? (
+                      <div className={s.transitList} style={{ position: "absolute", top: "110%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap" }}>
+                        {incoming.map((t) => (
+                          <span key={t.player_id}>→{nameOf(t.display_name)[0]} {transitEta(t)}s</span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+
+              {/* Legend */}
+              <div className={s.mapLegend}>
+                <span className={s.lgItem}>
+                  <span className={s.lgSwatch} style={{ background: "hsl(145 52% 30%)" }} />
+                  with you
+                </span>
+                <span className={s.lgItem}>
+                  <span className={s.lgSwatch} style={{ background: "hsl(43 70% 48%)" }} />
+                  contested
+                </span>
+                <span className={s.lgItem}>
+                  <span className={s.lgSwatch} style={{ background: "hsl(14 73% 46%)" }} />
+                  against
+                </span>
+              </div>
+            </div>
+
+            {/* ── Placement banner ───────────────────────────── */}
+            {isCoord && selectedMember ? (
+              <div className={s.placeBanner}>
                 <span>
                   {detail.phase === "active" ? "Moving" : "Placing"}{" "}
-                  <strong>{nameOf(selectedMember.display_name)}</strong> — click
-                  a location.
+                  <strong>{nameOf(selectedMember.display_name)}</strong> — click a pin.
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy}
+                <button
+                  type="button"
+                  className={s.placeBannerCancel}
                   onClick={() => setSelectedMemberId(null)}
                 >
                   Cancel
-                </Button>
+                </button>
               </div>
             ) : null}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {detail.locations.map(renderCard)}
+
+            {/* ── Self-select action for selected spot ────────── */}
+            {selectedLoc && !isCoord ? (
+              <div className={s.placeBanner} style={{ marginTop: 8 }}>
+                <span>
+                  <strong>{selectedLoc.name}</strong>
+                  {selectedLoc.blurb ? ` — ${selectedLoc.blurb}` : ""}
+                </span>
+                {viewerSource === "coordinator" ? (
+                  <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", fontStyle: "italic" }}>
+                    Coordinator placed you
+                  </span>
+                ) : selectedLoc.id === viewerLoc ? (
+                  <button
+                    type="button"
+                    className={s.placeBannerCancel}
+                    disabled={busy}
+                    onClick={handleLeave}
+                  >
+                    Leave
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={s.phasePrimary}
+                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                    disabled={busy}
+                    onClick={() => handleSelfSelect(selectedLoc.id)}
+                  >
+                    {viewerLoc ? "Move here" : "Show up here"}
+                  </button>
+                )}
+              </div>
+            ) : null}
+
+            {/* ── Encounter panel ─────────────────────────────── */}
+            {showEncounter ? (
+              <EncounterPanel
+                token={token}
+                eventId={eventId}
+                roundNumber={detail.round_number}
+              />
+            ) : null}
+          </div>
+
+          {/* ── RIGHT SIDEBAR ─────────────────────────────────── */}
+          <div>
+            {/* Standing */}
+            <div className={s.panel}>
+              <div className={s.panelH}>
+                <span
+                  style={{
+                    fontFamily: "var(--font-playfair, Georgia, serif)",
+                    fontWeight: 600,
+                    fontSize: 15,
+                  }}
+                >
+                  Standing
+                </span>
+                <span
+                  style={{
+                    fontFamily: "var(--font-space-mono, monospace)",
+                    fontSize: 11,
+                    color: "hsl(var(--muted-foreground))",
+                  }}
+                >
+                  {tally.ours}/{tally.total}
+                </span>
+              </div>
+              <div className={s.standing}>
+                <div className={s.standingRow}>
+                  <span style={{ fontSize: 12, color: "hsl(145 52% 30%)" }}>With you</span>
+                  <span style={{ fontSize: 12, color: "hsl(14 73% 46%)" }}>Against</span>
+                </div>
+                <div className={s.tug}>
+                  <div className={s.tugOursBar}   style={{ width: `${(tally.ours    / tally.total) * 100}%` }} />
+                  <div className={s.tugNeutral}    style={{ width: `${(tally.neutral / tally.total) * 100}%` }} />
+                  <div className={s.tugTheirsBar}  style={{ width: `${(tally.theirs  / tally.total) * 100}%` }} />
+                </div>
+              </div>
             </div>
+
+            {/* Constituency list */}
+            <div className={s.panel}>
+              <div className={s.panelH}>
+                <span
+                  style={{
+                    fontFamily: "var(--font-space-mono, monospace)",
+                    fontSize: 10,
+                    letterSpacing: ".1em",
+                    textTransform: "uppercase",
+                    color: "hsl(var(--muted-foreground))",
+                  }}
+                >
+                  Constituencies
+                </span>
+              </div>
+              <div className={s.clist}>
+                {detail.locations.map((loc) => {
+                  const meta  = STATE_META[loc.state];
+                  const drift = loc.split - loc.prev_split;
+                  const isSel = loc.id === selectedLocId;
+
+                  return (
+                    <div
+                      key={loc.id}
+                      className={`${s.crow} ${isSel ? s.crowSel : ""}`}
+                      onClick={() =>
+                        setSelectedLocId((prev) => (prev === loc.id ? null : loc.id))
+                      }
+                    >
+                      <span className={s.crowDot} style={{ background: meta.color }} />
+                      <span className={s.crowNm}>
+                        {loc.name}
+                        {loc.kind ? (
+                          <span className={s.crowKind} style={{ display: "block" }}>
+                            {loc.kind}
+                          </span>
+                        ) : null}
+                      </span>
+                      {loc.lane === "risk" ? (
+                        <span className={s.riskTag}>risk</span>
+                      ) : null}
+                      <span className={s.tugcell}>
+                        <div className={`${s.tugcell} rosterTugmini`} style={{ height: 5, borderRadius: 999, overflow: "hidden", display: "flex", background: "hsl(14 60% 82%)" }}>
+                          <span style={{ background: "hsl(145 52% 36%)", height: "100%", display: "block", width: `${loc.split}%` }} />
+                        </div>
+                      </span>
+                      <Drift d={drift} roster />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Coordinator roster panel */}
+            {isCoord ? (
+              <div className={s.panel}>
+                <div className={s.panelH}>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-space-mono, monospace)",
+                      fontSize: 10,
+                      letterSpacing: ".1em",
+                      textTransform: "uppercase",
+                      color: "hsl(var(--muted-foreground))",
+                    }}
+                  >
+                    Club roster
+                  </span>
+                </div>
+                <div className={s.rosterAside}>
+                  {detail.roster.map((m) => {
+                    const selected  = m.player_id === selectedMemberId;
+                    const transit   = transitByPlayer.get(m.player_id) ?? null;
+                    const current   = m.current;
+                    const here      = current
+                      ? locationNameById.get(current.location_id) ?? "a location"
+                      : null;
+                    const destName  = transit
+                      ? locationNameById.get(transit.to_location_id) ?? "a location"
+                      : null;
+
+                    return (
+                      <div
+                        key={m.player_id}
+                        className={`${s.rosterRow} ${selected ? s.rosterRowSel : ""}`}
+                        onClick={() =>
+                          setSelectedMemberId(selected ? null : m.player_id)
+                        }
+                      >
+                        <div
+                          className={s.ava}
+                          style={{ background: avatarColor(m.player_id), flexShrink: 0 }}
+                        >
+                          {nameOf(m.display_name)[0]?.toUpperCase() ?? "?"}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div className={s.rosterRowName}>{nameOf(m.display_name)}</div>
+                          <div className={s.rosterRowMeta}>
+                            {transit
+                              ? `→ ${destName} (${transitEta(transit)}s)`
+                              : current
+                              ? `${here} · ${assignmentSourceLabel(current.source)}`
+                              : "Unassigned"}
+                          </div>
+                        </div>
+                        {current && !transit ? (
+                          <button
+                            type="button"
+                            className={s.rosterUnassign}
+                            disabled={busy}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUnassign(m.player_id);
+                            }}
+                          >
+                            ✕
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {phaseControls}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {detail.locations.map(renderCard)}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

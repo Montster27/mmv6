@@ -26,7 +26,7 @@ export async function GET(
 
   const [presence, phaseState] = await Promise.all([
     getEventPresence(supabaseServer, id, user.id),
-    getEventPhaseState(supabaseServer, id),
+    getEventPhaseState(supabaseServer, id, user.id),
   ]);
 
   const body: EventDetailFull = { ...detail, ...presence, ...phaseState };
