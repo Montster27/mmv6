@@ -61,5 +61,11 @@ module.exports = {
   		}
   	}
   },
+  // Dynamically assembled in locationStateClasses() — Tailwind can't
+  // detect these through static analysis, so we pin them here.
+  safelist: [
+    "border-green-700", "bg-green-600",
+    "border-red-700",   "bg-red-600",
+  ],
   plugins: [require("tailwindcss-animate")],
 };
