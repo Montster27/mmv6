@@ -330,6 +330,33 @@ The `src/app/api/routine/activities/route.ts` route has zero UI consumers; the l
 
 ---
 
+## MP-06 encounter: binary skill tiers, Merchant Row skill mapping, private-until-resolve UX
+
+- **Date:** 2026-06-24
+- **Context:** Building the first location-game encounter (reframe-to-legitimize) for Merchant Row as part of MP-06. Three implementation decisions recorded here because they each had real alternatives.
+
+### Binary skill tiers in Arc One encounters
+
+`player_skills.status` has four states: `trained | active | queued | locked`. Arc One Level-1 skills have no numeric magnitude — a skill is either fully trained or it isn't. The encounter therefore collapses to two tiers: the player either has the skill (`status = 'trained'`) or they don't. "Level ≥ 1 threshold" = trained. This is logged in the seed migration comment and applied by `hasSkill()` in `src/lib/mpEncounters.ts`. Revisit if a numeric Level 2+ system is introduced in later arcs.
+
+### Merchant Row skill mapping (close_reading vs active_listening split)
+
+The encounter needs two distinct skill roles:
+1. **Insight-unlock skill** — reveals the real driver behind the merchants' stated objection (reading subtext, body language, what's not said).
+2. **Turnout-angle reframe skill** — the reframe that directly addresses merchants' real concern (foot traffic).
+
+Both roles could plausibly use `active_listening`. Rejected: if `active_listening` covers both, a player with that one skill gets both the hidden insight AND the highest-performing reframe. It dominates the encounter too strongly. Split instead:
+- Insight-unlock: `close_reading` (close attention to subtext, what's behind what's stated).
+- Turnout reframe: `active_listening` (listening to what merchants actually need).
+
+The other reframes use `critical_analysis` (cultural/educational angle), `creative_writing` (prestige/coverage angle), and `small_talk` (marked as the trap — confirming the "too niche" fear for this constituency).
+
+### Private-until-resolve UX for encounter pressure
+
+A player who runs the encounter sees their own resolve text immediately after POST. Their pressure contribution is NOT applied until `resolveRound` fires at the round boundary. Other players cannot see what any individual has contributed mid-round. The board location state only updates after resolution. This is intentional: visible live pressure would let players skip out ("we're already winning"), which undercuts the encounter's design tension. The resolve text is personal feedback; the board update is collective consequence.
+
+---
+
 ## NewsNet board routing: added `harvest_items.board` column rather than parsing newsgroup hints from `attribution`
 
 - **Date:** 2026-05-28

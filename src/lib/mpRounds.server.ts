@@ -303,6 +303,25 @@ export async function resolveRound(
     );
   }
 
+  // Step 3b: Merchant Row encounter pressure (replaces placeholder for this
+  // location only). Sum of signed pressure_contribution from mp_encounter_runs
+  // for the just-completed round. Positive → pro; negative → extra con.
+  // TODO(single-slice debt): hardcoded to Merchant Row; generalize when other
+  // locations have mp_location_games rows.
+  const MERCHANT_ROW_ID = "1c000000-0000-4000-a000-000000000002";
+  const { data: encRuns, error: encErr } = await client
+    .from("mp_encounter_runs")
+    .select("pressure_contribution")
+    .eq("event_id", eventId)
+    .eq("location_id", MERCHANT_ROW_ID)
+    .eq("round_number", roundRow.round_number);
+  if (encErr) {
+    console.error("[rounds] failed to fetch encounter runs for pressure", encErr);
+  }
+  const merchantEncounterTotal = (
+    (encRuns ?? []) as { pressure_contribution: number }[]
+  ).reduce((sum, r) => sum + r.pressure_contribution, 0);
+
   // Step 4: fetch location states + compute AI drift.
   const { data: locations, error: locErr } = await client
     .from("mp_event_locations")
@@ -320,10 +339,21 @@ export async function resolveRound(
   const { conBumps, escalated_id } = computeAiDrift(locRows);
 
   // Step 5: apply net deltas (pro pressure from players, con from AI drift).
+  // Merchant Row uses real encounter pressure; all other locations use the
+  // placeholder flat presence score.
   const stateUpdates: { id: string; state: MpEventLocationState }[] = [];
   for (const loc of locRows) {
-    const proScore = placeholderPresenceScore(countByLocation.get(loc.id) ?? 0);
-    const conScore = conBumps[loc.id] ?? 0; // conBumps already encodes AI_CON_DRIFT magnitude
+    let proScore: number;
+    let conScore: number;
+    if (loc.id === MERCHANT_ROW_ID) {
+      proScore = Math.max(0, merchantEncounterTotal);
+      // Trap options contribute negative total → extra con on top of AI drift.
+      conScore =
+        (conBumps[loc.id] ?? 0) + Math.max(0, -merchantEncounterTotal);
+    } else {
+      proScore = placeholderPresenceScore(countByLocation.get(loc.id) ?? 0);
+      conScore = conBumps[loc.id] ?? 0;
+    }
     const newState = applyStateDelta(loc.state, proScore, conScore);
     if (newState !== loc.state) {
       stateUpdates.push({ id: loc.id, state: newState });

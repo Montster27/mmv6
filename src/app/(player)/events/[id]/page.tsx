@@ -27,9 +27,15 @@ import {
   resolveRound,
   startRound,
 } from "@/lib/mpRounds";
+import {
+  MERCHANT_ROW_LOCATION_ID,
+  fetchEncounter,
+  runEncounter,
+} from "@/lib/mpEncounters";
 import type { EventDetailFull, MpTransitState } from "@/types/mpRounds";
 import type { PresentPlayer } from "@/types/mpAssignments";
 import type { MpEventLocation, MpEventStatus } from "@/types/mpEvents";
+import type { EncounterResult, EncounterView } from "@/types/mpEncounters";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +53,138 @@ function nameOf(displayName: string | null): string {
 // Seconds until a transit player arrives (client clock, display-only).
 function transitEta(t: MpTransitState): number {
   return Math.max(0, Math.ceil((new Date(t.arrives_at).getTime() - Date.now()) / 1000));
+}
+
+// ─── Encounter panel ──────────────────────────────────────────────────
+// Shown when the viewer is present at Merchant Row during an active round.
+// Fetches the encounter view on mount and re-fetches when round_number changes
+// (resets state between rounds). Private-until-resolve: the player sees their
+// own resolve text immediately; pressure is only applied at round boundary.
+
+function EncounterPanel({
+  token,
+  eventId,
+  roundNumber,
+}: {
+  token: string;
+  eventId: string;
+  roundNumber: number;
+}) {
+  const [view, setView] = useState<EncounterView | null>(null);
+  const [runResult, setRunResult] = useState<EncounterResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setView(null);
+    setRunResult(null);
+    setErr(null);
+    fetchEncounter(token, eventId, MERCHANT_ROW_LOCATION_ID)
+      .then(setView)
+      .catch((e) =>
+        setErr(
+          e instanceof Error ? e.message : "Failed to load encounter."
+        )
+      );
+  }, [token, eventId, roundNumber]);
+
+  const handleRun = async (optionId: string) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const result = await runEncounter(
+        token,
+        eventId,
+        MERCHANT_ROW_LOCATION_ID,
+        { option_id: optionId }
+      );
+      setRunResult(result);
+      setView((v) => (v ? { ...v, already_run_this_round: true } : v));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!view && !err) {
+    return (
+      <p className="mt-2 text-xs text-slate-400 italic">Loading encounter…</p>
+    );
+  }
+
+  const displayRun: { pressure_contribution: number; resolved_text: string } | null =
+    runResult ?? (view?.my_run ?? null);
+
+  return (
+    <div className="mt-3 space-y-3 rounded-md border border-slate-300 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Constituency Encounter
+      </p>
+
+      {view ? (
+        <>
+          <blockquote className="border-l-2 border-slate-300 pl-3 text-sm italic text-slate-700">
+            &ldquo;{view.game.objection_text}&rdquo;
+          </blockquote>
+
+          {view.insight_unlocked && view.game.insight_text ? (
+            <p className="border-l-2 border-emerald-400 pl-2 text-xs italic text-slate-600">
+              {view.game.insight_text}
+            </p>
+          ) : null}
+
+          {displayRun ? (
+            <div
+              className={`rounded border p-3 text-sm ${
+                displayRun.pressure_contribution > 0
+                  ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                  : "bg-amber-50 border-amber-300 text-amber-800"
+              }`}
+            >
+              <p>{displayRun.resolved_text}</p>
+              <p className="mt-1 font-mono text-xs">
+                {displayRun.pressure_contribution > 0
+                  ? `+${displayRun.pressure_contribution}`
+                  : displayRun.pressure_contribution}{" "}
+                pressure this round
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500">Choose a reframe:</p>
+              {view.options_with_skill.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  disabled={view.already_run_this_round || busy}
+                  onClick={() => handleRun(opt.id)}
+                  className="w-full space-y-1 rounded border border-slate-200 bg-white px-3 py-2.5 text-left text-sm hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <p className="font-medium">{opt.label}</p>
+                  <p className="text-xs text-slate-500">{opt.body}</p>
+                  {opt.skill_key ? (
+                    <span
+                      className={
+                        opt.has_skill
+                          ? "inline-block rounded px-1 py-0.5 text-xs bg-emerald-100 text-emerald-700"
+                          : "inline-block text-xs text-slate-400"
+                      }
+                    >
+                      {opt.has_skill ? "✓ " : ""}
+                      {opt.skill_key.replace(/_/g, " ")}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      ) : null}
+
+      {err ? <p className="text-xs text-red-600">{err}</p> : null}
+    </div>
+  );
 }
 
 function EventHeatmapContent({ eventId }: { eventId: string }) {
@@ -456,6 +594,15 @@ function EventHeatmapContent({ eventId }: { eventId: string }) {
       >
         {inner}
         {!isCoord ? renderSelfSelect(loc, isViewerHere) : null}
+        {isViewerHere &&
+        loc.id === MERCHANT_ROW_LOCATION_ID &&
+        detail.phase === "active" ? (
+          <EncounterPanel
+            token={token}
+            eventId={eventId}
+            roundNumber={detail.round_number}
+          />
+        ) : null}
       </Card>
     );
   };

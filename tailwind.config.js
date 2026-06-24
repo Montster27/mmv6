@@ -61,11 +61,16 @@ module.exports = {
   		}
   	}
   },
-  // Dynamically assembled in locationStateClasses() — Tailwind can't
-  // detect these through static analysis, so we pin them here.
+  // Dynamically assembled at runtime — Tailwind can't detect these through
+  // static analysis, so we pin them here.
+  // locationStateClasses(): board location state colors.
+  // EncounterPanel: result panel (positive vs con pressure) + skill badge.
   safelist: [
     "border-green-700", "bg-green-600",
     "border-red-700",   "bg-red-600",
+    "bg-emerald-50",    "border-emerald-300", "text-emerald-800",
+    "bg-amber-50",      "border-amber-300",   "text-amber-800",
+    "bg-emerald-100",   "text-emerald-700",
   ],
   plugins: [require("tailwindcss-animate")],
 };
