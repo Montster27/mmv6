@@ -1,7 +1,7 @@
 # MMV — Glossary
 > Canonical vocabulary. If a term isn't here, it's not official.
 > When you catch yourself using a synonym, stop and use the term from this file.
-> Last updated: 2026-04-16
+> Last updated: 2026-06-30
 
 ---
 
@@ -97,6 +97,17 @@
 
 ---
 
+## Multiplayer
+
+| Term | Definition | ~~Don't say~~ |
+|------|-----------|---------------|
+| **Campaign board** | The event control map (`mp_events` / `mp_event_locations`) — the coordinator's strategic surface, showing each location's contention state and presence. The board is **territory**: who is winning where. Replaces the informal "heatmap." | ~~heatmap~~, ~~heat map~~, ~~the heat~~, ~~control map~~ |
+| **Heat / exposure** | The personal 0–100 risk meter inside risky minigames. A property of **the player/actor**, never of territory. Warm/ember palette. Persisted per-(event, player) in `mp_event_exposure`. Distinct from the campaign board. | ~~heatmap~~ (that's the board), ~~risk bar~~, ~~suspicion meter~~ |
+| **Contention** | Who is currently winning a given location — the campaign-board signal. Rendered as a green/coral territorial split. A property of **territory**, on the location, never on the actor. | ~~heat~~, ~~control level~~, ~~tug-of-war~~ |
+| **The two-signal rule** | Exposure (personal risk; warm ember; on the actor) and contention (who's winning a location; green/coral split; on territory) must **never** share a visual language. Conflating the two palettes is a design bug. | ~~the heat system~~ (collapses both into one) |
+
+---
+
 ## Deprecated Terms
 
 These terms appeared in older docs or conversations. They are **wrong** now. If you see them, correct them.
@@ -113,3 +124,4 @@ These terms appeared in older docs or conversations. They are **wrong** now. If 
 | ~~ArmsterFlow~~ | **AmsterFlow** | Typo that keeps recurring |
 | ~~Dana~~ (roommate) | **Scott** | Gender audit, 2026-03-24 |
 | ~~Sandra~~ (RA) | **Scott** (RA is now male) | Gender audit, 2026-03-24 |
+| ~~heatmap~~ / ~~heat map~~ | **Campaign board** (the territorial control map). Do not confuse with **heat / exposure**, the personal risk meter. | 2026-06-30 |

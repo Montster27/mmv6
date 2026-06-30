@@ -2,9 +2,9 @@
 
 # Multiplayer Design — Current Thinking
 
-Status: MP-01 through MP-05 shipped on `clubs-heatmap` branch. This document is the
-working snapshot. Open questions are deferred deliberately — we will build a thin slice
-and revisit.
+Status: MP-01 through MP-08 shipped; merged to main as `17db5ee`. Visual port (Step 8)
+and exposure / split-drift tuning are the pending follow-ups. This document is the working
+snapshot. Open questions are deferred deliberately — we will build a thin slice and revisit.
 
 ---
 
@@ -234,11 +234,15 @@ locking in the AI's favor.
 | MP-01 | `8419e71`      | clubs, club_members, club_applications; SCA seed         |
 | MP-02 | `2f7fe70`      | mp_events, mp_event_locations; First Renfaire seed; board |
 | MP-03 | `f6579a0`      | mp_event_assignments; coordinator assign/unassign; self-select |
-| MP-05 | this commit    | mp_event_rounds, mp_event_transit; phase machine; realtime; transit movement; AI drift |
+| MP-05 | `ed14141`      | mp_event_rounds, mp_event_transit; phase machine; realtime; transit movement; AI drift (`2469e1e` safelist fix) |
+| MP-06 | `f4757e0`      | mp_location_games, mp_encounter_runs; Merchant Row reframe-to-legitimize encounter; Level-1 base-skill binding |
+| MP-07 | `b786358`      | mp_event_exposure; split/drift schema; location-state rename |
+| MP-08 | `a7f56df`      | campaign board UI (blueprint map, gamebar, signal discipline); coordinator Reset (`b64e9d0`) |
 
 MP-04 (encounter / minigame content) is intentionally skipped in this sequence — the
 phase machine infrastructure (MP-05) ships first so the hard runtime mechanics are proved
-before any content depends on them.
+before any content depends on them. MP-06 then lands the first real encounter on that
+infrastructure.
 
 ---
 

@@ -40,6 +40,8 @@
 4. **Don't run iCloud-synced.** Repo + Kanban must live under `~/Projects/`, never `~/Documents/`. iCloud silently corrupts `.git/`. (DECISIONS.md 2026-04-28 PATH B)
 5. **`modifiedBy: claude-code`** on every Kanban ticket edit — never use Monty's profile name.
 6. **Rewrite entire ticket files** on edit — Chokidar watches for partial writes.
+7. **Safelist runtime-assembled Tailwind classes.** Any Tailwind class assembled dynamically at runtime (e.g. `` `bg-${state}-500` ``) must be added to the Tailwind `safelist` — the JIT purge cannot see strings it never statically parses. (Source: the MP campaign-board locked-state blank-card bug, `2469e1e`.)
+8. **Add live-update tables to the realtime publication.** Any new table whose changes must reach clients live must be explicitly added to the `supabase_realtime` publication — being in the schema is not enough for Supabase Realtime to emit `postgres_changes`. (Source: the MP `mp_event_transit`-not-showing bug.)
 
 ## Environment routing
 

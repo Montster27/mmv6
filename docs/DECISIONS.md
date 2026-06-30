@@ -330,6 +330,31 @@ The `src/app/api/routine/activities/route.ts` route has zero UI consumers; the l
 
 ---
 
+## Multiplayer framework decisions (heat, skill harness, consequence tiers, time-shape)
+
+- **Date:** 2026-06-30
+- **Context:** Framework-level decisions made across the MP-01→08 build that were not yet recorded in this log. (The MP-06 encounter-specific decisions — binary skill tiers, the Merchant Row close_reading/active_listening split, private-until-resolve UX — are recorded separately below; not duplicated here.) Full design context: `docs/MULTIPLAYER-DESIGN.md`.
+
+- **Heat is per-event with decay; skill softens accrual, not success.** Exposure (heat) is scoped to a single event and decays over time. A relevant skill reduces how fast heat accrues during a risky minigame — it does **not** change the binary success/failure of the action. This keeps skill valuable without letting it trivialize risk.
+
+- **Consequence tiers 1–3; content re-skinned campus→world; Tier-3 may write one solo-narrative flag.** Encounter consequences ladder across three tiers, with content re-skinned from the campus context up to the world stage. Tier-3 (the most severe) may write a **single** solo-narrative flag — this is the one documented, deliberate exception to the solo/multiplayer layer decoupling. All other tiers stay fully decoupled.
+
+- **High-tier heat trip costs the club, not just the individual.** Tripping heat at a high tier costs the sponsoring club a campaign-board hit (a territorial setback), not merely a personal penalty for the actor. Collective stakes for individual risk-taking.
+
+- **Cooperative heat suppression ("cover") is deferred.** A lookout / cover mechanic — clubmates cooperatively suppressing an actor's heat accrual — is noted as a future **Tier-2 composite** ("cover"). Not built in Arc One.
+
+- **Skill harness binds via a three-level ladder; Arc One is Level-1 only.** The harness binds skills to encounters through three levels: (1) base skill, (2) composite, (3) composite-provenance. **Arc One ships Level-1 base-skill binding only.** Composite and provenance are deferred to post-Arc-One.
+
+- **Event time-shape is Reading C.** Real-time within a round; discrete planning/resolution between rounds (planning → active → resolving, repeating). Chosen over fully-real-time and fully-turn-based readings.
+
+- **Risk-lane gating is exposure-cost, not a hard lock.** A risk lane is gated by exposure cost rather than a binary lock; a clubmate present acts as suppression (lowering the exposure cost), rather than the lane being hard-locked open or closed.
+
+- **split/drift model.** `split` is continuous pressure on a location row, from which the discrete location state is derived; `drift` is computed round-over-round. No time-series table in v1 — drift is a round-boundary computation, not a stored history.
+
+- **Exposure persists in a per-(event, player) row.** Exposure lives in `mp_event_exposure`, keyed by (event, player) — not on the player profile and not on per-round records. Event-scoped, survives across rounds within the event, does not leak into the solo profile.
+
+---
+
 ## MP-06 encounter: binary skill tiers, Merchant Row skill mapping, private-until-resolve UX
 
 - **Date:** 2026-06-24

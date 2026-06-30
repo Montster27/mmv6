@@ -3,13 +3,13 @@
 > **One-page current state.** Everything older than the last entry below moves to `HANDOFF-archive.md`.
 > Read in: `Start session` (SOP.md §1).
 > Update at: `End session` (SOP.md §2).
-> Last touched: 2026-05-28
+> Last touched: 2026-06-30
 
 ---
 
 ## Top of stack
 <!-- One sentence. What is the very next concrete thing to do. -->
-T-1776329282002 NewsNet shipped to main (`65680ff`). Next: tester walkthrough by the 5–8 hand-picked Gate-2 testers — pull main (or use the Vercel deployment), fresh-account → handle → board → post → reload — to close AC#8 fully and surface real-use feedback on the board mix. Before tester session: ~5-min curl pass against the Vercel URL to upgrade AC#2 (reserved-handle 422) and AC#4 (server-stamped `in_game_day`) from code-inspection to live-server evidence.
+Multiplayer MP-01→08 merged to main (`17db5ee`). Next real task: **Step 8 — port the `mp.module.css` high-fidelity treatments into the component system** (the campaign board UI shipped functionally, but the Claude Design visual port may be incomplete — confirm scope before building). Then: Step 7 exposure is largely shipped (verify/tune, not build); Steps 9–12 (content fill, win/loss endgame, hardening, discoverability) remain; plus the in-flight clubs-multi-membership work already in the working tree.
 
 ## Branches in flight
 <!-- Every non-main branch with its merge gate. Empty rows are fine; remove a branch when it merges to main. -->
@@ -19,7 +19,7 @@ T-1776329282002 NewsNet shipped to main (`65680ff`). Next: tester walkthrough by
 | `content-studio-v2-visual` | T-CS-001–006 done + SLOT-GUARANTEE-SPEC committed (`ba4158c`); 272 tests passing | Visual QA in browser → merge to main | PM | T-CS-001–006, T-1778077549001 spike |
 | `worktree/interesting-margulis-809d6f` | Spike doc committed `ff9f4e0` | Merge to main | Code | T-1778077549005 |
 
-*(`feature/newsnet-multiuser` merged 2026-05-28 as `65680ff` and deleted. `feature/period-stance-infrastructure` merged 2026-05-01 as `3f0b420`.)*
+*(`clubs-heatmap` merged 2026-06-30 as `17db5ee` (MP-01→08). `feature/newsnet-multiuser` merged 2026-05-28 as `65680ff` and deleted. `feature/period-stance-infrastructure` merged 2026-05-01 as `3f0b420`.)*
 
 ## Active tickets
 <!-- 1-5 tickets. Just IDs + one-line status. Full detail lives in Kanban. -->
@@ -42,6 +42,17 @@ T-1776329282002 NewsNet shipped to main (`65680ff`). Next: tester walkthrough by
 ## Recently merged (last 7 days)
 <!-- One line per merge. Trim weekly. Older entries go to HANDOFF-archive.md. -->
 
+- 2026-06-30 — `17db5ee` merge `clubs-heatmap` → main. **The multiplayer campaign system, MP-01 through MP-08.** Slices:
+  - **MP-01** (`8419e71`) — clubs system: player-created clubs, one-per-player, founder = coordinator, application/accept-reject flow. SCA (Society for Creative Anachronism) seeded as the universal auto-join onboarding club.
+  - **MP-02 / MP-03** (`2f7fe70`, `f6579a0`) — campaign board (`mp_events`, `mp_event_locations`; location states contested / leaning_pro|con / locked_pro|con) + coordinator assignment and member self-selection (`mp_event_assignments`). "First Renfaire" seed event with six locations.
+  - **MP-05** (`ed14141`) — event phase machine (`mp_event_rounds`: planning → active → resolving), Supabase Realtime board sync, server-stamped movement-with-lag (`mp_event_transit`), lazy-expiry boundary resolution, algorithmic AI opposition (con-drift + one paced escalation per boundary). Two fixes landed: Tailwind safelist for locked-state colors (`2469e1e`) and the transit realtime-publication fix.
+  - **MP-06** (`f4757e0`) — first playable encounter (Merchant Row reframe-to-legitimize): `mp_location_games` + `mp_encounter_runs`, Level-1 base-skill binding (unlock / soften / reskin), real encounter pressure replacing the placeholder for that one location. 12 new tests.
+  - **MP-07** (`b786358`) — exposure persistence (`mp_event_exposure`, per-(event,player) row), split/drift schema, location-state rename.
+  - **MP-08** (`a7f56df`) — campaign board UI (blueprint map, gamebar, signal discipline); coordinator Reset button with inline confirm (`b64e9d0`).
+  - **Verification:** Tier-4 verified live two-browser — synced countdown, cross-client board sync, transit, auto-resolve. MP-06 verified live.
+  - **New DB tables (11):** `clubs`, `club_members`, `club_applications`, `mp_events`, `mp_event_locations`, `mp_event_assignments`, `mp_event_rounds`, `mp_event_transit`, `mp_location_games`, `mp_encounter_runs`, `mp_event_exposure`.
+  - **Design:** a Claude Design pass produced a high-fidelity visual prototype (campaign board, deploy, encounter, resolution, club screens) built on the two-signal system — exposure (warm/personal) vs. contention (cool/territorial). Visual port into the component system is pending (Step 8).
+  - **Doc-placement pending:** the MP-* prompt files (MP-01…MP-08) and the two design docs (`MP-06-encounter-screen-brief.md`, `MP-campaign-visual-port-notes.md`) are **not yet in the repo** — to be copied into `docs/prompts/` and `docs/design/` when available (deferred from this docsync; source files were not on hand).
 - 2026-05-28 — `65680ff` merge `feature/newsnet-multiuser` → main (T-1776329282002). 4 commits absorbed: Phase A migrations (`b824a30` — newsnet_posts, player_handles, harvest_items.board column + 14-row backfill 6/6/2 across net.philosophy/net.misc/rec.music), Phase B API (`561fb2c` — GET/POST /api/newsnet/{posts,handle}, JS-side merge of player + NPC harvest_items, server-stamped in_game_day, case-insensitive handle uniqueness, NPC-attribution reservation list, 28 new vitest tests), Phase C UI (`8817b6d` — modal/tabs/feed/compose/handle-setup, NewsNetButton wired into play/page.tsx header), flicker fix (`90a2289` — `handleState.kind` removed from NewsNetModal useEffect deps; was infinite-loop on no-handle path). tsc clean, vitest 305/1 (+28). SQL acceptance evidence captured per AC against fixture user `f208bd3e`. Migration files named for actual application timestamps (`20260527154342`, `20260527154400`) because applied via MCP, not `db push`, to avoid sweeping up the 7 pre-existing unpushed `20260503*` migrations (now tracked as T-1779926400001). Two pre-existing unpushed main commits caught up: `03d3803` fix, `5b4ec3d` EOD.
 
 *(All earlier entries moved to HANDOFF-archive.md.)*
@@ -49,7 +60,7 @@ T-1776329282002 NewsNet shipped to main (`65680ff`). Next: tester walkthrough by
 ---
 
 ## Project Summary
-**MMV (Many More Versions of You)** is a narrative-driven life simulation set in 1983. Players wake in a college dorm, gradually discover they've been sent back in time, and make choices that shape personal journey while uncovering what went wrong in the world. Target audience: adults 55+. **NewsNet (Gate 2) is the first multiplayer surface, shipped 2026-05-28.**
+**MMV (Many More Versions of You)** is a narrative-driven life simulation set in 1983. Players wake in a college dorm, gradually discover they've been sent back in time, and make choices that shape personal journey while uncovering what went wrong in the world. Target audience: adults 55+. **Multiplayer is an active, partly-shipped milestone** — NewsNet (Gate 2, the async social surface) shipped 2026-05-28, and the synchronous collective-action layer (clubs + campaign board + encounters, MP-01→08) merged to main 2026-06-30. See `docs/MULTIPLAYER-DESIGN.md`.
 
 ## Stack
 - **Framework:** Next.js 16 + React 19 + TypeScript
@@ -60,7 +71,7 @@ T-1776329282002 NewsNet shipped to main (`65680ff`). Next: tester walkthrough by
 - **Package manager:** npm
 
 ## Current Milestone
-**Milestone A — "It Runs"** is complete. Engine supports chain mode, pool mode (with `requires_choice` gating), skill queue, skills-in-storylets, routine-week mode (activates Day 3 since Week 2 push), server-authoritative day advancement. Content runs through Day 14+ landmarks (L1–L5 PASS). Gate 2 (NewsNet async board) shipped 2026-05-28.
+**Milestone A — "It Runs"** is complete. Engine supports chain mode, pool mode (with `requires_choice` gating), skill queue, skills-in-storylets, routine-week mode (activates Day 3 since Week 2 push), server-authoritative day advancement. Content runs through Day 14+ landmarks (L1–L5 PASS). Gate 2 (NewsNet async board) shipped 2026-05-28. The multiplayer synchronous layer (clubs, campaign board, phase machine, first encounter — MP-01→08) merged to main 2026-06-30 (`17db5ee`); next is the Step 8 visual port and Steps 9–12 (content fill, win/loss endgame, hardening, discoverability).
 
 ## Where Things Live
 | Layer | Location | Tool |
