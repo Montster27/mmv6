@@ -11,7 +11,7 @@ SET choices = (
   SELECT jsonb_agg(
     CASE elem->>'id'
       WHEN 'admin_before_lunch' THEN jsonb_set(elem, '{reaction_text}', to_jsonb(
-        '“Responsible,” Doug says. It lands halfway between praise and accusation. He is already walking backward down the hall, still talking. The office can wait, apparently; you are the one who cannot.'::text))
+        '“Responsible,” Doug says, halfway between praise and accusation. “Eleven-thirty, then.” He is already walking backward down the hall, still talking.'::text))
       WHEN 'lunch_first' THEN jsonb_set(elem, '{reaction_text}', to_jsonb(
         '“That’s what I’m saying.” Doug falls into step beside you. Four doors open as you pass, each room briefly offering a different song. By the stairs, you have acquired Mike and Keith without anyone formally inviting them.'::text))
       WHEN 'noncommittal' THEN jsonb_set(elem, '{reaction_text}', to_jsonb(
@@ -36,7 +36,7 @@ SET
       "text_variants": [
         {
           "condition": { "npc_memory": "npc_roommate_scott.player_asked_song" },
-          "text": "Scott is tying his shoes beside the desk. The cassette from yesterday is already back in its case. “Orientation at ten, right?” he asks, watching to see whether you remember the rest of the conversation."
+          "text": "Scott is tying his shoes beside the desk. The cassette from yesterday is already back in its case. “Orientation at ten, right?” His thumb rests on the cracked plastic hinge."
         },
         {
           "condition": { "npc_memory": "npc_roommate_scott.started_warm" },
@@ -104,7 +104,7 @@ WHERE activity_key = 'attend_classes';
 
 UPDATE public.routine_activities
 SET display_name = 'Keep Your Door Open',
-    flavor_text = 'Stay in Room 214 while the floor drifts past. Scott may stop. So may someone you have not met yet.'
+    flavor_text = 'Stay in Room 214 while the floor drifts past. Scott may stop by. So may someone you have not met yet.'
 WHERE activity_key = 'dorm_floor_time';
 
 UPDATE public.routine_activities

@@ -85,8 +85,8 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#4a5568]">
             Three days in, the campus is beginning to make demands. Classes have
             fixed hours. People have started saying “see you there” as if that
-            settles anything. Choose what you will make room for—and what will
-            have to notice your absence.
+            settles anything. Choose what you will make room for—and who may
+            notice your absence.
           </p>
         )}
       </div>
