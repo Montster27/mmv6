@@ -1,0 +1,24 @@
+name: first_three_days_affiliative
+description: Warm, socially available path through the rebuilt opening.
+steps:
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: lunch_first
+  - type: advance_segment
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: laugh_with_doug
+  - type: advance_segment
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: go_to_cards
+  - type: sleep
+  - type: expect_storylet_available
+    storylet_key: first_morning
+    served_by: chain
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation

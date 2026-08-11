@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import type { RoutineActivity, PlayerScheduleSelection } from "@/types/routine";
+import type { RoutineActivity } from "@/types/routine";
 import { ROUTINE_BUDGET_HALF_DAYS } from "@/types/routine";
 import { diegeticDateLabel, weekNumber } from "@/core/routine/constants";
 
@@ -81,6 +81,14 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
           Plan Your Week
         </p>
         <p className="text-sm text-[#4a5568]">{weekLabel}</p>
+        {weekNum === 1 && (
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#4a5568]">
+            Three days in, the campus is beginning to make demands. Classes have
+            fixed hours. People have started saying “see you there” as if that
+            settles anything. Choose what you will make room for—and what will
+            have to notice your absence.
+          </p>
+        )}
       </div>
 
       {/* Budget meter */}
@@ -173,6 +181,12 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
 
       {/* Commit button */}
       <div className="pt-2">
+        {weekNum === 1 && selected.size > 0 && !overBudget && (
+          <p className="mb-3 text-xs leading-relaxed text-[#4a5568]">
+            This is a promise to your future self. Other people may hear it as a
+            promise to them.
+          </p>
+        )}
         <Button
           onClick={handleCommit}
           disabled={overBudget || selected.size === 0 || committing}

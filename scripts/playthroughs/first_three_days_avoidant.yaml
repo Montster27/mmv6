@@ -1,0 +1,24 @@
+name: first_three_days_avoidant
+description: Reserved path that avoids early social commitments.
+steps:
+  - type: choose
+    storylet_key: room_214
+    choice_id: head_out
+  - type: choose
+    storylet_key: dorm_hallmates
+    choice_id: noncommittal
+  - type: advance_segment
+  - type: choose
+    storylet_key: lunch_floor
+    choice_id: focus_on_food
+  - type: advance_segment
+  - type: choose
+    storylet_key: evening_choice
+    choice_id: stay_in
+  - type: sleep
+  - type: expect_storylet_available
+    storylet_key: first_morning
+    served_by: chain
+  - type: choose
+    storylet_key: first_morning
+    choice_id: head_to_orientation
