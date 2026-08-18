@@ -202,6 +202,9 @@ function ProgressPanelComponent({
         <div className="space-y-1.5 text-sm">
           {resourcesEnabled ? (
             <>
+              <p className="pb-1 text-xs leading-relaxed text-muted-foreground">
+                Resources open or close options. Changes appear beside the choice that caused them.
+              </p>
               <div className="flex items-center justify-between text-foreground/70">
                 <span className="font-body">{resourceLabel("knowledge")}</span>
                 <span className="font-stat text-xs">{dayState?.knowledge ?? 0}</span>
@@ -268,6 +271,9 @@ function ProgressPanelComponent({
           onMouseLeave={onVectorsHoverEnd}
         >
           <p className="prep-label">Vectors</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Vectors reflect the habits your choices are forming. They describe direction, not a score to maximize.
+          </p>
           {vectorKeys.length === 0 ? (
             <p className="text-sm text-muted-foreground italic font-body">No vectors yet.</p>
           ) : (
