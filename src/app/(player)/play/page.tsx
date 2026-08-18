@@ -1141,6 +1141,7 @@ export default function PlayPage() {
   // refetch starts, which happens AFTER the advance-segment POST completes
   // (~100-300ms). The auto-advance timer (400ms) can fire in that gap.
   const advanceInFlightRef = useRef(false);
+  const [advanceInFlight, setAdvanceInFlight] = useState(false);
 
   // Single entry point for time advance. The server decides whether this is a
   // segment bump or a full day rollover based on daily_states — the client
@@ -1177,6 +1178,7 @@ export default function PlayPage() {
   const handleAdvanceSegment = async () => {
     if (advanceInFlightRef.current) return;
     advanceInFlightRef.current = true;
+    setAdvanceInFlight(true);
 
     try {
       const ds = dayStateRef.current ?? dayState;
@@ -1194,6 +1196,7 @@ export default function PlayPage() {
       await queryClient.refetchQueries({ queryKey: ["daily-run", userId] });
     } finally {
       advanceInFlightRef.current = false;
+      setAdvanceInFlight(false);
     }
   };
 
@@ -3979,8 +3982,10 @@ export default function PlayPage() {
                                     setBridgeText(null);
                                     handleAdvanceSegment();
                                   }}
+                                  disabled={advanceInFlight}
+                                  aria-busy={advanceInFlight}
                                 >
-                                  {`Continue to ${nextSeg} →`}
+                                  {advanceInFlight ? `Moving to ${nextSeg}…` : `Go to ${nextSeg}`}
                                 </Button>
                               </div>
                             )}
@@ -4011,6 +4016,7 @@ export default function PlayPage() {
                       currentSegment={(dayState?.current_segment ?? 'morning') as 'morning' | 'afternoon' | 'evening' | 'night'}
                       hoursRemaining={dayState?.hours_remaining ?? 16}
                       onAdvance={handleAdvanceSegment}
+                      advancing={advanceInFlight}
                     />
                   )}
 

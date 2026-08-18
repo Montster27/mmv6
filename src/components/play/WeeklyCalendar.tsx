@@ -36,6 +36,7 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
   }, [selected, activities]);
 
   const overBudget = totalCost > ROUTINE_BUDGET_HALF_DAYS;
+  const budgetComplete = totalCost === ROUTINE_BUDGET_HALF_DAYS;
   const weekNum = weekNumber(weekStart);
   const weekLabel = diegeticDateLabel(weekStart);
 
@@ -61,7 +62,7 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
   }
 
   async function handleCommit() {
-    if (overBudget || selected.size === 0 || committing) return;
+    if (!budgetComplete || committing) return;
     setCommitting(true);
     try {
       await onCommit(Array.from(selected));
@@ -81,6 +82,11 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
           Plan Your Week
         </p>
         <p className="text-sm text-[#4a5568]">{weekLabel}</p>
+        <p className="mt-2 text-sm leading-relaxed text-[#4a5568]">
+          Choose activities totaling five half-days. This sets your fixed
+          commitments; your daily allocation sets the priorities that shape
+          your resources.
+        </p>
       </div>
 
       {/* Budget meter */}
@@ -107,6 +113,13 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
       {overBudget && (
         <p className="text-sm text-[#c1666b] font-medium">
           Too many activities — drop one to fit your week.
+        </p>
+      )}
+
+      {!overBudget && !budgetComplete && (
+        <p className="text-sm text-[#4a5568]" role="status">
+          Choose {ROUTINE_BUDGET_HALF_DAYS - totalCost} more half-day
+          {ROUTINE_BUDGET_HALF_DAYS - totalCost === 1 ? "" : "s"} to complete the week.
         </p>
       )}
 
@@ -175,10 +188,10 @@ export function WeeklyCalendar({ activities, weekStart, onCommit, playerFlags = 
       <div className="pt-2">
         <Button
           onClick={handleCommit}
-          disabled={overBudget || selected.size === 0 || committing}
+          disabled={!budgetComplete || committing}
           className="w-full bg-[#5a9a7d] hover:bg-[#4a8a6d] text-white font-semibold disabled:opacity-50"
         >
-          {committing ? "Committing…" : "Commit Week"}
+          {committing ? "Saving your week…" : budgetComplete ? "Commit Week" : `Commit Week · ${totalCost}/${ROUTINE_BUDGET_HALF_DAYS}`}
         </Button>
       </div>
     </div>

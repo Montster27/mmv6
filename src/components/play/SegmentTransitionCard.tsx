@@ -21,8 +21,8 @@ const SEGMENT_FLAVOR: Record<Segment, { heading: string; body: string }> = {
     body: 'The light shifts. The campus starts to feel quieter in some ways, louder in others. Evening has its own texture.',
   },
   night: {
-    heading: 'The evening is done.',
-    body: 'The hall gets quieter. Whoever is still up is awake because they chose to be. The night part of the day begins.',
+    heading: 'The hall settles around you.',
+    body: 'Doors close one by one. Whoever is still awake has a reason, even if they have not admitted it yet.',
   },
   morning: {
     heading: 'A new segment.',
@@ -34,6 +34,7 @@ type Props = {
   currentSegment: Segment;
   hoursRemaining: number;
   onAdvance: () => void;
+  advancing?: boolean;
 };
 
 // Explicit-click design — no auto-advance timer. Aligns with the
@@ -50,7 +51,7 @@ type Props = {
 // Concurrent-click safety is at the parent: handleAdvanceSegment
 // guards on advanceInFlightRef so a double-click can't fire two
 // /api/time/advance calls.
-export function SegmentTransitionCard({ currentSegment, hoursRemaining, onAdvance }: Props) {
+export function SegmentTransitionCard({ currentSegment, hoursRemaining, onAdvance, advancing = false }: Props) {
   const nextSegment = NEXT_SEGMENT[currentSegment];
   const flavor = SEGMENT_FLAVOR[nextSegment];
 
@@ -80,8 +81,8 @@ export function SegmentTransitionCard({ currentSegment, hoursRemaining, onAdvanc
         <span className="font-stat text-xs text-muted-foreground tabular-nums">
           {hoursRemaining}h remaining
         </span>
-        <Button onClick={onAdvance} size="default">
-          Continue to {nextSegment}
+        <Button onClick={onAdvance} size="default" disabled={advancing} aria-busy={advancing}>
+          {advancing ? `Moving to ${nextSegment}…` : `Go to ${nextSegment}`}
         </Button>
       </div>
     </div>

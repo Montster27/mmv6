@@ -15,7 +15,7 @@ const BRIDGES: Record<Segment, string[]> = {
   ],
   night: [
     "The floor gets quieter. Somewhere a door closes. The night part of the day begins.",
-    "Late enough now that the campus feels like it belongs to whoever is still awake.",
+    "The campus contracts to lit windows and low voices. Night has begun.",
   ],
 };
 

@@ -56,6 +56,10 @@ function AllocationSectionComponent({
           Total must equal 100 (current: {totalAllocation})
         </span>
       </div>
+      <p className="text-sm leading-relaxed text-slate-600">
+        Divide 100 priority points across the five areas. This is separate from
+        your calendar: it determines which resources grow when the day ends.
+      </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {Object.keys(allocation).map((key) => {
           const allocationKey = key as keyof AllocationPayload;
@@ -85,11 +89,18 @@ function AllocationSectionComponent({
           );
         })}
       </div>
+      {!allocationValid ? (
+        <p className="text-sm font-medium text-amber-700" role="status">
+          {totalAllocation < 100
+            ? `Assign ${100 - totalAllocation} more points before saving.`
+            : `Remove ${totalAllocation - 100} points before saving.`}
+        </p>
+      ) : null}
       <Button
         onClick={onSave}
         disabled={!allocationValid || savingAllocation}
       >
-        {savingAllocation ? "Saving..." : "Save allocation"}
+        {savingAllocation ? "Saving priorities…" : "Save daily priorities"}
       </Button>
     </section>
   );
