@@ -19,6 +19,12 @@ const valid = {
 };
 
 describe("storyletValidation", () => {
+  it("rejects invalid timing windows and self-referential causal gates", () => {
+    const timed = { ...valid, track_id: "track", storylet_key: "intro", due_offset_days: 1, expires_after_days: 0 };
+    expect(validateStorylet({ ...timed, expires_after_days: -1 }).ok).toBe(false);
+    expect(validateStorylet({ ...timed, due_offset_days: 1.5 }).ok).toBe(false);
+    expect(validateStorylet({ ...timed, requirements: { requires_storylets: ["intro"] } }).ok).toBe(false);
+  });
   it("validates a well-formed storylet", () => {
     const res = validateStorylet(valid);
     expect(res.ok).toBe(true);

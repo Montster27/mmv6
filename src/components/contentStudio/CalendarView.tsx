@@ -7,16 +7,18 @@ import type { ArcDefinitionRow } from "@/hooks/contentStudio/useArcsAPI";
 import { TRACK_LABELS, type TrackKey } from "@/lib/trackPalette";
 import { StoryletCard } from "./StoryletCard";
 import { useStudio } from "./StudioContext";
+import { availableOnTrackDay } from "./storyletTiming";
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
-const SEGMENTS = ["morning", "afternoon", "evening"] as const;
+const SEGMENTS = ["morning", "afternoon", "evening", "night"] as const;
 type Segment = (typeof SEGMENTS)[number];
 
 const SEG_SHORT: Record<Segment, string> = {
   morning: "Morn",
   afternoon: "Aftn",
   evening: "Eve",
+  night: "Night",
 };
 
 const DAY_SUBLABELS: Record<number, string> = {
@@ -304,9 +306,7 @@ function WeekCalendar({
               }}
             >
               {wd.map((d) => {
-                const sls = visibleStorylets.filter(
-                  (s) => (s.due_offset_days ?? 0) === d
-                );
+                const sls = visibleStorylets.filter((s) => availableOnTrackDay(s, d));
                 return (
                   <div
                     key={d}
@@ -375,7 +375,8 @@ export function CalendarView({
   );
 
   const visibleStorylets = useMemo(() => {
-    let list = showInactive ? storylets : storylets.filter((s) => s.is_active);
+    let list = (showInactive ? storylets : storylets.filter((s) => s.is_active))
+      .filter((s) => s.track_id && s.due_offset_days != null && s.expires_after_days != null);
     if (trackFilter) {
       list = list.filter((s) => {
         const k = s.track_id ? (trackIdToKey[s.track_id] ?? null) : null;
@@ -388,7 +389,7 @@ export function CalendarView({
   const effectiveMaxDay = useMemo(() => {
     let m = 0;
     for (const s of visibleStorylets) {
-      const d = s.due_offset_days ?? 0;
+      const d = (s.due_offset_days ?? 0) + (s.expires_after_days ?? 0);
       if (d > m) m = d;
     }
     return Math.max(maxDay, m, 3);
@@ -443,6 +444,7 @@ export function CalendarView({
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <CalendarHead {...headProps} />
         <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+          <p className="px-4 py-2 text-xs text-slate-500">Track days are relative to track start. Cards repeat through their availability window; requirements may still hide them. Standalone storylets have no scheduled day.</p>
           <WeekCalendar
             days={days}
             visibleStorylets={visibleStorylets}
@@ -466,6 +468,7 @@ export function CalendarView({
       <CalendarHead {...headProps} />
 
       <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+        <p className="px-4 py-2 text-xs text-slate-500">Track days are relative to track start. Cards repeat through their availability window; requirements may still hide them. Standalone storylets have no scheduled day.</p>
         <div
           className="calendar-grid"
           style={{
@@ -496,8 +499,8 @@ export function CalendarView({
               {days.map((d) => {
                 const sls = visibleStorylets.filter(
                   (s) =>
-                    (s.due_offset_days ?? 0) === d &&
-                    (s.segment ?? "morning") === seg
+                    availableOnTrackDay(s, d) &&
+                    (!s.segment || s.segment === seg)
                 );
                 const collide = sls.length >= 2;
 

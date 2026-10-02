@@ -265,6 +265,13 @@ export function validateStoryletIssues(
   }
   const storylet = input as Storylet;
 
+  for (const field of ["due_offset_days", "expires_after_days"] as const) {
+    const value = storylet[field];
+    if (value != null && (!Number.isInteger(value) || value < 0)) {
+      addIssue(errors, storylet, field, `${field} must be a nonnegative whole number`);
+    }
+  }
+
   if (!isString(storylet.id) || !storylet.id) {
     addIssue(errors, storylet, "id", "Missing id");
   }
@@ -763,6 +770,9 @@ export function validateStoryletIssues(
             (req[field] as unknown[]).length === 0 ||
             (req[field] as unknown[]).some((key) => typeof key !== "string" || key.length === 0))) {
         addIssue(errors, storylet, `requirements.${field}`, `${field} must be a nonempty array of storylet keys`);
+      }
+      if (storylet.storylet_key && Array.isArray(req[field]) && req[field].includes(storylet.storylet_key)) {
+        addIssue(errors, storylet, `requirements.${field}`, `${field} cannot refer to this storylet itself`);
       }
     }
 

@@ -43,8 +43,9 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
           <span className="font-medium">This storylet belongs to a track</span>
         </label>
         <p className="mt-1 text-xs text-slate-500 pl-5">
-          Arc steps are scheduled with due/expiry windows and advance an arc instance FSM.
-          Standalone storylets are selected daily by the weighted pool.
+          Track storylets are opportunities with due/expiry windows. Choices may advance
+          this track; the player can also pass on scenes and meet a later alternative.
+          Standalone storylets are selected by the weighted daily pool.
         </p>
       </div>
 
@@ -96,11 +97,15 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
           </div>
 
           {/* Scheduling */}
+          <div className="rounded-md border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <strong>Timing:</strong> Due day is relative to track start. Expiry 0 means this scene appears only on its due day; a later introduction needs its own flexible fallback. A segment limits it to that part of the day.
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs text-slate-600">
-              Due offset (days after arc start)
+              Due offset (days after track start)
               <input
                 type="number"
+                min={0}
                 className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                 value={storylet.due_offset_days ?? ""}
                 placeholder="0"
@@ -115,6 +120,7 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
               Expires after (days)
               <input
                 type="number"
+                min={0}
                 className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
                 value={storylet.expires_after_days ?? ""}
                 placeholder="3"
@@ -126,6 +132,13 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
               />
             </label>
           </div>
+          {storylet.due_offset_days != null && storylet.expires_after_days != null && (
+            <p className="text-xs text-slate-600">
+              {storylet.expires_after_days === 0 ? "Fixed appointment" : "Flexible opportunity"}: available on track day {storylet.due_offset_days}
+              {storylet.expires_after_days > 0 ? ` through ${storylet.due_offset_days + storylet.expires_after_days}` : " only"}
+              {storylet.segment ? `, during ${storylet.segment}` : ", in any segment"}.
+            </p>
+          )}
 
           {/* Default next storylet */}
           <label className="block text-xs text-slate-600">

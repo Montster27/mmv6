@@ -72,7 +72,7 @@ export function StructuredEditor({
           <BasicFields storylet={draft} isNew={isNew} allTags={allTags} onChange={onChange} />
         )}
         {tab === "requirements" && (
-          <RequirementsPanel storylet={draft} onChange={onChange} />
+          <RequirementsPanel storylet={draft} stepKeyOptions={stepKeyOptions} onChange={onChange} />
         )}
         {tab === "choices" && (
           <ChoiceList

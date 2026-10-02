@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { Storylet, StoryletChoice } from "@/types/storylets";
@@ -10,6 +10,7 @@ import {
   type StreamStates,
 } from "@/types/chapterStreams";
 import { trackEvent } from "@/lib/events";
+import { TimingPreview } from "./TimingPreview";
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -113,7 +114,7 @@ function clamp(value: number) {
   return Math.max(0, Math.min(100, value));
 }
 
-function initialState(firstId: string | null): SimState {
+function initialState(): SimState {
   return {
     energy: 70,
     stress: 20,
@@ -134,7 +135,7 @@ export function PreviewSimulator({ storylets, defaultStorylet, arcDefinitions = 
     defaultStorylet?.id ?? storylets[0]?.id ?? null
   );
   const [simState, setSimState] = useState<SimState>(() =>
-    initialState(defaultStorylet?.id ?? storylets[0]?.id ?? null)
+    initialState()
   );
   const [activePanel, setActivePanel] = useState<
     "state" | "npc" | "streams" | "log"
@@ -224,7 +225,7 @@ export function PreviewSimulator({ storylets, defaultStorylet, arcDefinitions = 
   };
 
   const reset = () => {
-    setSimState(initialState(defaultStorylet?.id ?? storylets[0]?.id ?? null));
+    setSimState(initialState());
     setCurrentId(defaultStorylet?.id ?? storylets[0]?.id ?? null);
     trackEvent({ event_type: "preview_reset" });
   };
@@ -284,8 +285,9 @@ export function PreviewSimulator({ storylets, defaultStorylet, arcDefinitions = 
 
   return (
     <div className="space-y-4">
+      <TimingPreview storylets={storylets} defaultStorylet={defaultStorylet} arcDefinitions={arcDefinitions} />
       <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 flex items-center justify-between gap-3">
-        <span>Preview runs in a sandbox. It does not touch player data.</span>
+        <span>Linked-scene script preview. This follows authored links directly; use the timing preview above to test offers and missed scenes.</span>
         <div className="flex items-center gap-2 shrink-0">
           <label className="text-xs text-slate-500">Jump to:</label>
           <select

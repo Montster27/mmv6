@@ -13,7 +13,7 @@ export function PreviewMode({ draft, allStorylets, arcDefinitions }: PreviewMode
   return (
     <div style={{ padding: 16, height: "100%", overflow: "auto" }}>
       <PreviewSimulator
-        storylets={allStorylets}
+        storylets={[...allStorylets.filter((storylet) => storylet.id !== draft.id), draft]}
         defaultStorylet={draft}
         arcDefinitions={arcDefinitions}
       />

@@ -40,12 +40,13 @@ export function StoryletCard({
       className={cls}
       style={trackStyle(trackKey)}
       onClick={onClick}
-      title={`${sl.title} · ${displayKey}`}
+      title={`${sl.title} · ${displayKey}${sl.due_offset_days != null && sl.expires_after_days != null ? ` · track days ${sl.due_offset_days}–${sl.due_offset_days + sl.expires_after_days}${sl.segment ? ` · ${sl.segment}` : " · any segment"}` : ""}`}
     >
       <div className="title">{sl.title}</div>
       {!dense && (
         <div className="meta">
           <span className="badge mono">{displayKey}</span>
+          {sl.track_id && sl.expires_after_days != null && <span>{sl.expires_after_days === 0 ? "fixed day" : `window +${sl.expires_after_days}d`}</span>}
           {sl.default_next_key != null && <span>chain</span>}
         </div>
       )}

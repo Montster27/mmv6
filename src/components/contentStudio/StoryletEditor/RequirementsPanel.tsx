@@ -13,11 +13,8 @@ const RESOURCE_GATE_KEYS = [
 
 interface RequirementsPanelProps {
   storylet: Storylet;
+  stepKeyOptions?: { value: string; label?: string }[];
   onChange: (updates: Partial<Storylet>) => void;
-}
-
-function getReq(storylet: Storylet, key: string): unknown {
-  return (storylet.requirements ?? {})[key];
 }
 
 function setReq(
@@ -34,11 +31,41 @@ function setReq(
   return { requirements: req };
 }
 
-export function RequirementsPanel({ storylet, onChange }: RequirementsPanelProps) {
+export function RequirementsPanel({ storylet, stepKeyOptions = [], onChange }: RequirementsPanelProps) {
   const req = storylet.requirements ?? {};
+  const knownKeys = new Set(stepKeyOptions.map((option) => option.value));
+  const causalKeys = (["requires_storylets", "requires_any_storylets", "excludes_storylets"] as const)
+    .flatMap((key) => Array.isArray(req[key]) ? req[key] as string[] : []);
+  const unknownKeys = [...new Set(causalKeys.filter((key) => !knownKeys.has(key)))];
 
   return (
     <div className="space-y-4">
+      {storylet.track_id && (
+        <div className="rounded-md border border-indigo-100 bg-indigo-50 p-3 space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-indigo-900">Storylet history on this track</p>
+            <p className="text-xs text-indigo-700">These gates use resolved storylet keys, not visits or choices. Passing a scene does not count as resolving it.</p>
+          </div>
+          {([
+            ["requires_storylets", "All of these must have happened"],
+            ["requires_any_storylets", "At least one of these must have happened"],
+            ["excludes_storylets", "None of these may have happened"],
+          ] as const).map(([key, label]) => (
+            <div key={key}>
+              <p className="text-xs text-slate-700 mb-1">{label}</p>
+              <TagEditor
+                tags={Array.isArray(req[key]) ? req[key] as string[] : []}
+                suggestions={stepKeyOptions.map((option) => option.value).filter((value) => value !== storylet.storylet_key)}
+                placeholder="Add storylet key…"
+                onChange={(next) => onChange(setReq(storylet, key, next.length ? next : undefined))}
+              />
+            </div>
+          ))}
+          {unknownKeys.length > 0 && (
+            <p className="text-xs text-amber-800">Keys not found on this track: {unknownKeys.join(", ")}. Check spelling and track membership.</p>
+          )}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs text-slate-600">
           Min day index
