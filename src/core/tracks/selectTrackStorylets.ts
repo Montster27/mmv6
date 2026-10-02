@@ -237,9 +237,10 @@ export function selectTrackStorylets({
             // Override is due and not expired — apply segment filter
             if (passesSegmentFilter(overrideStorylet, currentSegment, timeTight)) {
               due.push({ progress: prog, storylet: overrideStorylet, track, expires_on_day: expiresOnDay });
+              continue;
             }
-            // Whether it passes segment or not, don't also scan pool for this track
-            continue;
+            // A morning chain pointer must not hide an eligible evening scene
+            // on the same track after the morning opportunity was passed.
           }
 
           // Override expired — fall through to pool scan

@@ -132,6 +132,21 @@ describe("selectTrackStorylets — invariant 1: resolved storylets excluded", ()
 });
 
 describe("fixed scenes and causal prerequisites", () => {
+  it("lets an evening fallback surface when a morning override missed its segment", () => {
+    const storylets = [
+      makeStorylet("arrival", { due_offset_days: 0, expires_after_days: 0, segment: "morning" }),
+      makeStorylet("solo_evening", { due_offset_days: 0, expires_after_days: 0,
+        segment: "evening", requirements: { excludes_storylets: ["arrival"] } }),
+    ];
+    const progress = [makeProgress({ next_key_override: "arrival" })];
+    const morning = selectTrackStorylets({ dayIndex: 0, currentSegment: "morning",
+      progress, storylets, tracks: [makeTrack()] });
+    expect(morning.map((offer) => offer.storylet.storylet_key)).toEqual(["arrival"]);
+    const evening = selectTrackStorylets({ dayIndex: 0, currentSegment: "evening",
+      progress, storylets, tracks: [makeTrack()] });
+    expect(evening.map((offer) => offer.storylet.storylet_key)).toEqual(["solo_evening"]);
+  });
+
   it("does not replay an arrival scene after its day, including through an override", () => {
     const storylets = [
       makeStorylet("arrival", { due_offset_days: 0, expires_after_days: 0 }),
