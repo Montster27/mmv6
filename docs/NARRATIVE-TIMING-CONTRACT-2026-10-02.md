@@ -20,6 +20,9 @@ The opening playtests showed three different chronology failures: an arrival sce
 | `floor_lunch_day2`, `scott_day2_morning` | Named second-day callbacks | Close after their scheduled day and require a prior introduction. |
 | `hallway_morning_day3`, `miguel_afternoon_day3` | Named third-day floor callbacks | Close after their scheduled day and require a floor introduction. Remove false “you heard this twice” variants from the first friction beat. |
 | `glenn_pastime_paradise`, academic and money opportunities | Flexible | Retain their authored windows. Their future follow-ups remain gated by flags or prior choices. |
+| `western_civ_day1`, `reading_or_lounge`, `second_morning_class`, `catch_up_or_coast` | First class and its immediate reading callback | Close on their scheduled days, so a first assignment cannot follow a later class. |
+| `roommate_evening_day3` | Third-day roommate evening | Close on that day, require a Scott introduction, and remove the unsupported claim that he left a note yesterday. |
+| `tuesday_commitment`, `tuesday_night_*`, `the_post` | Sunday decision and Tuesday appointments | Close on their scheduled days. A Tuesday appointment cannot happen on Wednesday or Thursday. |
 
 The new late introductions are short, repeatable in premise but single-use in the run. They tell the truth about elapsed time and preserve an entry into later roommate and floor situations. The quiet first evening preserves a meaningful path for a player who did not connect with the floor on arrival day. The encounter windows remain deliberately short; future content needs new situations rather than stretching “first” scenes for a week.
 
