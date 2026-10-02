@@ -44,6 +44,8 @@ export type RelationshipLogEntry = {
 };
 
 const DEFAULT_RELATIONSHIP = 5;
+const canonicalNpcId = (npcId: string) =>
+  npcId === "npc_roommate_dana" ? "npc_roommate_scott" : npcId;
 
 const ROLE_TAGS: Record<string, string> = {
   npc_roommate_scott: "roommate",
@@ -125,6 +127,23 @@ export function ensureRelationshipDefaults(
   const next = { ...(current ?? {}) } as Record<string, RelationshipState>;
   let changed = false;
   const now = new Date().toISOString();
+
+  const legacyRoommate = next.npc_roommate_dana;
+  if (legacyRoommate) {
+    const scott = next.npc_roommate_scott;
+    next.npc_roommate_scott = scott
+      ? {
+          ...scott,
+          met: scott.met || legacyRoommate.met,
+          knows_name: scott.knows_name || legacyRoommate.knows_name,
+          knows_face: scott.knows_face || legacyRoommate.knows_face,
+          relationship: Math.max(scott.relationship, legacyRoommate.relationship),
+          trust: Math.max(scott.trust, legacyRoommate.trust),
+        }
+      : { ...legacyRoommate, role_tag: "roommate" };
+    delete next.npc_roommate_dana;
+    changed = true;
+  }
 
   const ensure = (npcId: string, defaults: Partial<RelationshipState>) => {
     const existing = next[npcId];
@@ -224,7 +243,7 @@ export function ensureRelationshipDefaults(
 
 export function migrateLegacyNpcMemory(
   current: Record<string, RelationshipState> | null | undefined,
-  npcMemory: Record<string, any> | null | undefined
+  npcMemory: Record<string, unknown> | null | undefined
 ): { next: Record<string, RelationshipState>; changed: boolean } {
   const base = { ...(current ?? {}) } as Record<string, RelationshipState>;
   if (!npcMemory || typeof npcMemory !== "object") {
@@ -233,6 +252,7 @@ export function migrateLegacyNpcMemory(
   let changed = false;
   Object.entries(npcMemory).forEach(([npcId, raw]) => {
     if (!raw || typeof raw !== "object") return;
+    npcId = canonicalNpcId(npcId);
     const record = raw as Record<string, unknown>;
     const trust = typeof record.trust === "number" ? record.trust : 0;
     const relationship = clampRelationship(DEFAULT_RELATIONSHIP + trust);
@@ -261,6 +281,7 @@ export function applyRelationshipEvents(
   const now = new Date().toISOString();
 
   events.forEach((event) => {
+    event = { ...event, npc_id: canonicalNpcId(event.npc_id) };
     const magnitude = event.magnitude ?? 1;
     const prev = next[event.npc_id] ?? buildDefaultState(event.npc_id);
     const before = { ...prev };

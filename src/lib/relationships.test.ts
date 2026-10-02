@@ -51,6 +51,32 @@ describe("relationships", () => {
     expect(next.npc_floor_doug.relationship).toBeGreaterThan(5);
   });
 
+  it("records the legacy roommate ID as Scott", () => {
+    const { next, logs } = applyRelationshipEvents(
+      {},
+      [{ npc_id: "npc_roommate_dana", type: "INTRODUCED_SELF" }],
+      source
+    );
+    expect(next.npc_roommate_scott.met).toBe(true);
+    expect(next.npc_roommate_dana).toBeUndefined();
+    expect(logs[0].npc_id).toBe("npc_roommate_scott");
+  });
+
+  it("merges an existing legacy roommate record into Scott", () => {
+    const legacy = applyRelationshipEvents(
+      {},
+      [{ npc_id: "npc_roommate_scott", type: "INTRODUCED_SELF" }],
+      source
+    ).next.npc_roommate_scott;
+    const { next, changed } = ensureRelationshipDefaults({
+      npc_roommate_scott: { ...legacy, met: false },
+      npc_roommate_dana: legacy,
+    });
+    expect(changed).toBe(true);
+    expect(next.npc_roommate_scott.met).toBe(true);
+    expect(next.npc_roommate_dana).toBeUndefined();
+  });
+
   it("OVERHEARD_NAME sets knows_name without met", () => {
     const { next } = applyRelationshipEvents(
       {},

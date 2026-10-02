@@ -517,6 +517,9 @@ export default function PlayPage() {
     () => dailyState?.day_index ?? dayIndexState,
     [dailyState?.day_index, dayIndexState]
   );
+  const passedOfferStorageKey = dailyState?.id && dayState?.current_segment
+    ? `mmv:passed-offers:${dailyState.id}:${dayIndex}:${dayState.current_segment}`
+    : null;
   const chapterOneMode = useMemo(
     () =>
       featureFlags.chapterOneScarcityEnabled && dayIndex <= CHAPTER_ONE_LAST_DAY,
@@ -595,12 +598,21 @@ export default function PlayPage() {
     setResolvedTrackStoryletIds(new Set());
   }, [dailyRunQuery.data?.trackStorylets]);
 
-  // Passing on an offer is a choice for this segment, not a permanent rejection.
-  // The storylet remains eligible if its authored window allows a later encounter.
+  // A pass lasts for this run segment, including a page reload. A later segment
+  // or a reset gets a different key, so the authored storylet window still rules.
   useEffect(() => {
-    setPassedOfferKeys(new Set());
+    if (!passedOfferStorageKey) {
+      setPassedOfferKeys(new Set());
+      return;
+    }
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(passedOfferStorageKey) ?? "[]");
+      setPassedOfferKeys(new Set(Array.isArray(stored) ? stored.filter((key): key is string => typeof key === "string") : []));
+    } catch {
+      setPassedOfferKeys(new Set());
+    }
     setActiveOfferKey(null);
-  }, [dayIndex, dayState?.current_segment]);
+  }, [passedOfferStorageKey]);
 
   // Separate effect for allocation gating — must not reset resolvedTrackStoryletIds.
   useEffect(() => {
@@ -3939,10 +3951,18 @@ export default function PlayPage() {
                               dayIndex={dayIndex}
                               onChoose={setActiveOfferKey}
                               onLeave={() => {
-                                setPassedOfferKeys((prev) => new Set([
-                                  ...prev,
-                                  ...remainingOffers.map((offer) => offer.storylet_key),
-                                ]));
+                                setPassedOfferKeys((prev) => {
+                                  const next = new Set([
+                                    ...prev,
+                                    ...remainingOffers.map((offer) => offer.storylet_key),
+                                  ]);
+                                  if (passedOfferStorageKey) {
+                                    try {
+                                      sessionStorage.setItem(passedOfferStorageKey, JSON.stringify([...next]));
+                                    } catch { /* Storage may be unavailable; the in-memory pass still applies. */ }
+                                  }
+                                  return next;
+                                });
                                 setActiveOfferKey(null);
                               }}
                             />
