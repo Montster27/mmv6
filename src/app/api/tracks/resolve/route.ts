@@ -12,6 +12,7 @@ import { resourceLabel } from "@/core/resources/resourceMap";
 import type { ResourceKey } from "@/core/resources/resourceKeys";
 import { tickPracticeCredit } from "@/core/skills/practice";
 import { logState } from "@/lib/stateLog";
+import { meetsStoryletSequenceRequirements } from "@/core/tracks/selectTrackStorylets";
 
 async function getUserFromToken(token?: string) {
   if (!token) return null;
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
   // observed in pre-refactor playthroughs).
   const { data: dailyStateRow, error: dailyErr } = await supabaseServer
     .from("daily_states")
-    .select("day_index")
+    .select("day_index,current_segment,hours_remaining")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
 
   const { data: storyletRow, error: storyletErr } = await supabaseServer
     .from("storylets")
-    .select("id,track_id,storylet_key,title,segment,choices,default_next_key,due_offset_days,expires_after_days")
+    .select("id,track_id,storylet_key,title,segment,choices,default_next_key,due_offset_days,expires_after_days,requirements,is_active,is_conflict")
     .eq("track_id", progressRow.track_id)
     .eq("storylet_key", effectiveStoryletKey)
     .single();
@@ -158,6 +159,18 @@ export async function POST(request: Request) {
       resource_deltas: null,
       duplicate: true,
     });
+  }
+
+  const dueDay = Number(progressRow.started_day) + Number(storyletRow.due_offset_days ?? 0);
+  const expiresOnDay = dueDay + Number(storyletRow.expires_after_days ?? 0);
+  if (!storyletRow.is_active || day_index < dueDay || day_index > expiresOnDay ||
+      (storyletRow.segment && storyletRow.segment !== dailyStateRow.current_segment &&
+        !(storyletRow.is_conflict && Number(dailyStateRow.hours_remaining) < 4)) ||
+      !meetsStoryletSequenceRequirements(
+        storyletRow.requirements as Record<string, unknown> | null,
+        new Set(currentResolvedKeys)
+      )) {
+    return NextResponse.json({ error: "Storylet is no longer available" }, { status: 409 });
   }
 
   const choices: Array<Record<string, unknown>> = Array.isArray(storyletRow.choices)

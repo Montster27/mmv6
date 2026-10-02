@@ -80,14 +80,31 @@ const CONFLICT_THRESHOLD = 4;
  * NOTE: requires_choice and requires_flag are track-scoped. requires_skill is
  * global (skills are not track-scoped).
  */
+export function meetsStoryletSequenceRequirements(
+  requirements: Record<string, unknown> | null | undefined,
+  resolvedKeys: Set<string>
+): boolean {
+  if (!requirements) return true;
+  const required = requirements.requires_storylets;
+  if (Array.isArray(required) && required.some((key) => typeof key !== "string" || !resolvedKeys.has(key))) return false;
+  const anyRequired = requirements.requires_any_storylets;
+  if (Array.isArray(anyRequired) && anyRequired.length > 0 &&
+      !anyRequired.some((key) => typeof key === "string" && resolvedKeys.has(key))) return false;
+  const excluded = requirements.excludes_storylets;
+  if (Array.isArray(excluded) && excluded.some((key) => typeof key === "string" && resolvedKeys.has(key))) return false;
+  return true;
+}
+
 function meetsRequirements(
   storylet: TrackStoryletRow,
   resolvedChoices: Set<string>,
   trainedSkillIds: Set<string> = new Set(),
-  flags: Set<string> = new Set()
+  flags: Set<string> = new Set(),
+  resolvedKeys: Set<string> = new Set()
 ): boolean {
   const reqs = storylet.requirements as Record<string, unknown> | null | undefined;
   if (!reqs || typeof reqs !== "object" || Object.keys(reqs).length === 0) return true;
+  if (!meetsStoryletSequenceRequirements(reqs, resolvedKeys)) return false;
 
   if (typeof reqs.requires_choice === "string") {
     if (!resolvedChoices.has(reqs.requires_choice)) return false;
@@ -216,7 +233,7 @@ export function selectTrackStorylets({
           }
 
           else if (dayIndex <= expiresOnDay && overrideStorylet.is_active &&
-            meetsRequirements(overrideStorylet, resolvedChoices, trainedSkillIds, trackFlags)) {
+            meetsRequirements(overrideStorylet, resolvedChoices, trainedSkillIds, trackFlags, resolvedKeys)) {
             // Override is due and not expired — apply segment filter
             if (passesSegmentFilter(overrideStorylet, currentSegment, timeTight)) {
               due.push({ progress: prog, storylet: overrideStorylet, track, expires_on_day: expiresOnDay });
@@ -250,7 +267,7 @@ export function selectTrackStorylets({
       if (dayIndex < dueDay) continue;
       if (dayIndex > expiresOnDay) continue;
 
-      if (!meetsRequirements(storylet, resolvedChoices, trainedSkillIds, trackFlags)) continue;
+      if (!meetsRequirements(storylet, resolvedChoices, trainedSkillIds, trackFlags, resolvedKeys)) continue;
       if (!passesSegmentFilter(storylet, currentSegment, timeTight)) continue;
 
       const candidate: DueStorylet = { progress: prog, storylet, track, expires_on_day: expiresOnDay };

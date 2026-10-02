@@ -131,6 +131,35 @@ describe("selectTrackStorylets — invariant 1: resolved storylets excluded", ()
   });
 });
 
+describe("fixed scenes and causal prerequisites", () => {
+  it("does not replay an arrival scene after its day, including through an override", () => {
+    const storylets = [
+      makeStorylet("arrival", { due_offset_days: 0, expires_after_days: 0 }),
+      makeStorylet("late_intro", { due_offset_days: 1, expires_after_days: 2,
+        requirements: { excludes_storylets: ["arrival"] } }),
+    ];
+    const offers = selectTrackStorylets({ dayIndex: 1, progress: [makeProgress({ next_key_override: "arrival" })],
+      storylets, tracks: [makeTrack()] });
+    expect(offers.map((offer) => offer.storylet.storylet_key)).toEqual(["late_intro"]);
+  });
+
+  it("offers a sequel only after its cause, including through an override", () => {
+    const storylets = [
+      makeStorylet("first_morning", { due_offset_days: 1, expires_after_days: 0,
+        requirements: { requires_storylets: ["arrival"] } }),
+      makeStorylet("late_intro", { due_offset_days: 1, expires_after_days: 2,
+        requirements: { excludes_storylets: ["arrival"] } }),
+    ];
+    const skipped = selectTrackStorylets({ dayIndex: 1,
+      progress: [makeProgress({ next_key_override: "first_morning" })], storylets, tracks: [makeTrack()] });
+    expect(skipped.map((offer) => offer.storylet.storylet_key)).toEqual(["late_intro"]);
+    const met = selectTrackStorylets({ dayIndex: 1,
+      progress: [makeProgress({ next_key_override: "first_morning", resolved_storylet_keys: ["arrival"] })],
+      storylets, tracks: [makeTrack()] });
+    expect(met.map((offer) => offer.storylet.storylet_key)).toEqual(["first_morning"]);
+  });
+});
+
 // ────────────────────────────────────────────────────────────────────────────
 // Invariant 2: Expiry window boundaries
 // Regression guard for the first_morning NULL-expiry bug class.
