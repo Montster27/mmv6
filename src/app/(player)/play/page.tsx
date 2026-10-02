@@ -123,6 +123,7 @@ import { useBootstrap } from "@/hooks/queries/useBootstrap";
 import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { TrackStoryletCard } from "@/components/play/TrackStoryletCard";
+import { StoryletOfferMenu } from "@/components/play/StoryletOfferMenu";
 import { DialogueNodeView } from "@/components/play/DialogueNodeView";
 import { NpcColoredText } from "@/components/play/NpcColoredText";
 import { SleepCard } from "@/components/play/SleepCard";
@@ -333,6 +334,8 @@ export default function PlayPage() {
   const [resolvedTrackStoryletIds, setResolvedTrackStoryletIds] = useState<Set<string>>(
     new Set()
   );
+  const [passedOfferKeys, setPassedOfferKeys] = useState<Set<string>>(new Set());
+  const [activeOfferKey, setActiveOfferKey] = useState<string | null>(null);
   const [pendingDismissalBeats, setPendingDismissalBeats] = useState<
     Array<{ beat: TrackStorylet; chosenOption: StoryletChoice }>
   >([]);
@@ -538,8 +541,10 @@ export default function PlayPage() {
   // cards, auto-advance) so stale query data doesn't hide the segment advance
   // when all beats have been resolved but the refetch hasn't landed yet.
   const visibleTrackCount = useMemo(
-    () => trackStorylets.filter((b) => !resolvedTrackStoryletIds.has(b.storylet_key)).length,
-    [trackStorylets, resolvedTrackStoryletIds]
+    () => trackStorylets.filter(
+      (b) => !resolvedTrackStoryletIds.has(b.storylet_key) && !passedOfferKeys.has(b.storylet_key)
+    ).length,
+    [trackStorylets, resolvedTrackStoryletIds, passedOfferKeys]
   );
   // ── Phase 4: Routine-Week Mode data ──
   const gameMode = dailyRunQuery.data?.gameMode ?? "daily";
@@ -589,6 +594,13 @@ export default function PlayPage() {
   useEffect(() => {
     setResolvedTrackStoryletIds(new Set());
   }, [dailyRunQuery.data?.trackStorylets]);
+
+  // Passing on an offer is a choice for this segment, not a permanent rejection.
+  // The storylet remains eligible if its authored window allows a later encounter.
+  useEffect(() => {
+    setPassedOfferKeys(new Set());
+    setActiveOfferKey(null);
+  }, [dayIndex, dayState?.current_segment]);
 
   // Separate effect for allocation gating — must not reset resolvedTrackStoryletIds.
   useEffect(() => {
@@ -2694,6 +2706,7 @@ export default function PlayPage() {
 
       const newResolved = new Set([...resolvedTrackStoryletIds, beat.storylet_key]);
       setResolvedTrackStoryletIds(newResolved);
+      setActiveOfferKey(null);
       // Keep this beat visible until the user dismisses it via the Continue button.
       // Also clear the mini-game overlay here (if active) so both state changes
       // land in the same React batch — prevents the un-resolved card flashing back.
@@ -3873,7 +3886,7 @@ export default function PlayPage() {
                     chapterOneMode &&
                     gameMode === "daily" &&
                     !activeMiniGame?.pendingTrackStorylet &&
-                    (trackStorylets.length > 0 || pendingDismissalBeats.length > 0) && (
+                    (visibleTrackCount > 0 || pendingDismissalBeats.length > 0) && (
                     <section className="space-y-3">
                       <h2 className="prep-label">
                         Today&apos;s Moments
@@ -3887,7 +3900,7 @@ export default function PlayPage() {
                         // surface "Continue to <next> →" on the remaining card — if that
                         // re-render didn't land cleanly the player was stuck.
                         const allResolved = trackStorylets.every(
-                          (b) => resolvedTrackStoryletIds.has(b.storylet_key)
+                          (b) => resolvedTrackStoryletIds.has(b.storylet_key) || passedOfferKeys.has(b.storylet_key)
                         );
                         const currentSeg = (dayState?.current_segment ?? "morning") as Segment;
                         const canAdvance =
@@ -3913,22 +3926,38 @@ export default function PlayPage() {
                         //     only the first unresolved beat (avoids contradictory
                         //     directions on screen, e.g. "head to your room" vs
                         //     "head across the quad").
-                        //   - Once every beat is resolved, render one card per
-                        //     pending dismissal — the collapsed bottom-CTA below
-                        //     advances the segment atomically.
-                        const firstUnresolvedIdx = trackStorylets.findIndex(
-                          (b) => !resolvedTrackStoryletIds.has(b.storylet_key),
+                        //   - Show available moments as choices before entering one.
+                        //   - Once a beat resolves, show its outcome before another offer.
+                        const remainingOffers = trackStorylets.filter(
+                          (b) => !resolvedTrackStoryletIds.has(b.storylet_key) && !passedOfferKeys.has(b.storylet_key),
                         );
+                        const activeOffer = remainingOffers.find((b) => b.storylet_key === activeOfferKey);
+                        if (pendingDismissalBeats.length === 0 && remainingOffers.length > 0 && !activeOffer) {
+                          return (
+                            <StoryletOfferMenu
+                              offers={remainingOffers}
+                              dayIndex={dayIndex}
+                              onChoose={setActiveOfferKey}
+                              onLeave={() => {
+                                setPassedOfferKeys((prev) => new Set([
+                                  ...prev,
+                                  ...remainingOffers.map((offer) => offer.storylet_key),
+                                ]));
+                                setActiveOfferKey(null);
+                              }}
+                            />
+                          );
+                        }
                         const unifiedCards: Array<
                           | { kind: "unresolved"; beat: (typeof trackStorylets)[number] }
                           | { kind: "pending"; beat: (typeof trackStorylets)[number]; chosenOption: StoryletChoice }
                         > = [];
-                        if (firstUnresolvedIdx >= 0) {
-                          unifiedCards.push({ kind: "unresolved", beat: trackStorylets[firstUnresolvedIdx] });
-                        } else {
+                        if (pendingDismissalBeats.length > 0) {
                           for (const p of pendingDismissalBeats) {
                             unifiedCards.push({ kind: "pending", beat: p.beat, chosenOption: p.chosenOption });
                           }
+                        } else if (activeOffer ?? remainingOffers[0]) {
+                          unifiedCards.push({ kind: "unresolved", beat: (activeOffer ?? remainingOffers[0])! });
                         }
 
                         return (
@@ -3936,7 +3965,7 @@ export default function PlayPage() {
                             {unifiedCards.map((card) =>
                               card.kind === "pending" ? (
                                 <TrackStoryletCard
-                                  key={card.beat.progress_id}
+                                  key={`${card.beat.progress_id}:${card.beat.storylet_key}`}
                                   storylet={card.beat}
                                   dayIndex={dayIndex}
                                   onChoice={handleTrackStoryletChoice}
@@ -3953,7 +3982,7 @@ export default function PlayPage() {
                                 />
                               ) : (
                                 <TrackStoryletCard
-                                  key={card.beat.progress_id}
+                                  key={`${card.beat.progress_id}:${card.beat.storylet_key}`}
                                   storylet={card.beat}
                                   dayIndex={dayIndex}
                                   onChoice={handleTrackStoryletChoice}

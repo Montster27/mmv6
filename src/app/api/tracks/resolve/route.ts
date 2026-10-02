@@ -139,6 +139,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Storylet not found" }, { status: 404 });
   }
 
+  // A repeated request must be rejected before any resource, relationship, or
+  // track-state writes. The previous guard ran after resource deltas were applied.
+  const currentResolvedKeys: string[] = Array.isArray(progressRow.resolved_storylet_keys)
+    ? (progressRow.resolved_storylet_keys as string[])
+    : [];
+  if (currentResolvedKeys.includes(effectiveStoryletKey)) {
+    logState({
+      surface: "track-resolve",
+      action: "resolveTerminalChoice.duplicate",
+      userId: user.id,
+      details: { progressId, effectiveStoryletKey, optionKey: option_key },
+    });
+    return NextResponse.json({
+      ok: true,
+      next_key: null,
+      activated_track: null,
+      resource_deltas: null,
+      duplicate: true,
+    });
+  }
+
   const choices: Array<Record<string, unknown>> = Array.isArray(storyletRow.choices)
     ? storyletRow.choices
     : [];
@@ -251,9 +272,6 @@ export async function POST(request: Request) {
   // Record the just-resolved storylet in the resolved set.
   // Use effectiveStoryletKey (= next_key_override ?? current_storylet_key) so the
   // correct key is recorded regardless of whether this was served via override or pool.
-  const currentResolvedKeys: string[] = Array.isArray(progressRow.resolved_storylet_keys)
-    ? (progressRow.resolved_storylet_keys as string[])
-    : [];
   const newResolvedKeys = [...currentResolvedKeys, effectiveStoryletKey];
 
   const nextKey: string | null =
@@ -262,28 +280,6 @@ export async function POST(request: Request) {
       : (typeof storyletRow.default_next_key === "string"
           ? storyletRow.default_next_key
           : null);
-
-  // --- Deduplication guard: if effectiveStoryletKey is already resolved, bail ---
-  // This prevents double-resolution when the client fires the resolve call twice
-  // (e.g. mini-game completion race, stale card re-render).
-  if (currentResolvedKeys.includes(effectiveStoryletKey)) {
-    console.warn(
-      `[track-resolve] Storylet "${effectiveStoryletKey}" already in resolved_storylet_keys — skipping duplicate resolve.`
-    );
-    logState({
-      surface: "track-resolve",
-      action: "resolveTerminalChoice.duplicate",
-      userId: user.id,
-      details: { progressId, effectiveStoryletKey, optionKey: option_key, resolvedKeysLength: currentResolvedKeys.length },
-    });
-    return NextResponse.json({
-      ok: true,
-      next_key: null,
-      activated_track: null,
-      resource_deltas: null,
-      duplicate: true,
-    });
-  }
 
   // Verify next_key target exists on the SAME track before using it as a chain pointer.
   // Cross-track references (e.g. default_next_key pointing to another track's storylet)
@@ -343,22 +339,26 @@ export async function POST(request: Request) {
     // No valid chain pointer — check whether any unresolved content exists in the future.
     const { data: remainingStorylets } = await supabaseServer
       .from("storylets")
-      .select("storylet_key,due_offset_days")
+      .select("storylet_key,due_offset_days,expires_after_days")
       .eq("track_id", progressRow.track_id)
       .eq("is_active", true);
 
     const currentDayOffset = day_index - progressRow.started_day;
-    // PHASE-2-NOTE [T-1777320000004 Candidate D]: strict `>` misses same-day unresolved
-    // storylets (due_offset_days === currentDayOffset). Causes premature track close on the
-    // day of the storylet itself; does not directly cause repeats but can cause content gaps.
-    // Fix: change `>` to `>=`. Diagnose with the SQL in docs/DIAGNOSIS-T-1777320000004.md §3.D.
+    // A second pool storylet may be due today or still within its window.
+    // Neither should disappear because another storylet on the track resolved.
     const hasFutureContent = (remainingStorylets ?? []).some(
       (s) =>
         !newResolvedKeys.includes(s.storylet_key) &&
-        (s.due_offset_days ?? 0) > currentDayOffset
+        (s.due_offset_days ?? 0) + (s.expires_after_days ?? 0) >= currentDayOffset
     );
 
     if (hasFutureContent) {
+      const pendingOverride = progressRow.next_key_override as string | null;
+      const preservedOverride = pendingOverride &&
+        pendingOverride !== effectiveStoryletKey &&
+        !newResolvedKeys.includes(pendingOverride)
+        ? pendingOverride
+        : null;
       logState({
         surface: "track-resolve",
         action: "trackProgress.stayActive",
@@ -372,12 +372,13 @@ export async function POST(request: Request) {
           newResolvedLength: newResolvedKeys.length,
         },
       });
-      // Stay ACTIVE — pool scan will surface future content when it becomes due.
+      // Stay ACTIVE. A pool encounter must not erase a different, pending
+      // local chain target while it waits for its authored day.
       const { error: updateErr } = await supabaseServer
         .from("track_progress")
         .update({
           resolved_storylet_keys: newResolvedKeys,
-          next_key_override: null,
+          next_key_override: preservedOverride,
           updated_day: day_index,
         })
         .eq("id", progressId);

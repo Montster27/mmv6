@@ -302,7 +302,7 @@ describe("selectTrackStorylets — invariant 3: override beats pool", () => {
     expect(result.map((r) => r.storylet.storylet_key)).toEqual(["s_override"]);
   });
 
-  it("skips the track entirely when override is set but not yet due", () => {
+  it("allows another due situation while the override is still in the future", () => {
     const track = makeTrack();
     const progress = makeProgress({ next_key_override: "s_future" });
     const storylets = [
@@ -317,9 +317,8 @@ describe("selectTrackStorylets — invariant 3: override beats pool", () => {
       tracks: [track],
     });
 
-    // Override gate is "in flight" — the engine waits for it rather than
-    // falling through to the pool. Prevents out-of-order chain serving.
-    expect(result).toEqual([]);
+    // The future chain target remains pending, while another situation can appear.
+    expect(result.map((r) => r.storylet.storylet_key)).toEqual(["s_available"]);
   });
 
   it("falls through to pool when override storylet is expired", () => {

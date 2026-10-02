@@ -211,11 +211,12 @@ export function selectTrackStorylets({
           const expiresOnDay = dueDay + overrideStorylet.expires_after_days;
 
           if (dayIndex < dueDay) {
-            // Override is set but not yet due — wait; don't fall through to pool
-            continue;
+            // Keep the local chain pending, but allow unrelated eligible
+            // situations on this stream to surface in the meantime.
           }
 
-          if (dayIndex <= expiresOnDay) {
+          else if (dayIndex <= expiresOnDay && overrideStorylet.is_active &&
+            meetsRequirements(overrideStorylet, resolvedChoices, trainedSkillIds, trackFlags)) {
             // Override is due and not expired — apply segment filter
             if (passesSegmentFilter(overrideStorylet, currentSegment, timeTight)) {
               due.push({ progress: prog, storylet: overrideStorylet, track, expires_on_day: expiresOnDay });

@@ -1,4 +1,4 @@
-import type { ChapterOneState, LifePressureState, MoneyBand, SkillFlags, RelationshipState } from "@/core/chapter/types";
+import type { ChapterOneState, LifePressureState, MoneyBand, RelationshipState } from "@/core/chapter/types";
 
 const SKEW_THRESHOLD = 2;
 
@@ -11,23 +11,22 @@ function compareAxis(a: number, b: number, aLine: string, bLine: string): string
 function moneyLine(bandHistory: MoneyBand[]): string | null {
   if (bandHistory.length < 2) return null;
   const tightened = bandHistory.includes("tight");
-  if (tightened) return "You accepted financial strain for opportunity.";
+  if (tightened) return "Money was tight at some point this week.";
   return null;
 }
 
 function energyLine(energyLevel: ChapterOneState["energyLevel"]): string | null {
   if (energyLevel === "low") {
-    return "You repeatedly ran yourself thin.";
+    return "You ended the week low on energy.";
   }
   return null;
 }
 
-function expiredLine(expiredCount: number, peopleDominant: boolean): string | null {
+function expiredLine(expiredCount: number): string | null {
   if (expiredCount === 0) return null;
-  if (peopleDominant) {
-    return "Something academic slipped while you invested in connection.";
-  }
-  return "Some opportunities slipped while you focused elsewhere.";
+  return expiredCount === 1
+    ? "One opportunity passed this week."
+    : `${expiredCount} opportunities passed this week.`;
 }
 
 function relationalLine(relationships: Record<string, RelationshipState>): string | null {
@@ -36,10 +35,10 @@ function relationalLine(relationships: Record<string, RelationshipState>): strin
   const trustAvg = entries.reduce((sum, entry) => sum + (entry.trust ?? 0), 0) / entries.length;
   const reliabilityAvg = entries.reduce((sum, entry) => sum + (entry.reliability ?? 0), 0) / entries.length;
   if (reliabilityAvg < -0.5) {
-    return "Others may have experienced you as inconsistent.";
+    return "Some relationships ended the week with low reliability.";
   }
   if (trustAvg > 0.5) {
-    return "You built trust through direct engagement.";
+    return "Some of your relationships ended the week with trust.";
   }
   return null;
 }
@@ -79,7 +78,7 @@ export function buildReflectionSummary(params: {
   );
 
   lines.push(energyLine(chapterOneState.energyLevel));
-  lines.push(expiredLine(chapterOneState.expiredOpportunities.length, lp.people >= lp.achievement));
+  lines.push(expiredLine(chapterOneState.expiredOpportunities.length));
   lines.push(moneyLine(params.moneyBandHistory ?? []));
   lines.push(relationalLine(chapterOneState.relationships ?? {}));
 
