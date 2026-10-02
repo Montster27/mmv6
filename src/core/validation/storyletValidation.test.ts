@@ -24,6 +24,16 @@ describe("storyletValidation", () => {
     expect(res.ok).toBe(true);
   });
 
+  it("validates causal storylet requirements", () => {
+    expect(validateStorylet({ ...valid, requirements: {
+      requires_storylets: ["room_214"],
+      requires_any_storylets: ["room_214", "late_roommate_intro"],
+      excludes_storylets: ["dorm_hallmates"],
+    } }).ok).toBe(true);
+    expect(validateStorylet({ ...valid, requirements: { requires_storylets: [] } }).ok).toBe(false);
+    expect(validateStorylet({ ...valid, requirements: { requires_any_storylets: [7] } }).ok).toBe(false);
+  });
+
   it("rejects invalid choices", () => {
     const invalidChoices = { ...valid, choices: "not-array" };
     const res = validateStorylet(invalidChoices);

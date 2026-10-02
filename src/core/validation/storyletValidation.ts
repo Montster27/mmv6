@@ -193,6 +193,12 @@ const KNOWN_REQUIREMENT_KEYS = new Set([
   "requires_npc_met",
   "requires_npc_not_met",
   "requires_not_precluded",
+  "requires_choice",
+  "requires_flag",
+  "requires_skill",
+  "requires_storylets",
+  "requires_any_storylets",
+  "excludes_storylets",
   // Resource gates
   "requires_cash_min",
   "requires_knowledge_min",
@@ -748,6 +754,15 @@ export function validateStoryletIssues(
             }
           });
         }
+      }
+    }
+
+    for (const field of ["requires_storylets", "requires_any_storylets", "excludes_storylets"] as const) {
+      if (req[field] !== undefined &&
+          (!Array.isArray(req[field]) ||
+            (req[field] as unknown[]).length === 0 ||
+            (req[field] as unknown[]).some((key) => typeof key !== "string" || key.length === 0))) {
+        addIssue(errors, storylet, `requirements.${field}`, `${field} must be a nonempty array of storylet keys`);
       }
     }
 
