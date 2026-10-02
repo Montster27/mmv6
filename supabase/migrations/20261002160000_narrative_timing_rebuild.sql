@@ -61,7 +61,7 @@ INSERT INTO public.storylets (
 ), (
   'first_evening_alone', 'A Night of Your Own',
   'The first evening settles over campus. Voices rise from the hall and fade again. No one has made a claim on your time. The room, the paths outside, and the hours ahead are yours to choose.',
-  '[{"id":"walk_campus","label":"Walk the lit paths","time_cost":1,"energy_cost":0,"identity_tags":["curiosity"],"outcome":{"text":"The library windows stay bright after the rest of the quad goes dark. You learn the shape of the paths without needing to explain yourself to anyone.","deltas":{"stress":-1}}},{"id":"settle_in","label":"Stay in and make the room yours","time_cost":0,"energy_cost":0,"identity_tags":["safety"],"outcome":{"text":"You find places for the things still in your bag. Outside, other people's plans continue. Yours can wait until morning.","deltas":{"energy":1}}}]'::jsonb,
+  '[{"id":"walk_campus","label":"Walk the lit paths","time_cost":1,"energy_cost":0,"identity_tags":["curiosity"],"outcome":{"text":"The library windows stay bright after the rest of the quad goes dark. You learn the shape of the paths without needing to explain yourself to anyone.","deltas":{"stress":-1}}},{"id":"settle_in","label":"Stay in and make the room yours","time_cost":0,"energy_cost":0,"identity_tags":["safety"],"outcome":{"text":"You find places for the things still in your bag. Outside, other people’s plans continue. Yours can wait until morning.","deltas":{"energy":1}}}]'::jsonb,
   ARRAY['belonging','arrival','quiet'], '{"excludes_storylets":["lunch_floor"]}'::jsonb,
   80, true, ARRAY[]::text[],
   (SELECT id FROM public.tracks WHERE key = 'belonging'),
