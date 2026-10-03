@@ -1,4 +1,5 @@
 import "server-only";
+import { assertImpactAcknowledged, planningImpact } from "@/core/studio/planning";
 import { NextResponse } from "next/server";
 import { supabaseServer as db } from "@/lib/supabase/server";
 import { isUserAdmin } from "@/lib/adminAuthServer";
@@ -50,6 +51,10 @@ export function assertManifest(manifest: StudioManifest) {
     [...errors.slice(0, 8).map((issue) => `${issue.objectId}: ${issue.message}`), ...tests.filter((test) => !test.passed).map((test) => `${test.title}: ${test.failures.join(" ")}`)].join("\n"));
 }
 export async function handleStudioCommand(actor: StudioActor, action: string, payload: Record<string, unknown>) {
+  if ((action === "create" || action === "meta") && payload.plan_id) {
+    const manifest = action === "create" ? (await activeContext()).manifest : (await workspaceContext(String(payload.workspace_id))).manifest;
+    if (!manifest.plans.some((plan) => recordId(plan) === payload.plan_id)) throw new StudioError("The selected plan is not in this baseline. Publish the plan first, or choose a current plan.", 409);
+  }
   if (action === "member" && payload.email) {
     if (!actor.admin) throw new StudioError("Administrator required", 403);
     const lookup = await db.from("profiles").select("id,email").eq("email", String(payload.email).trim().toLowerCase()).maybeSingle();
@@ -62,6 +67,10 @@ export async function handleStudioCommand(actor: StudioActor, action: string, pa
     if (context.workspace.revision !== Number(payload.revision)) throw new StudioError("Workspace changed. Reload and compare before continuing.", 409);
     if (action === "rebase") {
       const current = await activeContext();
+      const impacts = planningImpact(context.base, current.manifest, context.changes, context.workspace.plan_id);
+      try { assertImpactAcknowledged(impacts, current.release.id, payload.release_id, payload.acknowledged_impacts); }
+      catch (error) { throw new StudioError(error instanceof Error ? error.message : "Review changed agreements before rebasing.", 409); }
+      payload.impact_review = impacts.map(({ id, fields, path }) => ({ id, fields, path }));
       const conflicts = rebaseConflicts(context.base, current.manifest, context.changes);
       const resolutions = payload.resolutions as Record<string, string> | undefined;
       if (conflicts.length && (payload.release_id !== current.release.id || !resolutions || conflicts.some((id) => !["draft", "released"].includes(resolutions[id])))) {
@@ -73,6 +82,7 @@ export async function handleStudioCommand(actor: StudioActor, action: string, pa
       });
       payload.release_id = current.release.id;
     } else {
+      if (context.workspace.plan_id && !context.manifest.plans.some((plan) => recordId(plan) === context.workspace.plan_id)) throw new StudioError("The assignment plan was removed. Choose a current plan before review.");
       assertManifest(context.manifest);
       payload.validation = { runtime_version: "narrative-offers-v1", tested_revision: context.workspace.revision, issues: validateManifest(context.manifest), tests: runStudioScenarios(context.manifest) };
       if (action === "publish" && context.changes.some((change) => ["storylets", "tracks", "consequences"].includes(change.kind)) && context.manifest.scenarios.length === 0) throw new StudioError("Add and pass at least one saved offer scenario before publication.");

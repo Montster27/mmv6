@@ -1,3 +1,5 @@
+import type { StudioRecord } from "../../src/types/studio";
+import type { PlanningImpact } from "../../src/core/studio/planning";
 import { test, expect, type Page } from "@playwright/test";
 
 // Browser interaction tests against a local build, with explicitly synthetic API state.
@@ -7,7 +9,7 @@ const owner = "10000000-0000-0000-0000-000000000001";
 const workspace = { id: "workspace", title: "Roommate strand", owner_id: owner, reviewer_id: "reviewer", collaborator_ids: [], base_release_id: "baseline", revision: 1, status: "draft", brief: "Leave room for late entry.", blocked_reason: "", plan_id: null };
 const empty = { storylets: [], tracks: [], consequences: [], plans: [], definitions: [], scenarios: [] };
 async function fixture(page: Page) {
-  const state = { actor: { id: owner, email: "writer@example.test", admin: false, role: "writer" }, workspace: { ...workspace }, workspaces: [{ ...workspace }], members: [{ user_id: owner, display_name: "Writer", role: "writer" }], releases: [{ id: "baseline", title: "Baseline", runtime_version: "narrative-offers-v1", created_at: "2026-10-03T12:00:00Z" }], activeReleaseId: "baseline", manifest: structuredClone(empty), base: structuredClone(empty), changes: [] as unknown[], events: [], conflicts: [] as unknown[], issues: [], tests: [] };
+  const state = { actor: { id: owner, email: "writer@example.test", admin: false, role: "writer" }, workspace: { ...workspace }, workspaces: [{ ...workspace }], members: [{ user_id: owner, display_name: "Writer", role: "writer" }], releases: [{ id: "baseline", title: "Baseline", runtime_version: "narrative-offers-v1", created_at: "2026-10-03T12:00:00Z" }], activeReleaseId: "baseline", activePlans: [] as StudioRecord[], inheritedBriefs: [] as StudioRecord[], impacts: [] as PlanningImpact[], manifest: structuredClone(empty), base: structuredClone(empty), changes: [] as unknown[], events: [], conflicts: [] as unknown[], issues: [], tests: [] };
   await page.addInitScript(({ owner }) => {
     sessionStorage.setItem("studio.workspace", "workspace");
     localStorage.setItem("sb-studio-test-auth-token", JSON.stringify({ access_token: "synthetic-ui-test", refresh_token: "synthetic", expires_at: Math.floor(Date.now()/1000)+3600, token_type: "bearer", user: { id: owner, email: "writer@example.test", aud: "authenticated" } }));
@@ -65,4 +67,32 @@ test("overlapping versions require an explicit choice before integration", async
   await page.getByLabel("Keep current release").check();
   await page.getByRole("button", { name: "Rebase reviewed changes" }).click();
   await expect.poll(() => setup.commands[0]).toMatchObject({ action: "rebase", release_id: "new-release", resolutions: { "plans:plot": "released" } });
+});
+
+test("a changed deadline is compared and acknowledged before rebasing", async ({ page }) => {
+  const setup = await fixture(page);
+  setup.state.activeReleaseId = "friday-release";
+  setup.state.impacts = [{ id: "definitions:meeting", title: "Study meeting", fields: ["timing"], path: ["invitation", "meeting"], before: { id: "meeting", timing: "Thursday" }, after: { id: "meeting", timing: "Friday" } }];
+  await page.goto("/studio/content/review");
+  await expect(page.getByRole("heading", { name: "Changed agreements affecting this assignment" })).toBeVisible();
+  await expect(page.getByText("Thursday", { exact: true })).toBeVisible();
+  await expect(page.getByText("Friday", { exact: true })).toBeVisible();
+  const rebase = page.getByRole("button", { name: "Rebase reviewed changes" });
+  await expect(rebase).toBeDisabled();
+  await page.getByLabel("I reviewed the impact of Study meeting").check();
+  await rebase.click();
+  await expect.poll(() => setup.commands[0]).toMatchObject({ action: "rebase", release_id: "friday-release", acknowledged_impacts: ["definitions:meeting"] });
+});
+test("a lead can hand off an approved plan with attributed constraints", async ({ page }) => {
+  const setup = await fixture(page);
+  setup.state.activePlans = [{ id: "plot", kind: "plot", title: "Belonging", constraints: "The player may decline", suggestions: "Try a quiet invitation" }];
+  setup.state.inheritedBriefs = setup.state.activePlans;
+  await page.goto("/studio/content/work?plan=plot");
+  await expect(page.getByLabel("Approved plan for this assignment")).toHaveValue("plot");
+  const brief = page.locator("section").filter({ has: page.getByRole("heading", { name: "Assignment brief", exact: true }) });
+  await expect(brief.getByText("The player may decline", { exact: true })).toBeVisible();
+  await expect(brief.getByText("Creative suggestions", { exact: true })).toBeVisible();
+  await page.getByLabel("Workspace title", { exact: true }).fill("Write the invitation");
+  await page.getByRole("button", { name: "Create draft workspace" }).click();
+  await expect.poll(() => setup.commands[0]).toMatchObject({ action: "create", plan_id: "plot", title: "Write the invitation" });
 });

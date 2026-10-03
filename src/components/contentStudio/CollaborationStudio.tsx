@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { BriefContext } from "./BriefContext";
+import type { PlanningImpact } from "@/core/studio/planning";
 import { apiRequest } from "@/lib/contentStudio/apiClient";
 import { recordId } from "@/core/studio/manifest";
 import type { StudioActor, StudioChange, StudioIssue, StudioKind, StudioManifest, StudioRecord, StudioRelease, StudioScenario, StudioTestResult, StudioWorkspace } from "@/types/studio";
@@ -11,6 +13,7 @@ type Member = { user_id: string; display_name: string; role: string };
 type StudioEvent = { id: number; actor_id: string; action: string; revision: number; created_at: string; detail: Record<string, unknown> };
 type Data = {
   actor: StudioActor; workspaces: StudioWorkspace[]; members: Member[]; releases: StudioRelease[];
+  activePlans?: StudioRecord[]; inheritedBriefs?: StudioRecord[]; impacts?: PlanningImpact[];
   conflicts: { id: string; draft: StudioRecord | null; released: StudioRecord | null }[];
   activeReleaseId: string; manifest: StudioManifest; workspace: StudioWorkspace | null;
   base: StudioManifest | null; changes: StudioChange[]; events: StudioEvent[]; issues: StudioIssue[]; tests: StudioTestResult[];
@@ -33,6 +36,8 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
   const [newTitle, setNewTitle] = useState("");
   const [newBrief, setNewBrief] = useState("");
   const [newOwner, setNewOwner] = useState("");
+  const [newPlan, setNewPlan] = useState("");
+  const [acknowledgedImpacts, setAcknowledgedImpacts] = useState<string[]>([]);
   const [newReviewer, setNewReviewer] = useState("");
   const [comment, setComment] = useState("");
   const [commentTarget, setCommentTarget] = useState("");
@@ -48,10 +53,11 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
   const load = useCallback(async (id: string) => {
     const result = await apiRequest<Data>(`/api/admin/studio${id ? `?workspace=${encodeURIComponent(id)}` : ""}`);
     if (!result.ok || !result.data) { setError(result.error ?? "Unable to load Studio"); return; }
-    setData(result.data); setResolutions({});
+    setData(result.data); setResolutions({}); setAcknowledgedImpacts([]);
   }, []);
   useEffect(() => {
     const id = sessionStorage.getItem("studio.workspace") ?? "";
+    setNewPlan(new URLSearchParams(window.location.search).get("plan") ?? "");
     setWorkspaceId(id);
     void load(id);
   }, [load]);
@@ -74,6 +80,7 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
     if (!result.ok) { setError(result.error ?? "Request failed. Your edits are still here."); return false; }
     if (action === "create" && result.data?.id) await selectWorkspace(result.data.id);
     else await load(workspaceId);
+    window.dispatchEvent(new Event("studio-workspace-change"));
     setNotice(action === "save" ? "Saved to this draft. Player content is unchanged." : "Saved.");
     return true;
   }
@@ -108,10 +115,24 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
     {notice && <p role="status" className="text-sm text-green-800">{notice}</p>}
     {workspace && <div className="rounded border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
       <strong>{workspace.title}</strong> · revision {workspace.revision} · {workspace.status} · owner {name(workspace.owner_id)} · reviewer {name(workspace.reviewer_id)}
-      {stale && <p className="mt-2 text-amber-900">A newer release is active. Compare and rebase this workspace before publication; approval will need to be renewed. <button disabled={busy} className={buttonClass} onClick={() => void act("rebase", { release_id: data.activeReleaseId, resolutions })}>Rebase reviewed changes</button></p>}
+      {stale && <p className="mt-2 text-amber-900">A newer release is active. Compare and rebase this workspace before publication; approval will need to be renewed. <button disabled={busy || (data.impacts ?? []).some((impact) => !acknowledgedImpacts.includes(impact.id))} className={buttonClass} onClick={() => void act("rebase", { release_id: data.activeReleaseId, resolutions, acknowledged_impacts: acknowledgedImpacts })}>Rebase reviewed changes</button></p>}
     </div>}
 
     {workspace && (editing || scenario) && editRevision !== workspace.revision && <section className={panelClass}><h2 className="font-semibold">This form started at revision {editRevision}</h2><p className="text-sm">Your text is preserved. Compare the latest saved object below, incorporate any changes into your form, then acknowledge the current revision before saving.</p><details><summary className="text-sm">Latest saved object</summary><pre className="max-h-72 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify((editing ? manifest[kind] : manifest.scenarios).find((row) => recordId(row) === recordId(editing ?? scenario!)) ?? null,null,2)}</pre></details><button className={buttonClass} onClick={() => setEditRevision(workspace.revision)}>I compared the latest version; keep my edited form</button></section>}
+
+    {stale && Boolean(data.impacts?.length) && <section className={panelClass}>
+      <h2 className="font-semibold">Changed agreements affecting this assignment</h2>
+      <p className="text-sm text-slate-600">These changes reach your work through its parent briefs or declared dependencies. Review each one before adopting the new baseline. Your draft remains unchanged until you rebase.</p>
+      {data.impacts?.map((impact) => <div key={impact.id} className="space-y-3 rounded border p-3">
+        <h3 className="text-sm font-semibold">{impact.title}{!impact.after ? " · removed" : ""}</h3>
+        <p className="text-xs text-slate-500">Connection: {impact.path.map(titleOf).join(" → ")}</p>
+        <dl className="space-y-2">{impact.fields.filter((field) => !["id", "key"].includes(field)).map((field) => <div key={field}>
+          <dt className="text-xs font-semibold">{field.replaceAll("_", " ")}</dt>
+          <dd className="grid gap-2 text-sm md:grid-cols-2"><div className="whitespace-pre-wrap rounded bg-slate-50 p-2"><span className="block text-xs text-slate-500">Your baseline</span><p>{typeof impact.before?.[field] === "string" ? String(impact.before[field]) : JSON.stringify(impact.before?.[field] ?? null)}</p></div><div className="whitespace-pre-wrap rounded bg-indigo-50 p-2"><span className="block text-xs text-slate-500">Current release</span><p>{typeof impact.after?.[field] === "string" ? String(impact.after[field]) : JSON.stringify(impact.after?.[field] ?? null)}</p></div></dd>
+        </div>)}</dl>
+        <label className="flex gap-2 text-sm"><input type="checkbox" checked={acknowledgedImpacts.includes(impact.id)} onChange={(event) => setAcknowledgedImpacts(event.target.checked ? [...acknowledgedImpacts, impact.id] : acknowledgedImpacts.filter((id) => id !== impact.id))}/>I reviewed the impact of {impact.title}</label>
+      </div>)}
+    </section>}
 
     {stale && data.conflicts.length > 0 && <section className={panelClass}><h2 className="font-semibold">Resolve overlapping edits</h2><p className="text-sm text-slate-600">Compare both versions. Keeping a draft replaces the released object in your workspace; keeping the release drops your change. Rebase applies these decisions and requires a new review.</p>{data.conflicts.map((conflict) => <div className="space-y-2 rounded border p-3" key={conflict.id}><strong className="text-sm">{conflict.draft?.title ?? conflict.released?.title ?? conflict.id}</strong><div className="grid gap-3 lg:grid-cols-2">{([['draft','Your draft',conflict.draft],['released','Current release',conflict.released]] as const).map(([choice,label,value]) => <div key={choice}><label className="flex gap-2 text-sm"><input type="radio" name={conflict.id} checked={resolutions[conflict.id] === choice} onChange={() => setResolutions({ ...resolutions, [conflict.id]: choice })}/>Keep {label.toLowerCase()}</label><details><summary className="text-xs">Compare {label.toLowerCase()}</summary><pre className="max-h-72 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(value,null,2)}</pre></details></div>)}</div></div>)}</section>}
 
@@ -121,10 +142,11 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
         {myWork.map((item) => <button key={item.id} className="block w-full rounded border p-3 text-left hover:border-indigo-400" onClick={() => void selectWorkspace(item.id)}><strong>{item.title}</strong><span className="ml-2 text-xs text-slate-500">{item.status} · {item.owner_id === actor.id ? "Writing" : item.reviewer_id === actor.id ? "Reviewing" : "Contributing"}</span><p className="text-sm text-slate-600">{item.blocked_reason || item.brief || "Add a brief to define the work."}</p></button>)}
       </section>
       <section className={panelClass}><h2 className="font-semibold">Create an assignment</h2><Field label="Workspace title" value={newTitle} onChange={setNewTitle}/><Field label="Brief: experience, constraints, open questions, and acceptance paths" value={newBrief} onChange={setNewBrief} multiline/>
+        <label className="block text-xs">Approved plan for this assignment<select className={inputClass} value={newPlan} onChange={(event) => setNewPlan(event.target.value)}><option value="">No parent plan</option>{(data.activePlans ?? []).map((plan) => <option key={recordId(plan)} value={recordId(plan)}>{plan.title}</option>)}</select></label>
         <div className="grid gap-3 md:grid-cols-2"><label className="text-xs">Owner<select className={inputClass} value={newOwner || actor.id} onChange={(event) => setNewOwner(event.target.value)}>{memberOptions}</select></label><label className="text-xs">Reviewer<select className={inputClass} value={newReviewer} onChange={(event) => setNewReviewer(event.target.value)}><option value="">Assign later</option>{memberOptions}</select></label></div>
-        <button className={primaryClass} disabled={busy || !newTitle.trim()} onClick={async () => { if (await act("create", { title: newTitle, brief: newBrief, owner_id: newOwner || actor.id, reviewer_id: newReviewer })) { setNewTitle(""); setNewBrief(""); } }}>Create draft workspace</button>
+        <button className={primaryClass} disabled={busy || !newTitle.trim()} onClick={async () => { if (await act("create", { title: newTitle, brief: newBrief, owner_id: newOwner || actor.id, reviewer_id: newReviewer, plan_id: newPlan })) { setNewTitle(""); setNewBrief(""); setNewPlan(""); } }}>Create draft workspace</button>
       </section>
-      {workspace && <section className={panelClass}><h2 className="font-semibold">Assignment brief</h2><p className="whitespace-pre-wrap text-sm">{workspace.brief || "No brief yet."}</p>
+      {workspace && <section className={panelClass}><h2 className="font-semibold">Assignment brief</h2><BriefContext plans={data.inheritedBriefs ?? []}/><p className="whitespace-pre-wrap text-sm">{workspace.brief || "No brief yet."}</p>
         <div className="flex flex-wrap gap-2"><Link className={primaryClass} href="/studio/content/storylets">Write storylets</Link><Link className={buttonClass} href="/studio/content/narrative">Open narrative map</Link><Link className={buttonClass} href="/studio/content/review">Review & test</Link><button disabled={!canEdit} className={buttonClass} onClick={() => setMeta({ ...workspace })}>Edit assignment</button></div>
         {meta && <div className="space-y-3 border-t pt-4"><Field label="Title" value={meta.title} onChange={(title) => setMeta({ ...meta, title })}/><Field label="Brief" value={meta.brief} onChange={(brief) => setMeta({ ...meta, brief })} multiline/><Field label="Blocked because (blank when ready)" value={meta.blocked_reason} onChange={(blocked_reason) => setMeta({ ...meta, blocked_reason })}/>
           <label className="block text-xs">Reviewer<select className={inputClass} value={meta.reviewer_id ?? ""} onChange={(event) => setMeta({ ...meta, reviewer_id: event.target.value || null })}><option value="">Unassigned</option>{memberOptions}</select></label>
@@ -143,6 +165,7 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
         {records.map((row) => <button key={recordId(row)} className="block w-full rounded border px-3 py-2 text-left hover:border-indigo-400" style={{ paddingLeft: 12 + depth(row)*16 }} onClick={() => edit(row)}><span className="text-xs uppercase text-slate-400">{String(row.kind ?? "")}</span><p className="text-sm font-medium">{row.title || "Untitled"}</p></button>)}
       </section>
       <section className={panelClass}>{editing ? <>
+        {mode === "narrative" && (data.activePlans ?? []).some((plan) => recordId(plan) === recordId(editing)) && <Link className="inline-block text-sm text-indigo-700 underline" href={`/studio/content/work?plan=${encodeURIComponent(recordId(editing))}`}>Assign work from the approved version of this plan</Link>}
         <Field label="Title" value={String(editing.title ?? "")} onChange={(value) => patch("title", value)}/>
         <div className="grid gap-3 md:grid-cols-2"><label className="text-xs">Type<select className={inputClass} value={String(editing.kind)} onChange={(event) => patch("kind", event.target.value)}>{(mode === "narrative" ? ["direction","plot","strand","arc"] : ["fact","npc","location","calendar","skill","resource","rule"]).map((value) => <option key={value}>{value}</option>)}</select></label><label className="text-xs">Parent plan<select className={inputClass} value={String(editing.parent_id ?? "")} onChange={(event) => patch("parent_id", event.target.value || null)}><option value="">None</option>{manifest.plans.filter((row) => recordId(row) !== recordId(editing)).map((row) => <option key={recordId(row)} value={recordId(row)}>{row.title}</option>)}</select></label></div>
         {(mode === "narrative" ? [["experience","Player experience"],["question","Dramatic question"],["constraints","Required constraints"],["suggestions","Creative suggestions"],["open_questions","Open questions"],["entrances","Entrances and assumptions"],["outcomes","Possible conclusions"],["miss_path","Miss, decline, late-entry, and repair paths"],["timing","Timing and costs"],["acceptance","Acceptance paths to play"]] : [["meaning","Meaning / biography / agreement"],["scope","Scope and who may know"],["constraints","Constraints and allowed changes"],["guidance","Voice or implementation guidance"]]).map(([key,label]) => <Field key={key} label={label} value={String(editing[key] ?? "")} onChange={(value) => patch(key, value)} multiline/>)}
