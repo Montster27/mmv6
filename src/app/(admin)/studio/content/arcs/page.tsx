@@ -76,6 +76,7 @@ export default function ArcsPage() {
     const result = await saveArcDefinition(arcDraft);
     if (result.ok) {
       setArcSaveState("saved");
+      setArcDraft({ ...arcDraft, _studio_revision: result.revision });
       setTimeout(() => setArcSaveState("idle"), 2000);
       await loadArcDefinitions();
     } else {
@@ -127,6 +128,8 @@ export default function ArcsPage() {
     const result = await saveStorylet(updated, session.user.email ?? null);
     if (!result.ok) {
       setStepSaveError(result.error ?? "Save failed");
+      setStepSaving(false);
+      throw new Error(result.error ?? "Save failed");
     } else {
       await loadStorylets();
       await loadArcDefinitions();
@@ -430,7 +433,7 @@ export default function ArcsPage() {
                               {isExpanded && fullStorylet && (
                                 <div className="border border-t-0 border-indigo-200 rounded-b-md bg-white" style={{ minHeight: 400 }}>
                                   <StoryletEditor
-                                    key={fullStorylet.id}
+                                    key={`${fullStorylet.id}:${fullStorylet._studio_revision ?? "released"}`}
                                     storylet={fullStorylet}
                                     allTags={allTags}
                                     storyletOptions={storyletOptions}

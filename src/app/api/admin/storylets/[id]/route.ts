@@ -1,145 +1,20 @@
-import { NextResponse, type NextRequest } from "next/server";
-
-import { getAdminClient } from "@/lib/supabaseAdmin";
-import { canAccessContentStudio } from "@/lib/adminAuthServer";
-import { validateStorylet, coerceStoryletRow } from "@/core/validation/storyletValidation";
-import type { Storylet } from "@/types/storylets";
-import { supabaseServer } from "@/lib/supabase/server";
-
-async function getUserFromToken(token?: string) {
-  if (!token) return null;
-  const { data, error } = await supabaseServer.auth.getUser(token);
-  if (error) {
-    console.error("Failed to verify user token", error);
-    return null;
-  }
-  return data.user;
+import { NextResponse } from "next/server";
+import { contentRead, contentWrite, failure, StudioError } from "@/lib/contentStudio/server";
+import { recordId } from "@/core/studio/manifest";
+type Context = { params: Promise<{ id: string }> };
+export async function GET(request: Request, context: Context) {
+  try {
+    const { id } = await context.params;
+    const row = (await contentRead(request, "storylets")).find((row) => recordId(row) === id);
+    if (!row) throw new StudioError("Not found", 404);
+    return NextResponse.json({ storylet: row });
+  } catch (error) { return failure(error); }
 }
-
-async function ensureContentStudioAccess(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length)
-    : undefined;
-  const user = await getUserFromToken(token);
-  if (!user) {
-    return null;
-  }
-  const ok = await canAccessContentStudio(user);
-  if (!ok) {
-    return null;
-  }
-  return user;
+export async function PUT(request: Request, context: Context) {
+  try { return NextResponse.json(await contentWrite(request, "storylets", (await context.params).id)); }
+  catch (error) { return failure(error); }
 }
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const resolvedParams = await params;
-  const user = await ensureContentStudioAccess(request);
-  if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-
-  const admin = getAdminClient();
-  const { data, error } = await admin
-    .from("storylets")
-    .select("*")
-    .eq("id", resolvedParams.id)
-    .maybeSingle();
-
-  if (error || !data) {
-    console.error("Failed to load storylet", error);
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ storylet: coerceStoryletRow(data) });
-}
-
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const resolvedParams = await params;
-  const user = await ensureContentStudioAccess(request);
-  if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-
-  const payload = await request.json();
-  const draft: Storylet = {
-    id: resolvedParams.id,
-    slug: payload.slug ?? "",
-    title: payload.title ?? "",
-    body: payload.body ?? "",
-    is_active: Boolean(payload.is_active),
-    tags: payload.tags ?? [],
-    weight: payload.weight ?? 100,
-    requirements: payload.requirements ?? {},
-    choices: payload.choices ?? [],
-    created_at: payload.created_at,
-  };
-
-  const validation = validateStorylet(draft);
-  if (!validation.ok) {
-    return NextResponse.json({ error: validation.errors }, { status: 400 });
-  }
-
-  const admin = getAdminClient();
-  const { error } = await admin
-    .from("storylets")
-    .update({
-      slug: draft.slug,
-      title: draft.title,
-      body: draft.body,
-      choices: draft.choices,
-      is_active: draft.is_active,
-      tags: draft.tags ?? [],
-      weight: draft.weight ?? 100,
-      requirements: draft.requirements ?? {},
-      introduces_npc: payload.introduces_npc ?? null,
-      // Track membership fields (write both legacy and current columns)
-      arc_id: payload.track_id ?? payload.arc_id ?? null,
-      step_key: payload.storylet_key ?? payload.step_key ?? null,
-      track_id: payload.track_id ?? payload.arc_id ?? null,
-      storylet_key: payload.storylet_key ?? payload.step_key ?? null,
-      order_index: payload.order_index ?? null,
-      due_offset_days: payload.due_offset_days ?? null,
-      expires_after_days: payload.expires_after_days ?? null,
-      default_next_key: payload.default_next_key ?? null,
-      // Segment / time-budget fields
-      segment: payload.segment ?? null,
-      time_cost_hours: payload.time_cost_hours ?? null,
-      is_conflict: payload.is_conflict ?? false,
-      // Conversational nodes
-      nodes: payload.nodes ?? null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", resolvedParams.id);
-
-  if (error) {
-    console.error("Failed to update storylet", error);
-    return NextResponse.json({ error: "Failed to update storylet" }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true });
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const resolvedParams = await params;
-  const user = await ensureContentStudioAccess(request);
-  if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-
-  const admin = getAdminClient();
-  const { error } = await admin
-    .from("storylets")
-    .delete()
-    .eq("id", resolvedParams.id);
-
-  if (error) {
-    console.error("Failed to delete storylet", error);
-    return NextResponse.json({ error: "Failed to delete storylet" }, { status: 500 });
-  }
-
-  return NextResponse.json({ ok: true });
+export async function DELETE(request: Request, context: Context) {
+  try { return NextResponse.json(await contentWrite(request, "storylets", (await context.params).id, true)); }
+  catch (error) { return failure(error); }
 }

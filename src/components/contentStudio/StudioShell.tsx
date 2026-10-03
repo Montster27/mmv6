@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useState, useEffect } from "react";
+import { WorkspaceBanner } from "./WorkspaceBanner";
 import { StudioContext } from "./StudioContext";
 import { StudioTopBar } from "./StudioTopBar";
 import { StudioNav } from "./StudioNav";
@@ -45,6 +46,7 @@ export function StudioShell({ children }: StudioShellProps) {
       <div className="studio-root" style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
         <StudioTopBar />
         <StudioNav />
+        <WorkspaceBanner />
 
         {/* Workspace: optional sidebar + canvas */}
         <div

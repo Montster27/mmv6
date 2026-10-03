@@ -143,7 +143,7 @@ export async function fetchStoryletBySlug(
   slug: string
 ): Promise<Storylet | null> {
   const { data, error } = await supabase
-    .from("storylets")
+    .rpc("runtime_storylets")
     .select("id,slug,title,body,choices,tags,is_active,requirements,weight")
     .eq("slug", slug)
     .limit(1)
@@ -165,7 +165,7 @@ export async function fetchStoryletBySlug(
 
 export async function fetchGameEntryStorylet(): Promise<Storylet | null> {
   const { data, error } = await supabase
-    .from("storylets")
+    .rpc("runtime_storylets")
     .select("id,slug,title,body,choices,tags,is_active,requirements,weight")
     .contains("tags", ["game_entry"])
     .limit(1)
@@ -354,10 +354,10 @@ export async function fetchTodayStoryletCandidates(
   const featureFlags = getFeatureFlags();
   const fetcher = async () => {
     const { data, error } = await supabase
-      .from("storylets")
+      .rpc("runtime_storylets")
       .select("id,slug,title,body,choices,is_active,created_at,tags,requirements,weight")
       .eq("is_active", true)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true }).returns<Storylet[]>();
 
     if (error) {
       console.error("Failed to fetch storylets", error);
@@ -365,7 +365,7 @@ export async function fetchTodayStoryletCandidates(
     }
 
     return (
-      data?.flatMap((item) => {
+      (Array.isArray(data) ? data : []).flatMap((item) => {
         const coerced = coerceStoryletRow({
           ...item,
           choices: parseChoices(item.choices),

@@ -130,7 +130,7 @@ export async function POST(request: Request) {
     ?? progressRow.current_storylet_key;
 
   const { data: storyletRow, error: storyletErr } = await supabaseServer
-    .from("storylets")
+    .rpc("runtime_storylets", { p_user_id: user.id })
     .select("id,track_id,storylet_key,title,segment,choices,default_next_key,due_offset_days,expires_after_days,requirements,is_active,is_conflict")
     .eq("track_id", progressRow.track_id)
     .eq("storylet_key", effectiveStoryletKey)
@@ -237,7 +237,7 @@ export async function POST(request: Request) {
 
     // Also update daily_states.stream_states for backward compatibility
     const { data: trackRow } = await supabaseServer
-      .from("tracks")
+      .rpc("runtime_tracks", { p_user_id: user.id })
       .select("key")
       .eq("id", progressRow.track_id)
       .single();
@@ -300,7 +300,7 @@ export async function POST(request: Request) {
   let validNextKey: string | null = null;
   if (nextKey) {
     const { data: nextStoryletRow } = await supabaseServer
-      .from("storylets")
+      .rpc("runtime_storylets", { p_user_id: user.id })
       .select("storylet_key,due_offset_days")
       .eq("track_id", progressRow.track_id)
       .eq("storylet_key", nextKey)
@@ -351,15 +351,15 @@ export async function POST(request: Request) {
   if (!validNextKey) {
     // No valid chain pointer — check whether any unresolved content exists in the future.
     const { data: remainingStorylets } = await supabaseServer
-      .from("storylets")
+      .rpc("runtime_storylets", { p_user_id: user.id })
       .select("storylet_key,due_offset_days,expires_after_days")
       .eq("track_id", progressRow.track_id)
-      .eq("is_active", true);
+      .eq("is_active", true).returns<{ storylet_key: string; due_offset_days: number; expires_after_days: number }[]>();
 
     const currentDayOffset = day_index - progressRow.started_day;
     // A second pool storylet may be due today or still within its window.
     // Neither should disappear because another storylet on the track resolved.
-    const hasFutureContent = (remainingStorylets ?? []).some(
+    const hasFutureContent = (Array.isArray(remainingStorylets) ? remainingStorylets : []).some(
       (s) =>
         !newResolvedKeys.includes(s.storylet_key) &&
         (s.due_offset_days ?? 0) + (s.expires_after_days ?? 0) >= currentDayOffset
@@ -442,7 +442,7 @@ export async function POST(request: Request) {
       const lookupKey = trackActivated.replace(/^arc_/, "");
 
       const { data: targetTrack } = await supabaseServer
-        .from("tracks")
+        .rpc("runtime_tracks", { p_user_id: user.id })
         .select("id,key")
         .eq("key", lookupKey)
         .eq("is_enabled", true)
@@ -458,7 +458,7 @@ export async function POST(request: Request) {
 
         if (!existingProgress) {
           const { data: firstStorylet } = await supabaseServer
-            .from("storylets")
+            .rpc("runtime_storylets", { p_user_id: user.id })
             .select("storylet_key,due_offset_days")
             .eq("track_id", targetTrack.id)
             .order("order_index", { ascending: true })
@@ -667,7 +667,7 @@ async function updatePlaythroughLog(
   try {
     // Look up the track key for a human-readable name
     const { data: trackRow } = await supabase
-      .from("tracks")
+      .rpc("runtime_tracks", { p_user_id: userId })
       .select("key")
       .eq("id", info.trackId)
       .maybeSingle();

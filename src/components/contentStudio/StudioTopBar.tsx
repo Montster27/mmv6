@@ -22,7 +22,7 @@ export function StudioTopBar() {
       <div className="right">
         <span className="pill live">
           <span className="blip" />
-          DB live
+          Versioned content
         </span>
 
         <input

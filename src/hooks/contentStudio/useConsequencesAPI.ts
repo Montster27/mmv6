@@ -31,17 +31,17 @@ export function useConsequencesAPI() {
     async (
       rule: DelayedConsequenceRule,
       isNew: boolean
-    ): Promise<{ ok: boolean; error?: string }> => {
+    ): Promise<{ ok: boolean; error?: string; revision?: number }> => {
       const url = isNew
         ? "/api/admin/consequences"
         : `/api/admin/consequences/${rule.key}`;
 
-      const result = await apiRequest(url, {
+      const result = await apiRequest<{ revision: number }>(url, {
         method: isNew ? "POST" : "PUT",
         body: JSON.stringify(rule),
       });
 
-      return { ok: result.ok, error: result.error };
+      return { ok: result.ok, error: result.error, revision: result.data?.revision };
     },
     []
   );
@@ -50,10 +50,11 @@ export function useConsequencesAPI() {
     async (key: string): Promise<{ ok: boolean; error?: string }> => {
       const result = await apiRequest(`/api/admin/consequences/${key}`, {
         method: "DELETE",
+        headers: { "X-Studio-Revision": String(rules.find((rule) => rule.key === key)?._studio_revision ?? "") },
       });
       return { ok: result.ok, error: result.error };
     },
-    []
+    [rules]
   );
 
   return { rules, setRules, loading, error, loadRules, saveRule, deleteRule };

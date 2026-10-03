@@ -1,4 +1,5 @@
 export type DelayedConsequenceRule = {
+  _studio_revision?: number;
   key: string;
   trigger: Record<string, unknown>;
   resolve: Record<string, unknown>;

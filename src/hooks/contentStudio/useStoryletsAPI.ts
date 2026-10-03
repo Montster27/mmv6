@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 import { apiRequest } from "@/lib/contentStudio/apiClient";
-import { buildAuditMeta } from "@/lib/contentStudio/audit";
+
 import type { Storylet } from "@/types/storylets";
 
 export function useStoryletsAPI() {
@@ -38,12 +38,10 @@ export function useStoryletsAPI() {
   const saveStorylet = useCallback(
     async (
       storylet: Storylet,
-      userEmail: string | null
+      _userEmail: string | null
     ): Promise<{ ok: boolean; error?: string }> => {
-      const requirements = {
-        ...(storylet.requirements ?? {}),
-        audit: buildAuditMeta(userEmail),
-      };
+      void _userEmail; // Attribution is recorded from the authenticated server session.
+      const requirements = { ...(storylet.requirements ?? {}) };
 
       const result = await apiRequest(`/api/admin/storylets/${storylet.id}`, {
         method: "PUT",
@@ -58,8 +56,9 @@ export function useStoryletsAPI() {
   const createStorylet = useCallback(
     async (
       draft: Omit<Storylet, "id">,
-      userEmail: string | null
+      _userEmail: string | null
     ): Promise<{ ok: true; id: string } | { ok: false; error?: string }> => {
+      void _userEmail;
       const id = `draft_${Date.now()}`;
       const body = draft.body?.trim() ? draft.body : "Draft body.";
 
@@ -71,7 +70,7 @@ export function useStoryletsAPI() {
           body,
           requirements: {
             ...draft.requirements,
-            audit: buildAuditMeta(userEmail),
+
           },
         }),
       });
@@ -86,16 +85,17 @@ export function useStoryletsAPI() {
     async (id: string): Promise<{ ok: boolean; error?: string }> => {
       const result = await apiRequest(`/api/admin/storylets/${id}`, {
         method: "DELETE",
+        headers: { "X-Studio-Revision": String(storylets.find((row) => row.id === id)?._studio_revision ?? "") },
       });
       return { ok: result.ok, error: result.error };
     },
-    []
+    [storylets]
   );
 
   const cloneStorylet = useCallback(
     async (
       storylet: Storylet,
-      userEmail: string | null
+      _userEmail: string | null
     ): Promise<{ ok: true; id: string } | { ok: false; error?: string }> => {
       const { id: _id, created_at: _c, ...rest } = storylet;
       void _id;
@@ -106,7 +106,7 @@ export function useStoryletsAPI() {
         title: `${storylet.title} (copy)`,
         is_active: false,
       };
-      return createStorylet(draft, userEmail);
+      return createStorylet(draft, _userEmail);
     },
     [createStorylet]
   );

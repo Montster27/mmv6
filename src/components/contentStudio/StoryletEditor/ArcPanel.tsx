@@ -27,8 +27,11 @@ export function ArcPanel({ storylet, arcOptions, stepKeyOptions = [], onChange }
             type="checkbox"
             className="rounded"
             checked={isTrackStorylet}
+            disabled={!isTrackStorylet && arcOptions.length === 0}
             onChange={(e) => {
-              if (!e.target.checked) {
+              if (e.target.checked && arcOptions[0]) {
+                onChange({ track_id: arcOptions[0].id, storylet_key: storylet.slug || null, order_index: 0, due_offset_days: 0, expires_after_days: 3 });
+              } else if (!e.target.checked) {
                 onChange({
                   track_id: null,
                   storylet_key: null,

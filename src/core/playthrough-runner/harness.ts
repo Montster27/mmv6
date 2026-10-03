@@ -77,9 +77,6 @@ export class PlaythroughHarness {
   // -------------------------------------------------------------------------
 
   async init(): Promise<void> {
-    this.tracks = await loadTracks();
-    this.storylets = await loadStorylets();
-
     const email = `test-runner-${randomUUID()}@test.local`;
     const { data, error } = await db.auth.admin.createUser({
       email,
@@ -90,14 +87,13 @@ export class PlaythroughHarness {
       throw new Error(`Failed to create test user: ${error?.message}`);
     }
     this.userId = data.user.id;
+    this.tracks = await loadTracks(this.userId);
+    this.storylets = await loadStorylets(this.userId);
 
     await this.seedFreshState();
   }
 
   async initFromFixture(fixture: FixtureSnapshot): Promise<void> {
-    this.tracks = await loadTracks();
-    this.storylets = await loadStorylets();
-
     const email = `test-runner-${randomUUID()}@test.local`;
     const { data, error } = await db.auth.admin.createUser({
       email,
@@ -108,6 +104,8 @@ export class PlaythroughHarness {
       throw new Error(`Failed to create test user: ${error?.message}`);
     }
     this.userId = data.user.id;
+    this.tracks = await loadTracks(this.userId);
+    this.storylets = await loadStorylets(this.userId);
 
     await this.loadFixture(fixture);
   }
@@ -277,12 +275,7 @@ export class PlaythroughHarness {
     // Validate next_key on same track (prevents cross-track chain bugs)
     let validNextKey: string | null = null;
     if (nextKey) {
-      const { data: nextStorylet } = await db
-        .from("storylets")
-        .select("storylet_key,due_offset_days")
-        .eq("track_id", storylet.track_id)
-        .eq("storylet_key", nextKey)
-        .maybeSingle();
+      const nextStorylet = this.storylets.find((row) => row.track_id === storylet.track_id && row.storylet_key === nextKey);
 
       if (nextStorylet) {
         validNextKey = nextKey;
@@ -309,11 +302,7 @@ export class PlaythroughHarness {
     let trackCompleted = false;
     if (!validNextKey) {
       // Check for future content on this track
-      const { data: remainingStorylets } = await db
-        .from("storylets")
-        .select("storylet_key,due_offset_days")
-        .eq("track_id", storylet.track_id)
-        .eq("is_active", true);
+      const remainingStorylets = this.storylets.filter((row) => row.track_id === storylet.track_id && row.is_active);
 
       const currentDayOffset = this.dayIndex - progressRow.started_day;
       const hasFutureContent = (remainingStorylets ?? []).some(

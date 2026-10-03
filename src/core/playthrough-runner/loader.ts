@@ -1,31 +1,25 @@
 /**
  * Playthrough Runner — Content Loader
  *
- * Reads storylets/tracks directly from Supabase (same source of truth as dev server).
- * No fixture copies of storylet content. Caches per session.
+ * Loads the immutable release pinned to the test player, exactly as the game does.
  */
 
 import { db } from "./client";
 import type { Track, TrackStoryletRow } from "@/types/tracks";
 
-let cachedTracks: Track[] | null = null;
-let cachedStorylets: TrackStoryletRow[] | null = null;
 
-export async function loadTracks(): Promise<Track[]> {
-  if (cachedTracks) return cachedTracks;
+export async function loadTracks(userId: string): Promise<Track[]> {
   const { data, error } = await db
-    .from("tracks")
+    .rpc("runtime_tracks", { p_user_id: userId })
     .select("id,key,title,description,category,chapter,is_enabled,tags")
     .eq("is_enabled", true);
   if (error) throw new Error(`Failed to load tracks: ${error.message}`);
-  cachedTracks = (data ?? []) as Track[];
-  return cachedTracks;
+  return (data ?? []) as Track[];
 }
 
-export async function loadStorylets(): Promise<TrackStoryletRow[]> {
-  if (cachedStorylets) return cachedStorylets;
+export async function loadStorylets(userId: string): Promise<TrackStoryletRow[]> {
   const { data, error } = await db
-    .from("storylets")
+    .rpc("runtime_storylets", { p_user_id: userId })
     .select(
       "id,slug,title,body,choices,tags,is_active,track_id,storylet_key,order_index," +
         "due_offset_days,expires_after_days,default_next_key,segment,time_cost_hours," +
@@ -33,7 +27,7 @@ export async function loadStorylets(): Promise<TrackStoryletRow[]> {
     );
   if (error) throw new Error(`Failed to load storylets: ${error.message}`);
   const rows = (data ?? []) as unknown as Record<string, unknown>[];
-  cachedStorylets = rows.map((row) => ({
+  return rows.map((row) => ({
     ...row,
     choices: Array.isArray(row.choices) ? row.choices : [],
     due_offset_days: (row.due_offset_days as number | null) ?? 0,
@@ -42,7 +36,6 @@ export async function loadStorylets(): Promise<TrackStoryletRow[]> {
     track_id: (row.track_id as string | null) ?? "",
     storylet_key: (row.storylet_key as string | null) ?? (row.slug as string),
   })) as TrackStoryletRow[];
-  return cachedStorylets;
 }
 
 export async function loadChoiceLog(
@@ -90,6 +83,5 @@ export async function loadFlagLog(
 }
 
 export function clearCache(): void {
-  cachedTracks = null;
-  cachedStorylets = null;
+  // Content is no longer cached across player releases.
 }

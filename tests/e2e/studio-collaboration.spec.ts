@@ -1,0 +1,68 @@
+import { test, expect, type Page } from "@playwright/test";
+
+// Browser interaction tests against a local build, with explicitly synthetic API state.
+// Database permissions and transactions are covered by check-studio-database.mjs.
+test.skip(!process.env.STUDIO_UI_TEST, "Run with STUDIO_UI_TEST=1 and a local BASE_URL using the studio-test Supabase URL.");
+const owner = "10000000-0000-0000-0000-000000000001";
+const workspace = { id: "workspace", title: "Roommate strand", owner_id: owner, reviewer_id: "reviewer", collaborator_ids: [], base_release_id: "baseline", revision: 1, status: "draft", brief: "Leave room for late entry.", blocked_reason: "", plan_id: null };
+const empty = { storylets: [], tracks: [], consequences: [], plans: [], definitions: [], scenarios: [] };
+async function fixture(page: Page) {
+  const state = { actor: { id: owner, email: "writer@example.test", admin: false, role: "writer" }, workspace: { ...workspace }, workspaces: [{ ...workspace }], members: [{ user_id: owner, display_name: "Writer", role: "writer" }], releases: [{ id: "baseline", title: "Baseline", runtime_version: "narrative-offers-v1", created_at: "2026-10-03T12:00:00Z" }], activeReleaseId: "baseline", manifest: structuredClone(empty), base: structuredClone(empty), changes: [] as unknown[], events: [], conflicts: [] as unknown[], issues: [], tests: [] };
+  await page.addInitScript(({ owner }) => {
+    sessionStorage.setItem("studio.workspace", "workspace");
+    localStorage.setItem("sb-studio-test-auth-token", JSON.stringify({ access_token: "synthetic-ui-test", refresh_token: "synthetic", expires_at: Math.floor(Date.now()/1000)+3600, token_type: "bearer", user: { id: owner, email: "writer@example.test", aud: "authenticated" } }));
+  }, { owner });
+  await page.route("https://studio-test.supabase.co/**", (route) => route.fulfill({ json: { id: owner } }));
+  const commands: Record<string, unknown>[] = [];
+  let conflict = false;
+  await page.route("**/api/admin/studio**", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: state });
+    const body = route.request().postDataJSON(); commands.push(body);
+    if (conflict) return route.fulfill({ status: 409, json: { error: "Revision conflict. Your work is preserved; reload and compare before saving." } });
+    if (body.action === "save") {
+      const rows = state.manifest[body.kind as keyof typeof empty] as unknown[];
+      rows.push(body.payload); state.changes.push({ kind: body.kind, object_id: body.object_id, payload: body.payload });
+    }
+    state.workspace.revision++;
+    return route.fulfill({ json: { revision: state.workspace.revision } });
+  });
+  return { state, commands, conflict: () => { conflict = true; } };
+}
+test("writer creates a plan and retains unsaved work after a competing save", async ({ page }) => {
+  const setup = await fixture(page);
+  await page.goto("/studio/content/narrative");
+  await page.getByRole("button", { name: "+ Plan", exact: true }).click();
+  await page.getByLabel("Title", { exact: true }).fill("Arriving late");
+  await page.getByLabel("Player experience").fill("Make a connection without requiring the first-night encounter.");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Saved to this draft");
+  expect(setup.commands[0]).toMatchObject({ action: "save", revision: 1, kind: "plans", payload: { title: "Arriving late" } });
+  await page.getByRole("button", { name: /arc Arriving late/ }).click();
+  await page.getByLabel("Title", { exact: true }).fill("My unsaved title");
+  setup.conflict();
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Revision conflict" })).toBeVisible();
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue("My unsaved title");
+});
+test("invalid advanced scenario input cannot silently save an older value", async ({ page }) => {
+  await fixture(page);
+  await page.goto("/studio/content/review");
+  await page.getByRole("button", { name: "+ Offer scenario", exact: true }).click();
+  await page.getByLabel("Test name").fill("Late entry");
+  await page.getByText("Advanced scenario state", { exact: true }).click();
+  await page.getByRole("textbox", { name: "Advanced scenario state" }).fill("{broken");
+  await expect(page.getByRole("button", { name: "Save and run scenario" })).toBeDisabled();
+  await expect(page.getByRole("alert").filter({ hasText: "Invalid scenario" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Advanced scenario state" }).fill('{"choices":{},"skills":[],"precluded":[]}');
+  await expect(page.getByRole("button", { name: "Save and run scenario" })).toBeEnabled();
+});
+test("overlapping versions require an explicit choice before integration", async ({ page }) => {
+  const setup = await fixture(page);
+  setup.state.activeReleaseId = "new-release";
+  setup.state.conflicts = [{ id: "plans:plot", draft: { title: "Writer version" }, released: { title: "Lead version" } }];
+  await page.goto("/studio/content/review");
+  await expect(page.getByRole("heading", { name: "Resolve overlapping edits" })).toBeVisible();
+  await page.getByLabel("Keep current release").check();
+  await page.getByRole("button", { name: "Rebase reviewed changes" }).click();
+  await expect.poll(() => setup.commands[0]).toMatchObject({ action: "rebase", release_id: "new-release", resolutions: { "plans:plot": "released" } });
+});

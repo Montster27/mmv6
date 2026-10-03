@@ -98,6 +98,7 @@ export async function POST(request: Request) {
     supabaseServer.from("daily_posture").delete().eq("user_id", userId),
     supabaseServer.from("skill_point_allocations").delete().eq("user_id", userId),
     supabaseServer.from("track_progress").delete().eq("user_id", userId),
+    supabaseServer.from("studio_run_releases").delete().eq("user_id", userId),
     supabaseServer.from("arc_offers").delete().eq("user_id", userId),
     supabaseServer.from("player_dispositions").delete().eq("user_id", userId),
     supabaseServer.from("choice_log").delete().eq("user_id", userId),

@@ -6,24 +6,25 @@ import { useState, useRef, useEffect } from "react";
 import { useStudio } from "./StudioContext";
 
 const PRIMARY_TABS = [
-  { label: "▦ Calendar",      href: "/studio/content/calendar" },
-  { label: "≡ Swimlane",      href: "/studio/content/swimlane" },
-  { label: "✦ Constellation", href: "/studio/content/constellation" },
+  { label: "My work", href: "/studio/content/work" },
+  { label: "Narrative map", href: "/studio/content/narrative" },
+  { label: "Library", href: "/studio/content/library" },
+  { label: "Review", href: "/studio/content/review" },
+  { label: "Releases", href: "/studio/content/releases" },
 ];
-
-const CONTENT_TABS = [
-  { label: "NPCs",    href: "/studio/content/npcs" },
-  { label: "History", href: "/studio/content/history" },
-  { label: "Rules",   href: "/studio/content/rules" },
-];
-
+const CONTENT_TABS: { label: string; href: string }[] = [];
 const MORE_TABS = [
-  { label: "Storylets",    href: "/studio/content/storylets" },
-  { label: "Tracks",       href: "/studio/content/arcs" },
-  { label: "Track States", href: "/studio/content/streams" },
-  { label: "Graph",        href: "/studio/content/graph" },
-  { label: "Economy",      href: "/studio/content/resource-economy" },
-  { label: "Preview",      href: "/studio/content/preview" },
+  { label: "Storylets", href: "/studio/content/storylets" },
+  { label: "Calendar", href: "/studio/content/calendar" },
+  { label: "Swimlane", href: "/studio/content/swimlane" },
+  { label: "Constellation", href: "/studio/content/constellation" },
+  { label: "NPCs", href: "/studio/content/npcs" },
+  { label: "Tracks", href: "/studio/content/arcs" },
+  { label: "Streams", href: "/studio/content/streams" },
+  { label: "Graph", href: "/studio/content/graph" },
+  { label: "Economy", href: "/studio/content/resource-economy" },
+  { label: "Preview", href: "/studio/content/preview" },
+  { label: "Consequence rules", href: "/studio/content/rules" },
 ];
 
 export function StudioNav() {

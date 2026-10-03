@@ -420,19 +420,19 @@ export async function getOrCreateDailyRun(
     try {
       // 1. Load Chapter One track definitions
       const { data: trackDefs, error: trackDefsError } = await supabase
-        .from("tracks")
+        .rpc("runtime_tracks")
         .select("id,key,title,description,tags,is_enabled,category,chapter")
         .in("key", CHAPTER_ONE_TRACK_KEYS)
-        .eq("is_enabled", true);
+        .eq("is_enabled", true).returns<Track[]>();
 
       if (trackDefsError) {
         console.error("[daily-run] tracks query failed:", trackDefsError);
       }
-      if (!trackDefs || trackDefs.length === 0) {
+      if (!Array.isArray(trackDefs) || trackDefs.length === 0) {
         console.warn("[daily-run] No tracks found. Keys queried:", CHAPTER_ONE_TRACK_KEYS);
       }
 
-      const tracks: Track[] = (trackDefs ?? []).map((r) => ({
+      const tracks: Track[] = (Array.isArray(trackDefs) ? trackDefs : []).map((r) => ({
         id: r.id,
         key: r.key,
         title: r.title,
@@ -448,17 +448,17 @@ export async function getOrCreateDailyRun(
 
         // 2. Load storylets for these tracks
         const { data: storyletRows, error: storyletRowsError } = await supabase
-          .from("storylets")
+          .rpc("runtime_storylets")
           .select("id,slug,track_id,storylet_key,order_index,title,body,choices,nodes,default_next_key,due_offset_days,expires_after_days,is_active,tags,requirements,weight,introduces_npc,segment,time_cost_hours,is_conflict")
           .in("track_id", trackIds)
-          .order("order_index");
+          .order("order_index").returns<TrackStoryletRow[]>();
 
         if (storyletRowsError) {
           console.error("[daily-run] storylets query failed:", storyletRowsError);
         }
-        console.log("[daily-run] Loaded", storyletRows?.length ?? 0, "track storylets for", trackIds.length, "tracks");
+        console.log("[daily-run] Loaded", Array.isArray(storyletRows) ? storyletRows.length : 0, "track storylets for", trackIds.length, "tracks");
 
-        const trackStoryletRows: TrackStoryletRow[] = (storyletRows ?? []).map((r) => ({
+        const trackStoryletRows: TrackStoryletRow[] = (Array.isArray(storyletRows) ? storyletRows : []).map((r) => ({
           id: r.id,
           slug: r.slug,
           track_id: r.track_id,

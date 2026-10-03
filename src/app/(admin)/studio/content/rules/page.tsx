@@ -27,11 +27,9 @@ function ruleToDraft(rule: DelayedConsequenceRule): RuleDraft {
 
 function draftToRule(draft: RuleDraft): DelayedConsequenceRule {
   const parseOrEmpty = (s: string) => {
-    try {
-      return JSON.parse(s);
-    } catch {
-      return {};
-    }
+    const value: unknown = JSON.parse(s);
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Rule fields must contain JSON objects.");
+    return value as Record<string, unknown>;
   };
   return {
     ...draft,
@@ -215,6 +213,7 @@ export default function RulesPage() {
     useConsequencesAPI();
   const { storylets, loadStorylets } = useStoryletsAPI();
   const [draft, setDraft] = useState<RuleDraft | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   useEffect(() => {
@@ -237,12 +236,19 @@ export default function RulesPage() {
     if (!draft) return;
     setSaveState("saving");
     const isNew = !rules.some((r) => r.key === draft.key);
-    const result = await saveRule(draftToRule(draft), isNew);
+    setSaveError(null);
+    let rule: DelayedConsequenceRule;
+    try { rule = draftToRule(draft); } catch {
+      setSaveError("Correct the JSON in the rule fields before saving. Your draft is preserved."); setSaveState("idle"); return;
+    }
+    const result = await saveRule(rule, isNew);
     if (result.ok) {
       setSaveState("saved");
+      setDraft({ ...draft, _studio_revision: result.revision });
       setTimeout(() => setSaveState("idle"), 2000);
       await loadRules();
     } else {
+      setSaveError(result.error ?? "Save failed");
       setSaveState("idle");
     }
   }
@@ -250,7 +256,8 @@ export default function RulesPage() {
   async function handleDelete() {
     if (!draft) return;
     if (!confirm(`Delete rule "${draft.key}"?`)) return;
-    await deleteRule(draft.key);
+    const result = await deleteRule(draft.key);
+    if (!result.ok) { setSaveError(result.error ?? "Delete failed"); return; }
     setDraft(null);
     await loadRules();
   }
@@ -301,7 +308,8 @@ export default function RulesPage() {
                   </button>
                 ))
               )}
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
             </div>
 
             {/* Editor */}

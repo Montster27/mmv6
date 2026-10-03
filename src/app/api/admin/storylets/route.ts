@@ -1,129 +1,18 @@
 import { NextResponse } from "next/server";
-
-import { getAdminClient } from "@/lib/supabaseAdmin";
-import { canAccessContentStudio } from "@/lib/adminAuthServer";
-import { validateStorylet, coerceStoryletRow } from "@/core/validation/storyletValidation";
-import type { Storylet } from "@/types/storylets";
-import { supabaseServer } from "@/lib/supabase/server";
-
-async function getUserFromToken(token?: string) {
-  if (!token) return null;
-  const { data, error } = await supabaseServer.auth.getUser(token);
-  if (error) {
-    console.error("Failed to verify user token", error);
-    return null;
-  }
-  return data.user;
-}
-
-async function ensureContentStudioAccess(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length)
-    : undefined;
-  const user = await getUserFromToken(token);
-  if (!user) {
-    return null;
-  }
-  const ok = await canAccessContentStudio(user);
-  if (!ok) {
-    return null;
-  }
-  return user;
-}
+import { contentRead, contentWrite, failure } from "@/lib/contentStudio/server";
 
 export async function GET(request: Request) {
-  const user = await ensureContentStudioAccess(request);
-  if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-
-  const { searchParams } = new URL(request.url);
-  const search = searchParams.get("search") || "";
-  const active = searchParams.get("active");
-
-  const admin = getAdminClient();
-  let query = admin
-    .from("storylets")
-    .select("id,slug,title,is_active,tags,weight,updated_at,choices,body,requirements,introduces_npc,arc_id,step_key,order_index,due_offset_days,expires_after_days,default_next_key,track_id,storylet_key,segment,time_cost_hours,is_conflict,nodes");
-
-  if (active === "true") {
-    query = query.eq("is_active", true);
-  } else if (active === "false") {
-    query = query.eq("is_active", false);
-  }
-
-  if (search) {
-    query = query.ilike("slug", `%${search}%`).or(`title.ilike.%${search}%`);
-  }
-
-  const { data, error } = await query.order("updated_at", { ascending: false });
-  if (error) {
-    console.error("Failed to list storylets", error);
-    return NextResponse.json({ error: "Failed to list storylets" }, { status: 500 });
-  }
-
-  const safe = (data ?? []).map((row) => coerceStoryletRow(row));
-  return NextResponse.json({ storylets: safe });
+  try {
+    let rows = await contentRead(request, "storylets");
+    const params = new URL(request.url).searchParams;
+    const active = params.get("active");
+    if (active === "true" || active === "false") rows = rows.filter((row) => Boolean(row.is_active) === (active === "true"));
+    const search = params.get("search")?.toLowerCase();
+    if (search) rows = rows.filter((row) => `${row.title} ${row.slug}`.toLowerCase().includes(search));
+    return NextResponse.json({ storylets: rows });
+  } catch (error) { return failure(error); }
 }
-
 export async function POST(request: Request) {
-  const user = await ensureContentStudioAccess(request);
-  if (!user) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-
-  const payload = await request.json();
-  const draft: Storylet = {
-    id: payload.id || "",
-    slug: payload.slug ?? "",
-    title: payload.title ?? "",
-    body: payload.body ?? "",
-    is_active: Boolean(payload.is_active),
-    tags: payload.tags ?? [],
-    weight: payload.weight ?? 100,
-    requirements: payload.requirements ?? {},
-    choices: payload.choices ?? [],
-    created_at: payload.created_at,
-  };
-
-  const validation = validateStorylet(draft);
-  if (!validation.ok) {
-    return NextResponse.json({ error: validation.errors }, { status: 400 });
-  }
-
-  const admin = getAdminClient();
-  const { data, error } = await admin
-    .from("storylets")
-    .insert({
-      slug: draft.slug,
-      title: draft.title,
-      body: draft.body,
-      choices: draft.choices,
-      is_active: draft.is_active,
-      tags: draft.tags ?? [],
-      weight: draft.weight ?? 100,
-      requirements: draft.requirements ?? {},
-      introduces_npc: payload.introduces_npc ?? null,
-      // Track membership fields (write both legacy and current columns)
-      arc_id: payload.track_id ?? payload.arc_id ?? null,
-      step_key: payload.storylet_key ?? payload.step_key ?? null,
-      track_id: payload.track_id ?? payload.arc_id ?? null,
-      storylet_key: payload.storylet_key ?? payload.step_key ?? null,
-      order_index: payload.order_index ?? null,
-      due_offset_days: payload.due_offset_days ?? null,
-      expires_after_days: payload.expires_after_days ?? null,
-      default_next_key: payload.default_next_key ?? null,
-      // Segment / time-budget fields
-      segment: payload.segment ?? null,
-      time_cost_hours: payload.time_cost_hours ?? null,
-      is_conflict: payload.is_conflict ?? false,
-      // Conversational nodes
-      nodes: payload.nodes ?? null,
-    })
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    console.error("Failed to create storylet", error);
-    return NextResponse.json({ error: "Failed to create storylet" }, { status: 500 });
-  }
-
-  return NextResponse.json({ id: data?.id });
+  try { return NextResponse.json(await contentWrite(request, "storylets")); }
+  catch (error) { return failure(error); }
 }

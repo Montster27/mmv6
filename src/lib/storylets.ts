@@ -9,10 +9,10 @@ export type StoryletListItem = Storylet;
 
 export async function fetchActiveStorylets(): Promise<Storylet[]> {
   const { data, error } = await supabase
-    .from("storylets")
+    .rpc("runtime_storylets")
     .select("id,slug,title,is_active,choices,body,created_at")
     .eq("is_active", true)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true }).returns<Storylet[]>();
 
   if (error) {
     console.error("Failed to fetch storylets", error);
@@ -20,7 +20,7 @@ export async function fetchActiveStorylets(): Promise<Storylet[]> {
   }
 
   return (
-    data?.flatMap((row) => {
+    (Array.isArray(data) ? data : []).flatMap((row) => {
       const coerced = coerceStoryletRow(row);
       const validated = validateStorylet(coerced);
       if (validated.ok) return [validated.value];

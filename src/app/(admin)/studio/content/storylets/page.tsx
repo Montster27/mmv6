@@ -174,11 +174,15 @@ function StoryletsContent() {
         await loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
       } else {
         setSaveError(result.error ?? "Create failed");
+        setSaving(false);
+        throw new Error(result.error ?? "Create failed");
       }
     } else {
       const result = await saveStorylet(updated, session.user.email ?? null);
       if (!result.ok) {
         setSaveError(result.error ?? "Save failed");
+        setSaving(false);
+        throw new Error(result.error ?? "Save failed");
       }
       await loadStorylets({ active: activeFilter !== "all" ? activeFilter : undefined });
     }
@@ -355,7 +359,7 @@ function StoryletsContent() {
               />
             ) : selected ? (
               <StoryletEditor
-                key={selected.id}
+                key={`${selected.id}:${selected._studio_revision ?? 0}`}
                 storylet={selected}
                 allTags={allTags}
                 storyletOptions={storyletOptions}

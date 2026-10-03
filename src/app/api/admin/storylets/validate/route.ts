@@ -1,69 +1,11 @@
 import { NextResponse } from "next/server";
-
-import { supabaseServer } from "@/lib/supabase/server";
-import { canAccessContentStudio } from "@/lib/adminAuthServer";
-import {
-  coerceStoryletRow,
-  validateStoryletIssues,
-  validateArcDefinitions,
-  type ValidationIssue,
-} from "@/core/validation/storyletValidation";
-
-async function getUserFromToken(token?: string) {
-  if (!token) return null;
-  const { data, error } = await supabaseServer.auth.getUser(token);
-  if (error) {
-    console.error("Failed to verify user token", error);
-    return null;
-  }
-  return data.user;
-}
-
-async function ensureAdmin(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length)
-    : undefined;
-  const user = await getUserFromToken(token);
-  if (!user) return null;
-  const ok = await canAccessContentStudio(user);
-  return ok ? user : null;
-}
-
+import { contentRead, failure } from "@/lib/contentStudio/server";
+import { validateStoryletIssues } from "@/core/validation/storyletValidation";
 export async function GET(request: Request) {
-  const admin = await ensureAdmin(request);
-  if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
-
-  const { data: rows, error } = await supabaseServer
-    .from("storylets")
-    .select("id,slug,title,body,choices,is_active,created_at,tags,requirements,weight")
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error("Failed to fetch storylets", error);
-    return NextResponse.json({ error: "Failed to fetch storylets" }, { status: 500 });
-  }
-
-  const errors: ValidationIssue[] = [];
-  const warnings: ValidationIssue[] = [];
-  const storylets = (rows ?? []).map((row) => coerceStoryletRow(row));
-
-  storylets.forEach((storylet) => {
-    const res = validateStoryletIssues(storylet);
-    if (res.errors.length) errors.push(...res.errors);
-    if (res.warnings.length) warnings.push(...res.warnings);
-  });
-
-  const arcWarnings = validateArcDefinitions(storylets);
-  if (arcWarnings.length) warnings.push(...arcWarnings);
-
-  return NextResponse.json({
-    errors,
-    warnings,
-    counts: {
-      storylets: storylets.length,
-      errors: errors.length,
-      warnings: warnings.length,
-    },
-  });
+  try {
+    const rows = await contentRead(request, "storylets");
+    const results = rows.map(validateStoryletIssues);
+    const errors = results.flatMap((result) => result.errors);
+    return NextResponse.json({ ok: errors.length === 0, errors, warnings: results.flatMap((result) => result.warnings), total: rows.length });
+  } catch (error) { return failure(error); }
 }

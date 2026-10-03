@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import { apiRequest } from "@/lib/contentStudio/apiClient";
 
 export type ArcDefinitionRow = {
+  _studio_revision?: number;
   id: string;
   key: string;
   title: string;
@@ -13,6 +14,7 @@ export type ArcDefinitionRow = {
 };
 
 export type ArcStepRow = {
+  _studio_revision?: number;
   id: string;
   arc_id: string;
   step_key: string;
@@ -56,12 +58,13 @@ export function useArcsAPI() {
   }, []);
 
   const saveArcDefinition = useCallback(
-    async (arc: ArcDefinitionRow): Promise<{ ok: boolean; error?: string }> => {
-      const result = await apiRequest(
+    async (arc: ArcDefinitionRow): Promise<{ ok: boolean; error?: string; revision?: number }> => {
+      const result = await apiRequest<{ revision: number }>(
         `/api/admin/arc-definitions/${arc.id}`,
         {
           method: "PUT",
           body: JSON.stringify({
+            _studio_revision: arc._studio_revision,
             title: arc.title,
             description: arc.description,
             tags: arc.tags ?? [],
@@ -69,7 +72,7 @@ export function useArcsAPI() {
           }),
         }
       );
-      return { ok: result.ok, error: result.error };
+      return { ok: result.ok, error: result.error, revision: result.data?.revision };
     },
     []
   );
@@ -79,6 +82,7 @@ export function useArcsAPI() {
       const result = await apiRequest(`/api/admin/arc-steps/${step.id}`, {
         method: "PUT",
         body: JSON.stringify({
+          _studio_revision: step._studio_revision,
           title: step.title,
           body: step.body,
           step_key: step.step_key,
@@ -97,10 +101,11 @@ export function useArcsAPI() {
     async (stepId: string): Promise<{ ok: boolean; error?: string }> => {
       const result = await apiRequest(`/api/admin/arc-steps/${stepId}`, {
         method: "DELETE",
+        headers: { "X-Studio-Revision": String(arcDefinitionSteps.find((step) => step.id === stepId)?._studio_revision ?? "") },
       });
       return { ok: result.ok, error: result.error };
     },
-    []
+    [arcDefinitionSteps]
   );
 
   const createArcDefinition = useCallback(
@@ -123,10 +128,11 @@ export function useArcsAPI() {
     async (id: string): Promise<{ ok: boolean; error?: string }> => {
       const result = await apiRequest(`/api/admin/arc-definitions/${id}`, {
         method: "DELETE",
+        headers: { "X-Studio-Revision": String(arcDefinitions.find((arc) => arc.id === id)?._studio_revision ?? "") },
       });
       return { ok: result.ok, error: result.error };
     },
-    []
+    [arcDefinitions]
   );
 
   return {

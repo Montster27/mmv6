@@ -232,6 +232,7 @@ export type DialogueNode = {
 };
 
 export type Storylet = {
+  _studio_revision?: number;
   id: string;
   slug: string;
   title: string;

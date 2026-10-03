@@ -163,7 +163,7 @@ export async function runWeek(
     (dailyState?.relationships as Record<string, RelationshipState>) ?? {};
 
   // Load calendar beats (active storylets with due_offset_days in this week's range)
-  const calendarBeats = await loadCalendarBeats(supabase, weekStart);
+  const calendarBeats = await loadCalendarBeats(supabase, weekStart, userId);
 
   // Load NPC deposit history (simplified: last deposit day from routine weeks)
   const npcDepositHistory = new Map<string, number>();
@@ -336,17 +336,18 @@ export async function resumeAfterInterruption(
 async function loadCalendarBeats(
   supabase: SupabaseClient,
   weekStart: number,
+  userId: string,
 ): Promise<CalendarBeat[]> {
   const weekEnd = weekStart + DAYS_PER_WEEK - 1;
 
   const { data } = await supabase
-    .from("storylets")
+    .rpc("runtime_storylets", { p_user_id: userId })
     .select("storylet_key, due_offset_days, segment, track_id")
     .eq("is_active", true)
     .gte("due_offset_days", weekStart)
-    .lte("due_offset_days", weekEnd);
+    .lte("due_offset_days", weekEnd).returns<{ storylet_key: string; due_offset_days: number; segment: string | null; track_id: string }[]>();
 
-  if (!data) return [];
+  if (!Array.isArray(data)) return [];
 
   return data.map((row) => ({
     storylet_key: (row as { storylet_key: string }).storylet_key,

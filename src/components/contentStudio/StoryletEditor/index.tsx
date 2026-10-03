@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiRequest } from "@/lib/contentStudio/apiClient";
 import type { Storylet } from "@/types/storylets";
 import { TRACK_LABELS, trackStyle, type TrackKey } from "@/lib/trackPalette";
 import { ScriptMode } from "../ScriptMode";
@@ -59,8 +60,10 @@ export function StoryletEditor({
   const [draft, setDraft] = useState<Storylet>(initial);
   const [rawError, setRawError] = useState(false);
 
-  const initialRef = useRef(JSON.stringify(initial));
-  const isDirty = useMemo(() => JSON.stringify(draft) !== initialRef.current, [draft]);
+  const [savedText, setSavedText] = useState(() => JSON.stringify(initial));
+  const [latest, setLatest] = useState<Storylet | null>(null);
+  const [compareError, setCompareError] = useState("");
+  const isDirty = JSON.stringify(draft) !== savedText;
 
   useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
 
@@ -76,8 +79,13 @@ export function StoryletEditor({
 
   const handleSave = useCallback(async () => {
     if (saving || rawError) return;
-    await onSave(draft);
-    initialRef.current = JSON.stringify(draft);
+    try {
+      await onSave(draft);
+      setSavedText(JSON.stringify(draft));
+      setLatest(null);
+    } catch {
+      // Keep unsaved edits and let the parent display the save/conflict error.
+    }
   }, [draft, onSave, saving, rawError]);
 
   useEffect(() => {
@@ -176,6 +184,17 @@ export function StoryletEditor({
         </div>
       </div>
 
+      {!isNew && saveError && /revision|changed|reload/i.test(saveError) && <div className="space-y-2 border-b border-amber-200 bg-amber-50 p-3 text-sm">
+        <p>Your draft is preserved. Compare the current saved version before retrying.</p>
+        <button className="btn" onClick={async () => {
+          const result = await apiRequest<{ storylet: Storylet }>(`/api/admin/storylets/${draft.id}`);
+          if (result.data) { setLatest(result.data.storylet); setCompareError(""); }
+          else setCompareError(result.error ?? "Could not load current version");
+        }}>Load version to compare</button>
+        {compareError && <p role="alert">{compareError}</p>}
+        {latest && <><div className="grid gap-3 md:grid-cols-2"><details><summary>Current saved version</summary><pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(latest,null,2)}</pre></details><details><summary>Your unsaved version</summary><pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(draft,null,2)}</pre></details></div><button className="btn" onClick={() => { setDraft({ ...draft, _studio_revision: latest._studio_revision }); setLatest(null); }}>I compared both; keep my draft for the next save</button></>}
+      </div>}
+
       {/* Outer tab bar */}
       <div className="tabbar">
         {outerTabs.map((t) => (
@@ -212,7 +231,7 @@ export function StoryletEditor({
               isNew={isNew}
               allTags={allTags}
               storyletOptions={storyletOptions}
-              stepKeyOptions={stepKeyOptions}
+              stepKeyOptions={allStorylets.length ? allStorylets.filter((s) => s.track_id === draft.track_id && s.storylet_key).map((s) => ({ value: s.storylet_key!, label: s.title })) : stepKeyOptions}
               arcOptions={arcOptions}
               onChange={patch}
               onReplaceAll={(full) => setDraft(full)}

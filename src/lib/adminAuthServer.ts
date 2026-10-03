@@ -27,6 +27,9 @@ export async function canAccessContentStudio(user: {
   id: string;
   email?: string | null;
 }): Promise<boolean> {
+  const membership = await supabaseServer.from("studio_members").select("user_id").eq("user_id", user.id).maybeSingle();
+  if (membership.data) return true;
+
   // Check admin status first
   if (await isUserAdmin(user)) return true;
 
