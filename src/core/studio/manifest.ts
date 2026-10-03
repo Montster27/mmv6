@@ -1,3 +1,4 @@
+import { validateAgreements } from "./agreements";
 import { validateStoryletIssues } from "@/core/validation/storyletValidation";
 import { selectTrackStorylets } from "@/core/tracks/selectTrackStorylets";
 import { CHAPTER_ONE_TRACK_KEYS } from "@/types/tracks";
@@ -106,7 +107,7 @@ export function validateManifest(manifest: StudioManifest): StudioIssue[] {
     if (row.runtime_required === true) add("error", id, "This planned capability is not implemented by the current runtime. Resolve the engine dependency before release.");
     if (row.kind === "arc" && !String(row.miss_path ?? "").trim()) add("warning", id, "Describe what happens if the player misses or declines this arc.");
   }
-  return issues;
+  return [...issues, ...validateAgreements(manifest)];
 }
 
 /** Bounded offer tests use the same selector as play. They do not claim full outcome simulation. */

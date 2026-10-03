@@ -1,4 +1,4 @@
-import type { StudioRecord } from "../../src/types/studio";
+import type { StudioRecord, StudioManifest } from "../../src/types/studio";
 import type { PlanningImpact } from "../../src/core/studio/planning";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -7,7 +7,7 @@ import { test, expect, type Page } from "@playwright/test";
 test.skip(!process.env.STUDIO_UI_TEST, "Run with STUDIO_UI_TEST=1 and a local BASE_URL using the studio-test Supabase URL.");
 const owner = "10000000-0000-0000-0000-000000000001";
 const workspace = { id: "workspace", title: "Roommate strand", owner_id: owner, reviewer_id: "reviewer", collaborator_ids: [], base_release_id: "baseline", revision: 1, status: "draft", brief: "Leave room for late entry.", blocked_reason: "", plan_id: null };
-const empty = { storylets: [], tracks: [], consequences: [], plans: [], definitions: [], scenarios: [] };
+const empty: StudioManifest = { storylets: [], tracks: [], consequences: [], plans: [], definitions: [], scenarios: [] };
 async function fixture(page: Page) {
   const state = { actor: { id: owner, email: "writer@example.test", admin: false, role: "writer" }, workspace: { ...workspace }, workspaces: [{ ...workspace }], members: [{ user_id: owner, display_name: "Writer", role: "writer" }], releases: [{ id: "baseline", title: "Baseline", runtime_version: "narrative-offers-v1", created_at: "2026-10-03T12:00:00Z" }], activeReleaseId: "baseline", activePlans: [] as StudioRecord[], inheritedBriefs: [] as StudioRecord[], impacts: [] as PlanningImpact[], manifest: structuredClone(empty), base: structuredClone(empty), changes: [] as unknown[], events: [], conflicts: [] as unknown[], issues: [], tests: [] };
   await page.addInitScript(({ owner }) => {
@@ -95,4 +95,35 @@ test("a lead can hand off an approved plan with attributed constraints", async (
   await page.getByLabel("Workspace title", { exact: true }).fill("Write the invitation");
   await page.getByRole("button", { name: "Create draft workspace" }).click();
   await expect.poll(() => setup.commands[0]).toMatchObject({ action: "create", plan_id: "plot", title: "Write the invitation" });
+});
+
+test("a writer defines a known false fact without confusing it with unknown", async ({ page }) => {
+  const setup = await fixture(page);
+  await page.goto("/studio/content/library");
+  await page.getByRole("button", { name: "+ Definition", exact: true }).click();
+  await page.getByLabel("Title", { exact: true }).fill("Study invitation accepted");
+  await page.getByRole("button", { name: "Define fact values" }).click();
+  await expect(page.getByLabel("Initial knowledge")).toHaveValue("unknown");
+  await page.getByLabel("Initial knowledge").selectOption("known");
+  await page.getByRole("combobox", { name: "Initial value", exact: true }).selectOption("false");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect.poll(() => setup.commands[0]).toMatchObject({ kind: "definitions", payload: { kind: "fact", fact_schema: { type: "boolean", default_known: true, default_value: false } } });
+});
+test("a calendar reservation captures its clock, location, and shared NPC", async ({ page }) => {
+  const setup = await fixture(page);
+  setup.state.manifest.tracks = [{ id: "academic", title: "Academic" }];
+  setup.state.manifest.definitions = [{ id: "priya", title: "Priya", kind: "npc" }, { id: "library", title: "Library", kind: "location" }];
+  await page.goto("/studio/content/library");
+  await page.getByRole("button", { name: "+ Definition", exact: true }).click();
+  await page.getByLabel("Title", { exact: true }).fill("Study meeting");
+  await page.getByRole("combobox", { name: "Type", exact: true }).selectOption("calendar");
+  await page.getByRole("button", { name: "Reserve a calendar window" }).click();
+  await page.getByLabel("Track clock").selectOption("academic");
+  await page.getByLabel("Track day", { exact: true }).fill("4");
+  await page.getByLabel("Start hour", { exact: true }).fill("14");
+  await page.getByLabel("End hour", { exact: true }).fill("16");
+  await page.getByRole("combobox", { name: "Location", exact: true }).selectOption("library");
+  await page.getByLabel("Required NPCs").selectOption(["priya"]);
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect.poll(() => setup.commands[0]).toMatchObject({ payload: { kind: "calendar", reservation: { track_id: "academic", day: 4, start_hour: 14, end_hour: 16, location_id: "library", npc_ids: ["priya"] } } });
 });

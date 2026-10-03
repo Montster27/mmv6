@@ -1,3 +1,4 @@
+import { agreementReferences } from "./agreements";
 import { recordId } from "./manifest";
 import { STUDIO_KINDS, type StudioChange, type StudioManifest, type StudioRecord } from "@/types/studio";
 
@@ -12,7 +13,7 @@ function stable(value: unknown): string {
   return JSON.stringify(value) ?? "undefined";
 }
 function references(row: StudioRecord): string[] {
-  return [...ids(row.dependencies), ...ids(row.storylet_ids), ...(typeof row.parent_id === "string" ? [row.parent_id] : [])];
+  return [...agreementReferences(row), ...ids(row.dependencies), ...ids(row.storylet_ids), ...(typeof row.parent_id === "string" ? [row.parent_id] : [])];
 }
 /** Root-to-leaf briefs, preserving attribution rather than flattening conflicting prose. */
 export function inheritedBriefs(manifest: StudioManifest, planId: string | null): StudioRecord[] {

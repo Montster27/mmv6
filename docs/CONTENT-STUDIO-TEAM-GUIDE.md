@@ -20,6 +20,14 @@ Workspaces hold changed objects and removals against an immutable baseline. Ever
 
 Different workspaces can advance independently. When a newer release changes a declared dependency or parent brief, Studio shows the changed fields and the connection to your assignment. Removed agreements are included. Review and acknowledge these changes before rebasing; the server checks those acknowledgements against the exact release and records the review in the audit history. Unrelated changes and bookkeeping timestamps do not trigger this impact review. If another workspace publishes first, compare and rebase your workspace. Independent changes integrate automatically. For overlapping objects, explicitly keep the draft or released version, then re-review. To combine both versions, retain your draft and edit it after rebasing. Any new change to the active release during integration rejects the stale comparison.
 
+## Shared facts and calendar agreements
+
+In **Library**, a fact can define true/false, numeric, or named values. An unknown initial state is distinct from a known false value. Plans declare which values they require on entry and which they may establish as possible outcomes. Review blocks missing definitions, invalid values, and contradictory entry assumptions. These references also participate in dependency impact review without requiring a duplicate manual link.
+
+Calendar definitions can reserve a track day and hour range, with defined NPCs, a location, and optional fact conditions. Unconditional overlapping reservations for the same NPC at different locations block review. Conditional overlaps generate editorial warnings; contradictory fact conditions identify mutually exclusive alternatives. Events on different track clocks receive a warning rather than an unsupported claim of simultaneous timing. Adjacent windows do not overlap.
+
+These are authoring contracts, not automatic gameplay effects. They do not create runtime flags, NPC knowledge, or scheduled scenes. Reviewers must check that playable conditions and outcomes implement the declared agreements. Resource outcome simulation and automatic prose continuity checks remain outside these checks.
+
 ## Review and publish
 
 Use **Review & playtests** to inspect before/after content, affected dependencies, structural errors, editorial warnings, and revision discussion. Comments record the authenticated author and revision. Saved tests declare a day, segment, history, flags, choices, and skills, with offers that must or must not appear. The game’s actual track offer selector runs these scenarios against the complete draft.
