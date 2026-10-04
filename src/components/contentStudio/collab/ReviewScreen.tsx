@@ -36,7 +36,9 @@ function ReviewActions({ ctx }: { ctx: StudioCtx }) {
         </button>
       </div>
       <p className="text-xs text-slate-500">
-        The owner or a contributor cannot approve their own work. Editing an approved package requires a new review.
+        {ctx.data.soloMode && ctx.actor.admin
+          ? "Solo mode is on: you can approve your own work. The release will be marked self-reviewed."
+          : "The owner or a contributor cannot approve their own work. Editing an approved package requires a new review."}
       </p>
     </section>
   );

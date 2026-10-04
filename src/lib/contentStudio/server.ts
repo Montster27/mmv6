@@ -1,5 +1,6 @@
 import "server-only";
 import { studyGroupPilot } from "@/core/studio/studyGroupPilot";
+import { clearCatalogChanges, isStarterInstalled, starterChanges } from "@/core/studio/starterPack";
 import { STUDIO_KINDS } from "@/types/studio";
 import { assertImpactAcknowledged, planningImpact } from "@/core/studio/planning";
 import { NextResponse } from "next/server";
@@ -52,7 +53,41 @@ export function assertManifest(manifest: StudioManifest) {
   if (errors.length || tests.some((test) => !test.passed)) throw new StudioError(
     [...errors.slice(0, 8).map((issue) => `${issue.objectId}: ${issue.message}`), ...tests.filter((test) => !test.passed).map((test) => `${test.title}: ${test.failures.join(" ")}`)].join("\n"));
 }
+/** The database accepts at most 128 changes per call. Each chunk is atomic and revision-checked. */
+async function saveInChunks(actor: StudioActor, workspaceId: string, revision: number, changes: StudioChange[]) {
+  let next = revision;
+  for (let start = 0; start < changes.length; start += 128) {
+    const { data, error } = await db.rpc("studio_save_batch", {
+      p_actor: actor.id, p_admin: actor.admin, p_workspace: workspaceId, p_revision: next,
+      p_changes: changes.slice(start, start + 128),
+    });
+    if (error) throw new StudioError(error.message, error.code === "40001" ? 409 : error.code === "42501" ? 403 : 400);
+    next = Number((data as { revision: number }).revision);
+  }
+  return { id: workspaceId, revision: next };
+}
+
 export async function handleStudioCommand(actor: StudioActor, action: string, payload: Record<string, unknown>) {
+  if (action === "clear" || action === "starter" || action === "fresh") {
+    const context = await workspaceContext(String(payload.workspace_id));
+    if (context.workspace.revision !== Number(payload.revision)) throw new StudioError("Workspace changed. Reload before changing the scenes.", 409);
+    if (context.workspace.status !== "draft") throw new StudioError("Return this workspace to draft before changing its scenes.", 409);
+    const clearing = action !== "starter" ? clearCatalogChanges(context.manifest) : [];
+    const afterClear = overlayManifest(context.manifest, clearing);
+    const adding = action !== "clear" ? (() => {
+      if (isStarterInstalled(afterClear)) throw new StudioError("The starter scenes are already in this draft.", 409);
+      try { return starterChanges(afterClear); }
+      catch (error) { throw new StudioError(error instanceof Error ? error.message : "Starter scenes unavailable", 409); }
+    })() : [];
+    const combined = overlayManifest(afterClear, adding);
+    // The result must itself be valid: no dangling links, and the starter tests must pass.
+    const errors = validateManifest(combined).filter((issue) => issue.severity === "error" && (adding.length > 0 || clearing.some((c) => c.object_id === issue.objectId)));
+    const failed = runStudioScenarios(combined).filter((test) => adding.some((c) => c.object_id === test.id) && !test.passed);
+    if (errors.length || failed.length) throw new StudioError([...errors.slice(0, 6).map((i) => i.message), ...failed.flatMap((t) => t.failures)].join("\n"));
+    const changes = [...clearing, ...adding];
+    if (changes.length === 0) return { id: context.workspace.id, revision: context.workspace.revision };
+    return saveInChunks(actor, context.workspace.id, context.workspace.revision, changes);
+  }
   if (action === "pilot") {
     const context = await workspaceContext(String(payload.workspace_id));
     if (context.workspace.revision !== Number(payload.revision)) throw new StudioError("Workspace changed. Reload before adding the pilot.",409);

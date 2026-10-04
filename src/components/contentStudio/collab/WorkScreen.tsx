@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { recordId } from "@/core/studio/manifest";
+import { isStarterInstalled } from "@/core/studio/starterPack";
 import type { StudioWorkspace } from "@/types/studio";
 import { BriefContext } from "../BriefContext";
 import {
@@ -298,12 +299,92 @@ function ContentTeam({ ctx }: { ctx: StudioCtx }) {
   );
 }
 
+/** Clean-slate tools: start a new catalog without touching anything players currently see. */
+function StarterPanel({ ctx }: { ctx: StudioCtx }) {
+  const { workspace, manifest } = ctx;
+  if (!workspace) return null;
+  const scenes = manifest.storylets.length;
+  const installed = isStarterInstalled(manifest);
+  const disabled = ctx.busy || !ctx.canEdit;
+  const reassurance =
+    "This only changes your draft. Players keep the version they are on until you publish, and people already mid-game stay on their current version.";
+  return (
+    <section className={panelClass}>
+      <h2 className="font-semibold">Starting a fresh set of scenes</h2>
+      <p className="text-sm text-slate-600">
+        This draft has {scenes} scene{scenes === 1 ? "" : "s"}. The game needs at least one scene on each of its six tracks
+        to start, so the starter scenes give you eight small working examples to learn from and replace.
+      </p>
+      <p className="text-xs text-slate-500">{reassurance}</p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className={primaryClass}
+          disabled={disabled}
+          onClick={() => {
+            if (window.confirm(`Remove all ${scenes} scenes from this draft and add the starter scenes? ${reassurance}`)) {
+              void ctx.act("fresh");
+            }
+          }}
+        >
+          Start fresh with starter scenes
+        </button>
+        <button className={buttonClass} disabled={disabled || installed} onClick={() => void ctx.act("starter")}>
+          {installed ? "Starter scenes already added" : "Add starter scenes only"}
+        </button>
+        <button
+          className={buttonClass}
+          disabled={disabled || scenes === 0}
+          onClick={() => {
+            if (window.confirm(`Remove all ${scenes} scenes from this draft, with no replacements? The game will not start new runs until each track has a scene. ${reassurance}`)) {
+              void ctx.act("clear");
+            }
+          }}
+        >
+          Remove all scenes
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** Lets a one-person team approve and publish their own work, clearly marked as self-reviewed. */
+function SoloModePanel({ ctx }: { ctx: StudioCtx }) {
+  if (!ctx.actor.admin) return null;
+  const on = ctx.data.soloMode === true;
+  const teamSize = ctx.members.length;
+  return (
+    <section className={panelClass}>
+      <h2 className="font-semibold">Working alone</h2>
+      <p className="text-sm text-slate-600">
+        {on
+          ? "Solo mode is on. You can approve and publish your own work. Every release you publish this way is permanently marked “self-reviewed”."
+          : "Normally a second person must review work before it goes live. If you are the only person on the team, turn on solo mode to approve your own work."}
+      </p>
+      <p className="text-xs text-slate-500">
+        Solo mode only works for a one-person team and switches itself off as soon as a second member is added.
+      </p>
+      <button
+        className={on ? buttonClass : primaryClass}
+        disabled={ctx.busy || (!on && teamSize >= 2)}
+        onClick={() => void ctx.act("solo", { enabled: !on })}
+      >
+        {on ? "Turn off solo mode" : "Turn on solo mode"}
+      </button>
+      {!on && teamSize >= 2 ? (
+        <p className="text-xs text-amber-800">Your team has {teamSize} members, so independent review applies.</p>
+      ) : null}
+    </section>
+  );
+}
+
 export function WorkScreen({ ctx }: { ctx: StudioCtx }) {
   return (
     <>
+      <SoloModePanel ctx={ctx} />
       <AssignmentList ctx={ctx} />
       <CreateAssignment ctx={ctx} />
       <AssignmentBrief ctx={ctx} />
+      <StarterPanel ctx={ctx} />
       <ContentTeam ctx={ctx} />
     </>
   );

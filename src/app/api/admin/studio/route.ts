@@ -8,18 +8,19 @@ export async function GET(request: Request) {
   try {
     const actor = await studioActor(request);
     const workspaceId = new URL(request.url).searchParams.get("workspace");
-    const [workspaces, members, releases, active] = await Promise.all([
+    const [workspaces, members, releases, active, settings] = await Promise.all([
       db.from("studio_workspaces").select("*").order("updated_at", { ascending: false }),
       db.from("studio_members").select("user_id,role,display_name"),
-      db.from("studio_releases").select("id,title,created_at,source_workspace_id,runtime_version").order("created_at", { ascending: false }),
+      db.from("studio_releases").select("id,title,created_at,source_workspace_id,runtime_version,self_reviewed").order("created_at", { ascending: false }),
       activeContext(),
+      db.from("studio_settings").select("solo_mode").maybeSingle(),
     ]);
     if (workspaces.error || members.error || releases.error) throw new Error("Unable to load Studio");
     const context = workspaceId ? await workspaceContext(workspaceId) : null;
     const events = workspaceId ? await db.from("studio_events").select("*").eq("workspace_id", workspaceId).order("id", { ascending: false }).limit(100) : null;
     const manifest = context?.manifest ?? active.manifest;
     return NextResponse.json({ actor, workspaces: workspaces.data, members: members.data, releases: releases.data,
-      activeReleaseId: active.release.id, activePlans: active.manifest.plans, manifest,
+      activeReleaseId: active.release.id, soloMode: settings.data?.solo_mode === true, activePlans: active.manifest.plans, manifest,
       inheritedBriefs: context ? inheritedBriefs(manifest, context.workspace.plan_id) : [],
       impacts: context ? planningImpact(context.base, active.manifest, context.changes, context.workspace.plan_id) : [], workspace: context?.workspace ?? null,
       conflicts: context ? rebaseConflicts(context.base, active.manifest, context.changes).map((id) => {
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   try {
     const actor = await studioActor(request);
     const { action, ...payload } = await request.json();
-    if (!["create", "meta", "save", "pilot", "submit", "approve", "changes", "withdraw", "rebase", "publish", "activate", "comment", "member"].includes(action)) return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    if (!["create", "meta", "save", "pilot", "submit", "approve", "changes", "withdraw", "rebase", "publish", "activate", "comment", "member", "solo", "clear", "starter", "fresh"].includes(action)) return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     return NextResponse.json(await handleStudioCommand(actor, action, payload));
   } catch (error) { return failure(error); }
 }

@@ -27,6 +27,9 @@ export function ReleasesScreen({ ctx }: { ctx: StudioCtx }) {
             {release.id === data.activeReleaseId ? (
               <span className="ml-2 rounded bg-green-100 px-2 text-xs text-green-800">Active for new runs</span>
             ) : null}
+            {release.self_reviewed ? (
+              <span className="ml-2 rounded bg-amber-100 px-2 text-xs text-amber-900">Self-reviewed</span>
+            ) : null}
             <p className="text-xs text-slate-500">
               {new Date(release.created_at).toLocaleString()} · {release.runtime_version}
             </p>
