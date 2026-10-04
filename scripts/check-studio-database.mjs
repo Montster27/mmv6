@@ -77,4 +77,42 @@ await assert.rejects(batch(owner,1,[planChange]),/Revision conflict/);
 assert.equal((await db.query("select has_function_privilege('authenticated','studio_save_batch(uuid,boolean,uuid,integer,jsonb)','EXECUTE') as allowed")).rows[0].allowed,false);
 console.log('Atomic batch checks passed: rollback, authorization, revision conflict, browser access denied.');
 
+
+// Clean-slate removals travel through the same batch: null payloads delete scenes from a draft only.
+const clearWs=await cmd(owner,'create',{title:'Clean slate',reviewer_id:reviewer});
+const clearId='20000000-0000-0000-0000-000000000001';
+await db.query('select studio_save_batch($1,false,$2,$3,$4::jsonb)',[owner,clearWs.id,1,JSON.stringify([{kind:'storylets',object_id:clearId,payload:null},{kind:'scenarios',object_id:'old-test',payload:null}])]);
+const cleared=(await db.query('select kind,object_id,payload from studio_changes where workspace_id=$1 order by kind',[clearWs.id])).rows;
+assert.equal(cleared.length,2,'removals were not recorded');
+assert.ok(cleared.every(r=>r.payload===null),'a removal stored a payload');
+assert.equal((await db.query('select title from storylets where id=$1',[clearId])).rows[0].title,'Original','clearing a draft changed live content');
+assert.equal((await db.query('select title from runtime_storylets($1)',[other])).rows.some(r=>r.title==='Original'||r.title==='Revised'),true,'players lost content before publication');
+console.log('Clean-slate checks passed: removals recorded as draft changes only, live content untouched.');
+
+// Solo mode: a one-person team can self-approve; every safeguard is checked.
+await db.exec(readFileSync('supabase/migrations/20261005100000_studio_solo_mode.sql','utf8'));
+await assert.rejects(cmd(owner,'solo',{enabled:true},false),/Administrator required/);
+await assert.rejects(cmd(owner,'solo',{enabled:true},true),/one-person team/);
+await db.query('delete from studio_members where user_id in ($1,$2)',[reviewer,other]);
+await cmd(owner,'solo',{enabled:true},true);
+const soloId='20000000-0000-0000-0000-000000000009';
+const soloWs=await cmd(owner,'create',{title:'Solo draft'},true);
+await cmd(owner,'save',{workspace_id:soloWs.id,revision:1,kind:'storylets',object_id:soloId,payload:{...payload,id:soloId,slug:'solo-scene',title:'Solo scene'}},true);
+await cmd(owner,'submit',{workspace_id:soloWs.id,revision:2},true);
+await assert.rejects(cmd(owner,'approve',{workspace_id:soloWs.id,revision:3},false),/Independent review|Assigned reviewer/);
+await cmd(owner,'approve',{workspace_id:soloWs.id,revision:3},true);
+assert.equal((await db.query("select detail->>'self_reviewed' as v from studio_events where workspace_id=$1 and action='approve'",[soloWs.id])).rows[0].v,'true');
+const soloRelease=await cmd(owner,'publish',{workspace_id:soloWs.id,revision:4},true);
+assert.equal((await db.query('select self_reviewed from studio_releases where id=$1',[soloRelease.release_id])).rows[0].self_reviewed,true,'self-reviewed release was not marked');
+assert.equal((await db.query("select count(*)::int as n from studio_releases where self_reviewed")).rows[0].n,1,'earlier independent releases were wrongly marked');
+// A second member switches solo mode off and independent review applies again.
+await cmd(owner,'member',{user_id:reviewer,role:'reviewer'},true);
+assert.equal((await db.query('select solo_mode from studio_settings')).rows[0].solo_mode,false,'solo mode did not switch off');
+const afterSolo=await cmd(owner,'create',{title:'After solo',reviewer_id:reviewer},true);
+await cmd(owner,'save',{workspace_id:afterSolo.id,revision:1,kind:'plans',object_id:'p',payload:{id:'p',title:'P'}},true);
+await cmd(owner,'submit',{workspace_id:afterSolo.id,revision:2},true);
+await assert.rejects(cmd(owner,'approve',{workspace_id:afterSolo.id,revision:3},true),/Independent review/);
+assert.equal((await db.query("select has_table_privilege('authenticated','studio_settings','SELECT') as allowed")).rows[0].allowed,false);
+console.log('Solo mode checks passed: admin-only, one-person limit, self-approval, self-reviewed mark, auto-off, browser access denied.');
+
 await db.close();

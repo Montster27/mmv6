@@ -27,7 +27,7 @@ export function CommandPalette({ onClose }: CommandPaletteProps) {
           <span className="text-slate-500 text-sm">⌘</span>
           <input
             autoFocus
-            placeholder="Search storylets, tracks, NPCs…"
+            placeholder="Search scenes, tracks, NPCs…"
             className="flex-1 bg-transparent text-slate-100 text-sm outline-none placeholder:text-slate-500"
             onKeyDown={(e) => e.key === "Escape" && onClose()}
           />

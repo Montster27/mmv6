@@ -89,3 +89,13 @@ describe('playable agreement bindings',()=>{
     expect(validateRuntimeBindings(m).some(i=>/known false initial/.test(i.message))).toBe(true);
   });
 });
+
+describe('identity tags in rehearsals', () => {
+  it('accepts tagged choices and says what is not simulated', () => {
+    const m = fixture();
+    (m.storylets[0].choices as StudioRecord[])[0].identity_tags = ['people'];
+    const result = runRehearsal(m, first(m));
+    expect(result.passed).toBe(true);
+    expect(result.trace?.some((row) => row.notes.some((note) => /Kind of choice \(people\)/.test(note)))).toBe(true);
+  });
+});

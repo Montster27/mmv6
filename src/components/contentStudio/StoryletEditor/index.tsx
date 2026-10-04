@@ -126,7 +126,7 @@ export function StoryletEditor({
           </button>
         )}
         <h2>
-          {draft.title || "Untitled"}
+          {draft.title || "Untitled scene"}
           {isDirty && (
             <span style={{ color: "var(--warn)", marginLeft: 5, fontSize: 12, fontWeight: 400 }}>
               unsaved
@@ -166,7 +166,7 @@ export function StoryletEditor({
               className="btn"
               style={{ color: "var(--bad)", borderColor: "#fca5a5" }}
               onClick={() => {
-                if (confirm(`Delete "${draft.title}"? This cannot be undone.`)) onDelete();
+                if (confirm(`Delete the scene "${draft.title}"? This cannot be undone.`)) onDelete();
               }}
               disabled={saving}
             >
@@ -247,6 +247,7 @@ export function StoryletEditor({
             allStorylets={allStorylets}
             arcOptions={arcOptions}
             trackKey={trackKey}
+            onReplace={(scene) => setDraft(scene)}
           />
         </div>
       </div>

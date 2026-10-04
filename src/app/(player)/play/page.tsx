@@ -124,6 +124,7 @@ import { useDailyRun } from "@/hooks/queries/useDailyRun";
 import { matchesRequirement } from "@/core/storylets/reactionRequirements";
 import { TrackStoryletCard } from "@/components/play/TrackStoryletCard";
 import { StoryletOfferMenu } from "@/components/play/StoryletOfferMenu";
+import { withPassed } from "@/core/play/offers";
 import { DialogueNodeView } from "@/components/play/DialogueNodeView";
 import { NpcColoredText } from "@/components/play/NpcColoredText";
 import { SleepCard } from "@/components/play/SleepCard";
@@ -520,6 +521,19 @@ export default function PlayPage() {
   const passedOfferStorageKey = dailyState?.id && dayState?.current_segment
     ? `mmv:passed-offers:${dailyState.id}:${dayIndex}:${dayState.current_segment}`
     : null;
+  // Passing one offer leaves the others on the menu. A pass lasts for this segment only.
+  const passOffers = (keys: string[]) => {
+    setPassedOfferKeys((prev) => {
+      const next = withPassed(prev, keys);
+      if (passedOfferStorageKey) {
+        try {
+          sessionStorage.setItem(passedOfferStorageKey, JSON.stringify([...next]));
+        } catch { /* Storage may be unavailable; the in-memory pass still applies. */ }
+      }
+      return next;
+    });
+    setActiveOfferKey(null);
+  };
   const chapterOneMode = useMemo(
     () =>
       featureFlags.chapterOneScarcityEnabled && dayIndex <= CHAPTER_ONE_LAST_DAY,
@@ -3950,21 +3964,8 @@ export default function PlayPage() {
                               offers={remainingOffers}
                               dayIndex={dayIndex}
                               onChoose={setActiveOfferKey}
-                              onLeave={() => {
-                                setPassedOfferKeys((prev) => {
-                                  const next = new Set([
-                                    ...prev,
-                                    ...remainingOffers.map((offer) => offer.storylet_key),
-                                  ]);
-                                  if (passedOfferStorageKey) {
-                                    try {
-                                      sessionStorage.setItem(passedOfferStorageKey, JSON.stringify([...next]));
-                                    } catch { /* Storage may be unavailable; the in-memory pass still applies. */ }
-                                  }
-                                  return next;
-                                });
-                                setActiveOfferKey(null);
-                              }}
+                              onPass={(key) => passOffers([key])}
+                              onLeave={() => passOffers(remainingOffers.map((offer) => offer.storylet_key))}
                             />
                           );
                         }

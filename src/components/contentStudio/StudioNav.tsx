@@ -5,26 +5,32 @@ import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { useStudio } from "./StudioContext";
 
-const PRIMARY_TABS = [
-  { label: "My work", href: "/studio/content/work" },
-  { label: "Narrative map", href: "/studio/content/narrative" },
-  { label: "Library", href: "/studio/content/library" },
-  { label: "Review", href: "/studio/content/review" },
-  { label: "Releases", href: "/studio/content/releases" },
+type Tab = { label: string; href: string; hint: string };
+
+// The tabs a new writer needs, in the order they are needed.
+const PRIMARY_TABS: Tab[] = [
+  { label: "Start here", href: "/studio/content/start", hint: "Write your first scene in a few guided steps" },
+  { label: "Scenes", href: "/studio/content/storylets", hint: "Write, edit and play-test scenes" },
+  { label: "My work", href: "/studio/content/work", hint: "Your drafts, assignments and team" },
+  { label: "Narrative map", href: "/studio/content/narrative", hint: "Plan arcs and see how scenes connect" },
+  { label: "Library", href: "/studio/content/library", hint: "Shared facts, people and places" },
+  { label: "Review", href: "/studio/content/review", hint: "Check, test and approve a draft" },
+  { label: "Releases", href: "/studio/content/releases", hint: "Publish approved work to players" },
 ];
-const CONTENT_TABS: { label: string; href: string }[] = [];
-const MORE_TABS = [
-  { label: "Storylets", href: "/studio/content/storylets" },
-  { label: "Calendar", href: "/studio/content/calendar" },
-  { label: "Swimlane", href: "/studio/content/swimlane" },
-  { label: "Constellation", href: "/studio/content/constellation" },
-  { label: "NPCs", href: "/studio/content/npcs" },
-  { label: "Tracks", href: "/studio/content/arcs" },
-  { label: "Streams", href: "/studio/content/streams" },
-  { label: "Graph", href: "/studio/content/graph" },
-  { label: "Economy", href: "/studio/content/resource-economy" },
-  { label: "Preview", href: "/studio/content/preview" },
-  { label: "Consequence rules", href: "/studio/content/rules" },
+const CONTENT_TABS: Tab[] = [];
+// Power tools. Useful once the catalog is large; not needed to write a first scene.
+const MORE_TABS: Tab[] = [
+  { label: "Glossary", href: "/studio/content/glossary", hint: "What Studio's words mean" },
+  { label: "Calendar", href: "/studio/content/calendar", hint: "Scenes laid out by day" },
+  { label: "Swimlane", href: "/studio/content/swimlane", hint: "Scenes by track" },
+  { label: "Constellation", href: "/studio/content/constellation", hint: "Relationships between scenes" },
+  { label: "NPCs", href: "/studio/content/npcs", hint: "People in the game" },
+  { label: "Tracks", href: "/studio/content/arcs", hint: "The six storylines" },
+  { label: "Streams", href: "/studio/content/streams", hint: "Track pressure over time" },
+  { label: "Graph", href: "/studio/content/graph", hint: "Scene graph" },
+  { label: "Economy", href: "/studio/content/resource-economy", hint: "Time, energy and money" },
+  { label: "Preview", href: "/studio/content/preview", hint: "Play through the content" },
+  { label: "Consequence rules", href: "/studio/content/rules", hint: "Delayed consequences" },
 ];
 
 export function StudioNav() {
@@ -53,6 +59,7 @@ export function StudioNav() {
         <Link
           key={tab.href}
           href={tab.href}
+          title={tab.hint}
           className={`tab${isActive(tab.href) ? " active" : ""}`}
         >
           {tab.label}
@@ -81,8 +88,9 @@ export function StudioNav() {
         <button
           className={`tab${moreActive ? " active" : ""}`}
           onClick={() => setMoreOpen((o) => !o)}
+          title="Power tools and the glossary"
         >
-          More ▾
+          Advanced ▾
         </button>
         {moreOpen && (
           <div
@@ -104,6 +112,7 @@ export function StudioNav() {
               <Link
                 key={tab.href}
                 href={tab.href}
+                title={tab.hint}
                 style={{
                   display: "block",
                   padding: "7px 14px",

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function ContentStudioRootPage() {
-  redirect("/studio/content/work");
+  redirect("/studio/content/start");
 }

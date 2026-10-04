@@ -265,7 +265,7 @@ export default function ArcsPage() {
             {/* Arc list */}
             <div className="space-y-2">
               {loading ? (
-                <p className="text-sm text-slate-600">Loading\u2026</p>
+                <p className="text-sm text-slate-600">Loading…</p>
               ) : arcDefinitions.length === 0 ? (
                 <p className="text-sm text-slate-600">No arc definitions found.</p>
               ) : (

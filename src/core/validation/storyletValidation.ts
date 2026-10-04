@@ -836,6 +836,45 @@ export function validateStoryletIssues(
   return { errors, warnings };
 }
 
+const IDENTITY_TAGS = ["risk", "people", "achieve", "safety"];
+
+/**
+ * Project rules a new writer is most likely to miss. These are warnings so they never
+ * block a save; the Studio turns each into a plain-language prompt with a fix.
+ * Opt-in (not part of validateStoryletIssues) so legacy callers keep their exact output.
+ */
+export function authoringWarnings(storylet: Storylet): ValidationIssue[] {
+  const warnings: ValidationIssue[] = [];
+  if (!storylet || typeof storylet !== "object") return warnings;
+  if (isString(storylet.body) && storylet.body.includes("(Example — replace")) {
+    addIssue(warnings, storylet, "body", "Scene still contains example text");
+  }
+  if (!Array.isArray(storylet.choices)) return warnings;
+  storylet.choices.forEach((choice, idx) => {
+    if (!choice || typeof choice !== "object") return;
+    const c = choice as unknown as Record<string, unknown>;
+    if (c.precludes === undefined) {
+      addIssue(warnings, storylet, `choices[${idx}].precludes`, "Choice does not say what it closes off (use an empty list for nothing)");
+    }
+    const tags = c.identity_tags;
+    if (!Array.isArray(tags) || tags.length === 0) {
+      addIssue(warnings, storylet, `choices[${idx}].identity_tags`, "Choice has no kind (risk, people, achieve or safety)");
+    } else {
+      const unknown = tags.filter((tag) => typeof tag !== "string" || !IDENTITY_TAGS.includes(tag));
+      if (unknown.length) {
+        addIssue(warnings, storylet, `choices[${idx}].identity_tags`, `Unknown kind of choice: ${unknown.join(", ")}. Use risk, people, achieve or safety`);
+      }
+    }
+    const outcome = c.outcome as { text?: unknown } | undefined;
+    const reacts = isString(c.reaction_text) && c.reaction_text.trim().length > 0;
+    const outcomeText = outcome && isString(outcome.text) && outcome.text.trim().length > 0;
+    if (!reacts && !outcomeText && !Array.isArray(c.outcomes) && !storylet.nodes) {
+      addIssue(warnings, storylet, `choices[${idx}].reaction_text`, "Choice shows the player nothing after they pick it");
+    }
+  });
+  return warnings;
+}
+
 export function validateArcDefinitions(storylets: Storylet[]) {
   void storylets;
   return [];

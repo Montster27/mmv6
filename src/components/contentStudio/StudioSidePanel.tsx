@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import type { Storylet } from "@/types/storylets";
-import { validateStoryletIssues } from "@/core/validation/storyletValidation";
+import { applyAllFixes, guidedIssues } from "@/core/validation/explainIssues";
 import { getScriptModeGaps } from "./StoryletEditor/getScriptModeGaps";
 import type { TrackKey } from "@/lib/trackPalette";
 import { TRACK_LABELS, trackStyle } from "@/lib/trackPalette";
+import { Term } from "./Term";
 
 type PanelId = "props" | "validation" | "npcs" | "collision" | "flags" | "history";
 
@@ -14,14 +15,16 @@ interface StudioSidePanelProps {
   allStorylets: Storylet[];
   arcOptions: { id: string; key: string; title: string }[];
   trackKey: TrackKey | null;
+  /** Replace the whole draft, used by one-click fixes. */
+  onReplace?: (scene: Storylet) => void;
 }
 
 const PANELS: { id: PanelId; label: string }[] = [
-  { id: "props", label: "Properties" },
-  { id: "validation", label: "Validation" },
-  { id: "npcs", label: "NPCs" },
-  { id: "collision", label: "Collision" },
-  { id: "flags", label: "Flags & Doors" },
+  { id: "props", label: "Details" },
+  { id: "validation", label: "Checks" },
+  { id: "npcs", label: "People" },
+  { id: "collision", label: "Overlaps" },
+  { id: "flags", label: "Flags" },
   { id: "history", label: "History" },
 ];
 
@@ -43,15 +46,15 @@ function PropsPanel({
   return (
     <div>
       <div className="sp-row">
-        <span className="sp-label">Day</span>
+        <span className="sp-label"><Term id="day" /></span>
         <span className="sp-value">{draft.due_offset_days ?? "—"}</span>
       </div>
       <div className="sp-row">
-        <span className="sp-label">Segment</span>
+        <span className="sp-label"><Term id="segment" /></span>
         <span className="sp-value">{draft.segment ?? "—"}</span>
       </div>
       <div className="sp-row">
-        <span className="sp-label">Track</span>
+        <span className="sp-label"><Term id="track" /></span>
         <span className="sp-value">
           {trackLabel ? (
             <span className="track-chip" style={trackStyle(trackKey)}>
@@ -62,13 +65,13 @@ function PropsPanel({
         </span>
       </div>
       <div className="sp-row">
-        <span className="sp-label">Key</span>
+        <span className="sp-label"><Term id="key">Key</Term></span>
         <span className="sp-value mono" style={{ fontSize: 11 }}>
           {draft.storylet_key ?? "—"}
         </span>
       </div>
       <div className="sp-row">
-        <span className="sp-label">Status</span>
+        <span className="sp-label"><Term id="status" /></span>
         <span
           className="sp-value"
           style={{
@@ -82,64 +85,65 @@ function PropsPanel({
         </span>
       </div>
       <div className="sp-row">
-        <span className="sp-label">Mode</span>
+        <span className="sp-label">Ready?</span>
         <span className="sp-value" style={{ fontSize: 11 }}>
-          {gaps.length === 0 ? "script-ready" : `structured (${gaps.length} gap${gaps.length !== 1 ? "s" : ""})`}
-        </span>
-      </div>
-      <div className="sp-row">
-        <span className="sp-label">Crystallizer</span>
-        <span style={{ fontSize: 11, color: "var(--ink-4)" }}>
-          stub — T-1778831000007
+          {gaps.length === 0
+            ? "Ready to write in the Script tab"
+            : `${gaps.length} thing${gaps.length !== 1 ? "s" : ""} to finish in the Structured tab`}
         </span>
       </div>
     </div>
   );
 }
 
-function ValidationPanel({ draft }: { draft: Storylet }) {
-  const { errors, warnings } = useMemo(() => validateStoryletIssues(draft), [draft]);
+function ValidationPanel({ draft, onReplace }: { draft: Storylet; onReplace?: (scene: Storylet) => void }) {
+  const issues = useMemo(() => guidedIssues(draft), [draft]);
   const gaps = useMemo(() => getScriptModeGaps(draft), [draft]);
+  const fixable = issues.filter((issue) => issue.fix).length;
 
-  if (errors.length === 0 && warnings.length === 0 && gaps.length === 0) {
+  if (issues.length === 0 && gaps.length === 0) {
     return (
       <div style={{ padding: "12px 0", color: "var(--good)", fontSize: 12, fontWeight: 500 }}>
-        ✓ No issues found
+        ✓ Nothing to fix. This scene follows the project rules.
       </div>
     );
   }
 
   return (
     <div>
-      {errors.map((issue, i) => (
-        <div key={i} className="val-row bad">
+      {fixable > 1 && onReplace ? (
+        <button type="button" className="btn" style={{ marginBottom: 8 }} onClick={() => onReplace(applyAllFixes(draft))}>
+          Fix the {fixable} that are safe to fix automatically
+        </button>
+      ) : null}
+      {issues.map((issue) => (
+        <div key={issue.id} className={`val-row ${issue.severity === "error" ? "bad" : "warn"}`}>
           <div className="icon" />
           <div>
-            <div className="rule">{issue.path}</div>
-            <div>{issue.message}</div>
-          </div>
-        </div>
-      ))}
-      {warnings.map((issue, i) => (
-        <div key={i} className="val-row warn">
-          <div className="icon" />
-          <div>
-            <div className="rule">{issue.path}</div>
-            <div>{issue.message}</div>
+            <div className="rule">
+              {issue.severity === "error" ? "Must fix" : "Worth fixing"} · {issue.where}
+            </div>
+            <div style={{ fontWeight: 600 }}>{issue.title}</div>
+            <div style={{ color: "var(--ink-3)" }}>{issue.why}</div>
+            {issue.fix && onReplace ? (
+              <button type="button" className="btn" style={{ marginTop: 4 }} onClick={() => onReplace(issue.fix!.apply(draft))}>
+                {issue.fix.label}
+              </button>
+            ) : null}
           </div>
         </div>
       ))}
       {gaps.length > 0 && (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--line)" }}>
           <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--ink-3)", marginBottom: 6 }}>
-            Script-mode gaps
+            Finish in the Structured tab
           </div>
           {gaps.map((gap) => (
             <div key={gap} className="val-row warn">
               <div className="icon" />
               <div>
                 <div className="rule">{gap}</div>
-                <div>Not editable in Script view — use Structured</div>
+                <div>Not editable in the Script tab.</div>
               </div>
             </div>
           ))}
@@ -152,8 +156,7 @@ function ValidationPanel({ draft }: { draft: Storylet }) {
 function NpcsPanel() {
   return (
     <div className="sp-grey">
-      NPC field not in schema yet<br />
-      <span style={{ fontSize: 10 }}>T-1778831000013</span>
+      Notes about the people in a scene are not available yet.
     </div>
   );
 }
@@ -182,7 +185,7 @@ function CollisionPanel({
   if (competing.length === 0) {
     return (
       <div style={{ padding: "12px 0", color: "var(--good)", fontSize: 12 }}>
-        ✓ No competing storylets on D{draft.due_offset_days}
+        ✓ No other scenes compete for D{draft.due_offset_days}
         {draft.segment ? `/${draft.segment}` : ""}
       </div>
     );
@@ -191,7 +194,7 @@ function CollisionPanel({
   return (
     <div>
       <div style={{ fontSize: 11, color: "var(--warn)", marginBottom: 8 }}>
-        {competing.length} storylet{competing.length !== 1 ? "s" : ""} compete for
+        {competing.length} other scene{competing.length !== 1 ? "s" : ""} could be offered at
         D{draft.due_offset_days}{draft.segment ? `/${draft.segment}` : ""}
       </div>
       {competing.map((s) => (
@@ -275,12 +278,12 @@ export function StudioSidePanel({
   allStorylets,
   arcOptions,
   trackKey,
+  onReplace,
 }: StudioSidePanelProps) {
   const [active, setActive] = useState<PanelId>("props");
 
   const validationCount = useMemo(() => {
-    const { errors, warnings } = validateStoryletIssues(draft);
-    return errors.length + warnings.length;
+    return guidedIssues(draft).length;
   }, [draft]);
 
   const collisionCount = useMemo(() => {
@@ -322,7 +325,7 @@ export function StudioSidePanel({
         {active === "props" && (
           <PropsPanel draft={draft} arcOptions={arcOptions} trackKey={trackKey} />
         )}
-        {active === "validation" && <ValidationPanel draft={draft} />}
+        {active === "validation" && <ValidationPanel draft={draft} onReplace={onReplace} />}
         {active === "npcs" && <NpcsPanel />}
         {active === "collision" && (
           <CollisionPanel draft={draft} allStorylets={allStorylets} />

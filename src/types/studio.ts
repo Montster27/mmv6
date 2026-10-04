@@ -16,7 +16,7 @@ export type StudioWorkspace = {
 };
 export type StudioChange = { kind: StudioKind; object_id: string; payload: StudioRecord | null };
 export type StudioIssue = { severity: "error" | "warning"; objectId: string; message: string };
-export type StudioRelease = { id: string; title: string; created_at: string; source_workspace_id: string | null; runtime_version: string };
+export type StudioRelease = { id: string; title: string; created_at: string; source_workspace_id: string | null; runtime_version: string; self_reviewed?: boolean };
 export type StudioScenario = StudioRecord & {
   id: string; title: string; day: number; segment: string;
   resolved: Record<string, string[]>; choices: Record<string, string[]>;

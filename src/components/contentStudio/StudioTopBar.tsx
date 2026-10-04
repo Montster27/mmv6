@@ -28,7 +28,7 @@ export function StudioTopBar() {
         <input
           type="text"
           className="search"
-          placeholder="Search storylets… (⌘K)"
+          placeholder="Search scenes… (⌘K)"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onFocus={() => {
