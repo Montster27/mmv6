@@ -78,6 +78,17 @@ assert.equal((await db.query("select has_function_privilege('authenticated','stu
 console.log('Atomic batch checks passed: rollback, authorization, revision conflict, browser access denied.');
 
 
+// Clean-slate removals travel through the same batch: null payloads delete scenes from a draft only.
+const clearWs=await cmd(owner,'create',{title:'Clean slate',reviewer_id:reviewer});
+const clearId='20000000-0000-0000-0000-000000000001';
+await db.query('select studio_save_batch($1,false,$2,$3,$4::jsonb)',[owner,clearWs.id,1,JSON.stringify([{kind:'storylets',object_id:clearId,payload:null},{kind:'scenarios',object_id:'old-test',payload:null}])]);
+const cleared=(await db.query('select kind,object_id,payload from studio_changes where workspace_id=$1 order by kind',[clearWs.id])).rows;
+assert.equal(cleared.length,2,'removals were not recorded');
+assert.ok(cleared.every(r=>r.payload===null),'a removal stored a payload');
+assert.equal((await db.query('select title from storylets where id=$1',[clearId])).rows[0].title,'Original','clearing a draft changed live content');
+assert.equal((await db.query('select title from runtime_storylets($1)',[other])).rows.some(r=>r.title==='Original'||r.title==='Revised'),true,'players lost content before publication');
+console.log('Clean-slate checks passed: removals recorded as draft changes only, live content untouched.');
+
 // Solo mode: a one-person team can self-approve; every safeguard is checked.
 await db.exec(readFileSync('supabase/migrations/20261005100000_studio_solo_mode.sql','utf8'));
 await assert.rejects(cmd(owner,'solo',{enabled:true},false),/Administrator required/);
