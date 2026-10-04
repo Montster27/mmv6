@@ -40,7 +40,7 @@ function matchesSearch(storylet: Storylet, search: string): boolean {
 function makeNewStorylet(seed?: { arcId?: string | null; stepKey?: string } | null): Omit<Storylet, "id"> {
   return {
     slug: seed?.stepKey ?? `draft_${Date.now()}`,
-    title: seed?.stepKey ? seed.stepKey.replace(/_/g, " ") : "New storylet",
+    title: seed?.stepKey ? seed.stepKey.replace(/_/g, " ") : "New scene",
     body: "",
     choices: [],
     is_active: false,
@@ -217,7 +217,7 @@ function StoryletsContent() {
             <div className="p-3 space-y-2 border-b border-slate-200 bg-white shrink-0">
               <input
                 className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-                placeholder="Search by title, slug, tag\u2026"
+                placeholder="Search by title, key or tag…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -247,7 +247,7 @@ function StoryletsContent() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-500">
-                  {filtered.length} storylet{filtered.length !== 1 ? "s" : ""}
+                  {filtered.length} scene{filtered.length !== 1 ? "s" : ""}
                 </span>
                 <Button onClick={handleNewStorylet}>+ New</Button>
               </div>
@@ -256,11 +256,11 @@ function StoryletsContent() {
             {/* List */}
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <p className="p-3 text-sm text-slate-600">Loading\u2026</p>
+                <p className="p-3 text-sm text-slate-600">Loading…</p>
               ) : error ? (
                 <p className="p-3 text-sm text-red-600">{error}</p>
               ) : paginated.length === 0 ? (
-                <p className="p-3 text-sm text-slate-500">No storylets found.</p>
+                <p className="p-3 text-sm text-slate-500">No scenes yet. Use “Start here” to write your first one, or + New.</p>
               ) : (
                 paginated.map((s) => {
                   const errorCount = getIssueCount(s);
@@ -301,7 +301,7 @@ function StoryletsContent() {
                           e.stopPropagation();
                           handleClone(s, session);
                         }}
-                        title="Clone this storylet"
+                        title="Duplicate this scene"
                       >
                         Clone
                       </button>
@@ -375,7 +375,7 @@ function StoryletsContent() {
               />
             ) : (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                Select a storylet or create a new one.
+                Select a scene, or create a new one with + New.
               </div>
             )}
           </div>

@@ -34,7 +34,7 @@ const segments = ['morning','afternoon','evening','night'];
 const idOf = (row: StudioRecord) => String(row.id ?? row.key ?? '');
 const defaults: ResourceSnapshot = { energy: 70, stress: 20, knowledge: 0, cashOnHand: 0, socialLeverage: 0, physicalResilience: 50, morale: 100 };
 const knownRequirements = new Set(['requires_storylets','requires_any_storylets','excludes_storylets','requires_choice','requires_flag','requires_skill']);
-const supportedChoiceFields = new Set(['id','label','reaction_text','reaction_with_skill','reaction_text_conditions','next_key','outcome','costs','rewards','energy_cost','requires_resource','costs_resource','sets_track_state','requires_skill','skill_modifier','practices_skills','precludes','sets_flag','events_emitted','relational_effects','set_npc_memory','time_cost']);
+const supportedChoiceFields = new Set(['id','label','reaction_text','reaction_with_skill','reaction_text_conditions','next_key','outcome','costs','rewards','energy_cost','requires_resource','costs_resource','sets_track_state','requires_skill','skill_modifier','practices_skills','precludes','sets_flag','events_emitted','relational_effects','set_npc_memory','time_cost','identity_tags']);
 function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message); }
 function stringList(value: unknown, label: string): string[] {
   assert(Array.isArray(value) && value.every(x => typeof x === 'string'), `${label} must be a list of names.`); return value;
@@ -138,6 +138,7 @@ export function runRehearsal(manifest: StudioManifest, raw: StudioRecord): Studi
           state.flags = [...new Set([...state.flags,...stringList(choice.sets_flag ?? [],'Choice flags')])];
           state.precluded = [...new Set([...state.precluded,...(choice.precludes ?? [])])];
           state.practiced = [...new Set([...state.practiced,...(choice.practices_skills ?? [])])];
+          if (choice.identity_tags?.length) notes.push(`Kind of choice (${choice.identity_tags.join(', ')}) is recorded in play; its effect on pressure counters is not simulated here.`);
           if (choice.practices_skills?.length) notes.push(`Practice requested: ${choice.practices_skills.join(', ')}. Only active training receives time credit in play; this does not grant a trained skill.`);
           const p = progress.find(p => p.track_id === scene.track_id)!;
           p.resolved_storylet_keys = [...p.resolved_storylet_keys,scene.storylet_key];

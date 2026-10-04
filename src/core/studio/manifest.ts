@@ -1,7 +1,8 @@
 import { runRehearsal } from "./rehearsal";
 import { validateRuntimeBindings } from "./bindings";
 import { validateAgreements } from "./agreements";
-import { validateStoryletIssues } from "@/core/validation/storyletValidation";
+import { authoringWarnings, validateStoryletIssues } from "@/core/validation/storyletValidation";
+import type { Storylet } from "@/types/storylets";
 import { selectTrackStorylets } from "@/core/tracks/selectTrackStorylets";
 import { CHAPTER_ONE_TRACK_KEYS } from "@/types/tracks";
 import type { Track, TrackProgress, TrackStoryletRow } from "@/types/tracks";
@@ -62,7 +63,7 @@ export function validateManifest(manifest: StudioManifest): StudioIssue[] {
     const id = recordId(row);
     const validation = validateStoryletIssues(row);
     for (const issue of validation.errors) add("error", id, `${issue.path}: ${issue.message}`);
-    for (const issue of validation.warnings) add("warning", id, `${issue.path}: ${issue.message}`);
+    for (const issue of [...validation.warnings, ...authoringWarnings(row as unknown as Storylet)]) add("warning", id, `${issue.path}: ${issue.message}`);
     if (row.track_id) {
       if (!trackIds.has(String(row.track_id))) add("error", id, "Track does not exist.");
       const key = `${row.track_id}:${row.storylet_key}`;
