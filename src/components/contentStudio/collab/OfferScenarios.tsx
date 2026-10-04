@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { recordId } from "@/core/studio/manifest";
-import type { StudioRecord, StudioScenario } from "@/types/studio";
+import type { StudioScenario } from "@/types/studio";
+import { ChipPicker } from "../ChipPicker";
 import { StaleFormNotice } from "./StaleFormNotice";
 import { buttonClass, Field, inputClass, panelClass, primaryClass, type StudioCtx } from "./shared";
 
@@ -31,38 +32,6 @@ function validAdvancedState(state: unknown): state is { choices?: Record<string,
   if (value.skills && !Array.isArray(value.skills)) return false;
   if (value.precluded && !Array.isArray(value.precluded)) return false;
   return true;
-}
-
-function SceneSelect({
-  label,
-  value,
-  options,
-  onChange,
-  height,
-}: {
-  label: string;
-  value: string[];
-  options: StudioRecord[];
-  onChange: (next: string[]) => void;
-  height: string;
-}) {
-  return (
-    <label className="block text-xs">
-      {label}
-      <select
-        multiple
-        className={`${inputClass} ${height}`}
-        value={value}
-        onChange={(event) => onChange(Array.from(event.target.selectedOptions, (option) => option.value))}
-      >
-        {options.map((row) => (
-          <option key={recordId(row)} value={String(row.storylet_key)}>
-            {row.title}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
 }
 
 export function OfferScenarios({ ctx }: { ctx: StudioCtx }) {
@@ -172,35 +141,30 @@ export function OfferScenarios({ ctx }: { ctx: StudioCtx }) {
                 </select>
               </label>
             </div>
-            <label className="block text-xs">
-              Scenes that already happened
-              <select
-                multiple
-                className={`${inputClass} h-32`}
-                value={manifest.storylets
-                  .filter((row) => (scenario.resolved[String(row.track_id)] ?? []).includes(String(row.storylet_key)))
-                  .map(recordId)}
-                onChange={(event) => onResolvedChange(Array.from(event.target.selectedOptions, (option) => option.value))}
-              >
-                {trackScenes.map((row) => (
-                  <option key={recordId(row)} value={recordId(row)}>
-                    {row.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <SceneSelect
+            <ChipPicker
+              label="Scenes that already happened"
+              emptyText="None. The player is at the very start."
+              placeholder="Search scenes…"
+              options={trackScenes.map((row) => ({ value: recordId(row), label: String(row.title || "Untitled scene"), hint: String(row.storylet_key ?? "") }))}
+              value={manifest.storylets
+                .filter((row) => (scenario.resolved[String(row.track_id)] ?? []).includes(String(row.storylet_key)))
+                .map(recordId)}
+              onChange={onResolvedChange}
+            />
+            <ChipPicker
               label="Must be offered"
+              emptyText="No scene is required to appear."
+              placeholder="Search scenes…"
+              options={trackScenes.map((row) => ({ value: String(row.storylet_key), label: String(row.title || "Untitled scene") }))}
               value={scenario.expected}
-              options={trackScenes}
-              height="h-24"
               onChange={(expected) => setScenario({ ...scenario, expected })}
             />
-            <SceneSelect
+            <ChipPicker
               label="Must not be offered"
+              emptyText="No scene is required to be absent."
+              placeholder="Search scenes…"
+              options={trackScenes.map((row) => ({ value: String(row.storylet_key), label: String(row.title || "Untitled scene") }))}
               value={scenario.forbidden}
-              options={trackScenes}
-              height="h-24"
               onChange={(forbidden) => setScenario({ ...scenario, forbidden })}
             />
             <Field

@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { recordId } from "@/core/studio/manifest";
 import type { StudioKind, StudioRecord } from "@/types/studio";
 import { AgreementEditor } from "../AgreementEditor";
+import { ArcMap } from "../ArcMap";
+import { ChipPicker } from "../ChipPicker";
 import { StaleFormNotice } from "./StaleFormNotice";
 import { buttonClass, Field, inputClass, panelClass, primaryClass, type Mode, type StudioCtx } from "./shared";
 
@@ -28,10 +30,6 @@ const DEFINITION_FIELDS: [string, string][] = [
 ];
 const PLAN_KINDS = ["direction", "plot", "strand", "arc"];
 const DEFINITION_KINDS = ["fact", "npc", "location", "calendar", "skill", "resource", "rule"];
-
-function selected(event: { target: HTMLSelectElement }): string[] {
-  return Array.from(event.target.selectedOptions, (option) => option.value);
-}
 
 export function PlanLibraryScreen({ ctx, mode }: { ctx: StudioCtx; mode: Extract<Mode, "narrative" | "library"> }) {
   const { manifest, workspace, markDirty } = ctx;
@@ -163,39 +161,31 @@ export function PlanLibraryScreen({ ctx, mode }: { ctx: StudioCtx; mode: Extract
                 <Field key={key} label={label} value={String(editing[key] ?? "")} onChange={(value) => patch(key, value)} multiline />
               ))}
               <AgreementEditor record={editing} manifest={manifest} patch={patch} disabled={!ctx.canEdit} />
-              <label className="block text-xs">
-                Depends on
-                <select
-                  multiple
-                  className={`${inputClass} h-28`}
-                  value={Array.isArray(editing.dependencies) ? (editing.dependencies as string[]) : []}
-                  onChange={(event) => patch("dependencies", selected(event))}
-                >
-                  {[...manifest.plans, ...manifest.definitions]
-                    .filter((row) => recordId(row) !== recordId(editing))
-                    .map((row) => (
-                      <option key={recordId(row)} value={recordId(row)}>
-                        {row.title}
-                      </option>
-                    ))}
-                </select>
-              </label>
+              <ChipPicker
+                label="Depends on"
+                emptyText="Nothing yet. Add the facts, people or plans this relies on."
+                placeholder="Search plans and shared definitions…"
+                options={[...manifest.plans, ...manifest.definitions]
+                  .filter((row) => recordId(row) !== recordId(editing))
+                  .map((row) => ({ value: recordId(row), label: String(row.title || "Untitled"), hint: String(row.kind ?? "") }))}
+                value={Array.isArray(editing.dependencies) ? (editing.dependencies as string[]) : []}
+                onChange={(next) => patch("dependencies", next)}
+              />
               {mode === "narrative" ? (
-                <label className="block text-xs">
-                  Storylets in this arc
-                  <select
-                    multiple
-                    className={`${inputClass} h-28`}
-                    value={Array.isArray(editing.storylet_ids) ? (editing.storylet_ids as string[]) : []}
-                    onChange={(event) => patch("storylet_ids", selected(event))}
-                  >
-                    {manifest.storylets.map((row) => (
-                      <option key={recordId(row)} value={recordId(row)}>
-                        {row.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <ChipPicker
+                  label="Scenes in this arc"
+                  emptyText="No scenes linked yet."
+                  placeholder="Search scenes…"
+                  options={manifest.storylets.map((row) => ({ value: recordId(row), label: String(row.title || "Untitled scene"), hint: String(row.storylet_key ?? "") }))}
+                  value={Array.isArray(editing.storylet_ids) ? (editing.storylet_ids as string[]) : []}
+                  onChange={(next) => patch("storylet_ids", next)}
+                />
+              ) : null}
+              {mode === "narrative" && Array.isArray(editing.storylet_ids) && editing.storylet_ids.length > 0 ? (
+                <div className="space-y-1">
+                  <h3 className="text-xs font-medium text-slate-600">How the scenes in this arc connect</h3>
+                  <ArcMap scenes={manifest.storylets.filter((row) => (editing.storylet_ids as string[]).includes(recordId(row)))} />
+                </div>
               ) : null}
               <label className="flex gap-2 text-sm">
                 <input

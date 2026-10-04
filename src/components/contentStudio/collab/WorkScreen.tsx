@@ -60,12 +60,9 @@ function CreateAssignment({ ctx }: { ctx: StudioCtx }) {
   const [title, setTitle] = useState("");
   const [brief, setBrief] = useState("");
   const [owner, setOwner] = useState("");
-  const [plan, setPlan] = useState("");
+  // This screen only mounts after Studio has loaded in the browser, so reading the URL here is safe.
+  const [plan, setPlan] = useState(() => new URLSearchParams(window.location.search).get("plan") ?? "");
   const [reviewer, setReviewer] = useState("");
-
-  useEffect(() => {
-    setPlan(new URLSearchParams(window.location.search).get("plan") ?? "");
-  }, []);
 
   async function create() {
     const created = await ctx.act("create", {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { recordId } from "@/core/studio/manifest";
 import { apiRequest } from "@/lib/contentStudio/apiClient";
 import { PlanLibraryScreen } from "./collab/PlanLibraryScreen";
@@ -9,6 +9,7 @@ import { ReleasesScreen } from "./collab/ReleasesScreen";
 import { ReviewScreen } from "./collab/ReviewScreen";
 import {
   buttonClass,
+  createDirtyRegistry,
   inputClass,
   SCREEN_TITLES,
   type Mode,
@@ -17,27 +18,28 @@ import {
 } from "./collab/shared";
 import { WorkScreen } from "./collab/WorkScreen";
 
+function fetchStudio(id: string) {
+  return apiRequest<StudioData>(`/api/admin/studio${id ? `?workspace=${encodeURIComponent(id)}` : ""}`);
+}
+
 /**
  * Shell for the five collaboration screens. It owns loading, the working-context switch,
  * and the rebase flow; each screen owns its own forms.
  */
 export function CollaborationStudio({ mode }: { mode: Mode }) {
   const [data, setData] = useState<StudioData | null>(null);
-  const [workspaceId, setWorkspaceId] = useState("");
+  // The first render is always the loading state, so reading sessionStorage here cannot cause a hydration mismatch.
+  const [initialWorkspaceId] = useState(() => (typeof window === "undefined" ? "" : (sessionStorage.getItem("studio.workspace") ?? "")));
+  const [workspaceId, setWorkspaceId] = useState(initialWorkspaceId);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [acknowledgedImpacts, setAcknowledgedImpacts] = useState<string[]>([]);
   const [resolutions, setResolutions] = useState<Record<string, string>>({});
-  const dirty = useRef(new Set<string>());
+  const dirty = useMemo(() => createDirtyRegistry(), []);
+  const markDirty = useCallback((source: string, isDirty: boolean) => dirty.mark(source, isDirty), [dirty]);
 
-  const markDirty = useCallback((source: string, isDirty: boolean) => {
-    if (isDirty) dirty.current.add(source);
-    else dirty.current.delete(source);
-  }, []);
-
-  const load = useCallback(async (id: string) => {
-    const result = await apiRequest<StudioData>(`/api/admin/studio${id ? `?workspace=${encodeURIComponent(id)}` : ""}`);
+  const applyLoad = useCallback((result: Awaited<ReturnType<typeof fetchStudio>>) => {
     if (!result.ok || !result.data) {
       setError(result.error ?? "Unable to load Studio");
       return;
@@ -46,17 +48,22 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
     setResolutions({});
     setAcknowledgedImpacts([]);
   }, []);
+  const load = useCallback(async (id: string) => applyLoad(await fetchStudio(id)), [applyLoad]);
 
   useEffect(() => {
-    const id = sessionStorage.getItem("studio.workspace") ?? "";
-    setWorkspaceId(id);
-    void load(id);
-  }, [load]);
+    let current = true;
+    void fetchStudio(initialWorkspaceId).then((result) => {
+      if (current) applyLoad(result);
+    });
+    return () => {
+      current = false;
+    };
+  }, [applyLoad, initialWorkspaceId]);
 
   const selectWorkspace = useCallback(
     async (id: string) => {
-      if (dirty.current.size > 0 && !window.confirm("Leave this unsaved form?")) return;
-      dirty.current.clear();
+      if (dirty.any() && !window.confirm("Leave this unsaved form?")) return;
+      dirty.clear();
       if (id) sessionStorage.setItem("studio.workspace", id);
       else sessionStorage.removeItem("studio.workspace");
       sessionStorage.removeItem("studio.revision");
@@ -66,7 +73,7 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
       window.dispatchEvent(new Event("studio-workspace-change"));
       await load(id);
     },
-    [load]
+    [load, dirty]
   );
 
   const act = useCallback(

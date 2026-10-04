@@ -5,6 +5,7 @@ import { agreementReferences } from "@/core/studio/agreements";
 import { PILOT_PLAN_ID } from "@/core/studio/studyGroupPilot";
 import { recordId } from "@/core/studio/manifest";
 import { RehearsalPanel } from "../RehearsalPanel";
+import { ChangeSummary } from "./ChangeSummary";
 import { OfferScenarios } from "./OfferScenarios";
 import { buttonClass, Field, inputClass, panelClass, primaryClass, type StudioCtx } from "./shared";
 
@@ -64,15 +65,22 @@ function ChangedContent({ ctx }: { ctx: StudioCtx }) {
             <summary className="cursor-pointer text-sm font-medium">
               {change.payload?.title || before?.title || change.object_id} · {change.kind} · {verdict}
             </summary>
-            <div className="grid gap-3 pt-3 lg:grid-cols-2">
-              <div>
-                <p className="text-xs font-semibold">Approved baseline</p>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(before ?? null, null, 2)}</pre>
-              </div>
-              <div>
-                <p className="text-xs font-semibold">Proposed revision</p>
-                <pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(change.payload, null, 2)}</pre>
-              </div>
+            <div className="space-y-2 pt-3">
+              <p className="text-xs font-semibold">What changed</p>
+              <ChangeSummary kind={change.kind} before={before} after={change.payload} />
+              <details className="text-xs">
+                <summary className="cursor-pointer">Technical details (full before and after)</summary>
+                <div className="grid gap-3 pt-2 lg:grid-cols-2">
+                  <div>
+                    <p className="font-semibold">Approved baseline</p>
+                    <pre className="max-h-80 overflow-auto whitespace-pre-wrap">{JSON.stringify(before ?? null, null, 2)}</pre>
+                  </div>
+                  <div>
+                    <p className="font-semibold">Proposed revision</p>
+                    <pre className="max-h-80 overflow-auto whitespace-pre-wrap">{JSON.stringify(change.payload, null, 2)}</pre>
+                  </div>
+                </div>
+              </details>
             </div>
             {affected.length > 0 ? (
               <p className="mt-2 text-xs text-amber-800">Dependent work: {affected.map((row) => row.title).join(", ")}</p>

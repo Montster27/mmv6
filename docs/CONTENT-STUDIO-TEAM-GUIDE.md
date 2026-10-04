@@ -2,6 +2,8 @@
 
 Updated October 4, 2026 on `Narrative_rebuild`.
 
+New to Studio? Start with the [beginner guide](CONTENT-STUDIO-BEGINNER-GUIDE.md). It covers writing a first scene, solo mode for a one-person team, and starting a fresh set of scenes. Everything below is for working as a team.
+
 ## Start with the team and direction
 
 An administrator opens **My work**, adds existing game accounts to the content team, and assigns writer, lead, reviewer, or publisher roles. Administrator access remains available. Tester access alone does not grant editing rights.

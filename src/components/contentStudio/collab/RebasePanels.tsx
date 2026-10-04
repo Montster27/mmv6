@@ -1,5 +1,6 @@
 "use client";
 
+import { ChangeSummary } from "./ChangeSummary";
 import { panelClass, type StudioCtx } from "./shared";
 
 function show(value: unknown): string {
@@ -96,6 +97,11 @@ export function ConflictPanel({
           <strong className="text-sm">
             {conflict.draft?.title ?? conflict.released?.title ?? conflict.id}
           </strong>
+          <div>
+            <p className="text-xs font-semibold">How the two versions differ</p>
+            <ChangeSummary kind={conflict.id.split(":")[0]} before={conflict.released} after={conflict.draft} />
+            <p className="text-xs text-slate-500">Reads as: the current release → your draft.</p>
+          </div>
           <div className="grid gap-3 lg:grid-cols-2">
             {(
               [

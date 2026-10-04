@@ -65,6 +65,19 @@ export type StudioCtx = {
   titleOf: (id: string) => string;
 };
 
+/** Tracks which screens hold unsaved forms, so switching context can confirm first. */
+export function createDirtyRegistry() {
+  const sources = new Set<string>();
+  return {
+    mark(source: string, dirty: boolean) {
+      if (dirty) sources.add(source);
+      else sources.delete(source);
+    },
+    any: () => sources.size > 0,
+    clear: () => sources.clear(),
+  };
+}
+
 export const inputClass = "w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm";
 export const buttonClass =
   "rounded border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-40";

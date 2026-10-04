@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { ChipPicker } from './ChipPicker';
+import { describeRehearsalStep } from '@/core/studio/rehearsalText';
 import type { RehearsalScenario, RehearsalStep } from '@/core/studio/rehearsal';
 import type { StudioManifest, StudioRecord, StudioTestResult } from '@/types/studio';
 const input = 'mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm';
@@ -24,7 +26,8 @@ export function RehearsalPanel({manifest,tests,revision,canEdit,busy,save,onEdit
       {test.trace?.map(row=><details className="rounded border p-2 text-sm" key={row.step}><summary>Step {row.step} · {row.storylet_id?title(row.storylet_id):row.action} · {row.after.day}/{row.after.segment} · energy {row.after.resources.energy}, stress {row.after.resources.stress} {row.failures.length?'· failed':''}</summary>
         {row.storylet_id&&<Link className="text-indigo-700 underline" href={`/studio/content/storylets?id=${encodeURIComponent(row.storylet_id)}`}>Open scene and choice {row.choice_id}</Link>}
         <p>Offered next: {row.offered.map(title).join(', ')||'none'}</p>{row.notes.map((note,i)=><p key={i} className="text-amber-800">{note}</p>)}
-        <div className="grid gap-3 md:grid-cols-2"><div><p>Before</p><pre className="max-h-64 overflow-auto text-xs">{JSON.stringify(row.before,null,2)}</pre></div><div><p>After</p><pre className="max-h-64 overflow-auto text-xs">{JSON.stringify(row.after,null,2)}</pre></div></div>
+        {(()=>{const lines=describeRehearsalStep(row.before,row.after,title);return lines.length?<ul className="list-disc pl-5">{lines.map((l,i)=><li key={i}>{l}</li>)}</ul>:<p className="text-slate-500">Nothing changed in this step.</p>;})()}
+        <details className="text-xs"><summary>Technical details (full state before and after)</summary><div className="grid gap-3 md:grid-cols-2"><div><p>Before</p><pre className="max-h-64 overflow-auto text-xs">{JSON.stringify(row.before,null,2)}</pre></div><div><p>After</p><pre className="max-h-64 overflow-auto text-xs">{JSON.stringify(row.after,null,2)}</pre></div></div></details>
       </details>)}
       <button className={button} onClick={()=>edit(manifest.scenarios.find(s=>s.id===test.id) as RehearsalScenario)}>Inspect rehearsal</button>
     </div>)}
@@ -37,7 +40,7 @@ export function RehearsalPanel({manifest,tests,revision,canEdit,busy,save,onEdit
         <h3 className="text-sm font-semibold">Step {index+1}</h3>
         <label className="block text-xs">Action<select className={input} value={step.action} onChange={e=>patchStep(index,{action:e.target.value as RehearsalStep['action'],storylet_id:undefined,choice_id:undefined})}><option value="check">Check opportunities and state</option><option value="choose">Choose a scene outcome</option><option value="advance">Move to next segment / sleep</option></select></label>
         {step.action==='choose'&&<><label className="block text-xs">Scene<select className={input} value={step.storylet_id??''} onChange={e=>patchStep(index,{storylet_id:e.target.value,choice_id:undefined})}><option value="">Choose a scene</option>{manifest.storylets.filter(s=>s.track_id).map(s=><option key={String(s.id)} value={String(s.id)}>{s.title}</option>)}</select></label><label className="block text-xs">Choice<select className={input} value={step.choice_id??''} onChange={e=>patchStep(index,{choice_id:e.target.value})}><option value="">Choose an outcome</option>{((manifest.storylets.find(s=>s.id===step.storylet_id)?.choices??[]) as StudioRecord[]).map(c=><option key={String(c.id)} value={String(c.id)}>{String(c.label)}</option>)}</select></label></>}
-        {(['offered','forbidden'] as const).map(key=><label key={key} className="block text-xs">{key==='offered'?'Must be offered afterward':'Must not be offered afterward'}<select multiple className={`${input} h-24`} value={step.expect?.[key]??[]} onChange={e=>patchStep(index,{expect:{...step.expect,[key]:Array.from(e.target.selectedOptions,o=>o.value)}})}>{manifest.storylets.filter(s=>s.track_id).map(s=><option key={String(s.id)} value={String(s.id)}>{s.title}</option>)}</select></label>)}
+        {(['offered','forbidden'] as const).map(key=><ChipPicker key={key} label={key==='offered'?'Must be offered afterward':'Must not be offered afterward'} emptyText={key==='offered'?'No scene is required to appear.':'No scene is required to be absent.'} placeholder="Search scenes…" options={manifest.storylets.filter(s=>s.track_id).map(s=>({value:String(s.id),label:String(s.title||'Untitled scene'),hint:String(s.storylet_key??'')}))} value={step.expect?.[key]??[]} onChange={next=>patchStep(index,{expect:{...step.expect,[key]:next}})}/>)}
         <div className="grid gap-3 sm:grid-cols-2">{(['energy','stress'] as const).map(key=><label key={key} className="text-xs">Expected {key} (optional)<input type="number" min={0} max={100} className={input} value={step.expect?.resources?.[key]??''} onChange={e=>patchStep(index,{expect:{...step.expect,resources:{...step.expect?.resources,[key]:e.target.value===''?undefined:Number(e.target.value)}}})}/></label>)}</div>
         <button className={button} onClick={()=>setDraft({...draft,steps:draft.steps.filter((_,i)=>i!==index)})}>Remove step {index+1}</button>
       </div>)}

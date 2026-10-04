@@ -9,7 +9,7 @@ test.skip(!process.env.STUDIO_UI_TEST, "Run with STUDIO_UI_TEST=1 and a local BA
 const me = "10000000-0000-0000-0000-000000000001";
 const tracks = CHAPTER_ONE_TRACK_KEYS.map((key) => ({ id: `track-${key}`, key, title: key, is_enabled: true }));
 
-async function setup(page: Page, opts: { admin?: boolean; soloMode?: boolean; withWorkspace?: boolean; scenes?: number; members?: number } = {}) {
+async function setup(page: Page, opts: { admin?: boolean; soloMode?: boolean; withWorkspace?: boolean; scenes?: number; members?: number; mutate?: (state: Record<string, any>) => void } = {}) { // eslint-disable-line @typescript-eslint/no-explicit-any
   const workspace = { id: "ws", title: "My draft", owner_id: me, reviewer_id: null, collaborator_ids: [], base_release_id: "base", revision: 1, status: "draft", brief: "", blocked_reason: "", plan_id: null };
   const manifest: StudioManifest = { ...emptyManifest(), tracks: tracks as never };
   for (let i = 0; i < (opts.scenes ?? 0); i++) manifest.storylets.push({ id: `old-${i}`, slug: `old-${i}`, storylet_key: `old_${i}`, title: `Old ${i}`, body: "Old.", choices: [], is_active: true, track_id: "track-roommate", order_index: i + 1 });
@@ -24,6 +24,7 @@ async function setup(page: Page, opts: { admin?: boolean; soloMode?: boolean; wi
     activeReleaseId: "base", activePlans: [], inheritedBriefs: [], impacts: [], conflicts: [], manifest, base: manifest, changes: [], events: [], issues: [], tests: [],
     soloMode: opts.soloMode ?? false,
   };
+  opts.mutate?.(state as Record<string, any>); // eslint-disable-line @typescript-eslint/no-explicit-any
   await page.addInitScript(({ me, ws }) => {
     if (ws) sessionStorage.setItem("studio.workspace", "ws");
     localStorage.setItem("sb-studio-test-auth-token", JSON.stringify({ access_token: "synthetic-ui-test", refresh_token: "synthetic", expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: "bearer", user: { id: me, email: "writer@example.test", aud: "authenticated" } }));
@@ -167,4 +168,53 @@ test("a scene shows its checks with a one-click fix in the editor", async ({ pag
   await expect(page.getByText("Say what kind of choice this is").first()).toBeVisible();
   await page.getByRole("button", { name: /Mark it “safety”/ }).first().click();
   await expect(page.getByText("Say what kind of choice this is")).toHaveCount(0);
+});
+
+const sceneRow = (id: string, extra: Record<string, unknown> = {}) => ({ id, slug: id, storylet_key: id, title: `Scene ${id}`, body: "Text.", choices: [], is_active: true, track_id: "track-roommate", order_index: 1, due_offset_days: 0, expires_after_days: 1, segment: "morning", requirements: {}, ...extra });
+
+test("an arc shows a map of its scenes, and scenes are added with a searchable picker", async ({ page }) => {
+  await setup(page, {
+    withWorkspace: true,
+    mutate: (state) => {
+      state.manifest.storylets = [
+        sceneRow("a", { choices: [{ id: "x", label: "X", sets_flag: ["spoke"], next_key: "b" }] }),
+        sceneRow("b", { due_offset_days: 1, requirements: { requires_storylets: ["a"], requires_flag: "spoke" } }),
+        sceneRow("c", { title: "Scene c, not yet linked" }),
+      ];
+      state.manifest.plans = [{ id: "arc1", kind: "arc", title: "Study group", storylet_ids: ["a", "b"], miss_path: "The player may decline." }];
+    },
+  });
+  await page.goto("/studio/content/narrative");
+  await page.getByRole("button", { name: /arc Study group/ }).click();
+  await expect(page.getByRole("img", { name: "Map of this arc's scenes" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open scene Scene a" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open scene Scene b" })).toBeVisible();
+  await expect(page.getByText("Needs this scene first")).toBeVisible();
+  await expect(page.getByText("Day 1")).toBeVisible();
+
+  const picker = page.getByRole("combobox", { name: "Scenes in this arc" });
+  await picker.fill("not yet");
+  await page.getByRole("option", { name: /Scene c, not yet linked/ }).click();
+  await expect(page.getByRole("link", { name: "Open scene Scene c, not yet linked" })).toBeVisible();
+  await page.getByRole("button", { name: "Remove Scene c, not yet linked" }).click();
+  await expect(page.getByRole("link", { name: "Open scene Scene c, not yet linked" })).toHaveCount(0);
+});
+
+test("review shows what changed in plain words, with the raw data tucked away", async ({ page }) => {
+  await setup(page, {
+    withWorkspace: true,
+    mutate: (state) => {
+      const before = sceneRow("a", { title: "The phone", choices: [{ id: "x", label: "Call", energy_cost: 1 }] });
+      const after = sceneRow("a", { title: "The hall phone", choices: [{ id: "x", label: "Call", energy_cost: 3 }, { id: "y", label: "Write" }] });
+      state.base = { ...state.manifest, storylets: [before] };
+      state.manifest = { ...state.manifest, storylets: [after] };
+      state.changes = [{ kind: "storylets", object_id: "a", payload: after }];
+    },
+  });
+  await page.goto("/studio/content/review");
+  await page.getByText(/The hall phone · storylets · changed/).click();
+  await expect(page.getByText("Title changed from “The phone” to “The hall phone”.")).toBeVisible();
+  await expect(page.getByText("“Call”: now — costs 3 energy.")).toBeVisible();
+  await expect(page.getByText("Choice added: “Write”.")).toBeVisible();
+  await expect(page.getByText("Technical details (full before and after)")).toBeVisible();
 });
