@@ -8,14 +8,21 @@ export async function GET(request: Request) {
   try {
     const actor = await studioActor(request);
     const workspaceId = new URL(request.url).searchParams.get("workspace");
-    const [workspaces, members, releases, active, settings] = await Promise.all([
+    const releaseColumns = "id,title,created_at,source_workspace_id,runtime_version";
+    const [workspaces, members, newReleases, active, settings] = await Promise.all([
       db.from("studio_workspaces").select("*").order("updated_at", { ascending: false }),
       db.from("studio_members").select("user_id,role,display_name"),
-      db.from("studio_releases").select("id,title,created_at,source_workspace_id,runtime_version,self_reviewed").order("created_at", { ascending: false }),
+      db.from("studio_releases").select(`${releaseColumns},self_reviewed`).order("created_at", { ascending: false }),
       activeContext(),
       db.from("studio_settings").select("solo_mode").maybeSingle(),
     ]);
-    if (workspaces.error || members.error || releases.error) throw new Error("Unable to load Studio");
+    // Databases that have not yet applied the solo-mode migration lack `self_reviewed` and
+    // `studio_settings`. Studio still loads; solo mode simply stays off until it is applied.
+    const releases = newReleases.error
+      ? await db.from("studio_releases").select(releaseColumns).order("created_at", { ascending: false })
+      : newReleases;
+    const failed = [["workspaces", workspaces.error], ["members", members.error], ["releases", releases.error]].find(([, e]) => e);
+    if (failed) throw new Error(`Unable to load Studio (${failed[0]}: ${(failed[1] as { message?: string }).message ?? "database error"}). Check that the Studio migrations have been applied.`);
     const context = workspaceId ? await workspaceContext(workspaceId) : null;
     const events = workspaceId ? await db.from("studio_events").select("*").eq("workspace_id", workspaceId).order("id", { ascending: false }).limit(100) : null;
     const manifest = context?.manifest ?? active.manifest;
