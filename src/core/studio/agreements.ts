@@ -3,7 +3,7 @@ import type { StudioIssue, StudioManifest, StudioRecord } from "@/types/studio";
 export type FactSchema = { type: "boolean" | "number" | "enum"; values?: string[]; default_known: boolean; default_value?: unknown };
 export type FactUse = { definition_id: string; mode: "requires" | "establishes"; value: unknown };
 export type Reservation = {
-  track_id: string; day: number; start_hour: number; end_hour: number;
+  segment?: string; track_id: string; day: number; start_hour: number; end_hour: number;
   location_id: string; npc_ids: string[]; conditions: FactUse[];
 };
 const idOf = (row: StudioRecord) => String(row.id ?? row.key ?? "");
@@ -20,6 +20,8 @@ export function agreementReferences(row: StudioRecord): string[] {
   return [...uses.flatMap((use) => typeof use?.definition_id === "string" ? [use.definition_id] : []),
     ...(typeof reservation?.location_id === "string" ? [reservation.location_id] : []),
     ...(Array.isArray(reservation?.npc_ids) ? reservation.npc_ids.filter((id): id is string => typeof id === "string") : []),
+    ...uses.flatMap((use) => typeof use?.storylet_id === "string" ? [use.storylet_id] : []),
+    ...(Array.isArray(row.storylet_ids) ? row.storylet_ids.filter((id): id is string => typeof id === "string") : []),
     ...(typeof reservation?.track_id === "string" ? [reservation.track_id] : [])];
 }
 export function validateAgreements(manifest: StudioManifest): StudioIssue[] {

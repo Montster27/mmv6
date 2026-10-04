@@ -1,3 +1,5 @@
+import { runRehearsal } from "./rehearsal";
+import { validateRuntimeBindings } from "./bindings";
 import { validateAgreements } from "./agreements";
 import { validateStoryletIssues } from "@/core/validation/storyletValidation";
 import { selectTrackStorylets } from "@/core/tracks/selectTrackStorylets";
@@ -107,7 +109,7 @@ export function validateManifest(manifest: StudioManifest): StudioIssue[] {
     if (row.runtime_required === true) add("error", id, "This planned capability is not implemented by the current runtime. Resolve the engine dependency before release.");
     if (row.kind === "arc" && !String(row.miss_path ?? "").trim()) add("warning", id, "Describe what happens if the player misses or declines this arc.");
   }
-  return [...issues, ...validateAgreements(manifest)];
+  return [...issues, ...validateAgreements(manifest), ...validateRuntimeBindings(manifest)];
 }
 
 /** Bounded offer tests use the same selector as play. They do not claim full outcome simulation. */
@@ -115,6 +117,7 @@ export function runStudioScenarios(manifest: StudioManifest): StudioTestResult[]
   const tracks = manifest.tracks.filter((row) => CHAPTER_ONE_TRACK_KEYS.some((key) => key === row.key)) as unknown as Track[];
   const storylets = manifest.storylets.filter((row) => row.track_id && row.storylet_key).map((row) => ({ ...row, order_index: Number(row.order_index ?? 0) })) as unknown as TrackStoryletRow[];
   return (manifest.scenarios as unknown as StudioScenario[]).map((scenario) => {
+    if (scenario.mode === "rehearsal") return runRehearsal(manifest, scenario);
     try {
       const progress: TrackProgress[] = tracks.map((track) => ({
         id: `test:${track.id}`, user_id: "studio", track_id: track.id, state: "ACTIVE", current_storylet_key: "", storylet_due_day: 0,

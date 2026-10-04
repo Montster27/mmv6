@@ -23,7 +23,7 @@ export type StudioScenario = StudioRecord & {
   flags: string[]; precluded: string[]; skills: string[];
   expected: string[]; forbidden: string[];
 };
-export type StudioTestResult = { id: string; title: string; passed: boolean; offered: string[]; failures: string[] };
+export type StudioTestResult = { id: string; title: string; passed: boolean; offered: string[]; failures: string[]; trace?: import("@/core/studio/rehearsal").RehearsalTrace[] };
 export type StudioActor = { id: string; email: string | null; role: StudioRole; admin: boolean };
 export type RuntimeManifest = { storylets: Storylet[]; tracks: Track[] };
 export const STUDIO_RUNTIME_VERSION = "narrative-offers-v1";

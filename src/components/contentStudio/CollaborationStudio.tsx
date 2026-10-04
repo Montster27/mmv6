@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { agreementReferences } from "@/core/studio/agreements";
+import { PILOT_PLAN_ID } from "@/core/studio/studyGroupPilot";
+import { RehearsalPanel } from "./RehearsalPanel";
 import { AgreementEditor } from "./AgreementEditor";
 import { BriefContext } from "./BriefContext";
 import type { PlanningImpact } from "@/core/studio/planning";
@@ -49,6 +51,7 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
   const [memberRole, setMemberRole] = useState("writer");
   const [meta, setMeta] = useState<StudioWorkspace | null>(null);
   const [resolutions, setResolutions] = useState<Record<string, string>>({});
+  const [rehearsalEditing, setRehearsalEditing] = useState(false);
   const [scenarioError, setScenarioError] = useState("");
   const [scenario, setScenario] = useState<StudioScenario | null>(null);
 
@@ -65,7 +68,7 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
   }, [load]);
 
   async function selectWorkspace(id: string) {
-    if ((editing || meta || scenario) && !window.confirm("Leave this unsaved form?")) return;
+    if ((editing || meta || scenario || rehearsalEditing) && !window.confirm("Leave this unsaved form?")) return;
     if (id) sessionStorage.setItem("studio.workspace", id); else sessionStorage.removeItem("studio.workspace");
     sessionStorage.removeItem("studio.revision");
     setWorkspaceId(id); setEditing(null); setMeta(null); setScenario(null); setError(""); setNotice("");
@@ -193,8 +196,10 @@ export function CollaborationStudio({ mode }: { mode: Mode }) {
         return <details key={`${change.kind}:${change.object_id}`} className="rounded border p-3"><summary className="cursor-pointer text-sm font-medium">{change.payload?.title || before?.title || change.object_id} · {change.kind} · {change.payload ? before ? "changed" : "new" : "removed"}</summary><div className="grid gap-3 pt-3 lg:grid-cols-2"><div><p className="text-xs font-semibold">Approved baseline</p><pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(before ?? null,null,2)}</pre></div><div><p className="text-xs font-semibold">Proposed revision</p><pre className="max-h-80 overflow-auto whitespace-pre-wrap text-xs">{JSON.stringify(change.payload,null,2)}</pre></div></div>{affected.length > 0 && <p className="mt-2 text-xs text-amber-800">Dependent work: {affected.map((row) => row.title).join(", ")}</p>}</details>;
       })}</section>
       <section className={panelClass}><h2 className="font-semibold">Checks · {issueErrors.length} must fix</h2><p className="text-xs text-slate-500">Warnings need editorial judgment. These checks do not prove every possible playthrough.</p>{data.issues.slice(0,150).map((issue,index) => <p key={index} className={`text-sm ${issue.severity === "error" ? "text-red-800" : "text-amber-800"}`}><strong>{issue.severity === "error" ? "Must fix" : "Review"}: {titleOf(issue.objectId)}</strong> — {issue.message}</p>)}</section>
+      <section className={panelClass}><h2 className="font-semibold">Study-group team pilot</h2><p className="text-sm">Add director and strand briefs, three writing assignments, an independent-review brief, seven playable scenes and seven rehearsal paths to this draft. The pilot tests explicitly exclude the surrounding catalog; integration with the rest of the game needs additional rehearsals before release.</p><button className={buttonClass} disabled={!canEdit || busy || manifest.plans.some(plan => plan.id === PILOT_PLAN_ID)} onClick={() => void act("pilot")}>Add study-group pilot to draft</button><p className="text-xs text-slate-500">Imported as one revision-checked transaction. No player content changes until independently approved and published. Assign actual people through My work; role briefs do not count as human review.</p></section>
+      <RehearsalPanel onEditingChange={setRehearsalEditing} key={workspaceId} manifest={manifest} tests={data.tests} revision={workspace?.revision ?? 0} canEdit={canEdit} busy={busy} save={(record, revision) => act("save", {kind:"scenarios",object_id:recordId(record),payload:record,revision})}/>
       <section className={panelClass}><h2 className="font-semibold">Saved offer scenarios</h2><p className="text-xs text-slate-500">Tests the actual offer selector across tracks for this exact manifest. Covers a declared day, history, choices, flags, and skills; it does not simulate prose meaning, resource outcomes, or full conversation walks.</p>
-        {data.tests.map((test) => <div className="rounded border p-3 text-sm" key={test.id}><strong className={test.passed ? "text-green-800" : "text-red-800"}>{test.passed ? "Pass" : "Fail"}: {test.title}</strong><p>Offered: {test.offered.join(", ") || "none"}</p>{test.failures.map((failure) => <p key={failure}>{failure}</p>)}<button className={`${buttonClass} mt-2`} onClick={() => { setScenarioError(""); setScenario(manifest.scenarios.find((row) => row.id === test.id) as StudioScenario); setEditRevision(workspace?.revision ?? 0); }}>Inspect scenario</button></div>)}
+        {data.tests.filter(test => !test.trace).map((test) => <div className="rounded border p-3 text-sm" key={test.id}><strong className={test.passed ? "text-green-800" : "text-red-800"}>{test.passed ? "Pass" : "Fail"}: {test.title}</strong><p>Offered: {test.offered.join(", ") || "none"}</p>{test.failures.map((failure) => <p key={failure}>{failure}</p>)}<button className={`${buttonClass} mt-2`} onClick={() => { setScenarioError(""); setScenario(manifest.scenarios.find((row) => row.id === test.id) as StudioScenario); setEditRevision(workspace?.revision ?? 0); }}>Inspect scenario</button></div>)}
         <button className={buttonClass} disabled={!canEdit} onClick={() => { setScenarioError(""); setScenario({ id: crypto.randomUUID(), title: "", day: 0, segment: "morning", resolved: {}, choices: {}, flags: [], precluded: [], skills: [], expected: [], forbidden: [] }); setEditRevision(workspace?.revision ?? 0); }}>+ Offer scenario</button>
         {scenario && <div className="space-y-3 border-t pt-3"><Field label="Test name" value={scenario.title} onChange={(title) => setScenario({ ...scenario, title })}/><div className="flex gap-3"><label className="text-xs">Track day<input aria-label="Test day" type="number" min={0} className={inputClass} value={scenario.day} onChange={(event) => setScenario({ ...scenario, day: Number(event.target.value) })}/></label><label className="text-xs">Segment<select className={inputClass} value={scenario.segment} onChange={(event) => setScenario({ ...scenario, segment: event.target.value })}>{["morning","afternoon","evening","night"].map((segment) => <option key={segment}>{segment}</option>)}</select></label></div>
           <label className="block text-xs">Scenes that already happened<select multiple className={`${inputClass} h-32`} value={manifest.storylets.filter((row) => (scenario.resolved[String(row.track_id)] ?? []).includes(String(row.storylet_key))).map(recordId)} onChange={(event) => { const resolved: Record<string,string[]> = {}; for (const option of Array.from(event.target.selectedOptions)) { const row = manifest.storylets.find((item) => recordId(item) === option.value)!; (resolved[String(row.track_id)] ??= []).push(String(row.storylet_key)); } setScenario({ ...scenario, resolved }); }}>{manifest.storylets.filter((row) => row.track_id).map((row) => <option key={recordId(row)} value={recordId(row)}>{row.title}</option>)}</select></label>

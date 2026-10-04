@@ -1,4 +1,6 @@
-import type { StudioRecord, StudioManifest } from "../../src/types/studio";
+import { studyGroupPilot } from "../../src/core/studio/studyGroupPilot";
+import { runStudioScenarios, overlayManifest, validateManifest } from "../../src/core/studio/manifest";
+import type { StudioRecord, StudioManifest, StudioTestResult, StudioIssue } from "../../src/types/studio";
 import type { PlanningImpact } from "../../src/core/studio/planning";
 import { test, expect, type Page } from "@playwright/test";
 
@@ -9,7 +11,7 @@ const owner = "10000000-0000-0000-0000-000000000001";
 const workspace = { id: "workspace", title: "Roommate strand", owner_id: owner, reviewer_id: "reviewer", collaborator_ids: [], base_release_id: "baseline", revision: 1, status: "draft", brief: "Leave room for late entry.", blocked_reason: "", plan_id: null };
 const empty: StudioManifest = { storylets: [], tracks: [], consequences: [], plans: [], definitions: [], scenarios: [] };
 async function fixture(page: Page) {
-  const state = { actor: { id: owner, email: "writer@example.test", admin: false, role: "writer" }, workspace: { ...workspace }, workspaces: [{ ...workspace }], members: [{ user_id: owner, display_name: "Writer", role: "writer" }], releases: [{ id: "baseline", title: "Baseline", runtime_version: "narrative-offers-v1", created_at: "2026-10-03T12:00:00Z" }], activeReleaseId: "baseline", activePlans: [] as StudioRecord[], inheritedBriefs: [] as StudioRecord[], impacts: [] as PlanningImpact[], manifest: structuredClone(empty), base: structuredClone(empty), changes: [] as unknown[], events: [], conflicts: [] as unknown[], issues: [], tests: [] };
+  const state = { actor: { id: owner, email: "writer@example.test", admin: false, role: "writer" }, workspace: { ...workspace }, workspaces: [{ ...workspace }], members: [{ user_id: owner, display_name: "Writer", role: "writer" }], releases: [{ id: "baseline", title: "Baseline", runtime_version: "narrative-offers-v1", created_at: "2026-10-03T12:00:00Z" }], activeReleaseId: "baseline", activePlans: [] as StudioRecord[], inheritedBriefs: [] as StudioRecord[], impacts: [] as PlanningImpact[], manifest: structuredClone(empty), base: structuredClone(empty), changes: [] as unknown[], events: [], conflicts: [] as unknown[], issues: [] as StudioIssue[], tests: [] as StudioTestResult[] };
   await page.addInitScript(({ owner }) => {
     sessionStorage.setItem("studio.workspace", "workspace");
     localStorage.setItem("sb-studio-test-auth-token", JSON.stringify({ access_token: "synthetic-ui-test", refresh_token: "synthetic", expires_at: Math.floor(Date.now()/1000)+3600, token_type: "bearer", user: { id: owner, email: "writer@example.test", aud: "authenticated" } }));
@@ -25,6 +27,12 @@ async function fixture(page: Page) {
       const rows = state.manifest[body.kind as keyof typeof empty] as unknown[];
       rows.push(body.payload); state.changes.push({ kind: body.kind, object_id: body.object_id, payload: body.payload });
     }
+    if (body.action === "pilot") {
+      const pilot = studyGroupPilot(state.manifest);
+      state.manifest = overlayManifest(state.manifest, Object.entries(pilot).flatMap(([kind,rows])=>rows.map(row=>({kind:kind as keyof StudioManifest,object_id:String(row.id),payload:row}))));
+    }
+    state.tests = runStudioScenarios(state.manifest);
+    state.issues = validateManifest(state.manifest);
     state.workspace.revision++;
     return route.fulfill({ json: { revision: state.workspace.revision } });
   });
@@ -126,4 +134,41 @@ test("a calendar reservation captures its clock, location, and shared NPC", asyn
   await page.getByLabel("Required NPCs").selectOption(["priya"]);
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect.poll(() => setup.commands[0]).toMatchObject({ payload: { kind: "calendar", reservation: { track_id: "academic", day: 4, start_hour: 14, end_hour: 16, location_id: "library", npc_ids: ["priya"] } } });
+});
+
+
+test("a writer rehearses choices and gets a scene-linked failure trace", async ({ page }) => {
+  const setup = await fixture(page);
+  setup.state.manifest.tracks=[{id:'academic',key:'academic',is_enabled:true},{id:'belonging',key:'belonging',is_enabled:true}];
+  await page.goto('/studio/content/review');
+  await page.getByRole('button',{name:'Add study-group pilot to draft'}).click();
+  await expect(page.getByText('Pass: Pilot: attend and learn',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Add study-group pilot to draft'})).toBeDisabled();
+  const testCard=page.locator('div').filter({has:page.getByText('Pass: Pilot: attend and learn',{exact:true})}).filter({has:page.getByRole('button',{name:'Inspect rehearsal'})}).last();
+  await testCard.getByRole('button',{name:'Inspect rehearsal'}).click();
+  await page.getByLabel('Expected energy (optional)').nth(2).fill('99');
+  setup.conflict();
+  await page.getByRole('button',{name:'Save and run rehearsal'}).click();
+  await expect(page.getByRole('alert').filter({hasText:'Revision conflict'})).toBeVisible();
+  await expect(page.getByLabel('Expected energy (optional)').nth(2)).toHaveValue('99');
+  expect(setup.commands.at(-1)).toMatchObject({action:'save',revision:2,kind:'scenarios'});
+  await testCard.getByText(/Step 3 · The space beside the notebook/).click();
+  await expect(testCard.getByRole('link',{name:'Open scene and choice attend'})).toHaveAttribute('href',/storylets\?id=/);
+});
+
+test("advanced rehearsal edits require explicit application and refresh from guided edits",async({page})=>{
+  const setup=await fixture(page);
+  await page.goto('/studio/content/review');
+  await page.getByRole('button',{name:'+ Rehearsal',exact:true}).click();
+  await page.getByLabel('Rehearsal name').fill('Afternoon energy');
+  await page.getByLabel('Expected energy (optional)').fill('70');
+  await page.getByRole('button',{name:'Edit advanced state and expectations'}).click();
+  await expect(page.getByLabel('Advanced rehearsal JSON')).toHaveValue(/"energy": 70/);
+  await page.getByLabel('Advanced rehearsal JSON').fill('{broken');
+  await page.getByRole('button',{name:'Apply advanced changes'}).click();
+  await expect(page.getByRole('button',{name:'Save and run rehearsal'})).toBeDisabled();
+  await page.getByRole('button',{name:'Discard advanced changes'}).click();
+  await page.getByRole('button',{name:'Save and run rehearsal'}).click();
+  await expect.poll(()=>setup.commands[0]).toMatchObject({action:'save',payload:{mode:'rehearsal',steps:[{action:'check',expect:{resources:{energy:70}}}]}});
+  await expect(page.getByText('Pass: Afternoon energy',{exact:true})).toBeVisible();
 });

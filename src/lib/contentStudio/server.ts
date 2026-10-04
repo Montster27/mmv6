@@ -1,4 +1,6 @@
 import "server-only";
+import { studyGroupPilot } from "@/core/studio/studyGroupPilot";
+import { STUDIO_KINDS } from "@/types/studio";
 import { assertImpactAcknowledged, planningImpact } from "@/core/studio/planning";
 import { NextResponse } from "next/server";
 import { supabaseServer as db } from "@/lib/supabase/server";
@@ -51,6 +53,20 @@ export function assertManifest(manifest: StudioManifest) {
     [...errors.slice(0, 8).map((issue) => `${issue.objectId}: ${issue.message}`), ...tests.filter((test) => !test.passed).map((test) => `${test.title}: ${test.failures.join(" ")}`)].join("\n"));
 }
 export async function handleStudioCommand(actor: StudioActor, action: string, payload: Record<string, unknown>) {
+  if (action === "pilot") {
+    const context = await workspaceContext(String(payload.workspace_id));
+    if (context.workspace.revision !== Number(payload.revision)) throw new StudioError("Workspace changed. Reload before adding the pilot.",409);
+    const pilot = studyGroupPilot(context.manifest);
+    const changes = STUDIO_KINDS.flatMap(kind => pilot[kind].map(record => ({kind,object_id:recordId(record),payload:record})));
+    if (changes.some(change => context.manifest[change.kind].some(record => recordId(record) === change.object_id))) throw new StudioError("This workspace already contains the study-group pilot. Open its plans instead of importing it again.",409);
+    const combined = overlayManifest(context.manifest, changes);
+    // Existing draft issues remain visible; the template itself must validate.
+    const pilotChecks = runStudioScenarios(combined).filter(test => pilot.scenarios.some(row => row.id === test.id));
+    if (pilotChecks.some(test => !test.passed)) throw new StudioError(pilotChecks.flatMap(test => test.failures).join("\n"));
+    const {data,error} = await db.rpc("studio_save_batch",{p_actor:actor.id,p_admin:actor.admin,p_workspace:context.workspace.id,p_revision:context.workspace.revision,p_changes:changes});
+    if (error) throw new StudioError(error.message,error.code === "40001" ? 409 : error.code === "42501" ? 403 : 400);
+    return data;
+  }
   if ((action === "create" || action === "meta") && payload.plan_id) {
     const manifest = action === "create" ? (await activeContext()).manifest : (await workspaceContext(String(payload.workspace_id))).manifest;
     if (!manifest.plans.some((plan) => recordId(plan) === payload.plan_id)) throw new StudioError("The selected plan is not in this baseline. Publish the plan first, or choose a current plan.", 409);

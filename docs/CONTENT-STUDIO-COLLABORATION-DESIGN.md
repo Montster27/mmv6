@@ -230,3 +230,10 @@ Recommended defaults:
 6. Keep mandatory outcomes limited to true world constraints. An approved plot promises possibilities and coherence, not player obedience.
 
 Questions with material cost consequences: expected team size; whether outside writers need restricted visibility; who has final authority over shared NPCs; whether live runs can remain on older content; and how much integration review time the team can sustain. These refine the design without preventing adoption of the defaults above.
+
+
+## October 4 implementation: playable contracts and rehearsals
+
+Delivered flag producer/consumer bindings, occurrence-scene calendar checks, bounded multi-scene track rehearsals, before/after failure traces, and a study-group collaboration template. Review, approval and publication rerun rehearsals against the exact proposed manifest. The template installs atomically using the existing revision/ownership/audit rules.
+
+See `CONTENT-STUDIO-TEAM-GUIDE.md` for the supported model and workflow. Deliberate limits: author clock-hour reservations are not engine appointment slots; authored track scene durations are not currently charged by the track resolver; practice requests do not imply completed training. Dialogue walks, routine weeks, probabilistic/identity mechanics and full consequence processing need further rehearsal adapters. The seven pilot paths isolate their scenes from the surrounding catalog. Real team assignment, independent editorial review and integrated catalog playtests remain distinct from a passing template test.

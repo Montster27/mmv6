@@ -62,4 +62,19 @@ await cmd(owner,'publish',{workspace_id:second.id,revision:7},true);
 assert.equal((await db.query('select title from storylets where id=$1',[freshId])).rows[0].title,'New scene','new identity was not materialized');
 assert.equal((await db.query('select count(*)::int as n from runtime_storylets($1)',[reviewer])).rows[0].n,2);
 console.log('PostgreSQL checks passed: migration, isolated drafts, revision conflicts, ownership, independent review, publication, run pinning, rollback, user isolation, stale baselines, reapproval, new identities.');
+
+await db.exec(readFileSync('supabase/migrations/20261004130000_studio_atomic_batch.sql','utf8'));
+const batchWorkspace = await cmd(owner,'create',{title:'Atomic pilot',reviewer_id:reviewer});
+const batch = (actor,revision,changes) => db.query('select studio_save_batch($1,false,$2,$3,$4::jsonb) as result',[actor,batchWorkspace.id,revision,JSON.stringify(changes)]);
+const planChange = {kind:'plans',object_id:'pilot-direction',payload:{id:'pilot-direction',title:'Pilot'}};
+await assert.rejects(batch(owner,1,[planChange,{kind:'invalid',object_id:'bad',payload:{id:'bad'}}]));
+assert.equal((await db.query('select revision from studio_workspaces where id=$1',[batchWorkspace.id])).rows[0].revision,1);
+assert.equal((await db.query('select count(*)::int as n from studio_changes where workspace_id=$1',[batchWorkspace.id])).rows[0].n,0);
+await assert.rejects(batch(other,1,[planChange]),/owner or contributor/);
+await batch(owner,1,[planChange,{kind:'scenarios',object_id:'pilot-test',payload:{id:'pilot-test',title:'Test'}}]);
+assert.equal((await db.query('select revision from studio_workspaces where id=$1',[batchWorkspace.id])).rows[0].revision,3);
+await assert.rejects(batch(owner,1,[planChange]),/Revision conflict/);
+assert.equal((await db.query("select has_function_privilege('authenticated','studio_save_batch(uuid,boolean,uuid,integer,jsonb)','EXECUTE') as allowed")).rows[0].allowed,false);
+console.log('Atomic batch checks passed: rollback, authorization, revision conflict, browser access denied.');
+
 await db.close();

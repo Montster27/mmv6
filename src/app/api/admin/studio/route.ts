@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   try {
     const actor = await studioActor(request);
     const { action, ...payload } = await request.json();
-    if (!["create", "meta", "save", "submit", "approve", "changes", "withdraw", "rebase", "publish", "activate", "comment", "member"].includes(action)) return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    if (!["create", "meta", "save", "pilot", "submit", "approve", "changes", "withdraw", "rebase", "publish", "activate", "comment", "member"].includes(action)) return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     return NextResponse.json(await handleStudioCommand(actor, action, payload));
   } catch (error) { return failure(error); }
 }
