@@ -1,3 +1,4 @@
+import { coerceStoryletRow } from "@/core/validation/storyletValidation";
 import { describe, expect, it } from 'vitest';
 import { emptyManifest, runStudioScenarios, validateManifest } from './manifest';
 import { studyGroupPilot } from './studyGroupPilot';
@@ -68,6 +69,11 @@ describe('multi-scene author rehearsals',()=>{
   });
 });
 describe('playable agreement bindings',()=>{
+  it('preserves persistent fact effects when a scene is loaded for authoring',()=>{
+    const m=fixture();
+    const loaded=coerceStoryletRow(m.storylets[0]);
+    expect(loaded.choices[0].sets_flag).toEqual(['pilot_study_accepted']);
+  });
   it('detects a changed producer, missing consumer and calendar drift',()=>{
     const m=fixture();expect(validateRuntimeBindings(m).filter(i=>i.severity==='error')).toEqual([]);
     (m.storylets[0].choices as StudioRecord[])[0].sets_flag=['wrong'];

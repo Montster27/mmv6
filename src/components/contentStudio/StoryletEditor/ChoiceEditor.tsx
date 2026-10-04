@@ -379,6 +379,7 @@ export function ChoiceEditor({
   );
 
   const narrativeCount = countSet(
+    choice.sets_flag?.length ? true : undefined,
     choice.identity_tags?.length ? true : undefined,
     choice.precludes?.length ? true : undefined,
     choice.sets_expired_opportunity,
@@ -553,6 +554,11 @@ export function ChoiceEditor({
             />
           </div>
 
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-1">Persistent facts set by this choice</p>
+            <TagEditor tags={choice.sets_flag ?? []} onChange={(tags) => onChange({ sets_flag: tags.length ? tags : undefined })} placeholder="Add gameplay flag…" />
+            <p className="mt-1 text-xs text-slate-500">Use the flag name from its shared-library fact. Once set, any track can require it in a later scene.</p>
+          </div>
           <div>
             <p className="text-xs font-medium text-slate-600 mb-1">
               Precludes (storylet slugs or states this choice blocks)

@@ -144,6 +144,8 @@ export type StoryletChoice = {
   /** Skill web: require minimum skill levels to show/enable this choice. */
   skill_web_requirements?: Array<{ skill: string; min_level: number }>;
   precludes?: string[];
+  /** Persistent cross-track facts set by a terminal choice. Separate from walk-local flags. */
+  sets_flag?: string[];
   relational_effects?: Record<string, Record<string, number>>;
   set_npc_memory?: Record<string, Record<string, boolean>>;
   condition?: Record<string, unknown>;

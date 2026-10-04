@@ -102,6 +102,7 @@ function coerceChoice(raw: unknown): StoryletChoice | null {
     reaction_with_skill: reactionWithSkill,
     practices_skills: practicesSkills,
     precludes,
+    sets_flag: Array.isArray(obj.sets_flag) ? obj.sets_flag.filter((flag): flag is string => typeof flag === "string") : undefined,
     relational_effects: relationalEffects,
     set_npc_memory: setNpcMemory,
     requires_resource: requiresResource,
